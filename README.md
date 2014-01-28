@@ -17,6 +17,7 @@ Wharfie accepts the following inputs to do a build:
 
 The build process is as follows:
 
+1. Wharfie pulls the source image if it is not already present on the system
 1. Wharfie creates a new docker container from the source image
 1. Wharfie bind-mounts the application source into `/usr/source` in the container
 1. Wharfie calls `/usr/bin/prepare` in the container
@@ -29,6 +30,21 @@ following scripts in `/usr/bin`:
 
 1. `prepare` : This script is responsible for building and/or deploying the source
 1. `run`: This script is responsible for running the deployed source
+
+### Incremental wharfie builds
+
+When you call `wharfie build` with the `--incremental` flag, the build process is as follows:
+
+1. Wharfie pulls the source image if it is not already present on the system
+1. Wharfie pulls the incremental build image if it is not already present on the system
+1. Wharfie creates a new docker container from the prior image, with a volume in `/usr/artifacts`
+1. Wharfie runs `/usr/bin/save-artifact` in this container
+1. Wharfie creates a new docker container from the source image, mounting the volumes from the
+   incremental build container
+1. Wharfie bind-mounts the application source into `/usr/source` in the container
+1. Wharfie runs `/usr/bin/restore-artifact` to restore the build context from the prior image
+1. Wharfie calls `/usr/bin/prepare` in the container
+1. Wharfie commits the container as a new image, setting the new image's command to `/usr/bin/run`
 
 There are two more scripts to implement to support incremental builds:
 
