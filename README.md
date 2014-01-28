@@ -18,10 +18,12 @@ Wharfie accepts the following inputs to do a build:
 The build process is as follows:
 
 1. Wharfie pulls the source image if it is not already present on the system
-1. Wharfie creates a new docker container from the source image
-1. Wharfie bind-mounts the application source into `/usr/source` in the container
-1. Wharfie calls `/usr/bin/prepare` in the container
-1. Wharfie commits the container as a new image, setting the new image's command to `/usr/bin/run`
+1. Wharfie generates a `Dockerfile` to describe the output image:
+    1. Based on the wharfie source image
+    1. Adds the application source at `/usr/source` in the container
+    1. Calls `/usr/bin/prepare` in the container
+    1. Sets the image's default command to `/usr/bin/run`
+1. Wharfie builds the new image from the `Dockerfile` using `docker build`
 
 ### Anatomy of a wharfie source image
 
@@ -51,3 +53,6 @@ There are two more scripts to implement to support incremental builds:
 1. `save-artifact`: This script is responsible for moving build dependencies to `/usr/artifacts`
 1. `restore-artifact`: This script is responsible for restoring a build environment from 
 `/usr/artifacts`
+
+### Getting started
+
