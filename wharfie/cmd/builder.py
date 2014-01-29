@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 import sys
 import docopt
 import docker
@@ -18,7 +19,7 @@ class Builder(object):
     Wharfie.
 
     Usage:
-        wharfie build IMAGE_NAME SOURCE_DIR [--incremental=OLD_IMAGE_NAME] [--user=USERID] [--url=URL]
+        wharfie build NEW_IMAGE_NAME IMAGE_NAME SOURCE_DIR [--incremental=OLD_IMAGE_NAME] [--user=USERID] [--url=URL]
         wharfie validate IMAGE_NAME [--supports-incremental] [--url=URL]
         wharfie --help
 
@@ -35,7 +36,8 @@ class Builder(object):
     def __init__(self):
         self.arguments = docopt.docopt(Builder.__doc__)
         self.docker_url = self.arguments['--url']
-        self.docker_client = docker.Client(base_url=self.docker_url)
+        # TODO: make timeout an option or smarter
+        self.docker_client = docker.Client(base_url=self.docker_url, timeout=1000)
         server_version = self.docker_client.version()
         print "Connected to Docker server version %s. Server linux kernel: %s" % \
               (server_version['Version'],server_version['KernelVersion'])
@@ -75,51 +77,68 @@ class Builder(object):
             self.docker_client.remove_container(container)
 
             if valid_image:
-                print("Looks good!")
+                print("%s passes source image validation" % image_name)
 
             return valid_image
         except docker.APIError as e:
             print("Error while creating container for image %s. %s" % (image_name, e.explanation))
             return False
 
-    def build(self, image_name, source_dir, incremental_image, user_id):
-        tmp_dir = tempfile.mkdtemp();
+    def build(self, new_image_name, image_name, source_dir, incremental_image, user_id):
+        tmp_dir = tempfile.mkdtemp()
+
         try:
             if incremental_image:
+                artifact_tmp_dir = os.path.join(tmp_dir, 'artifacts')
                 container = self.docker_client.create_container(image_name,
                                                                 ["/usr/bin/save-artifacts"],
                                                                 volumes={"/usr/artifacts": {}})
                 container_id = container['Id']
-                self.docker_client.start(container_id, binds={tmp_dir: "/usr/artifacts"})
+                self.docker_client.start(container_id, binds={artifact_tmp_dir: "/usr/artifacts"})
                 exitcode = self.client.wait(container_id)
                 self.docker_client.remove_container(container)
 
-            docker_file = ["FROM %s" % image_name]
-            docker_file.append("ADD %s /usr/src" % source_dir)
-            if incremental_image:
-                docker_file.append("ADD %s /usr/artifacts" % tmp_dir)
-            docker_file.append('RUN /usr/bin/prepare')
+            dockerfile_lines = ["FROM %s" % image_name]
 
-            script = io.BytesIO('\n'.join(docker_file).encode('ascii'))
-            img, logs = self.docker_client.build(fileobj=script)
+            build_context_source = os.path.join(tmp_dir, 'src')
+            shutil.copytree(source_dir, build_context_source)
+            dockerfile_lines.append("ADD ./src /usr/src/")
+
+            if incremental_image:
+                dockerfile_lines.append("ADD ./artifacts /usr/artifacts")
+
+            dockerfile_lines.append('RUN /usr/bin/prepare')
+            dockerfile_lines.append('CMD /usr/bin/run')
+            
+            dockerfile = open(os.path.join(tmp_dir, 'Dockerfile'), 'w+')
+            for line in dockerfile_lines:
+                print>>dockerfile, line
+            dockerfile.close()
+
+            print("Building new docker image")
+            img, logs = self.docker_client.build(tag=new_image_name, path=tmp_dir)
             print("Build logs: %s" % logs)
 
-            print("Image %s" % img)
+            print("Built image %s" % new_image_name)
         finally:
             shutil.rmtree(tmp_dir)
 
     def main(self):
+        image_name = self.arguments['IMAGE_NAME']
+
         if self.arguments['validate']:
-            self.validate_image(self.arguments['IMAGE_NAME'], self.arguments['--supports-incremental']);
+            self.validate_image(image_name, self.arguments['--supports-incremental']);
 
         if self.arguments['build']:
+            new_image_name = self.arguments['NEW_IMAGE_NAME']
+
             if self.arguments['--incremental']:
-                self.validate_image(self.arguments['IMAGE_NAME'], True);
+                self.validate_image(image_name, True);
                 self.validate_image(self.arguments['--incremental'], True);
             else:
-                self.validate_image(self.arguments['IMAGE_NAME'], False);
+                self.validate_image(image_name, False);
 
-            self.build(self.arguments['IMAGE_NAME'], self.arguments['SOURCE_DIR'], self.arguments['--incremental'],
+            self.build(new_image_name, image_name, self.arguments['SOURCE_DIR'], self.arguments['--incremental'],
                        self.arguments['--user'])
 
         self.docker_client.close()
