@@ -57,7 +57,7 @@ class Builder(object):
 
         image = self.docker_client.inspect_image(images[0]['Id'])
         if image['config']['Entrypoint']:
-            print("Image %s has a configured Entrypoint and is incompatible with wharfi" % image_name)
+            print("Image %s has a configured Entrypoint and is incompatible with wharfie" % image_name)
             return False
 
         valid_image = True
