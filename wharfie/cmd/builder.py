@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from colorama import *
 import os
 import sys
 import docopt
@@ -124,10 +125,15 @@ class Builder(object):
             print("Building new docker image")
             img, logs = self.docker_client.build(tag=tag, path=tmp_dir, rm=True)
             print("Build logs: %s" % logs)
-            if tag:
-                print("Built image %s" % tag)
+
+            if img is not None:
+                if tag:
+                    print("Built image %s" % tag)
+                else:
+                    print("Built image %s" % img)
             else:
-                print("Built image %s" % img)
+                print(Fore.RED + "Wharfie build failed.")
+
         finally:
             shutil.rmtree(tmp_dir)
 
