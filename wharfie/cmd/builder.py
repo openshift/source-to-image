@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 
 import sys
-import docopt;
-import docker;
-import time;
+import docopt
+import docker
+import io
+import tempfile
+import shutil
+from array import array
 
 """Wharfie is a tool for building reproducable Docker images.  Wharfie produces ready-to-run images by
 injecting a user source into a docker image and /preparing/ a new Docker image which incorporates
@@ -76,7 +79,30 @@ class Builder(object):
             return False
 
     def build(self, image_name, source_dir, incremental_image, user_id):
-        print("Building image:%s dir:%s incr-image:%s uid:%s" % (image_name, source_dir, incremental_image, user_id))
+        tmp_dir = tempfile.mkdtemp();
+        try:
+            if incremental_image:
+                container = self.docker_client.create_container(image_name,
+                                                                ["/usr/bin/save-artifacts"],
+                                                                volumes={"/usr/artifacts": {}})
+                container_id = container['Id']
+                self.docker_client.start(container_id, binds={tmp_dir: "/usr/artifacts"})
+                exitcode = self.client.wait(container_id)
+                self.docker_client.remove_container(container)
+
+            docker_file = array("FROM %s" % image_name)
+            docker_file.append("ADD %s /usr/src" % source_dir)
+            if incremental_image:
+                docker_file.append("ADD %s /usr/artifacts" % tmp_dir)
+            docker_file.append('RUN /usr/bin/prepare')
+
+            script = io.BytesIO('\n'.join(docker_file).encode('ascii'))
+            img, logs = self.docker_client.build(fileobj=script)
+            print("Build logs: %s" % logs)
+
+            print("Image %s" % img)
+        finally:
+            shutil.rmtree(tmp_dir)
 
     def main(self):
         if self.arguments['validate']:
@@ -93,6 +119,7 @@ class Builder(object):
                        self.arguments['--user'])
 
         self.docker_client.close()
+
 
 def main():
     builder = Builder()
