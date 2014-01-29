@@ -94,7 +94,7 @@ class Builder(object):
                 exitcode = self.client.wait(container_id)
                 self.docker_client.remove_container(container)
 
-            docker_file = array("FROM %s" % image_name)
+            docker_file = ["FROM %s" % image_name]
             docker_file.append("ADD %s /usr/src" % source_dir)
             if incremental_image:
                 docker_file.append("ADD %s /usr/artifacts" % tmp_dir)
