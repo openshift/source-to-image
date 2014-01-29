@@ -12,9 +12,11 @@ incremental builds which re-use previously downloaded dependencies, previously b
 """
 class Builder(object):
     """
+    Wharfie.
+
     Usage:
-        wharfie build IMAGE_NAME SOURCE_DIR [--incremental=OLD_IMAGE_NAME] [--user=USERID]
-        wharfie validate IMAGE_NAME [--supports-incremental]
+        wharfie build IMAGE_NAME SOURCE_DIR [--incremental=OLD_IMAGE_NAME] [--user=USERID] [--url=URL]
+        wharfie validate IMAGE_NAME [--supports-incremental] [--url=URL]
         wharfie --help
 
     Arguments:
@@ -24,11 +26,13 @@ class Builder(object):
     Options:
         --incremental=OLD_IMAGE_NAME    Perform an incremental build.
         --user=USERID                   Perform the build as specified user.
+        --url=URL                       Connect to docker at the specified url [default: unix://var/run/docker.sock]
         --help                          Print this help message.
     """
     def __init__(self):
         self.arguments = docopt.docopt(Builder.__doc__)
-        self.docker_client = docker.Client("http://10.211.55.27:5555")
+        self.docker_url = self.arguments['--url']
+        self.docker_client = docker.Client(base_url=self.docker_url)
         server_version = self.docker_client.version()
         print "Connected to Docker server version %s. Server linux kernel: %s" % \
               (server_version['Version'],server_version['KernelVersion'])
