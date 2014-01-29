@@ -65,7 +65,7 @@ class Builder(object):
         if should_support_incremental:
             required_files += ['/usr/bin/save-artifacts']
         try:
-            container = self.docker_client.create_container(image_name)
+            container = self.docker_client.create_container(image_name, command='true')
             container_id = container['Id']
             for f in required_files:
                 if not self.check_file_exists(container_id, f):
