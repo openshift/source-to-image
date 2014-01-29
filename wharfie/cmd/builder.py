@@ -9,7 +9,7 @@ import shutil
 from array import array
 
 """Wharfie is a tool for building reproducable Docker images.  Wharfie produces ready-to-run images by
-injecting a user source into a docker image and /preparing/ a new Docker image which incorporates
+injecting a user source into a docker image and preparing a new Docker image which incorporates
 the base image and built source, and is ready to use with `docker run`.  Wharfie supports
 incremental builds which re-use previously downloaded dependencies, previously built artifacts, etc.
 """
@@ -73,6 +73,10 @@ class Builder(object):
                     print("Invalid image: file %s is missing." % f)
             self.docker_client.stop(container)
             self.docker_client.remove_container(container)
+
+            if valid_image:
+                print("Looks good!")
+
             return valid_image
         except docker.APIError as e:
             print("Error while creating container for image %s. %s" % (image_name, e.explanation))
