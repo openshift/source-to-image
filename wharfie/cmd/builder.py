@@ -140,9 +140,9 @@ class Builder(object):
         image_name = self.arguments['IMAGE_NAME']
         try:
             if self.arguments['validate']:
-                self.validate_image(image_name, self.arguments['--supports-incremental']);
-
-            if self.arguments['build']:
+                if not self.validate_image(image_name, self.arguments['--supports-incremental']):
+                    return -1
+            elif self.arguments['build']:
                 tag = self.arguments['--tag']
 
                 if self.arguments['--incremental']:
