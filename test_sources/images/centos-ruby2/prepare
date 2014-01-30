@@ -1,9 +1,15 @@
-#!/bin/sh
+#!/bin/bash -x
 
 PATH=/opt/rbenv/bin:/opt/ruby/bin:$PATH
 eval "$(rbenv init -)"
 
 set -e
+
+if [ -e /usr/artifacts/gems.tgz ]; then
+  pushd /;
+  tar zxvf /usr/artifacts/gems.tgz;
+  popd;
+fi
 
 echo "Building your $tarball"
 mkdir -p /opt/ruby/source/
