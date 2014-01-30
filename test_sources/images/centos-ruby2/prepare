@@ -1,0 +1,12 @@
+#!/bin/sh
+
+PATH=/opt/rbenv/bin:/opt/ruby/bin:$PATH
+eval "$(rbenv init -)"
+
+set -e
+
+echo "Building your $tarball"
+mkdir -p /opt/ruby/source/
+cd /opt/ruby/source/
+cp -Rf /usr/src/* .
+GEM_HOME=/opt/ruby bundle install --path /opt/ruby/bundle/

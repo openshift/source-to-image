@@ -1,0 +1,5 @@
+#!/bin/sh
+
+PATH=/opt/rbenv/bin:/opt/openshift/bin:$PATH
+eval "$(rbenv init -)"
+GEM_HOME=/opt/ruby $@
