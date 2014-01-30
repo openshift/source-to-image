@@ -127,10 +127,9 @@ class Builder(object):
             print("Build logs: %s" % logs)
 
             if img is not None:
-                if tag:
-                    print("Built image %s" % tag)
-                else:
-                    print("Built image %s" % img)
+                built_image_name = tag or img
+
+                print(Fore.GREEN + "Built image %s" % built_image_name)
             else:
                 print(Fore.RED + "Wharfie build failed.")
 
