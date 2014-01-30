@@ -1,4 +1,3 @@
 #!/bin/bash
 
-mkdir /wharfie-fake
 touch /wharfie-fake/run-invoked
