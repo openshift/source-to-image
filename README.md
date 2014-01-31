@@ -27,7 +27,7 @@ The build process is as follows:
 
 ### Philosophy
 
-1. Simplify the process of source -> image for most use cases (the 80%)
+1. Simplify the process of source + base image -> usable image for most use cases (the 80%)
 2. Define and implement a workflow for incremental build that eventually uses only docker primitives
 3. Develop tooling that can assist in verifying that two different base images result in the same "docker run" outcome for the same input
 4. Use native docker primitives to accomplish this - map out useful improvements to docker build that benefit all image builders
