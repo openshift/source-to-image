@@ -10,23 +10,23 @@ import shutil
 import time
 import logging
 
-"""Wharfie is a tool for building reproducable Docker images.  Wharfie produces ready-to-run images by
+"""STI is a tool for building reproducable Docker images.  STI produces ready-to-run images by
 injecting a user source into a docker image and preparing a new Docker image which incorporates
-the base image and built source, and is ready to use with `docker run`.  Wharfie supports
+the base image and built source, and is ready to use with `docker run`.  STI supports
 incremental builds which re-use previously downloaded dependencies, previously built artifacts, etc.
 """
 class Builder(object):
     """
-    Wharfie.
+    Docker Source to Image.
 
     Usage:
-        wharfie build IMAGE_NAME SOURCE_DIR [--tag=BUILD_TAG] [--incremental=PREV_BUILD]
+        sti build IMAGE_NAME SOURCE_DIR [--tag=BUILD_TAG] [--incremental=PREV_BUILD]
             [--user=USERID] [--url=URL] [--timeout=TIMEOUT] [-e ENV_NAME=VALUE]... [-l LOG_LEVEL]
-        wharfie validate IMAGE_NAME [--supports-incremental] [--url=URL] [--timeout=TIMEOUT] [-l LOG_LEVEL]
-        wharfie --help
+        sti validate IMAGE_NAME [--supports-incremental] [--url=URL] [--timeout=TIMEOUT] [-l LOG_LEVEL]
+        sti --help
 
     Arguments:
-        IMAGE_NAME      Source image name. Wharfie will pull this image if not available locally.
+        IMAGE_NAME      Source image name. STI will pull this image if not available locally.
         SOURCE_DIR      Directory containing your application sources.
 
     Options:
@@ -77,7 +77,7 @@ class Builder(object):
 
         image = self.docker_client.inspect_image(images[0]['Id'])
         if image['config']['Entrypoint']:
-            self.logger.critical("Image %s has a configured Entrypoint and is incompatible with wharfie" , image_name)
+            self.logger.critical("Image %s has a configured Entrypoint and is incompatible with sti" , image_name)
             return False
 
         valid_image = True
@@ -145,7 +145,7 @@ class Builder(object):
                 built_image_name = tag or img
                 self.logger.info("%s Built image %s %s" , Fore.GREEN, built_image_name, Fore.RESET)
             else:
-                self.logger.critical("%s Wharfie build failed. %s", Fore.RED, Fore.RESET)
+                self.logger.critical("%s STI build failed. %s", Fore.RED, Fore.RESET)
 
         finally:
             shutil.rmtree(tmp_dir)
