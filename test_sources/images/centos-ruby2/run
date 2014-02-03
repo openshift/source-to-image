@@ -2,4 +2,4 @@
 
 PATH=/opt/rbenv/bin:/opt/ruby/bin:$PATH
 eval "$(rbenv init -)"
-GEM_HOME=/opt/ruby bundle exec rackup
+GEM_HOME=/opt/ruby exec bundle exec rackup
