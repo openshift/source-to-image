@@ -30,6 +30,7 @@ class Builder(object):
         SOURCE_DIR      Directory containing your application sources.
 
     Options:
+        --build-image=BUILD_IMAGE_NAME  Perform the source build in the named build image
         --clean                         Do a clean build, ie. do not re-use the context from an earlier build
         -l LOG_LEVEL                    Logging level. Default: INFO
         --tag=BUILD_TAG                 Image will be tagged with provided name after a successful build.
@@ -125,14 +126,14 @@ class Builder(object):
         if validate_incremental:
             required_files += ['/usr/bin/save-artifacts']
 
-        valid_image = self.validate_container(container_id, required_files)
+        valid_image = self.validate_required_files(container_id, required_files)
 
         if valid_image:
             self.logger.debug("%s passes source image validation" , image_name)
 
         return valid_image
 
-    def validate_container(self, container_id, required_files=[]):
+    def validate_required_files(self, container_id, required_files=[]):
         valid_image = True
 
         for f in required_files:
@@ -154,11 +155,13 @@ class Builder(object):
             self.logger.critical("Error while detecting whether image %s supports incremental build" % image_name)
             return False
 
-    def direct_build(self, image_name, source_dir, incremental_image, user_id, tag, envs=[]):
+    def direct_build(self, image_name, source_dir, incremental_build, user_id, tag, envs=[]):
         tmp_dir = tempfile.mkdtemp()
 
         try:
-            if incremental_image:
+            if incremental_build:
+                # TODO: detect whether incremental image exists
+                incremental_image = "%s-app" % image_name
                 self.logger.debug("Saving data from %s for incremental build" , incremental_image)
                 artifact_tmp_dir = os.path.join(tmp_dir, 'artifacts')
                 os.mkdir(artifact_tmp_dir)
@@ -211,16 +214,22 @@ class Builder(object):
             shutil.rmtree(tmp_dir)
             pass
 
+    def indirect_build(self, build_image, runtime_image, clean, user_id, tag, envs=[]):
+        pass
+
     def main(self):
-        runtime_image_name = self.arguments['IMAGE_NAME']
+        runtime_image = self.arguments['IMAGE_NAME']
+        build_image = self.arguments['--build-image']
         validations = []
+
         try:
             if self.arguments['validate']:
-                validations.append(ImageValidationRequest('Target image', runtime_image_name, self.arguments['--supports-incremental']))
+                validations.append(ImageValidationRequest('Target image', runtime_image, self.arguments['--supports-incremental']))
             elif self.arguments['build']:
-                validations.append(ImageValidationRequest('Runtime image', runtime_image_name))
-                build_image_name = self.arguments['--build-image']
-                validations.append(ImageValidationRequest('Build image', runtime_image_name))
+                if build_image:
+                    validations.append(ImageValidationRequest('Build image', build_image, True))
+
+                validations.append(ImageValidationRequest('Runtime image', runtime_image))
 
             if not self.validate_images(validations):
                 return -1
@@ -228,10 +237,20 @@ class Builder(object):
             if self.arguments['validate']:
                 return 0
 
-            tag = self.arguments['--tag']
+            source      = self.arguments['SOURCE_DIR']
+            tag         = self.arguments['--tag']
+            clean_build = self.arguments['--clean']
+            user        = self.arguments['--user']
+            env_str     = self.arguments['ENV_NAME=VALUE']
+            incremental = False
 
-            self.direct_build(image_name, self.arguments['SOURCE_DIR'], self.arguments['--incremental'],
-                              self.arguments['--user'], tag, self.arguments['ENV_NAME=VALUE'])
+            if not clean_build and not build_image:
+                incremental = self.detect_incremental_build(runtime_image)
+
+            if build_image:
+                self.indirect_build(build_image, runtime_image, source, incremental, usr, tag, env_str)
+            else:
+                self.direct_build(runtime_image, source, clean_build, user, tag, env_str)
         finally:
             self.docker_client.close()
 
