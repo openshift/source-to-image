@@ -114,11 +114,11 @@ class Builder(object):
     def validate_image(self, image_name, container_id, validate_incremental):
         images = self.docker_client.images(image_name)
 
-        if images.__len__ < 1:
+        if images.__len__() < 1:
             self.logger.critical("Couldn't find image %s" % image_name)
             return False
 
-        image = self.docker_client.inspect_image(images[0])
+        image = self.docker_client.inspect_image(images[0]['Id'])
 
         if image['config']['Entrypoint']:
             self.logger.critical("Image %s has a configured Entrypoint and is incompatible with sti" , image_name)
@@ -167,22 +167,22 @@ class Builder(object):
                 self.logger.critical("%s command failed (%i)", git_clone_cmd, e.returncode)
                 return False
         else:
-            shutil.copytree(source, build_context_source)
+            shutil.copytree(source, target_source_dir)
 
     def save_artifacts(self, image_name, target_dir):
         self.logger.debug("Saving data from image %s for incremental build" , image_name)
-        container = self.docker_client.create_container(incremental_image,
+        container = self.docker_client.create_container(image_name,
                                                         ["/usr/bin/save-artifacts"],
                                                         volumes={"/usr/artifacts": {}})
         container_id = container['Id']
-        self.docker_client.start(container_id, binds={artifact_tmp_dir: "/usr/artifacts"})
+        self.docker_client.start(container_id, binds={target_dir: "/usr/artifacts"})
         exitcode = self.docker_client.wait(container_id)
         # TODO: error handling
         self.logger.debug(self.docker_client.logs(container_id))
         time.sleep(1)
         self.docker_client.remove_container(container_id)
 
-    def build_deployable_image(self, image_name, context_dir, envs, incremental=False):
+    def build_deployable_image(self, image_name, context_dir, tag, envs, incremental=False):
         with open(os.path.join(context_dir, 'Dockerfile'), 'w+') as docker_file:
             docker_file.write("FROM %s\n" % image_name)
             docker_file.write('ADD ./src /usr/src/\n')
@@ -213,7 +213,7 @@ class Builder(object):
 
             build_context_source = os.path.join(tmp_dir, 'src')
             self.prepare_source_dir(source_dir, build_context_source)
-            img = self.build_deployable_image(iamge_name, tmp_dir, envs, incremental_build)
+            img = self.build_deployable_image(image_name, tmp_dir, tag, envs, incremental_build)
 
             if img is not None:
                 built_image_name = tag or img
@@ -237,7 +237,7 @@ class Builder(object):
             if not clean_build:
                 self.pull_image(build_image_tag)
                 images = self.docker_client.images(build_image_tag)
-                if images.__len__ < 1:
+                if images.__len__() < 1:
                     # TODO: handle better?
                     clean_build = True
                 else:
@@ -259,7 +259,7 @@ class Builder(object):
 
             build_context_source = os.path.join(tmp_dir, 'src')
             self.prepare_source_dir(output_source_dir, build_context_source)
-            img = self.build_deployable_image(runtime_image, tmp_dir, envs)
+            img = self.build_deployable_image(runtime_image, tmp_dir, tag, envs)
 
             if img is not None:
                 built_image_name = tag or img
@@ -306,9 +306,9 @@ class Builder(object):
                 incremental = self.detect_incremental_build(runtime_image)
 
             if build_image:
-                self.indirect_build(build_image, runtime_image, source, incremental, usr, tag, env_str)
+                self.indirect_build(build_image, runtime_image, source, clean_build, usr, tag, env_str)
             else:
-                self.direct_build(runtime_image, source, clean_build, user, tag, env_str)
+                self.direct_build(runtime_image, source, incremental, user, tag, env_str)
         finally:
             self.docker_client.close()
 

@@ -8,6 +8,7 @@ def run_command(command):
     print("Running command \"%s\"" % command)
     p = subprocess.Popen(command, shell=True, bufsize=0)
     p.wait()
+    print "output: %s" % p.stdout
     return p.returncode
 
 def make_docker_client(url='unix://var/run/docker.sock', timeout=60):
@@ -17,21 +18,21 @@ def make_docker_client(url='unix://var/run/docker.sock', timeout=60):
     return docker_client
 
 class TestBuilder:
-    def build_source_image(self, image_name):
+    def build_source_image(self, image_name, tag=None):
         print("Building source image %s" % image_name)
         image_path = "test_sources/images/%s" % image_name
-        test_image_tag = "sti-test/%s" % image_name
+        test_image_tag = tag or "sti-test/%s" % image_name
         img, logs = self.docker_client.build(path=image_path, rm=True, tag=test_image_tag)
         print("Build logs: %s" % logs)
         assert (img is not None), "Source image docker build failed"
         return test_image_tag
 
     def basic_build(self, source_image, application_source, tag):
-        exitcode = run_command("sti build %s %s --tag %s" % (source_image, application_source, tag))
+        exitcode = run_command("sti build %s %s --tag %s --clean" % (source_image, application_source, tag))
         assert exitcode == 0, 'build failed'
 
-    def incremental_build(self, source_image, prev_image, application_source, tag):
-        exitcode = run_command("sti build %s %s --tag %s --incremental %s" % (source_image, application_source, tag, prev_image))
+    def incremental_build(self, source_image, application_source, tag):
+        exitcode = run_command("sti build %s %s --tag %s" % (source_image, application_source, tag))
         assert exitcode == 0, 'build failed'
 
     def run_sti_product(self, image_name):
@@ -79,6 +80,8 @@ class TestBuilder:
 
         test_image_tag = self.build_source_image('sti-fake')
         # use the sti-fake image as its own previous build
-        self.incremental_build(test_image_tag, test_image_tag, app_source, sti_build_tag)
+        self.build_source_image('sti-fake', 'test/sti-incremental-app')
+
+        self.incremental_build(test_image_tag, app_source, sti_build_tag)
         container_id = self.run_sti_product(sti_build_tag)
         self.check_incremental_build_state(container_id)
