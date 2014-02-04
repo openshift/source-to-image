@@ -182,6 +182,26 @@ class Builder(object):
         time.sleep(1)
         self.docker_client.remove_container(container_id)
 
+    def build_deployable_image(self, image_name, context_dir, envs, incremental=False):
+        with open(os.path.join(context_dir, 'Dockerfile'), 'w+') as docker_file:
+            docker_file.write("FROM %s\n" % image_name)
+            docker_file.write('ADD ./src /usr/src/\n')
+            if incremental:
+                docker_file.write('ADD ./artifacts /usr/artifacts/\n')
+            for env in envs:
+                env = env.split("=")
+                name = env[0]
+                value = env[1]
+                docker_file.write("ENV %s %s\n" % (name, value))
+            docker_file.write('RUN /usr/bin/prepare\n')
+            docker_file.write('CMD /usr/bin/run\n')
+
+        self.logger.debug("Building new docker image")
+        img, logs = self.docker_client.build(tag=tag, path=context_dir, rm=True)
+        self.logger.debug("Build logs: %s" , logs)
+
+        return img
+
     def direct_build(self, image_name, source_dir, incremental_build, user_id, tag, envs=[]):
         tmp_dir = tempfile.mkdtemp()
 
@@ -193,24 +213,7 @@ class Builder(object):
 
             build_context_source = os.path.join(tmp_dir, 'src')
             self.prepare_source_dir(source_dir, build_context_source)
-
-            # TODO: extract utility method
-            with open(os.path.join(tmp_dir, 'Dockerfile'), 'w+') as docker_file:
-                docker_file.write("FROM %s\n" % image_name)
-                docker_file.write('ADD ./src /usr/src/\n')
-                if incremental_image:
-                    docker_file.write('ADD ./artifacts /usr/artifacts/\n')
-                for env in envs:
-                    env = env.split("=")
-                    name = env[0]
-                    value = env[1]
-                    docker_file.write("ENV %s %s\n" % (name, value))
-                docker_file.write('RUN /usr/bin/prepare\n')
-                docker_file.write('CMD /usr/bin/run\n')
-
-            self.logger.debug("Building new docker image")
-            img, logs = self.docker_client.build(tag=tag, path=tmp_dir, rm=True)
-            self.logger.debug("Build logs: %s" , logs)
+            img = self.build_deployable_image(iamge_name, tmp_dir, envs, incremental_build)
 
             if img is not None:
                 built_image_name = tag or img
@@ -256,22 +259,7 @@ class Builder(object):
 
             build_context_source = os.path.join(tmp_dir, 'src')
             self.prepare_source_dir(output_source_dir, build_context_source)
-
-            # TODO: extract utility method
-            with open(os.path.join(tmp_dir, 'Dockerfile'), 'w+') as docker_file:
-                docker_file.write("FROM %s\n" % image_name)
-                docker_file.write('ADD ./src /usr/src/\n')
-                for env in envs:
-                    env = env.split("=")
-                    name = env[0]
-                    value = env[1]
-                    docker_file.write("ENV %s %s\n" % (name, value))
-                docker_file.write('RUN /usr/bin/prepare\n')
-                docker_file.write('CMD /usr/bin/run\n')
-
-            self.logger.debug("Building new docker image")
-            img, logs = self.docker_client.build(tag=tag, path=tmp_dir, rm=True)
-            self.logger.debug("Build logs: %s" , logs)
+            img = self.build_deployable_image(runtime_image, tmp_dir, envs)
 
             if img is not None:
                 built_image_name = tag or img
