@@ -9,6 +9,8 @@ import tempfile
 import shutil
 import time
 import logging
+import subprocess
+import re
 
 """STI is a tool for building reproducable Docker images.  STI produces ready-to-run images by
 injecting a user source into a docker image and preparing a new Docker image which incorporates
@@ -27,7 +29,7 @@ class Builder(object):
 
     Arguments:
         IMAGE_NAME      Source image name. STI will pull this image if not available locally.
-        SOURCE_DIR      Directory containing your application sources.
+        SOURCE_DIR      Directory or GIT repository containing your application sources.
 
     Options:
         --incremental=PREV_BUILD        Perform an incremental build. PREV_BUILD specified the previous built image.
@@ -122,7 +124,17 @@ class Builder(object):
                 time.sleep(1)
                 self.docker_client.remove_container(container_id)
             build_context_source = os.path.join(tmp_dir, 'src')
-            shutil.copytree(source_dir, build_context_source)
+
+            if re.match('^(http(s?)|git|file)://', source_dir):
+                git_clone_cmd = "git clone --quiet %s %s" %(source_dir, build_context_source)
+                try:
+                    self.logger.debug("Fetching %s", source_dir)
+                    subprocess.check_output(git_clone_cmd, stderr=subprocess.STDOUT, shell=True)
+                except subprocess.CalledProcessError as e:
+                    self.logger.critical("%s command failed (%i)", git_clone_cmd, e.returncode)
+                    return False
+            else:
+                shutil.copytree(source_dir, build_context_source)
 
             with open(os.path.join(tmp_dir, 'Dockerfile'), 'w+') as docker_file:
                 docker_file.write("FROM %s\n" % image_name)
