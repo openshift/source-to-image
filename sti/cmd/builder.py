@@ -9,8 +9,6 @@ import tempfile
 import shutil
 import time
 import logging
-import subprocess
-import re
 
 """STI is a tool for building reproducable Docker images.  STI produces ready-to-run images by
 injecting a user source into a docker image and preparing a new Docker image which incorporates
@@ -22,17 +20,17 @@ class Builder(object):
     Docker Source to Image.
 
     Usage:
-        sti build IMAGE_NAME SOURCE_DIR [--tag=BUILD_TAG] [--incremental=PREV_BUILD]
+        sti build IMAGE_NAME SOURCE_DIR --tag=BUILD_TAG [--build-image=BUILD_IMAGE_NAME] [--clean]
             [--user=USERID] [--url=URL] [--timeout=TIMEOUT] [-e ENV_NAME=VALUE]... [-l LOG_LEVEL]
         sti validate IMAGE_NAME [--supports-incremental] [--url=URL] [--timeout=TIMEOUT] [-l LOG_LEVEL]
         sti --help
 
     Arguments:
         IMAGE_NAME      Source image name. STI will pull this image if not available locally.
-        SOURCE_DIR      Directory or GIT repository containing your application sources.
+        SOURCE_DIR      Directory containing your application sources.
 
     Options:
-        --incremental=PREV_BUILD        Perform an incremental build. PREV_BUILD specified the previous built image.
+        --clean                         Do a clean build, ie. do not re-use the context from an earlier build
         -l LOG_LEVEL                    Logging level. Default: INFO
         --tag=BUILD_TAG                 Image will be tagged with provided name after a successful build.
         --timeout=TIMEOUT               Timeout commands if they take too long. Default: 120 seconds.
@@ -69,7 +67,7 @@ class Builder(object):
         except docker.APIError as e:
             return False
 
-    def validate_image(self, image_name, should_support_incremental):
+    def pull_image(self, image_name):
         images = self.docker_client.images(image_name)
         if images.__len__() == 0:
             self.logger.warn("Image %s not found in local registry. Pulling from remote." , image_name)
@@ -77,36 +75,86 @@ class Builder(object):
         else:
             self.logger.debug("Image %s is available in local registry" % image_name)
 
-        image = self.docker_client.inspect_image(images[0]['Id'])
-        if image['config']['Entrypoint']:
-            self.logger.critical("Image %s has a configured Entrypoint and is incompatible with sti" , image_name)
-            return False
-
-        valid_image = True
-        required_files = ['/usr/bin/prepare', '/usr/bin/run']
-        if should_support_incremental:
-            required_files += ['/usr/bin/save-artifacts']
+    def container_from_image(self, image_name):
         try:
             container = self.docker_client.create_container(image_name, command='/bin/true')
             container_id = container['Id']
             self.docker_client.start(container_id)
             exitcode = self.docker_client.wait(container_id)
-            for f in required_files:
-                if not self.check_file_exists(container_id, f):
-                    valid_image = False
-                    self.logger.critical("Invalid image: file %s is missing." , f)
             time.sleep(1)
-            self.docker_client.remove_container(container_id)
 
-            if valid_image:
-                self.logger.debug("%s passes source image validation" , image_name)
-
-            return valid_image
+            return container_id
         except docker.APIError as e:
             self.logger.critical("Error while creating container for image %s. %s" , image_name, e.explanation)
+            return None
+
+    def remove_container(self, container_id):
+        self.docker_client.remove_container(container_id)
+
+    def validate_images(self, requests=[]):
+        for request in requests:
+            image_name = request.image_name
+            self.pull_image(image_name)
+            container_id = self.container_from_image(image_name)
+
+            if not container_id:
+                return False
+
+            valid = self.validate_image(image_name, container_id, request.validate_incremental)
+            self.remove_container(container_id)
+
+            if not valid:
+                self.logger.critical("%s %s failed validation %s" % (Fore.RED, request.description, Fore.RESET))
+                return False
+        return True
+
+    def validate_image(self, image_name, container_id, validate_incremental):
+        images = self.docker_client.images(image_name)
+
+        if len(images) < 1:
+            self.logger.critical("Couldn't find image %s" % image_name)
             return False
 
-    def build(self, image_name, source_dir, incremental_image, user_id, tag, envs=[]):
+        image = self.docker_client.inspect_image(images[0])
+
+        if image['config']['Entrypoint']:
+            self.logger.critical("Image %s has a configured Entrypoint and is incompatible with sti" , image_name)
+            return False
+
+        required_files = ['/usr/bin/prepare', '/usr/bin/run']
+        if validate_incremental:
+            required_files += ['/usr/bin/save-artifacts']
+
+        valid_image = self.validate_container(container_id, required_files)
+
+        if valid_image:
+            self.logger.debug("%s passes source image validation" , image_name)
+
+        return valid_image
+
+    def validate_container(self, container_id, required_files=[]):
+        valid_image = True
+
+        for f in required_files:
+            if not self.check_file_exists(container_id, f):
+                valid_image = False
+                self.logger.critical("Invalid image: file %s is missing." , f)
+
+        return valid_image
+
+    def detect_incremental_build(self, image_name):
+        container_id = self.container_from_image(image_name)
+
+        try:
+            result = self.check_file_exists(container_id, '/usr/bin/save-artifacts')
+            self.remove_container(container_id)
+
+            return result
+        except docker.APIError as e:
+            self.logger.critical("Error while detecting whether image %s supports incremental build" % image_name)
+            return False
+
+    def direct_build(self, image_name, source_dir, incremental_image, user_id, tag, envs=[]):
         tmp_dir = tempfile.mkdtemp()
 
         try:
@@ -164,27 +212,34 @@ class Builder(object):
             pass
 
     def main(self):
-        image_name = self.arguments['IMAGE_NAME']
+        runtime_image_name = self.arguments['IMAGE_NAME']
+        validations = []
         try:
             if self.arguments['validate']:
-                if not self.validate_image(image_name, self.arguments['--supports-incremental']):
-                    return -1
+                validations.append(ImageValidationRequest('Target image', runtime_image_name, self.arguments['--supports-incremental']))
             elif self.arguments['build']:
-                tag = self.arguments['--tag']
+                validations.append(ImageValidationRequest('Runtime image', runtime_image_name))
+                build_image_name = self.arguments['--build-image']
+                validations.append(ImageValidationRequest('Build image', runtime_image_name))
 
-                if self.arguments['--incremental']:
-                    if ((not self.validate_image(image_name, True)) or
-                            (not self.validate_image(self.arguments['--incremental'], True))):
-                        return -1
-                else:
-                    if not self.validate_image(image_name, False):
-                        return -1
+            if not self.validate_images(validations):
+                return -1
 
-                self.build(image_name, self.arguments['SOURCE_DIR'], self.arguments['--incremental'],
-                           self.arguments['--user'], tag, self.arguments['ENV_NAME=VALUE'])
+            if self.arguments['validate']:
+                return 0
+
+            tag = self.arguments['--tag']
+
+            self.direct_build(image_name, self.arguments['SOURCE_DIR'], self.arguments['--incremental'],
+                              self.arguments['--user'], tag, self.arguments['ENV_NAME=VALUE'])
         finally:
             self.docker_client.close()
 
+class ImageValidationRequest:
+    def __init__(self, description, image_name, validate_incremental=False):
+        self.description = description
+        self.image_name = image_name
+        self.validate_incremental = validate_incremental
 
 def main():
     builder = Builder()
