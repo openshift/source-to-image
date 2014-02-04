@@ -1,3 +1,6 @@
-#!/bin/bash -x
+#!/bin/bash
 
-exec /usr/mock/mock_server.rb 0.0.0.0 /usr/mock/source/
+CONTAINER_IP_ADDR=$(ip a s | sed -ne '/127.0.0.1/!{s/^[ \t]*inet[ \t]*\([0-9.]\+\)\/.*$/\1/p}')
+
+set -x
+exec /usr/mock/mock_server.rb ${CONTAINER_IP_ADDR} /usr/mock/source/
