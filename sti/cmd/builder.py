@@ -9,6 +9,8 @@ import tempfile
 import shutil
 import time
 import logging
+import subprocess
+import re
 
 """STI is a tool for building reproducable Docker images.  STI produces ready-to-run images by
 injecting a user source into a docker image and preparing a new Docker image which incorporates
@@ -27,7 +29,7 @@ class Builder(object):
 
     Arguments:
         IMAGE_NAME      Source image name. STI will pull this image if not available locally.
-        SOURCE_DIR      Directory containing your application sources.
+        SOURCE_DIR      Directory or GIT repository containing your application sources.
 
     Options:
         --build-image=BUILD_IMAGE_NAME  Perform the source build in the named build image
@@ -112,7 +114,7 @@ class Builder(object):
     def validate_image(self, image_name, container_id, validate_incremental):
         images = self.docker_client.images(image_name)
 
-        if len(images) < 1:
+        if images.__len__ < 1:
             self.logger.critical("Couldn't find image %s" % image_name)
             return False
 
@@ -155,38 +157,44 @@ class Builder(object):
             self.logger.critical("Error while detecting whether image %s supports incremental build" % image_name)
             return False
 
+    def prepare_source_dir(self, source, target_source_dir):
+        if re.match('^(http(s?)|git|file)://', source):
+            git_clone_cmd = "git clone --quiet %s %s" %(source, build_context_source)
+            try:
+                self.logger.debug("Fetching %s", source)
+                subprocess.check_output(git_clone_cmd, stderr=subprocess.STDOUT, shell=True)
+            except subprocess.CalledProcessError as e:
+                self.logger.critical("%s command failed (%i)", git_clone_cmd, e.returncode)
+                return False
+        else:
+            shutil.copytree(source, build_context_source)
+
+    def save_artifacts(self, image_name, target_dir):
+        self.logger.debug("Saving data from image %s for incremental build" , image_name)
+        container = self.docker_client.create_container(incremental_image,
+                                                        ["/usr/bin/save-artifacts"],
+                                                        volumes={"/usr/artifacts": {}})
+        container_id = container['Id']
+        self.docker_client.start(container_id, binds={artifact_tmp_dir: "/usr/artifacts"})
+        exitcode = self.docker_client.wait(container_id)
+        # TODO: error handling
+        self.logger.debug(self.docker_client.logs(container_id))
+        time.sleep(1)
+        self.docker_client.remove_container(container_id)
+
     def direct_build(self, image_name, source_dir, incremental_build, user_id, tag, envs=[]):
         tmp_dir = tempfile.mkdtemp()
 
         try:
             if incremental_build:
-                # TODO: detect whether incremental image exists
-                incremental_image = "%s-app" % image_name
-                self.logger.debug("Saving data from %s for incremental build" , incremental_image)
                 artifact_tmp_dir = os.path.join(tmp_dir, 'artifacts')
                 os.mkdir(artifact_tmp_dir)
-                container = self.docker_client.create_container(incremental_image,
-                                                                ["/usr/bin/save-artifacts"],
-                                                                volumes={"/usr/artifacts": {}})
-                container_id = container['Id']
-                self.docker_client.start(container_id, binds={artifact_tmp_dir: "/usr/artifacts"})
-                exitcode = self.docker_client.wait(container_id)
-                self.logger.debug(self.docker_client.logs(container_id))
-                time.sleep(1)
-                self.docker_client.remove_container(container_id)
+                self.save_artifacts(tag, artifact_tmp_dir)
+
             build_context_source = os.path.join(tmp_dir, 'src')
+            self.prepare_source_dir(source_dir, build_context_source)
 
-            if re.match('^(http(s?)|git|file)://', source_dir):
-                git_clone_cmd = "git clone --quiet %s %s" %(source_dir, build_context_source)
-                try:
-                    self.logger.debug("Fetching %s", source_dir)
-                    subprocess.check_output(git_clone_cmd, stderr=subprocess.STDOUT, shell=True)
-                except subprocess.CalledProcessError as e:
-                    self.logger.critical("%s command failed (%i)", git_clone_cmd, e.returncode)
-                    return False
-            else:
-                shutil.copytree(source_dir, build_context_source)
-
+            # TODO: extract utility method
             with open(os.path.join(tmp_dir, 'Dockerfile'), 'w+') as docker_file:
                 docker_file.write("FROM %s\n" % image_name)
                 docker_file.write('ADD ./src /usr/src/\n')
@@ -214,8 +222,70 @@ class Builder(object):
             shutil.rmtree(tmp_dir)
             pass
 
-    def indirect_build(self, build_image, runtime_image, clean, user_id, tag, envs=[]):
-        pass
+    def indirect_build(self, build_image, runtime_image, source_dir, clean_build, user_id, tag, envs=[]):
+        previous_build_volume = tempfile.mkdtemp()
+        input_source_dir      = tempfile.mkdtemp()
+        output_source_dir     = tempfile.mkdtemp()
+        tmp_dir               = tempfile.mkdtemp()
+
+        build_image_tag = "%s-build" % tag
+
+        try:
+            if not clean_build:
+                self.pull_image(build_image_tag)
+                images = self.docker_client.images(build_image_tag)
+                if images.__len__ < 1:
+                    # TODO: handle better?
+                    clean_build = True
+                else:
+                    self.save_artifacts(build_image_tag, previous_build_volume)
+
+            volumes = {'/usr/artifacts': {}, '/usr/src': {}, '/usr/build': {}}
+            bind_mounts = {previous_build_volume: '/usr/artifacts', input_source_dir: '/usr/src', output_source_dir: '/usr/build'}
+            self.prepare_source_dir(source_dir, input_source_dir)
+
+            build_container = self.docker_client.create_container(build_image, '/usr/bin/prepare', volumes=volumes)
+            build_container_id = build_container['Id']
+            self.docker_client.start(build_container_id, binds=bind_mounts)
+            exitcode = self.docker_client.wait(build_container_id)
+            self.logger.debug(self.docker_client.logs(build_container_id))
+            
+            if exitcode != 0:
+                # TODO: handle
+                pass
+
+            build_context_source = os.path.join(tmp_dir, 'src')
+            self.prepare_source_dir(output_source_dir, build_context_source)
+
+            # TODO: extract utility method
+            with open(os.path.join(tmp_dir, 'Dockerfile'), 'w+') as docker_file:
+                docker_file.write("FROM %s\n" % image_name)
+                docker_file.write('ADD ./src /usr/src/\n')
+                for env in envs:
+                    env = env.split("=")
+                    name = env[0]
+                    value = env[1]
+                    docker_file.write("ENV %s %s\n" % (name, value))
+                docker_file.write('RUN /usr/bin/prepare\n')
+                docker_file.write('CMD /usr/bin/run\n')
+
+            self.logger.debug("Building new docker image")
+            img, logs = self.docker_client.build(tag=tag, path=tmp_dir, rm=True)
+            self.logger.debug("Build logs: %s" , logs)
+
+            if img is not None:
+                built_image_name = tag or img
+                self.logger.info("%s Built image %s %s" , Fore.GREEN, built_image_name, Fore.RESET)
+                self.docker_client.commit(build_container_id, tag=build_image_tag)
+                self.remove_container(build_container_id)
+            else:
+                self.logger.critical("%s STI build failed. %s", Fore.RED, Fore.RESET)
+                self.remove_container(build_container_id)
+        finally:
+            shutil.rmtree(previous_build_volume)
+            shutil.rmtree(input_source_dir)
+            shutil.rmtree(output_source_dir)
+            shutil.rmtree(tmp_dir)
 
     def main(self):
         runtime_image = self.arguments['IMAGE_NAME']
