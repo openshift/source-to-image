@@ -12,14 +12,13 @@ import logging
 import subprocess
 import re
 
-"""STI is a tool for building reproducable Docker images.  STI produces ready-to-run images by
-injecting a user source into a docker image and preparing a new Docker image which incorporates
-the base image and built source, and is ready to use with `docker run`.  STI supports
-incremental builds which re-use previously downloaded dependencies, previously built artifacts, etc.
-"""
+
 class Builder(object):
     """
-    Docker Source to Image.
+    Docker Source to Image(STI) is a tool for building reproducable Docker images.  STI produces ready-to-run images by
+    injecting a user source into a docker image and preparing a new Docker image which incorporates the base image and
+    built source, and is ready to use with `docker run`.  STI supports incremental builds which re-use previously
+    downloaded dependencies, previously built artifacts, etc.
 
     Usage:
         sti build IMAGE_NAME SOURCE_DIR --tag=BUILD_TAG [--build-image=BUILD_IMAGE_NAME] [--clean]
@@ -47,7 +46,7 @@ class Builder(object):
         numeric_level = getattr(logging, log_level.upper(), None)
         if not isinstance(numeric_level, int):
             logging.warn("Invalid log level %s. Defaulting to INFO", log_level)
-            numeric_level = logging.INFO;
+            numeric_level = logging.INFO
         logging.basicConfig(level=numeric_level)
         self.logger = logging.getLogger(__name__)
 
@@ -61,7 +60,7 @@ class Builder(object):
         self.docker_client = docker.Client(base_url=self.docker_url, timeout=self.timeout)
         server_version = self.docker_client.version()
         self.logger.debug("Connected to Docker server version %s. Server linux kernel: %s",
-              server_version['Version'],server_version['KernelVersion'])
+                          server_version['Version'], server_version['KernelVersion'])
 
     def check_file_exists(self, container_id, file_path):
         try:
@@ -73,7 +72,7 @@ class Builder(object):
     def pull_image(self, image_name):
         images = self.docker_client.images(image_name)
         if images.__len__() == 0:
-            self.logger.warn("Image %s not found in local registry. Pulling from remote." , image_name)
+            self.logger.warn("Image %s not found in local registry. Pulling from remote.", image_name)
             self.docker_client.pull(image_name)
         else:
             self.logger.debug("Image %s is available in local registry" % image_name)
@@ -88,7 +87,7 @@ class Builder(object):
 
             return container_id
         except docker.APIError as e:
-            self.logger.critical("Error while creating container for image %s. %s" , image_name, e.explanation)
+            self.logger.critical("Error while creating container for image %s. %s", image_name, e.explanation)
             return None
 
     def remove_container(self, container_id):
@@ -121,7 +120,7 @@ class Builder(object):
         image = self.docker_client.inspect_image(images[0]['Id'])
 
         if image['config']['Entrypoint']:
-            self.logger.critical("Image %s has a configured Entrypoint and is incompatible with sti" , image_name)
+            self.logger.critical("Image %s has a configured Entrypoint and is incompatible with sti", image_name)
             return False
 
         required_files = ['/usr/bin/prepare', '/usr/bin/run']
@@ -131,7 +130,7 @@ class Builder(object):
         valid_image = self.validate_required_files(container_id, required_files)
 
         if valid_image:
-            self.logger.debug("%s passes source image validation" , image_name)
+            self.logger.debug("%s passes source image validation", image_name)
 
         return valid_image
 
@@ -141,7 +140,7 @@ class Builder(object):
         for f in required_files:
             if not self.check_file_exists(container_id, f):
                 valid_image = False
-                self.logger.critical("Invalid image: file %s is missing." , f)
+                self.logger.critical("Invalid image: file %s is missing.", f)
 
         return valid_image
 
@@ -159,7 +158,7 @@ class Builder(object):
 
     def prepare_source_dir(self, source, target_source_dir):
         if re.match('^(http(s?)|git|file)://', source):
-            git_clone_cmd = "git clone --quiet %s %s" %(source, build_context_source)
+            git_clone_cmd = "git clone --quiet %s %s" % (source, build_context_source)
             try:
                 self.logger.debug("Fetching %s", source)
                 subprocess.check_output(git_clone_cmd, stderr=subprocess.STDOUT, shell=True)
@@ -170,7 +169,7 @@ class Builder(object):
             shutil.copytree(source, target_source_dir)
 
     def save_artifacts(self, image_name, target_dir):
-        self.logger.debug("Saving data from image %s for incremental build" , image_name)
+        self.logger.debug("Saving data from image %s for incremental build", image_name)
         container = self.docker_client.create_container(image_name,
                                                         ["/usr/bin/save-artifacts"],
                                                         volumes={"/usr/artifacts": {}})
@@ -198,7 +197,7 @@ class Builder(object):
 
         self.logger.debug("Building new docker image")
         img, logs = self.docker_client.build(tag=tag, path=context_dir, rm=True)
-        self.logger.debug("Build logs: %s" , logs)
+        self.logger.debug("Build logs: %s", logs)
 
         return img
 
@@ -217,7 +216,7 @@ class Builder(object):
 
             if img is not None:
                 built_image_name = tag or img
-                self.logger.info("%s Built image %s %s" , Fore.GREEN, built_image_name, Fore.RESET)
+                self.logger.info("%s Built image %s %s", Fore.GREEN, built_image_name, Fore.RESET)
             else:
                 self.logger.critical("%s STI build failed. %s", Fore.RED, Fore.RESET)
 
@@ -227,9 +226,9 @@ class Builder(object):
 
     def indirect_build(self, build_image, runtime_image, source_dir, clean_build, user_id, tag, envs=[]):
         previous_build_volume = tempfile.mkdtemp()
-        input_source_dir      = tempfile.mkdtemp()
-        output_source_dir     = tempfile.mkdtemp()
-        tmp_dir               = tempfile.mkdtemp()
+        input_source_dir = tempfile.mkdtemp()
+        output_source_dir = tempfile.mkdtemp()
+        tmp_dir = tempfile.mkdtemp()
 
         build_image_tag = "%s-build" % tag
 
@@ -244,7 +243,11 @@ class Builder(object):
                     self.save_artifacts(build_image_tag, previous_build_volume)
 
             volumes = {'/usr/artifacts': {}, '/usr/src': {}, '/usr/build': {}}
-            bind_mounts = {previous_build_volume: '/usr/artifacts', input_source_dir: '/usr/src', output_source_dir: '/usr/build'}
+            bind_mounts = {
+                previous_build_volume: '/usr/artifacts',
+                input_source_dir: '/usr/src',
+                output_source_dir: '/usr/build'
+            }
             self.prepare_source_dir(source_dir, input_source_dir)
 
             build_container = self.docker_client.create_container(build_image, '/usr/bin/prepare', volumes=volumes)
@@ -252,7 +255,7 @@ class Builder(object):
             self.docker_client.start(build_container_id, binds=bind_mounts)
             exitcode = self.docker_client.wait(build_container_id)
             self.logger.debug(self.docker_client.logs(build_container_id))
-            
+
             if exitcode != 0:
                 # TODO: handle
                 pass
@@ -263,7 +266,7 @@ class Builder(object):
 
             if img is not None:
                 built_image_name = tag or img
-                self.logger.info("%s Built image %s %s" , Fore.GREEN, built_image_name, Fore.RESET)
+                self.logger.info("%s Built image %s %s", Fore.GREEN, built_image_name, Fore.RESET)
                 self.docker_client.commit(build_container_id, tag=build_image_tag)
                 self.remove_container(build_container_id)
             else:
@@ -282,7 +285,9 @@ class Builder(object):
 
         try:
             if self.arguments['validate']:
-                validations.append(ImageValidationRequest('Target image', runtime_image, self.arguments['--supports-incremental']))
+                validations.append(ImageValidationRequest('Target image',
+                                                          runtime_image,
+                                                          self.arguments['--incremental']))
             elif self.arguments['build']:
                 if build_image:
                     validations.append(ImageValidationRequest('Build image', build_image, True))
@@ -295,11 +300,11 @@ class Builder(object):
             if self.arguments['validate']:
                 return 0
 
-            source      = self.arguments['SOURCE_DIR']
-            tag         = self.arguments['--tag']
+            source = self.arguments['SOURCE_DIR']
+            tag = self.arguments['--tag']
             clean_build = self.arguments['--clean']
-            user        = self.arguments['--user']
-            env_str     = self.arguments['ENV_NAME=VALUE']
+            user = self.arguments['--user']
+            env_str = self.arguments['ENV_NAME=VALUE']
             incremental = False
 
             if not clean_build and not build_image:
@@ -312,11 +317,13 @@ class Builder(object):
         finally:
             self.docker_client.close()
 
+
 class ImageValidationRequest:
     def __init__(self, description, image_name, validate_incremental=False):
         self.description = description
         self.image_name = image_name
         self.validate_incremental = validate_incremental
+
 
 def main():
     builder = Builder()
