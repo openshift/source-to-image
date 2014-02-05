@@ -1,5 +1,6 @@
 #!/bin/bash
 
+cp -ad /usr/src /sti-fake/
 touch /sti-fake/prepare-invoked
 
 if [ -e /usr/artifacts/save-artifacts-invoked ]; then
