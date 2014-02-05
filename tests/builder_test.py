@@ -3,7 +3,8 @@ import tempfile
 import shutil
 import subprocess
 import time
- 
+
+
 def run_command(command):
     print("Running command \"%s\"" % command)
     p = subprocess.Popen(command, shell=True, bufsize=0)
@@ -11,11 +12,13 @@ def run_command(command):
     print "output: %s" % p.stdout
     return p.returncode
 
+
 def make_docker_client(url='unix://var/run/docker.sock', timeout=60):
     docker_client = docker.Client(base_url=url, timeout=timeout)	
     server_version = docker_client.version()
     assert (server_version is not None), "Couldn't connect to Docker"
     return docker_client
+
 
 class TestBuilder:
     def build_source_image(self, image_name, tag=None):
@@ -29,18 +32,18 @@ class TestBuilder:
 
     def direct_build(self, runtime_image, application_source, tag, clean=False):
         if clean:
-            command = "sti build %s %s --tag %s --clean" % (runtime_image, application_source, tag)
+            command = "sti build %s %s %s --clean" % (application_source, runtime_image, tag)
         else:
-            command = "sti build %s %s --tag %s" % (runtime_image, application_source, tag)
+            command = "sti build %s %s %s" % (application_source, runtime_image, tag)
 
         exitcode = run_command(command)
         assert exitcode == 0, 'build failed'
 
     def indirect_build(self, build_image, runtime_image, application_source, tag, clean=False):
         if clean:
-            command = "sti build %s %s --build-image %s --tag %s --clean" % (runtime_image, application_source, build_image, tag)
+            command = "sti build %s %s %s --build-image %s --clean" % (application_source, runtime_image, tag, build_image)
         else:
-            command = "sti build %s %s --build-image %s --tag %s" % (runtime_image, application_source, build_image, tag)
+            command = "sti build %s %s %s --build-image %s" % (application_source, runtime_image, tag, build_image)
 
         exitcode = run_command(command)
         assert exitcode == 0, 'build failed'
