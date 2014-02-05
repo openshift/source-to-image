@@ -1,5 +1,5 @@
 FROM fedora:20
-RUN mkdir -p /sti-fake/src
+RUN mkdir /sti-fake-builder
 ADD ./prepare /usr/bin/
 ADD ./run /usr/bin/
 ADD ./save-artifacts /usr/bin/

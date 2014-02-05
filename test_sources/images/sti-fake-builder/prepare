@@ -1,0 +1,9 @@
+#!/bin/bash
+
+touch /sti-fake-builder/prepare-invoked
+
+if [ -e /usr/artifacts/save-artifacts-invoked ]; then
+  touch /sti-fake-builder/save-artifacts-invoked
+fi
+
+cp -ad /usr/src /usr/build/
