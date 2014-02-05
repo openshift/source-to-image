@@ -41,9 +41,9 @@ class TestBuilder:
 
     def indirect_build(self, build_image, runtime_image, application_source, tag, clean=False):
         if clean:
-            command = "sti build %s %s %s --build-image %s --clean" % (application_source, runtime_image, tag, build_image)
+            command = "sti build %s %s %s --runtime-image %s --clean" % (application_source, build_image, tag, runtime_image)
         else:
-            command = "sti build %s %s %s --build-image %s" % (application_source, runtime_image, tag, build_image)
+            command = "sti build %s %s %s --runtime-image %s" % (application_source, build_image, tag, runtime_image)
 
         exitcode = run_command(command)
         assert exitcode == 0, 'build failed'
