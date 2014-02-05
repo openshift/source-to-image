@@ -21,31 +21,33 @@ class Builder(object):
     downloaded dependencies, previously built artifacts, etc.
 
     Usage:
-        sti build SOURCE_DIR RUNTIME_IMAGE_TAG APP_IMAGE_TAG [--build-image=BUILD_IMAGE_TAG] [--clean]
+        sti build SOURCE_DIR BUILD_IMAGE_TAG APP_IMAGE_TAG [--runtime-image=RUNTIME_IMAGE_TAG] [--clean]
             [--user=USERID] [--url=URL] [--timeout=TIMEOUT] [-e ENV_NAME=VALUE]... [-l LOG_LEVEL]
             [--dir=WORKING_DIR] [--push]
-        sti validate RUNTIME_IMAGE_TAG [--build-image=BUILD_IMAGE_TAG] [--incremental] [--url=URL]
+        sti validate BUILD_IMAGE_TAG [--runtime-image=RUNTIME_IMAGE_TAG] [--incremental] [--url=URL]
             [--timeout=TIMEOUT] [-l LOG_LEVEL]
         sti --help
 
     Arguments:
-        RUNTIME_IMAGE_TAG      Tag for the Docker image which provides the runtime for the application.
+        BUILD_IMAGE_TAG        Tag for the Docker image which provides the build and runtime for the application.
         SOURCE_DIR             Directory or GIT repository containing your application sources.
         APP_IMAGE_TAG          Tag for the Docker image which is created by STI. In the case of incremental
                                builds, this tag is also used to identify the previous build of the application.
 
 
     Options:
-        --build-image=BUILD_IMAGE_TAG   Tag which identifies a Docker image with compilation tools required to
-                                        build the application.
-        --clean                         Do a clean build, ie. do not perform an incremental build.
-        --dir=WORKING_DIR               Directory where Dockerfiles and other support scripts are created.
-                                        (Default: temp dir)
-        -l LOG_LEVEL                    Logging level. Default: INFO
-        --timeout=TIMEOUT               Timeout commands if they take too long. Default: 120 seconds.
-        --user=USERID                   Perform the build as specified user.
-        --url=URL                       Connect to docker at the specified url [default: unix://var/run/docker.sock]
-        --help                          Print this help message.
+        --runtime-image=RUNTIME_IMAGE_TAG   Tag which identifies an optional Docker image with runtime components but
+                                            none of the build dependencies. If provided, the application will be built
+                                            with BUILD_IMAGE_TAG and the binaries will be extracted and installed on
+                                            the runtime image.
+        --clean                             Do a clean build, ie. do not perform an incremental build.
+        --dir=WORKING_DIR                   Directory where Dockerfiles and other support scripts are created.
+                                            (Default: temp dir)
+        -l LOG_LEVEL                        Logging level. Default: INFO
+        --timeout=TIMEOUT                   Timeout commands if they take too long. Default: 120 seconds.
+        --user=USERID                       Perform the build as specified user.
+        --url=URL                           Connect to docker at the specified url [default: unix://var/run/docker.sock]
+        --help                              Print this help message.
     """
     def __init__(self):
         self.arguments = docopt.docopt(Builder.__doc__)
@@ -301,9 +303,9 @@ class Builder(object):
             pass
 
     def main(self):
-        runtime_image = self.arguments['RUNTIME_IMAGE_TAG']
-        build_image = self.arguments['--build-image']
-        prev_build_image = app_image = self.arguments['APP_IMAGE_TAG']
+        build_image = self.arguments['BUILD_IMAGE_TAG']
+        runtime_image = self.arguments['--runtime-image']
+        prev_app_build = app_image = self.arguments['APP_IMAGE_TAG']
         source = self.arguments['SOURCE_DIR']
         user = self.arguments['--user']
         env_str = self.arguments['ENV_NAME=VALUE']
@@ -312,26 +314,26 @@ class Builder(object):
         should_push = self.arguments['--push']
 
         if is_incremental:
-            self.pull_image(prev_build_image)
-            is_incremental = self.is_image_in_local_registry(prev_build_image)
+            self.pull_image(prev_app_build)
+            is_incremental = self.is_image_in_local_registry(prev_app_build)
 
         validations = []
 
         try:
-            if build_image:
+            if runtime_image:
                 if self.arguments['validate']:
+                    validations.append(ImageValidationRequest('Runtime image', runtime_image, False))
                     validations.append(ImageValidationRequest('Build image', build_image, True))
-                    validations.append(ImageValidationRequest('Runtime image', runtime_image))
                     self.validate_images(validations)
                 elif self.arguments['build']:
                     self.indirect_build(working_dir, build_image, runtime_image, source, is_incremental, user, app_image, env_str)
             else:
                 if self.arguments['validate']:
-                    validations.append(ImageValidationRequest('Target image', runtime_image,
+                    validations.append(ImageValidationRequest('Target image', build_image,
                                                               self.arguments['--incremental']))
                     self.validate_images(validations)
                 elif self.arguments['build']:
-                    self.direct_build(working_dir, runtime_image, source, is_incremental, user, app_image, env_str)
+                    self.direct_build(working_dir, build_image, source, is_incremental, user, app_image, env_str)
         finally:
             self.docker_client.close()
 
