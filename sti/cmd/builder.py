@@ -87,6 +87,7 @@ class Builder(object):
 
     def is_image_in_local_registry(self, image_name):
         images = self.docker_client.images(image_name)
+        self.logger.debug("Checking if %s found. Result: %s", image_name, (images.__len__() != 0))
         return images.__len__() != 0
 
     def push_image(self, image_name):
@@ -245,25 +246,26 @@ class Builder(object):
                 shutil.rmtree(build_dir)
             pass
 
-    def indirect_build(self, working_dir, build_image, runtime_image, source_dir, incremental_build, user_id, tag, env_str):
-        build_dir = working_dir
+    def indirect_build(self, working_dir, build_image, runtime_image, source_dir, incremental_build, user_id, tag, app_build_tag, env_str):
+        build_dir = working_dir or tempfile.mkdtemp()
 
-        previous_build_volume = os.path.join(build_dir, 'last_build_artifacts')
-        input_source_dir = os.path.join(build_dir, 'src')
-        output_source_dir = os.path.join(build_dir, 'compiled_src')
-        tmp_dir = os.path.join(build_dir, 'tmp')
+        builder_build_dir = os.path.join(build_dir, 'build')
+        runtime_build_dir = os.path.join(build_dir, 'runtime')
+        previous_build_volume = os.path.join(builder_build_dir, 'last_build_artifacts')
+        input_source_dir = os.path.join(builder_build_dir, 'src')
+        output_source_dir = os.path.join(runtime_build_dir, 'src')
 
-        build_image_tag = "%s-build" % tag
+        os.mkdir(builder_build_dir)
+        os.mkdir(runtime_build_dir)
+        os.mkdir(previous_build_volume)
+        os.mkdir(output_source_dir)
 
+        build_container_id = None
         try:
+            self.logger.debug("Incremental build: %s", incremental_build)
             if incremental_build:
-                self.pull_image(build_image_tag)
-                images = self.docker_client.images(build_image_tag)
-                if images.__len__() < 1:
-                    # TODO: handle better?
-                    clean_build = True
-                else:
-                    self.save_artifacts(build_image_tag, previous_build_volume)
+                self.pull_image(app_build_tag)
+                self.save_artifacts(app_build_tag, previous_build_volume)
 
             volumes = {'/usr/artifacts': {}, '/usr/src': {}, '/usr/build': {}}
             bind_mounts = {
@@ -272,7 +274,6 @@ class Builder(object):
                 output_source_dir: '/usr/build'
             }
             self.prepare_source_dir(source_dir, input_source_dir)
-
             build_container = self.docker_client.create_container(build_image, '/usr/bin/prepare', volumes=volumes)
             build_container_id = build_container['Id']
             self.docker_client.start(build_container_id, binds=bind_mounts)
@@ -280,32 +281,31 @@ class Builder(object):
             self.logger.debug(self.docker_client.logs(build_container_id))
 
             if exitcode != 0:
-                # TODO: handle
-                pass
+                self.logger.error("Unable to build application")
+                raise "Unable to build container"
 
-            build_context_source = os.path.join(tmp_dir, 'src')
-            self.prepare_source_dir(output_source_dir, build_context_source)
-            img = self.build_deployable_image(runtime_image, tmp_dir, tag, env_str)
-
+            img = self.build_deployable_image(runtime_image, runtime_build_dir, tag, env_str)
             if img is not None:
                 built_image_name = tag or img
+                build_container_img = self.docker_client.commit(build_container_id)
+                self.docker_client.tag(build_container_img['Id'], app_build_tag)
+                self.logger.info("%s Built build-image %s %s", Fore.GREEN, app_build_tag, Fore.RESET)
                 self.logger.info("%s Built image %s %s", Fore.GREEN, built_image_name, Fore.RESET)
-                self.docker_client.commit(build_container_id, tag=build_image_tag)
-                self.remove_container(build_container_id)
             else:
                 self.logger.critical("%s STI build failed. %s", Fore.RED, Fore.RESET)
-                self.remove_container(build_container_id)
         finally:
-            #shutil.rmtree(previous_build_volume)
-            #shutil.rmtree(input_source_dir)
-            #shutil.rmtree(output_source_dir)
-            #shutil.rmtree(tmp_dir)
-            pass
+            if build_container_id != None:
+              self.remove_container(build_container_id)
+            if not working_dir:
+                shutil.rmtree(builder_build_dir)
+                shutil.rmtree(runtime_build_dir)
+                shutil.rmtree(build_dir)
 
     def main(self):
         build_image = self.arguments['BUILD_IMAGE_TAG']
         runtime_image = self.arguments['--runtime-image']
-        prev_app_build = app_image = self.arguments['APP_IMAGE_TAG']
+        app_image = self.arguments['APP_IMAGE_TAG']
+        app_build_tag = "%s-build" % app_image
         source = self.arguments['SOURCE_DIR']
         user = self.arguments['--user']
         env_str = self.arguments['ENV_NAME=VALUE']
@@ -313,21 +313,24 @@ class Builder(object):
         working_dir = self.arguments['--dir']
         should_push = self.arguments['--push']
 
-        if is_incremental:
-            self.pull_image(prev_app_build)
-            is_incremental = self.is_image_in_local_registry(prev_app_build)
 
         validations = []
 
         try:
             if runtime_image:
+                if is_incremental:
+                    self.pull_image(app_build_tag)
+                    is_incremental = self.is_image_in_local_registry(app_build_tag)
                 if self.arguments['validate']:
                     validations.append(ImageValidationRequest('Runtime image', runtime_image, False))
                     validations.append(ImageValidationRequest('Build image', build_image, True))
                     self.validate_images(validations)
                 elif self.arguments['build']:
-                    self.indirect_build(working_dir, build_image, runtime_image, source, is_incremental, user, app_image, env_str)
+                    self.indirect_build(working_dir, build_image, runtime_image, source, is_incremental, user, app_image, app_build_tag, env_str)
             else:
+                if is_incremental:
+                    self.pull_image(app_image)
+                    is_incremental = self.is_image_in_local_registry(app_image)
                 if self.arguments['validate']:
                     validations.append(ImageValidationRequest('Target image', build_image,
                                                               self.arguments['--incremental']))

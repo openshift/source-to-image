@@ -1,9 +1,10 @@
-#!/bin/bash
+#!/bin/bash -x
 
 touch /sti-fake-builder/prepare-invoked
+mkdir -p /usr/build/
 
 if [ -e /usr/artifacts/save-artifacts-invoked ]; then
-  touch /sti-fake-builder/save-artifacts-invoked
+  touch /usr/build/save-artifacts-invoked
 fi
 
 cp -ad /usr/src /usr/build/

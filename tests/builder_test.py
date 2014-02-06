@@ -101,6 +101,14 @@ class TestBuilder:
         container_id = self.run_sti_product(sti_build_tag)
         self.check_incremental_build_state(container_id)
 
+    def check_indirect_build_state(self, container_id):
+        assert self.check_file_exists(container_id, '/sti-fake/prepare-invoked')
+        assert self.check_file_exists(container_id, '/sti-fake/run-invoked')
+
+    def check_incremental_indirect_build_state(self, container_id):
+        self.check_indirect_build_state(container_id)
+        assert self.check_file_exists(container_id, '/sti-fake/src/save-artifacts-invoked')
+
     def test_clean_indirect_build(self):
         sti_build_tag = 'test/sti-indirect-app'
         app_source = 'test_sources/applications/html'
@@ -112,5 +120,14 @@ class TestBuilder:
         container_id = self.run_sti_product(sti_build_tag)
         self.check_indirect_build_state(container_id)
 
-    # def test_indirect_build(self):
-    #     pass
+    def test_indirect_build(self):
+        sti_build_tag = 'test/sti-indirect-app'
+        app_source = 'test_sources/applications/html'
+
+        build_image_tag = self.build_source_image('sti-fake-builder')
+        runtime_image_tag = self.build_source_image('sti-fake')
+
+        self.indirect_build(build_image_tag, runtime_image_tag, app_source, sti_build_tag, True)
+        self.indirect_build(build_image_tag, runtime_image_tag, app_source, sti_build_tag, False)
+        container_id = self.run_sti_product(sti_build_tag)
+        self.check_incremental_indirect_build_state(container_id)
