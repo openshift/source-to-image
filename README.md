@@ -105,7 +105,7 @@ You can start using sti right away by using the sample image and application sou
 `test_sources` directory.  Here's an example that builds a simple HTML app:
 
 	docker build -rm -t fedora-mock test_sources/images/fedora-mock
-	sti build fedora-mock test_sources/applications/html --tag sti_app
+	sti build fedora-mock test_sources/applications/html sti_app
 	docker run -rm -i -p PORT -t sti_app
 
 ### Validating a source image
