@@ -30,7 +30,7 @@ class TestBuilder:
         assert (img is not None), "Source image docker build failed"
         return runtime_image_tag
 
-    def direct_build(self, runtime_image, application_source, tag, clean=False):
+    def build(self, runtime_image, application_source, tag, clean=False):
         if clean:
             command = "sti build %s %s %s --clean" % (application_source, runtime_image, tag)
         else:
@@ -39,7 +39,7 @@ class TestBuilder:
         exitcode = run_command(command)
         assert exitcode == 0, 'build failed'
 
-    def indirect_build(self, build_image, runtime_image, application_source, tag, clean=False):
+    def extended_build(self, build_image, runtime_image, application_source, tag, clean=False):
         if clean:
             command = "sti build %s %s %s --runtime-image %s --clean" % (application_source, build_image, tag, runtime_image)
         else:
@@ -79,17 +79,17 @@ class TestBuilder:
     def setup(self):
         self.docker_client = make_docker_client()
 
-    def test_clean_direct_build(self):
+    def test_clean_build(self):
         sti_build_tag = 'test/sti-app'
         app_source = 'test_sources/applications/html'
 
         runtime_image_tag = self.build_source_image('sti-fake')
 
-        self.direct_build(runtime_image_tag, app_source, sti_build_tag, True)
+        self.build(runtime_image_tag, app_source, sti_build_tag, True)
         container_id = self.run_sti_product(sti_build_tag)
         self.check_basic_build_state(container_id)
 
-    def test_incremental_direct_build(self):
+    def test_incremental_build(self):
         sti_build_tag = 'test/sti-incremental-app'
         app_source = 'test_sources/applications/html'
 
@@ -97,37 +97,37 @@ class TestBuilder:
         # use the sti-fake image as its own previous build
         self.build_source_image('sti-fake', 'test/sti-incremental-app')
 
-        self.direct_build(runtime_image_tag, app_source, sti_build_tag)
+        self.build(runtime_image_tag, app_source, sti_build_tag)
         container_id = self.run_sti_product(sti_build_tag)
         self.check_incremental_build_state(container_id)
 
-    def check_indirect_build_state(self, container_id):
+    def check_extended_build_state(self, container_id):
         assert self.check_file_exists(container_id, '/sti-fake/prepare-invoked')
         assert self.check_file_exists(container_id, '/sti-fake/run-invoked')
 
-    def check_incremental_indirect_build_state(self, container_id):
-        self.check_indirect_build_state(container_id)
+    def check_incremental_extended_build_state(self, container_id):
+        self.check_extended_build_state(container_id)
         assert self.check_file_exists(container_id, '/sti-fake/src/save-artifacts-invoked')
 
-    def test_clean_indirect_build(self):
-        sti_build_tag = 'test/sti-indirect-app'
+    def test_clean_extended_build(self):
+        sti_build_tag = 'test/sti-extended-app'
         app_source = 'test_sources/applications/html'
 
         build_image_tag = self.build_source_image('sti-fake-builder')
         runtime_image_tag = self.build_source_image('sti-fake')
 
-        self.indirect_build(build_image_tag, runtime_image_tag, app_source, sti_build_tag, True)
+        self.extended_build(build_image_tag, runtime_image_tag, app_source, sti_build_tag, True)
         container_id = self.run_sti_product(sti_build_tag)
-        self.check_indirect_build_state(container_id)
+        self.check_extended_build_state(container_id)
 
-    def test_indirect_build(self):
-        sti_build_tag = 'test/sti-indirect-app'
+    def test_extended_build(self):
+        sti_build_tag = 'test/sti-extended-app'
         app_source = 'test_sources/applications/html'
 
         build_image_tag = self.build_source_image('sti-fake-builder')
         runtime_image_tag = self.build_source_image('sti-fake')
 
-        self.indirect_build(build_image_tag, runtime_image_tag, app_source, sti_build_tag, True)
-        self.indirect_build(build_image_tag, runtime_image_tag, app_source, sti_build_tag, False)
+        self.extended_build(build_image_tag, runtime_image_tag, app_source, sti_build_tag, True)
+        self.extended_build(build_image_tag, runtime_image_tag, app_source, sti_build_tag, False)
         container_id = self.run_sti_product(sti_build_tag)
-        self.check_incremental_indirect_build_state(container_id)
+        self.check_incremental_extended_build_state(container_id)

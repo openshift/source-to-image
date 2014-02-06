@@ -87,12 +87,12 @@ class Builder(object):
 
     def is_image_in_local_registry(self, image_name):
         images = self.docker_client.images(image_name)
-        self.logger.debug("Checking if %s found. Result: %s", image_name, (images.__len__() != 0))
-        return images.__len__() != 0
+        self.logger.debug("Checking if %s found. Result: %s", image_name, len(images) != 0)
+        return len(images) != 0
 
     def push_image(self, image_name):
         images = self.docker_client.images(image_name)
-        if images.__len__() == 0:
+        if len(images) == 0:
             raise "Image %s not found in local registry. Unable to push." % image_name
         else:
             self.logger.debug("Image %s is available in local registry. Pushing to remote." % image_name)
@@ -134,7 +134,7 @@ class Builder(object):
     def validate_image(self, image_name, container_id, validate_incremental):
         images = self.docker_client.images(image_name)
 
-        if images.__len__() < 1:
+        if len(images) < 1:
             self.logger.critical("Couldn't find image %s" % image_name)
             return False
 
@@ -222,7 +222,7 @@ class Builder(object):
 
         return img
 
-    def direct_build(self, working_dir, image_name, source_dir, incremental_build, user_id, tag, env_str):
+    def build(self, working_dir, image_name, source_dir, incremental_build, user_id, tag, env_str):
         build_dir = working_dir or tempfile.mkdtemp()
 
         try:
@@ -246,7 +246,7 @@ class Builder(object):
                 shutil.rmtree(build_dir)
             pass
 
-    def indirect_build(self, working_dir, build_image, runtime_image, source_dir, incremental_build, user_id, tag, app_build_tag, env_str):
+    def extended_build(self, working_dir, build_image, runtime_image, source_dir, incremental_build, user_id, tag, app_build_tag, env_str):
         build_dir = working_dir or tempfile.mkdtemp()
 
         builder_build_dir = os.path.join(build_dir, 'build')
@@ -326,7 +326,7 @@ class Builder(object):
                     validations.append(ImageValidationRequest('Build image', build_image, True))
                     self.validate_images(validations)
                 elif self.arguments['build']:
-                    self.indirect_build(working_dir, build_image, runtime_image, source, is_incremental, user, app_image, app_build_tag, env_str)
+                    self.extended_build(working_dir, build_image, runtime_image, source, is_incremental, user, app_image, app_build_tag, env_str)
             else:
                 if is_incremental:
                     self.pull_image(app_image)
@@ -336,7 +336,7 @@ class Builder(object):
                                                               self.arguments['--incremental']))
                     self.validate_images(validations)
                 elif self.arguments['build']:
-                    self.direct_build(working_dir, build_image, source, is_incremental, user, app_image, env_str)
+                    self.build(working_dir, build_image, source, is_incremental, user, app_image, env_str)
         finally:
             self.docker_client.close()
 
