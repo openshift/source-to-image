@@ -46,7 +46,7 @@ class Builder(object):
         -l LOG_LEVEL                        Logging level. Default: INFO
         --timeout=TIMEOUT                   Timeout commands if they take too long. Default: 120 seconds.
         --user=USERID                       Perform the build as specified user.
-        --url=URL                           Connect to docker at the specified url [default: unix://var/run/docker.sock]
+        --url=URL                           Connect to docker at the specified url Default: $DOCKER_HOST or unix://var/run/docker.sock
         --help                              Print this help message.
     """
     def __init__(self):
@@ -60,7 +60,16 @@ class Builder(object):
         logging.basicConfig(level=numeric_level)
         self.logger = logging.getLogger(__name__)
 
-        self.docker_url = self.arguments['--url']
+        if self.arguments['--url'] is not None:
+            self.docker_url = self.arguments['--url']
+        else:
+            self.docker_url = os.getenv('DOCKER_HOST', 'unix://var/run/docker.sock')
+
+        # these two checks should be done by the python docker client ...
+        if self.docker_url.startswith('tcp:'):
+            self.docker_url = self.docker_url.replace('tcp:', 'http:')
+        if self.docker_url == 'http://':
+            self.docker_url = 'http://127.0.0.1:4243'
 
         try:
             self.timeout = float(self.arguments['--timeout'])
