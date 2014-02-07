@@ -77,7 +77,7 @@ dependencies to `/usr/artifacts`
 
 ### Extended builds
 
-Extended builds allow you to execute your build on the build image, then deploy it on a different 
+Extended builds allow you to execute your build on a build image, then deploy it on a different 
 runtime image. The workflow for extended builds is as follows:
 
 1. source-to-images looks for the previous build image for the tag, `<tag>-build`.
@@ -130,11 +130,18 @@ You can start using sti right away by using the sample image and application sou
 
 You can validate that an image is usable as a sti source image as follows:
 
-	sti validate IMAGE_NAME
+	sti validate BUILD_IMAGE_TAG
 
-Add the `--supports-incremental` option to validate the a source image supports incremental builds:
+The `--incremental` option to enables validation for incremental builds:
 
-	sti validate IMAGE_NAME --supports-incremental
+    sti validate BUILD_IMAGE_TAG --incremental
+
+Add the `--runtime-image` option to additionally validate a runtime image for extended builds:
+
+    sti validate BUILD_IMAGE_TAG --runtime-image RUNTIME_IMAGE_TAG
+
+When specifying a runtime image with `sti validate`, the build image is automatically validated for
+incremental builds.
 
 ### Building a deployable image with sti
 
@@ -160,3 +167,42 @@ Add the `--supports-incremental` option to validate the a source image supports 
         --timeout=TIMEOUT                   Timeout commands if they take too long. Default: 120 seconds.
         --user=USERID                       Perform the build as specified user.
         --url=URL                           Connect to docker at the specified url [default: unix://var/run/docker.sock]
+
+The most basic `sti build` uses a single build image:
+
+    sti build SOURCE_DIR BUILD_IMAGE_TAG APP_IMAGE_TAG
+
+If the build is successful, the built image will be tagged with `APP_IMAGE_TAG`.
+
+If the build image is compatible with incremental builds, `sti build` will look for an image tagged
+with `APP_IMAGE_TAG`.  If an image is present with that tag, `sti build` will save the build
+artifacts from that image and add them to the build container at `/usr/artifacts` so an image's
+`/usr/bin/prepare` script can restore them before building the source.
+
+When using an image that supports incremental builds, you can do a clean build with `--clean`:
+
+    sti build SOURCE_DIR BUILD_IMAGE_TAG APP_IMAGE_TAG --clean
+
+Extended builds allow you to use distinct images for building your sources and deploying them. Use
+the `--runtime-image` option perform an extended build targeting a runtime image:
+
+    sti build SOURCE_DIR BUILD_IMAGE_TAG APP_IMAGE_TAG --runtime-image RUNTIME_IMAGE_TAG
+
+When specifying a runtime image, the build image must be compatible with incremental builds.  
+`sti build` will look for an image tagged with `<APP_IMAGE_TAG>-build`.  If an image is present with
+that tag, `sti build` will save the build artifacts from that image and add them to the build
+container at `/usr/artifacts` so the build image's `/usr/bin/prepare` script can restore them before
+building the source.  The build image's `/usr/bin/prepare` script is responsible for populating
+`/usr/build` with an artifact to be deployed into the runtime container.
+
+After performing the build, a new runtime image is created based on the image tagged with 
+`RUNTIME_IMAGE_TAG` with the output of the build in `/usr/src`.  The runtime image's 
+`/usr/bin/prepare` script is responsible for detecting and deploying the artifact.  If the build is
+successful, two images are tagged:
+
+1. The build image is tagged with `<APP_IMAGE_TAG>-build`
+1. The prepared image incorporating the deployed build is tagged with `APP_IMAGE_TAG`
+
+You can do a clean extended build with `--clean`:
+
+    sti build SOURCE_DIR BUILD_IMAGE_TAG APP_IMAGE_TAG --runtime-image RUNTIME_IMAGE_TAG --clean
