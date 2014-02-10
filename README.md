@@ -101,12 +101,18 @@ runtime image. The workflow for extended builds is as follows:
 
 ### Getting started
 
+#### Installation
+
+	pip install --user git+https://github.com/openshift/docker-source-to-images
+
+#### Example
+
 You can start using sti right away by using the sample image and application sources in the
 `test_sources` directory.  Here's an example that builds a simple HTML app:
 
 	docker build -rm -t fedora-mock test_sources/images/fedora-mock
 	sti build test_sources/applications/html fedora-mock sti_app
-	docker run -rm -i -p PORT -t sti_app
+	docker run -rm -i -p PORT:8080 -t sti_app
 
 ### Validating a source image
 
