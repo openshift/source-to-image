@@ -11,7 +11,7 @@ if [ -e /usr/artifacts/gems.tgz ]; then
   popd;
 fi
 
-echo "Building your $tarball"
+echo "Building your app"
 mkdir -p /opt/ruby/source/
 cd /opt/ruby/source/
 cp -Rf /usr/src/* .

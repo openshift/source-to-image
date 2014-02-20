@@ -160,7 +160,7 @@ class Builder(object):
         valid_image = self.validate_required_files(container_id, required_files)
 
         if valid_image:
-            self.logger.debug("%s passes source image validation", image_name)
+            self.logger.info("%s passes source image validation", image_name)
 
         return valid_image
 
@@ -190,7 +190,7 @@ class Builder(object):
         if re.match('^(http(s?)|git|file)://', source):
             git_clone_cmd = "git clone --quiet %s %s" % (source, target_source_dir)
             try:
-                self.logger.debug("Fetching %s", source)
+                self.logger.info("Fetching %s", source)
                 subprocess.check_output(git_clone_cmd, stderr=subprocess.STDOUT, shell=True)
             except subprocess.CalledProcessError as e:
                 self.logger.critical("%s command failed (%i)", git_clone_cmd, e.returncode)
@@ -199,7 +199,7 @@ class Builder(object):
             shutil.copytree(source, target_source_dir)
 
     def save_artifacts(self, image_name, target_dir):
-        self.logger.debug("Saving data from image %s for incremental build", image_name)
+        self.logger.info("Saving data from image %s for incremental build", image_name)
         container = self.docker_client.create_container(image_name,
                                                         ["/usr/bin/save-artifacts"],
                                                         volumes={"/usr/artifacts": {}})
@@ -225,9 +225,9 @@ class Builder(object):
             docker_file.write('RUN /usr/bin/prepare\n')
             docker_file.write('CMD /usr/bin/run\n')
 
-        self.logger.debug("Building new docker image")
+        self.logger.info("Building new docker image")
         img, logs = self.docker_client.build(tag=tag, path=context_dir, rm=True)
-        self.logger.debug("Build logs: %s", logs)
+        self.logger.info("Build logs:\n%s", logs)
 
         return img
 
