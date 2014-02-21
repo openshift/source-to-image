@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 PATH=/opt/rbenv/bin:/opt/ruby/bin:$PATH
 eval "$(rbenv init -)"
