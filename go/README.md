@@ -1,5 +1,5 @@
-docker-source-to-images (sti)
-=======
+go-sti
+======
 
 Source-to-images (`sti`) is a tool for building reproducable Docker images.  `sti`
 produces ready-to-run images by injecting a user source into a docker image and <i>preparing</i>
@@ -141,20 +141,12 @@ You can start using sti right away with the following test sources and publicly 
 
     sti validate BUILD_IMAGE_TAG [flags]
 
-    Arguments:
-        BUILD_IMAGE_TAG        Tag for the Docker image which provides the build and runtime for the application.
-        SOURCE_DIR             Directory or GIT repository containing your application sources.
-        APP_IMAGE_TAG          Tag for the Docker image which is created by STI. In the case of incremental
-                               builds, this tag is also used to identify the previous build of the application.
+    Available Flags:
+         --debug=false: Enable debugging output
+     -I, --incremental=false: Validate for an incremental build
+     -R, --runtime="": Set the runtime image to use
+     -U, --url="unix:///var/run/docker.sock": Set the url of the docker socket to use
 
-    Options:
-        --runtime-image=RUNTIME_IMAGE_TAG   Tag which identifies an optional Docker image with runtime components but
-                                            none of the build dependencies. If provided, the application will be built
-                                            with BUILD_IMAGE_TAG and the binaries will be extracted and installed on
-                                            the runtime image.
-        -l LOG_LEVEL                        Logging level. Default: INFO
-        --timeout=TIMEOUT                   Timeout commands if they take too long. Default: 120 seconds.
-        --url=URL                           Connect to docker at the specified url [default: unix://var/run/docker.sock]
 
 You can validate that an image is usable as a sti source image as follows:
 
@@ -182,6 +174,7 @@ incremental builds.
      -e, --env="": Specify an environment var NAME=VALUE,NAME2=VALUE2,...
      -R, --runtime="": Set the runtime image to use
      -U, --url="unix:///var/run/docker.sock": Set the url of the docker socket to use
+
 
 The most basic `sti build` uses a single build image:
 
