@@ -1,5 +1,0 @@
-#!/bin/bash
-
-HOME=$(pwd)
-for f in .profile.d/*; do . $f; done
-exec foreman start -t 3 -p 5000 web
