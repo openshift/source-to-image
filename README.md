@@ -1,7 +1,7 @@
 docker-source-to-images (sti)
 =======
 
-source-to-images (`sti`) is a tool for building reproducable Docker images.  source-to-images 
+source-to-images (`sti`) is a tool for building reproducible Docker images.  source-to-images 
 produces ready-to-run images by injecting a user source into a docker image and /preparing/
 a new Docker image which incorporates the base image and built source, and is ready to use 
 with `docker run`.  source-to-images supports:
