@@ -327,7 +327,7 @@ func (s *IntegrationTestSuite) createContainer(c *C, image string) string {
 }
 
 func (s *IntegrationTestSuite) removeContainer(cId string) {
-	s.dockerClient.RemoveContainer(docker.RemoveContainerOptions{cId, true})
+	s.dockerClient.RemoveContainer(docker.RemoveContainerOptions{cId, true, true})
 }
 
 func (s *IntegrationTestSuite) checkFileExists(c *C, cId string, filePath string) {

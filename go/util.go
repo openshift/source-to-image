@@ -3,6 +3,7 @@ package sti
 import (
 	"archive/tar"
 	"bytes"
+	"github.com/fsouza/go-dockerclient"
 	"io"
 	"io/ioutil"
 	"os"
@@ -10,8 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-
-	"github.com/fsouza/go-dockerclient"
 )
 
 // Determine whether a file exists in a container.
@@ -104,11 +103,22 @@ func copy(sourcePath string, targetPath string) error {
 	return cmd.Run()
 }
 
-func gitClone(source string, targetPath string) error {
-	cmd := exec.Command("git", "clone", "--quiet", source, targetPath)
-	err := cmd.Run()
+func gitClone(source string, targetPath string) (string, error) {
+	var buffer bytes.Buffer
+	cmd := exec.Command("git", "clone", "--recursive", source, targetPath)
 
-	return err
+	// Redirect stdout/stderr into buffer
+	cmd.Stdout, cmd.Stderr = &buffer, &buffer
+
+	if err := cmd.Start(); err != nil {
+		return buffer.String(), err
+	}
+
+	if err := cmd.Wait(); err != nil {
+		return buffer.String(), err
+	}
+
+	return buffer.String(), nil
 }
 
 func imageHasEntryPoint(image *docker.Image) bool {

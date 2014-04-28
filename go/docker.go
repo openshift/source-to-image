@@ -2,6 +2,7 @@ package sti
 
 import (
 	"log"
+	"os"
 
 	"github.com/fsouza/go-dockerclient"
 )
@@ -112,7 +113,7 @@ func (h requestHandler) containerFromImage(imageName string) (*docker.Container,
 
 // Remove a container and its associated volumes.
 func (h requestHandler) removeContainer(id string) {
-	h.dockerClient.RemoveContainer(docker.RemoveContainerOptions{id, true})
+	h.dockerClient.RemoveContainer(docker.RemoveContainerOptions{id, true, true})
 }
 
 // Commit the container with the given ID with the given tag.
@@ -120,4 +121,14 @@ func (h requestHandler) commitContainer(id, tag string) error {
 	// TODO: commit message / author?
 	_, err := h.dockerClient.CommitContainer(docker.CommitContainerOptions{Container: id, Repository: tag})
 	return err
+}
+
+// If image is not present locally, pull it from Docker registry
+func (h requestHandler) pullImage(image string) (*docker.Image, error) {
+	log.Printf("Image %s was not found locally, pulling it from Docker registry", image)
+	err := h.dockerClient.PullImage(docker.PullImageOptions{Repository: image, OutputStream: os.Stdout}, docker.AuthConfiguration{})
+	if err != nil {
+		return nil, err
+	}
+	return h.dockerClient.InspectImage(image)
 }

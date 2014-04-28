@@ -92,7 +92,7 @@ func (h requestHandler) validateRequiredFiles(imageName string, files []string) 
 	if err != nil {
 		return false, ErrCreateContainerFailed
 	}
-	defer h.dockerClient.RemoveContainer(docker.RemoveContainerOptions{container.ID, true})
+	defer h.dockerClient.RemoveContainer(docker.RemoveContainerOptions{container.ID, true, true})
 
 	for _, file := range files {
 		if !FileExistsInContainer(h.dockerClient, container.ID, file) {
