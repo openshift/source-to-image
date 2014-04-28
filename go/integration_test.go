@@ -1,8 +1,12 @@
 package sti
 
 import (
+	"encoding/json"
 	"flag"
+	"fmt"
 	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 
@@ -97,28 +101,63 @@ func (s *IntegrationTestSuite) TestValidateFailure(c *C) {
 
 // Test a clean build.  The simplest case.
 func (s *IntegrationTestSuite) TestCleanBuild(c *C) {
-	s.exerciseCleanBuild(c, TagCleanBuild, false, FakeBaseImage)
+	s.exerciseCleanBuild(c, TagCleanBuild, false, false, FakeBaseImage)
 }
 
 func (s *IntegrationTestSuite) TestCleanBuildRun(c *C) {
-	s.exerciseCleanBuild(c, TagCleanBuildRun, true, FakeBaseImage)
+	s.exerciseCleanBuild(c, TagCleanBuildRun, true, false, FakeBaseImage)
 }
 
 func (s *IntegrationTestSuite) TestCleanBuildRunUser(c *C) {
-	s.exerciseCleanBuild(c, TagCleanBuildRunUser, true, FakeUserImage)
+	s.exerciseCleanBuild(c, TagCleanBuildRunUser, true, false, FakeUserImage)
 }
 
-func (s *IntegrationTestSuite) exerciseCleanBuild(c *C, tag string, useRun bool, imageName string) {
+// Test that a build request with a callbackUrl will invoke HTTP endpoint
+func (s *IntegrationTestSuite) TestCleanBuildCallbackInvoked(c *C) {
+	s.exerciseCleanBuild(c, TagCleanBuildRun, true, true, FakeBaseImage)
+}
+
+func (s *IntegrationTestSuite) exerciseCleanBuild(c *C, tag string, useRun bool, verifyCallback bool, imageName string) {
+	callbackUrl := ""
+	callbackInvoked := false
+	callbackHasValidJson := false
+	if verifyCallback {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			// we got called
+			callbackInvoked = true
+			// the header is as expected
+			contentType := r.Header["Content-Type"][0]
+			callbackHasValidJson = contentType == "application/json"
+			// the request body is as expected
+			if callbackHasValidJson {
+				defer r.Body.Close()
+				body, _ := ioutil.ReadAll(r.Body)
+				type CallbackMessage struct {
+					Payload string
+					Success bool
+				}
+				var callbackMessage CallbackMessage
+				err := json.Unmarshal(body, &callbackMessage)
+				callbackHasValidJson = (err == nil) && (callbackMessage.Success)
+			}
+			fmt.Fprintln(w, "Hello, sti build")
+		}
+		ts := httptest.NewServer(http.HandlerFunc(handler))
+		defer ts.Close()
+		callbackUrl = ts.URL
+	}
+
 	req := BuildRequest{
 		Request: Request{
 			WorkingDir:   s.tempDir,
 			DockerSocket: DockerSocket,
 			Verbose:      true,
 			BaseImage:    imageName},
-		Source: TestSource,
-		Tag:    tag,
-		Clean:  true,
-		Writer: os.Stdout}
+		Source:      TestSource,
+		Tag:         tag,
+		Clean:       true,
+		Writer:      os.Stdout,
+		CallbackUrl: callbackUrl}
 
 	if useRun {
 		req.Method = "run"
@@ -127,8 +166,11 @@ func (s *IntegrationTestSuite) exerciseCleanBuild(c *C, tag string, useRun bool,
 	}
 
 	resp, err := Build(req)
+
 	c.Assert(err, IsNil, Commentf("Sti build failed"))
 	c.Assert(resp.Success, Equals, true, Commentf("Sti build failed"))
+	c.Assert(callbackInvoked, Equals, verifyCallback, Commentf("Sti build did not invoke callback"))
+	c.Assert(callbackHasValidJson, Equals, verifyCallback, Commentf("Sti build did not invoke callback with valid json message"))
 
 	s.checkForImage(c, tag)
 	containerId := s.createContainer(c, tag)
