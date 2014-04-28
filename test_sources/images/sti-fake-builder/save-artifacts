@@ -1,3 +1,0 @@
-#!/bin/bash
-
-touch /usr/artifacts/save-artifacts-invoked

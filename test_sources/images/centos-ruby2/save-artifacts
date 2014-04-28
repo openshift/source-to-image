@@ -1,5 +1,0 @@
-#!/bin/bash -x
-
-cd /
-tar zcvf /usr/artifacts/gems.tgz /opt/ruby/bundle/ruby
-/bin/sync

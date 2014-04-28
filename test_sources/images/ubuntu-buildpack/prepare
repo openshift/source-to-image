@@ -1,3 +1,0 @@
-#!/bin/bash
-
-/usr/buildpack/buildpack /usr/source
