@@ -16,6 +16,7 @@ import (
 type BuildRequest struct {
 	Request
 	Source      string
+	Ref         string
 	Tag         string
 	Clean       bool
 	Environment map[string]string
@@ -165,7 +166,7 @@ func (h requestHandler) build(req BuildRequest, incremental bool) (*BuildResult,
 	}
 
 	targetSourceDir := filepath.Join(req.WorkingDir, "src")
-	err = h.prepareSourceDir(req.Source, targetSourceDir)
+	err = h.prepareSourceDir(req.Source, targetSourceDir, req.Ref)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +203,7 @@ func (h requestHandler) extendedBuild(req BuildRequest, incremental bool) (*Buil
 		}
 	}
 
-	err := h.prepareSourceDir(req.Source, inputSourceDir)
+	err := h.prepareSourceDir(req.Source, inputSourceDir, req.Ref)
 	if err != nil {
 		return nil, err
 	}
@@ -349,20 +350,39 @@ func (h requestHandler) saveArtifacts(image string, tmpDir string, path string) 
 	return nil
 }
 
-func (h requestHandler) prepareSourceDir(source string, targetSourceDir string) error {
+func (h requestHandler) prepareSourceDir(source, targetSourceDir, ref string) error {
 	// Support git:// and https:// schema for GIT repositories
-	//
 	if strings.HasPrefix(source, "git://") || strings.HasPrefix(source, "https://") {
-		if h.debug {
-			log.Printf("Fetching %s to directory %s", source, targetSourceDir)
+		if ref != "" {
+			valid := validateGitRef(ref)
+			if !valid {
+				return ErrInvalidRef
+			}
 		}
+
+		if h.debug {
+			log.Printf("Cloning %s to directory %s", source, targetSourceDir)
+		}
+
 		output, err := gitClone(source, targetSourceDir)
 		if err != nil {
 			if h.debug {
-				log.Println(output)
+				log.Printf("Git clone output:\n%s", output)
 				log.Printf("Git clone failed: %+v", err)
 			}
+
 			return err
+		}
+
+		if ref != "" {
+			if h.debug {
+				log.Printf("Checking out ref %s", ref)
+			}
+
+			err := gitCheckout(targetSourceDir, ref, h.debug)
+			if err != nil {
+				return err
+			}
 		}
 	} else {
 		// TODO: investigate using bind-mounts instead

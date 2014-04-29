@@ -13,6 +13,7 @@ const (
 	ErrInvalidBuildMethod
 	ErrBuildFailed
 	ErrCommitContainerFailed
+	ErrInvalidRef
 )
 
 func (s StiError) Error() string {
@@ -37,6 +38,8 @@ func (s StiError) Error() string {
 		return "Running /usr/bin/prepare in base image failed"
 	case ErrCommitContainerFailed:
 		return "Failed to commit built container"
+	case ErrInvalidRef:
+		return "Invalid git ref"
 	default:
 		return "Unknown error"
 	}
