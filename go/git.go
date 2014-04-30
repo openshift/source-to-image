@@ -29,7 +29,7 @@ func gitClone(source, target string) (string, error) {
 	return buffer.String(), nil
 }
 
-func gitCheckout(repo, ref string, debug bool) error {
+func gitCheckout(repo, ref string, verbose bool) error {
 	var buffer bytes.Buffer
 	cmd := exec.Command("git", "checkout", ref)
 	cmd.Stdout, cmd.Stderr = &buffer, &buffer
@@ -42,7 +42,7 @@ func gitCheckout(repo, ref string, debug bool) error {
 
 	err = cmd.Wait()
 	if err != nil {
-		if debug {
+		if verbose {
 			log.Printf("Git checkout output:\n%s", buffer.String())
 		}
 		return err

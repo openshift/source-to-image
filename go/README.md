@@ -34,7 +34,7 @@ You can start using sti right away with the following test sources and publicly 
     sti validate BUILD_IMAGE_TAG [flags]
 
     Available Flags:
-         --debug=false: Enable debugging output
+         --verbose=false: Enable verbose output
      -I, --incremental=false: Validate for an incremental build
      -R, --runtime="": Set the runtime image to use
      -U, --url="unix:///var/run/docker.sock": Set the url of the docker socket to use
@@ -54,7 +54,7 @@ The `--incremental` option to enables validation for incremental builds:
 
     Available Flags:
          --clean=false: Perform a clean build
-         --debug=false: Enable debugging output
+         --verbose=false: Enable verbose output
          --dir="tempdir": Directory where generated Dockerfiles and other support scripts are created
      -e, --env="": Specify an environment var NAME=VALUE,NAME2=VALUE2,...
      -R, --runtime="": Set the runtime image to use

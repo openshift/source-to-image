@@ -67,7 +67,7 @@ func (s *IntegrationTestSuite) TestValidateSuccess(c *C) {
 		Request: Request{
 			WorkingDir:   s.tempDir,
 			DockerSocket: DockerSocket,
-			Debug:        true,
+			Verbose:      true,
 			BaseImage:    FakeBaseImage,
 		},
 		Incremental: false,
@@ -83,7 +83,7 @@ func (s *IntegrationTestSuite) TestValidateFailure(c *C) {
 		Request: Request{
 			WorkingDir:   s.tempDir,
 			DockerSocket: DockerSocket,
-			Debug:        true,
+			Verbose:      true,
 			BaseImage:    FakeBrokenBaseImage,
 		},
 		Incremental: false,
@@ -107,7 +107,7 @@ func (s *IntegrationTestSuite) exerciseCleanBuild(c *C, tag string, useRun bool)
 		Request: Request{
 			WorkingDir:   s.tempDir,
 			DockerSocket: DockerSocket,
-			Debug:        true,
+			Verbose:      true,
 			BaseImage:    FakeBaseImage},
 		Source: TestSource,
 		Tag:    tag,
@@ -144,7 +144,7 @@ func (s *IntegrationTestSuite) exerciseIncrementalBuild(c *C, tag string, useRun
 		Request: Request{
 			WorkingDir:   s.tempDir,
 			DockerSocket: DockerSocket,
-			Debug:        true,
+			Verbose:      true,
 			BaseImage:    FakeBaseImage},
 		Source: TestSource,
 		Tag:    tag,
