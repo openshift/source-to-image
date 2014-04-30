@@ -34,25 +34,11 @@ func Validate(req ValidateRequest) (*ValidateResult, error) {
 
 	result := &ValidateResult{Success: true}
 
-	if req.RuntimeImage != "" {
-		valid, err := c.validateImage(req.BaseImage, false)
-		if err != nil {
-			return nil, err
-		}
-		result.recordValidation("Base image", req.BaseImage, valid)
-
-		valid, err = c.validateImage(req.RuntimeImage, true)
-		if err != nil {
-			return nil, err
-		}
-		result.recordValidation("Runtime image", req.RuntimeImage, valid)
-	} else {
-		valid, err := c.validateImage(req.BaseImage, req.Incremental)
-		if err != nil {
-			return nil, err
-		}
-		result.recordValidation("Base image", req.BaseImage, valid)
+	valid, err := c.validateImage(req.BaseImage, req.Incremental)
+	if err != nil {
+		return nil, err
 	}
+	result.recordValidation("Base image", req.BaseImage, valid)
 
 	return result, nil
 }

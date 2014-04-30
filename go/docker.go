@@ -10,8 +10,7 @@ import (
 // Request contains essential fields for any request: a Configuration, a base image, and an
 // optional runtime image.
 type Request struct {
-	BaseImage    string
-	RuntimeImage string
+	BaseImage string
 
 	DockerSocket  string
 	DockerTimeout int
