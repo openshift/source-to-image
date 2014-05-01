@@ -50,7 +50,7 @@ func (h requestHandler) validateImage(imageName string, incremental bool) (bool,
 		return false, err
 	}
 
-	if h.debug {
+	if h.verbose {
 		log.Printf("Pulled image %s: {%+v}", imageName, image)
 	}
 
@@ -84,7 +84,7 @@ func (h requestHandler) validateRequiredFiles(imageName string, files []string) 
 		if !FileExistsInContainer(h.dockerClient, container.ID, file) {
 			log.Printf("ERROR: Image %s is missing %s\n", imageName, file)
 			return false, nil
-		} else if h.debug {
+		} else if h.verbose {
 			log.Printf("OK: Image %s contains file %s\n", imageName, file)
 		}
 	}

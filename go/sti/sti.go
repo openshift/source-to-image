@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	_ "net/http/pprof"
 
 	"errors"
@@ -55,13 +56,18 @@ func Execute() {
 		},
 	}
 	stiCmd.PersistentFlags().StringVarP(&(req.DockerSocket), "url", "U", "unix:///var/run/docker.sock", "Set the url of the docker socket to use")
-	stiCmd.PersistentFlags().BoolVar(&(req.Debug), "debug", false, "Enable debugging output")
+	stiCmd.PersistentFlags().BoolVar(&(req.Verbose), "verbose", false, "Enable verbose output")
 
 	buildCmd := &cobra.Command{
 		Use:   "build SOURCE BUILD_IMAGE APP_IMAGE_TAG",
 		Short: "Build an image",
 		Long:  "Build an image",
 		Run: func(cmd *cobra.Command, args []string) {
+			// if we're not verbose, make sure the logger doesn't print out timestamps
+			if !req.Verbose {
+				log.SetFlags(0)
+			}
+
 			buildReq.Request = req
 			buildReq.Source = args[0]
 			buildReq.BaseImage = args[1]

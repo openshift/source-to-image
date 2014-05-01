@@ -65,12 +65,10 @@ func Build(req BuildRequest) (*BuildResult, error) {
 		}
 	}
 
-	if h.debug {
-		if incremental {
-			log.Printf("Existing image for tag %s detected for incremental build\n", tag)
-		} else {
-			log.Println("Clean build will be performed")
-		}
+	if incremental {
+		log.Printf("Existing image for tag %s detected for incremental build\n", tag)
+	} else {
+		log.Println("Clean build will be performed")
 	}
 
 	var result *BuildResult
@@ -109,7 +107,7 @@ CMD [ "/usr/bin/run" ]
 `))
 
 func (h requestHandler) detectIncrementalBuild(tag string) (bool, error) {
-	if h.debug {
+	if h.verbose {
 		log.Printf("Determining whether image %s is compatible with incremental build", tag)
 	}
 
@@ -123,7 +121,7 @@ func (h requestHandler) detectIncrementalBuild(tag string) (bool, error) {
 }
 
 func (h requestHandler) build(req BuildRequest, incremental bool) (*BuildResult, error) {
-	if h.debug {
+	if h.verbose {
 		log.Printf("Performing source build from %s\n", req.Source)
 	}
 
@@ -157,7 +155,7 @@ func (h requestHandler) build(req BuildRequest, incremental bool) (*BuildResult,
 }
 
 func (h requestHandler) saveArtifacts(image string, tmpDir string, path string) error {
-	if h.debug {
+	if h.verbose {
 		log.Printf("Saving build artifacts from image %s to path %s\n", image, path)
 	}
 
@@ -228,7 +226,7 @@ func (h requestHandler) saveArtifacts(image string, tmpDir string, path string) 
 	}
 
 	if exitCode != 0 {
-		if h.debug {
+		if h.verbose {
 			log.Printf("Exit code: %d", exitCode)
 		}
 		return ErrSaveArtifactsFailed
@@ -247,13 +245,13 @@ func (h requestHandler) prepareSourceDir(source, targetSourceDir, ref string) er
 			}
 		}
 
-		if h.debug {
+		if h.verbose {
 			log.Printf("Cloning %s to directory %s", source, targetSourceDir)
 		}
 
 		output, err := gitClone(source, targetSourceDir)
 		if err != nil {
-			if h.debug {
+			if h.verbose {
 				log.Printf("Git clone output:\n%s", output)
 				log.Printf("Git clone failed: %+v", err)
 			}
@@ -262,11 +260,11 @@ func (h requestHandler) prepareSourceDir(source, targetSourceDir, ref string) er
 		}
 
 		if ref != "" {
-			if h.debug {
+			if h.verbose {
 				log.Printf("Checking out ref %s", ref)
 			}
 
-			err := gitCheckout(targetSourceDir, ref, h.debug)
+			err := gitCheckout(targetSourceDir, ref, h.verbose)
 			if err != nil {
 				return err
 			}
@@ -320,7 +318,7 @@ func (h requestHandler) buildDeployableImageWithDockerBuild(req BuildRequest, im
 		return nil, ErrCreateDockerfileFailed
 	}
 
-	if h.debug {
+	if h.verbose {
 		log.Printf("Wrote Dockerfile for build to %s\n", dockerFilePath)
 	}
 
@@ -329,7 +327,7 @@ func (h requestHandler) buildDeployableImageWithDockerBuild(req BuildRequest, im
 		return nil, err
 	}
 
-	if h.debug {
+	if h.verbose {
 		log.Printf("Created tarball for %s at %s\n", contextDir, tarBall.Name())
 	}
 
@@ -392,7 +390,7 @@ func (h requestHandler) buildDeployableImageWithDockerRun(req BuildRequest, imag
 		}
 		config.Env = cmdEnv
 	}
-	if h.debug {
+	if h.verbose {
 		log.Printf("Creating container using config: %+v\n", config)
 	}
 
@@ -430,7 +428,7 @@ func (h requestHandler) buildDeployableImageWithDockerRun(req BuildRequest, imag
 	}
 
 	hostConfig := docker.HostConfig{Binds: binds}
-	if h.debug {
+	if h.verbose {
 		log.Printf("Starting container with config: %+v\n", hostConfig)
 	}
 
@@ -456,7 +454,7 @@ func (h requestHandler) buildDeployableImageWithDockerRun(req BuildRequest, imag
 	}
 
 	config = docker.Config{Image: image, Cmd: []string{"/usr/bin/run"}, Env: cmdEnv}
-	if h.debug {
+	if h.verbose {
 		log.Printf("Commiting container with config: %+v\n", config)
 	}
 
@@ -465,7 +463,7 @@ func (h requestHandler) buildDeployableImageWithDockerRun(req BuildRequest, imag
 		return nil, ErrBuildFailed
 	}
 
-	if h.debug {
+	if h.verbose {
 		log.Printf("Built image: %+v\n", builtImage)
 	}
 
