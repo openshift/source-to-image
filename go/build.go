@@ -173,10 +173,13 @@ func (h requestHandler) saveArtifacts(image string, tmpDir string, path string) 
 
 	if hasUser {
 		volumeMap["/.container.init"] = struct{}{}
-		cmd = []string{"/.container.init"}
+		cmd = []string{"/.container.init/init.sh"}
 	}
 
 	config := docker.Config{User: "root", Image: image, Cmd: cmd, Volumes: volumeMap}
+	if h.verbose {
+		log.Printf("Creating container using config: %+v\n", config)
+	}
 	container, err := h.dockerClient.CreateContainer(docker.CreateContainerOptions{Name: "", Config: &config})
 	if err != nil {
 		return err
@@ -186,13 +189,28 @@ func (h requestHandler) saveArtifacts(image string, tmpDir string, path string) 
 	binds := []string{path + ":/tmp/artifacts"}
 	if hasUser {
 		// TODO: add custom errors?
+		if h.verbose {
+			log.Println("Creating stub file")
+		}
 		stubFile, err := openFileExclusive(filepath.Join(path, ".stub"), 0666)
 		if err != nil {
 			return err
 		}
 		defer stubFile.Close()
 
-		initScriptPath := filepath.Join(tmpDir, "save-artifacts-init.sh")
+		containerInitDir := filepath.Join(tmpDir, ".container.init")
+		if h.verbose {
+			log.Printf("Creating dir %+v\n", containerInitDir)
+		}
+		err = os.MkdirAll(containerInitDir, 0700)
+		if err != nil {
+			return err
+		}
+
+		initScriptPath := filepath.Join(containerInitDir, "init.sh")
+		if h.verbose {
+			log.Printf("Writing %+v\n", initScriptPath)
+		}
 		initScript, err := openFileExclusive(initScriptPath, 0766)
 		if err != nil {
 			return err
@@ -204,10 +222,13 @@ func (h requestHandler) saveArtifacts(image string, tmpDir string, path string) 
 		}
 		initScript.Close()
 
-		binds = append(binds, initScriptPath+":/.container.init")
+		binds = append(binds, containerInitDir+":/.container.init")
 	}
 
 	hostConfig := docker.HostConfig{Binds: binds}
+	if h.verbose {
+		log.Printf("Starting container with host config %+v\n", hostConfig)
+	}
 	err = h.dockerClient.StartContainer(container.ID, &hostConfig)
 	if err != nil {
 		return err
@@ -378,7 +399,7 @@ func (h requestHandler) buildDeployableImageWithDockerRun(req BuildRequest, imag
 
 	cmd := []string{"/usr/bin/prepare"}
 	if hasUser {
-		cmd = []string{"/.container.init"}
+		cmd = []string{"/.container.init/init.sh"}
 		volumeMap["/.container.init"] = struct{}{}
 	}
 
@@ -407,7 +428,13 @@ func (h requestHandler) buildDeployableImageWithDockerRun(req BuildRequest, imag
 		binds = append(binds, filepath.Join(contextDir, "artifacts")+":/tmp/artifacts")
 	}
 	if hasUser {
-		buildScriptPath := filepath.Join(contextDir, "tmp", ".container.init")
+		containerInitDir := filepath.Join(req.WorkingDir, "tmp", ".container.init")
+		err := os.MkdirAll(containerInitDir, 0700)
+		if err != nil {
+			return nil, err
+		}
+
+		buildScriptPath := filepath.Join(containerInitDir, "init.sh")
 		buildScript, err := openFileExclusive(buildScriptPath, 0700)
 		if err != nil {
 			return nil, err
@@ -424,7 +451,7 @@ func (h requestHandler) buildDeployableImageWithDockerRun(req BuildRequest, imag
 		}
 		buildScript.Close()
 
-		binds = append(binds, buildScriptPath+":/.container.init")
+		binds = append(binds, containerInitDir+":/.container.init")
 	}
 
 	hostConfig := docker.HostConfig{Binds: binds}
@@ -454,6 +481,10 @@ func (h requestHandler) buildDeployableImageWithDockerRun(req BuildRequest, imag
 	}
 
 	config = docker.Config{Image: image, Cmd: []string{"/usr/bin/run"}, Env: cmdEnv}
+	if hasUser {
+		config.User = user
+	}
+
 	if h.verbose {
 		log.Printf("Commiting container with config: %+v\n", config)
 	}
