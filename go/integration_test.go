@@ -20,12 +20,11 @@ type IntegrationTestSuite struct {
 }
 
 // Register IntegrationTestSuite with the gocheck suite manager and add support for 'go test' flags,
-// viz: go test -integration -extended
+// viz: go test -integration
 var (
 	_ = Suite(&IntegrationTestSuite{})
 
 	integration = flag.Bool("integration", false, "Include integration tests")
-	extended    = flag.Bool("extended", false, "Include long-running tests")
 )
 
 const (
@@ -36,15 +35,11 @@ const (
 	FakeBuildImage      = "pmorie/sti-fake-builder"
 	FakeBrokenBaseImage = "pmorie/sti-fake-broken"
 
-	TagCleanBuild               = "test/sti-fake-app"
-	TagIncrementalBuild         = "test/sti-incremental-app"
-	TagExtendedBuild            = "test/sti-extended-app"
-	TagIncrementalExtendedBuild = "test/sti-inc-ext-app"
+	TagCleanBuild       = "test/sti-fake-app"
+	TagIncrementalBuild = "test/sti-incremental-app"
 
-	TagCleanBuildRun               = "test/sti-fake-app-run"
-	TagIncrementalBuildRun         = "test/sti-incremental-app-run"
-	TagExtendedBuildRun            = "test/sti-extended-app-run"
-	TagIncrementalExtendedBuildRun = "test/sti-inc-ext-app-run"
+	TagCleanBuildRun       = "test/sti-fake-app-run"
+	TagIncrementalBuildRun = "test/sti-incremental-app-run"
 )
 
 // Suite/Test fixtures are provided by gocheck
@@ -54,7 +49,7 @@ func (s *IntegrationTestSuite) SetUpSuite(c *C) {
 	}
 
 	s.dockerClient, _ = docker.NewClient(DockerSocket)
-	for _, image := range []string{TagCleanBuild, TagIncrementalBuild, TagExtendedBuild, TagIncrementalExtendedBuild} {
+	for _, image := range []string{TagCleanBuild, TagIncrementalBuild} {
 		s.dockerClient.RemoveImage(image)
 		s.dockerClient.RemoveImage(image + "-run")
 	}
@@ -92,38 +87,6 @@ func (s *IntegrationTestSuite) TestValidateFailure(c *C) {
 			BaseImage:    FakeBrokenBaseImage,
 		},
 		Incremental: false,
-	}
-	resp, err := Validate(req)
-	c.Assert(err, IsNil, Commentf("Validation failed: err"))
-	c.Assert(resp.Success, Equals, false, Commentf("Validation should have failed: invalid response"))
-}
-
-// Test an extended validation
-func (s *IntegrationTestSuite) TestValidateExtendedSuccess(c *C) {
-	req := ValidateRequest{
-		Request: Request{
-			WorkingDir:   s.tempDir,
-			DockerSocket: DockerSocket,
-			Debug:        true,
-			BaseImage:    FakeBaseImage,
-			RuntimeImage: FakeBaseImage,
-		},
-	}
-	resp, err := Validate(req)
-	c.Assert(err, IsNil, Commentf("Validation failed: err"))
-	c.Assert(resp.Success, Equals, true, Commentf("Validation failed: invalid response"))
-}
-
-// Test an extended validation with a broken runtime image
-func (s *IntegrationTestSuite) TestValidateExtendedFailure(c *C) {
-	req := ValidateRequest{
-		Request: Request{
-			WorkingDir:   s.tempDir,
-			DockerSocket: DockerSocket,
-			Debug:        true,
-			BaseImage:    FakeBaseImage,
-			RuntimeImage: FakeBrokenBaseImage,
-		},
 	}
 	resp, err := Validate(req)
 	c.Assert(err, IsNil, Commentf("Validation failed: err"))
@@ -177,10 +140,6 @@ func (s *IntegrationTestSuite) TestIncrementalBuildRun(c *C) {
 }
 
 func (s *IntegrationTestSuite) exerciseIncrementalBuild(c *C, tag string, useRun bool) {
-	if !*extended {
-		c.Skip("-extended not provided")
-	}
-
 	req := BuildRequest{
 		Request: Request{
 			WorkingDir:   s.tempDir,
@@ -215,95 +174,6 @@ func (s *IntegrationTestSuite) exerciseIncrementalBuild(c *C, tag string, useRun
 	containerId := s.createContainer(c, tag)
 	defer s.removeContainer(containerId)
 	s.checkIncrementalBuildState(c, containerId)
-}
-
-// Test an extended build.
-func (s *IntegrationTestSuite) TestCleanExtendedBuild(c *C) {
-	s.exerciseCleanExtendedBuild(c, TagExtendedBuild, false)
-}
-
-func (s *IntegrationTestSuite) TestCleanExtendedBuildRun(c *C) {
-	s.exerciseCleanExtendedBuild(c, TagExtendedBuildRun, true)
-}
-
-func (s *IntegrationTestSuite) exerciseCleanExtendedBuild(c *C, tag string, useRun bool) {
-	req := BuildRequest{
-		Request: Request{
-			WorkingDir:   s.tempDir,
-			DockerSocket: DockerSocket,
-			Debug:        true,
-			BaseImage:    FakeBuildImage,
-			RuntimeImage: FakeBaseImage},
-		Source: TestSource,
-		Tag:    tag,
-		Clean:  true,
-		Writer: os.Stdout}
-
-	if useRun {
-		req.Method = "run"
-	} else {
-		req.Method = "build"
-	}
-
-	resp, err := Build(req)
-	c.Assert(err, IsNil, Commentf("Sti build failed"))
-	c.Assert(resp.Success, Equals, true, Commentf("Sti build failed"))
-
-	s.checkForImage(c, tag)
-	containerId := s.createContainer(c, tag)
-	defer s.removeContainer(containerId)
-	s.checkExtendedBuildState(c, containerId)
-}
-
-// Test an incremental extended build
-func (s *IntegrationTestSuite) TestIncrementalExtendedBuild(c *C) {
-	s.exerciseIncrementalExtendedBuild(c, TagIncrementalExtendedBuild, false)
-}
-
-func (s *IntegrationTestSuite) TestIncrementalExtendedBuildRun(c *C) {
-	s.exerciseIncrementalExtendedBuild(c, TagIncrementalExtendedBuildRun, false)
-}
-
-func (s *IntegrationTestSuite) exerciseIncrementalExtendedBuild(c *C, tag string, useRun bool) {
-	if !*extended {
-		c.Skip("-extended not provided")
-	}
-
-	req := BuildRequest{
-		Request: Request{
-			WorkingDir:   s.tempDir,
-			DockerSocket: DockerSocket,
-			Debug:        true,
-			BaseImage:    FakeBuildImage,
-			RuntimeImage: FakeBaseImage},
-		Source: TestSource,
-		Tag:    tag,
-		Clean:  true,
-		Writer: os.Stdout}
-
-	if useRun {
-		req.Method = "run"
-	} else {
-		req.Method = "build"
-	}
-
-	resp, err := Build(req)
-	c.Assert(err, IsNil, Commentf("Sti build failed"))
-	c.Assert(resp.Success, Equals, true, Commentf("Sti build failed"))
-
-	os.Remove(s.tempDir)
-	s.tempDir, _ = ioutil.TempDir("", "go-sti-integration")
-	req.WorkingDir = s.tempDir
-	req.Clean = false
-
-	resp, err = Build(req)
-	c.Assert(err, IsNil, Commentf("Sti build failed"))
-	c.Assert(resp.Success, Equals, true, Commentf("Sti build failed"))
-
-	s.checkForImage(c, tag)
-	containerId := s.createContainer(c, tag)
-	defer s.removeContainer(containerId)
-	s.checkIncrementalExtendedBuildState(c, containerId)
 }
 
 // Support methods
@@ -345,14 +215,4 @@ func (s *IntegrationTestSuite) checkBasicBuildState(c *C, cId string) {
 func (s *IntegrationTestSuite) checkIncrementalBuildState(c *C, cId string) {
 	s.checkBasicBuildState(c, cId)
 	s.checkFileExists(c, cId, "/sti-fake/save-artifacts-invoked")
-}
-
-func (s *IntegrationTestSuite) checkExtendedBuildState(c *C, cId string) {
-	s.checkFileExists(c, cId, "/sti-fake/prepare-invoked")
-	s.checkFileExists(c, cId, "/sti-fake/run-invoked")
-}
-
-func (s *IntegrationTestSuite) checkIncrementalExtendedBuildState(c *C, cId string) {
-	s.checkExtendedBuildState(c, cId)
-	s.checkFileExists(c, cId, "/sti-fake/src/save-artifacts-invoked")
 }

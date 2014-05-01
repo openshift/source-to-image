@@ -45,15 +45,8 @@ func Build(req BuildRequest) (*BuildResult, error) {
 		return nil, err
 	}
 
-	incremental := !req.Clean
-
-	// If a runtime image is defined, check for the presence of an
-	// existing build image for the app to determine if an incremental
-	// build should be performed
 	tag := req.Tag
-	if req.RuntimeImage != "" {
-		tag += "-build"
-	}
+	incremental := !req.Clean
 
 	if incremental {
 		exists, err := h.isImageInLocalRegistry(tag)
@@ -82,11 +75,7 @@ func Build(req BuildRequest) (*BuildResult, error) {
 
 	var result *BuildResult
 
-	if req.RuntimeImage == "" {
-		result, err = h.build(req, incremental)
-	} else {
-		result, err = h.extendedBuild(req, incremental)
-	}
+	result, err = h.build(req, incremental)
 
 	return result, err
 }
@@ -96,13 +85,6 @@ var saveArtifactsInitTemplate = template.Must(template.New("sa-init.sh").Parse(`
 chown -R {{.User}}:{{.User}} /tmp/artifacts && chmod -R 755 /tmp/artifacts
 exec su {{.User}} -s /bin/bash -c /usr/bin/save-artifacts
 `))
-
-// var extendedBuildTemplate = template.Must(template.New("ex-build-init.sh").Parse(`#!/bin/bash
-// chown {{.User}}:{{.User}} /tmp/src && chmod 755 /tmp/src
-// chown {{.User}}:{{.User}} /tmp/artifacts && chmod 755 /tmp/artifacts
-// chown {{.User}}:{{.User}} /tmp/build && chmod 755 /tmp/build
-// exec su {{.User}} -s /bin/bash -c /usr/bin/prepare
-// `))
 
 // Script used to initialize permissions on bind-mounts for a docker-run build (prepare call)
 var buildTemplate = template.Must(template.New("build-init.sh").Parse(`#!/bin/bash
@@ -172,101 +154,6 @@ func (h requestHandler) build(req BuildRequest, incremental bool) (*BuildResult,
 	}
 
 	return h.buildDeployableImage(req, req.BaseImage, req.WorkingDir, incremental)
-}
-
-func (h requestHandler) extendedBuild(req BuildRequest, incremental bool) (*BuildResult, error) {
-	var (
-		buildImageTag = req.Tag + "-build"
-		wd            = req.WorkingDir
-
-		tmpDir = filepath.Join(wd, "tmp")
-
-		builderBuildDir     = filepath.Join(wd, "build")
-		previousBuildVolume = filepath.Join(builderBuildDir, "last_build_artifacts")
-		inputSourceDir      = filepath.Join(builderBuildDir, "src")
-
-		runtimeBuildDir = filepath.Join(wd, "runtime")
-		outputSourceDir = filepath.Join(runtimeBuildDir, "src")
-	)
-
-	for _, dir := range []string{tmpDir, builderBuildDir, runtimeBuildDir, previousBuildVolume, outputSourceDir} {
-		err := os.Mkdir(dir, 0700)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if incremental {
-		err := h.saveArtifacts(buildImageTag, tmpDir, previousBuildVolume)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	err := h.prepareSourceDir(req.Source, inputSourceDir, req.Ref)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: necessary to specify these, if specifying bind-mounts?
-	volumeMap := make(map[string]struct{})
-	volumeMap["/tmp/artifacts"] = struct{}{}
-	volumeMap["/tmp/src"] = struct{}{}
-	volumeMap["/tmp/build"] = struct{}{}
-
-	bindMounts := []string{
-		previousBuildVolume + ":/tmp/artifacts",
-		inputSourceDir + ":/tmp/src",
-		outputSourceDir + ":/tmp/build",
-	}
-
-	if h.debug {
-		log.Println("Creating build container to run source build")
-	}
-
-	config := docker.Config{Image: req.BaseImage, Cmd: []string{"/usr/bin/prepare"}, Volumes: volumeMap}
-	container, err := h.dockerClient.CreateContainer(docker.CreateContainerOptions{Name: "", Config: &config})
-	if err != nil {
-		return nil, err
-	}
-	cID := container.ID
-
-	if h.debug {
-		log.Printf("Build container: %s\n", cID)
-	} else {
-		defer h.removeContainer(cID)
-	}
-
-	hostConfig := docker.HostConfig{Binds: bindMounts}
-	err = h.dockerClient.StartContainer(cID, &hostConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	exitCode, err := h.dockerClient.WaitContainer(cID)
-	if err != nil {
-		return nil, err
-	}
-
-	if exitCode != 0 {
-		return nil, ErrBuildFailed
-	}
-
-	buildResult, err := h.buildDeployableImage(req, req.RuntimeImage, runtimeBuildDir, false)
-	if err != nil {
-		return nil, err
-	}
-
-	if h.debug {
-		log.Printf("Commiting build container %s to tag %s", cID, buildImageTag)
-	}
-
-	err = h.commitContainer(cID, buildImageTag)
-	if err != nil {
-		log.Printf("Unable commit container %s to tag %s\n", cID, buildImageTag)
-	}
-
-	return buildResult, nil
 }
 
 func (h requestHandler) saveArtifacts(image string, tmpDir string, path string) error {
