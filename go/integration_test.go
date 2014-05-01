@@ -32,6 +32,7 @@ const (
 	TestSource   = "git://github.com/pmorie/simple-html"
 
 	FakeBaseImage       = "pmorie/sti-fake"
+	FakeUserImage       = "pmorie/sti-fake-user"
 	FakeBuildImage      = "pmorie/sti-fake-builder"
 	FakeBrokenBaseImage = "pmorie/sti-fake-broken"
 
@@ -39,6 +40,7 @@ const (
 	TagIncrementalBuild = "test/sti-incremental-app"
 
 	TagCleanBuildRun       = "test/sti-fake-app-run"
+	TagCleanBuildRunUser   = "test/sti-fake-app-run-user"
 	TagIncrementalBuildRun = "test/sti-incremental-app-run"
 )
 
@@ -95,20 +97,24 @@ func (s *IntegrationTestSuite) TestValidateFailure(c *C) {
 
 // Test a clean build.  The simplest case.
 func (s *IntegrationTestSuite) TestCleanBuild(c *C) {
-	s.exerciseCleanBuild(c, TagCleanBuild, false)
+	s.exerciseCleanBuild(c, TagCleanBuild, false, FakeBaseImage)
 }
 
 func (s *IntegrationTestSuite) TestCleanBuildRun(c *C) {
-	s.exerciseCleanBuild(c, TagCleanBuildRun, true)
+	s.exerciseCleanBuild(c, TagCleanBuildRun, true, FakeBaseImage)
 }
 
-func (s *IntegrationTestSuite) exerciseCleanBuild(c *C, tag string, useRun bool) {
+func (s *IntegrationTestSuite) TestCleanBuildRunUser(c *C) {
+	s.exerciseCleanBuild(c, TagCleanBuildRunUser, true, FakeUserImage)
+}
+
+func (s *IntegrationTestSuite) exerciseCleanBuild(c *C, tag string, useRun bool, imageName string) {
 	req := BuildRequest{
 		Request: Request{
 			WorkingDir:   s.tempDir,
 			DockerSocket: DockerSocket,
 			Verbose:      true,
-			BaseImage:    FakeBaseImage},
+			BaseImage:    imageName},
 		Source: TestSource,
 		Tag:    tag,
 		Clean:  true,
