@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+docker pull pmorie/sti-fake
+docker pull pmorie/sti-fake-user
+docker pull pmorie/sti-fake-broken
+go test github.com/openshift/docker-source-to-images/go $@
