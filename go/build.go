@@ -3,8 +3,11 @@ package sti
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +25,7 @@ type BuildRequest struct {
 	Environment map[string]string
 	Method      string
 	Writer      io.Writer
+	CallbackUrl string
 }
 
 type BuildResult STIResult
@@ -75,7 +79,50 @@ func Build(req BuildRequest) (*BuildResult, error) {
 
 	result, err = h.build(req, incremental)
 
+	if req.CallbackUrl != "" {
+		executeCallback(req.CallbackUrl, result)
+	}
+
 	return result, err
+}
+
+func executeCallback(callbackUrl string, result *BuildResult) {
+
+	buf := new(bytes.Buffer)
+	writer := bufio.NewWriter(buf)
+	for _, message := range result.Messages {
+		fmt.Fprintln(writer, message)
+	}
+	writer.Flush()
+
+	d := map[string]interface{}{
+		"payload": buf.String(),
+		"success": result.Success,
+	}
+
+	jsonBuffer := new(bytes.Buffer)
+	writer = bufio.NewWriter(jsonBuffer)
+	jsonWriter := json.NewEncoder(writer)
+	jsonWriter.Encode(d)
+	writer.Flush()
+
+	var resp *http.Response
+	var err error
+
+	for retries := 0; retries < 3; retries++ {
+		resp, err = http.Post(callbackUrl, "application/json", jsonBuffer)
+		if err != nil {
+			errorMessage := fmt.Sprintf("Unable to invoke callback: %s", err.Error())
+			result.Messages = append(result.Messages, errorMessage)
+		}
+		if resp != nil {
+			if resp.StatusCode >= 300 {
+				errorMessage := fmt.Sprintf("Callback returned with error code: %d", resp.StatusCode)
+				result.Messages = append(result.Messages, errorMessage)
+			}
+			break
+		}
+	}
 }
 
 // Script used to initialize permissions on bind-mounts when a non-root user is specified by an image
