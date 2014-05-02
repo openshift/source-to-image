@@ -3,7 +3,6 @@ package sti
 import (
 	"encoding/json"
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -37,7 +36,6 @@ const (
 
 	FakeBaseImage       = "pmorie/sti-fake"
 	FakeUserImage       = "pmorie/sti-fake-user"
-	FakeBuildImage      = "pmorie/sti-fake-builder"
 	FakeBrokenBaseImage = "pmorie/sti-fake-broken"
 
 	TagCleanBuild       = "test/sti-fake-app"
@@ -140,7 +138,6 @@ func (s *IntegrationTestSuite) exerciseCleanBuild(c *C, tag string, useRun bool,
 				err := json.Unmarshal(body, &callbackMessage)
 				callbackHasValidJson = (err == nil) && (callbackMessage.Success)
 			}
-			fmt.Fprintln(w, "Hello, sti build")
 		}
 		ts := httptest.NewServer(http.HandlerFunc(handler))
 		defer ts.Close()
