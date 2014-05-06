@@ -3,14 +3,39 @@ package sti
 import (
 	"bytes"
 	"log"
+	"net/url"
 	"os/exec"
 	"regexp"
+	"strings"
 )
 
 var gitRefExp = regexp.MustCompile(`\A[\w\d\-_\.\^~]+$`)
+var gitSshUrlExp = regexp.MustCompile(`\A([\w\d\-_\.+]+@[\w\d\-_\.+]+:[\w\d\-_\.+%/]+\.git)$`)
 
 func validateGitRef(ref string) bool {
 	return gitRefExp.MatchString(ref)
+}
+
+var allowedSchemes = []string{"git", "http", "https", "file"}
+
+func validCloneSpec(source string, verbose bool) bool {
+	url, err := url.Parse(source)
+	if err != nil {
+		return false
+	}
+
+	if stringInSlice(url.Scheme, allowedSchemes) {
+		return true
+	}
+
+	// support 'git@' ssh urls and local protocol without 'file://' scheme
+	if url.Scheme == "" {
+		if strings.HasSuffix(source, ".git") || (strings.HasPrefix(source, "git@") && gitSshUrlExp.MatchString(source)) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func gitClone(source, target string) (string, error) {
