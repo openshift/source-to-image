@@ -304,15 +304,7 @@ func (h requestHandler) saveArtifacts(image string, tmpDir string, path string) 
 }
 
 func (h requestHandler) prepareSourceDir(source, targetSourceDir, ref string) error {
-	// Support git:// and https:// schema for GIT repositories
-	if strings.HasPrefix(source, "git://") || strings.HasPrefix(source, "https://") {
-		if ref != "" {
-			valid := validateGitRef(ref)
-			if !valid {
-				return ErrInvalidRef
-			}
-		}
-
+	if validCloneSpec(source, h.verbose) {
 		if h.verbose {
 			log.Printf("Cloning %s to directory %s", source, targetSourceDir)
 		}
