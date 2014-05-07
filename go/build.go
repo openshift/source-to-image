@@ -239,7 +239,7 @@ func (h requestHandler) saveArtifacts(image string, tmpDir string, path string) 
 		if h.verbose {
 			log.Println("Creating stub file")
 		}
-		stubFile, err := openFileExclusive(filepath.Join(path, ".stub"), 0666)
+		stubFile, err := os.OpenFile(filepath.Join(path, ".stub"), os.O_CREATE|os.O_RDWR, 0666)
 		if err != nil {
 			return err
 		}
@@ -258,7 +258,7 @@ func (h requestHandler) saveArtifacts(image string, tmpDir string, path string) 
 		if h.verbose {
 			log.Printf("Writing %+v\n", initScriptPath)
 		}
-		initScript, err := openFileExclusive(initScriptPath, 0766)
+		initScript, err := os.OpenFile(initScriptPath, os.O_CREATE|os.O_RDWR, 0766)
 		if err != nil {
 			return err
 		}
@@ -347,7 +347,7 @@ func (h requestHandler) buildDeployableImage(req BuildRequest, image string, con
 
 func (h requestHandler) buildDeployableImageWithDockerBuild(req BuildRequest, image string, contextDir string, incremental bool) (*BuildResult, error) {
 	dockerFilePath := filepath.Join(contextDir, "Dockerfile")
-	dockerFile, err := openFileExclusive(dockerFilePath, 0700)
+	dockerFile, err := os.OpenFile(dockerFilePath, os.O_CREATE|os.O_RDWR, 0700)
 	if err != nil {
 		return nil, err
 	}
@@ -474,7 +474,7 @@ func (h requestHandler) buildDeployableImageWithDockerRun(req BuildRequest, imag
 		}
 
 		buildScriptPath := filepath.Join(containerInitDir, "init.sh")
-		buildScript, err := openFileExclusive(buildScriptPath, 0700)
+		buildScript, err := os.OpenFile(buildScriptPath, os.O_CREATE|os.O_RDWR, 0700)
 		if err != nil {
 			return nil, err
 		}
