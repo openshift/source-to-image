@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"github.com/fsouza/go-dockerclient"
 )
@@ -112,21 +111,4 @@ func imageHasEntryPoint(image *docker.Image) bool {
 	}
 
 	return found
-}
-
-func openFileExclusive(path string, mode os.FileMode) (*os.File, error) {
-	file, errf := os.OpenFile(path, os.O_CREATE|os.O_RDWR, mode)
-	if errf != nil {
-		return nil, errf
-	}
-
-	if errl := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); errl != nil {
-		if errl == syscall.EWOULDBLOCK {
-			return nil, ErrCreateDockerfileFailed
-		}
-
-		return nil, errl
-	}
-
-	return file, nil
 }
