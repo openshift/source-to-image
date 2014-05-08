@@ -29,25 +29,6 @@ You can start using sti right away with the following test sources and publicly 
     docker run -rm -i -p :8080 -t sti_app
 
 
-### Validating a source image
-
-    sti validate BUILD_IMAGE_TAG [flags]
-
-    Available Flags:
-         --verbose=false: Enable verbose output
-     -I, --incremental=false: Validate for an incremental build
-     -R, --runtime="": Set the runtime image to use
-     -U, --url="unix:///var/run/docker.sock": Set the url of the docker socket to use
-
-
-You can validate that an image is usable as a sti source image as follows:
-
-	sti validate BUILD_IMAGE_TAG
-
-The `--incremental` option to enables validation for incremental builds:
-
-    sti validate BUILD_IMAGE_TAG --incremental
-
 ### Building a deployable image with sti
 
     sti build SOURCE BUILD_IMAGE APP_IMAGE_TAG [flags]
@@ -69,8 +50,7 @@ If the build is successful, the built image will be tagged with `APP_IMAGE_TAG`.
 
 If the build image is compatible with incremental builds, `sti build` will look for an image tagged
 with `APP_IMAGE_TAG`.  If an image is present with that tag, `sti build` will save the build
-artifacts from that image and add them to the build container at `/tmp/artifacts` so an image's
-`/usr/bin/prepare` script can restore them before building the source.
+artifacts from that image and add them to the build container at `/tmp/artifacts` so the `assemble` script can restore them before building the source.
 
 When using an image that supports incremental builds, you can do a clean build with `--clean`:
 

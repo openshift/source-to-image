@@ -35,7 +35,7 @@ func (s StiError) Error() string {
 	case ErrInvalidBuildMethod:
 		return "Invalid build method - valid methods are: run,build"
 	case ErrBuildFailed:
-		return "Running /usr/bin/prepare in base image failed"
+		return "Running assemble in base image failed"
 	case ErrCommitContainerFailed:
 		return "Failed to commit built container"
 	case ErrInvalidRef:
