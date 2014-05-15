@@ -34,9 +34,9 @@ const (
 	DockerSocket = "unix:///var/run/docker.sock"
 	TestSource   = "git://github.com/pmorie/simple-html"
 
-	FakeBaseImage       = "pmorie/sti-fake"
-	FakeUserImage       = "pmorie/sti-fake-user"
-	FakeBrokenBaseImage = "pmorie/sti-fake-broken"
+	FakeBaseImage       = "sti_test/sti-fake"
+	FakeUserImage       = "sti_test/sti-fake-user"
+	FakeBrokenBaseImage = "sti_test/sti-fake-broken"
 
 	TagCleanBuild       = "test/sti-fake-app"
 	TagIncrementalBuild = "test/sti-incremental-app"
@@ -65,57 +65,25 @@ func (s *IntegrationTestSuite) SetUpTest(c *C) {
 
 // TestXxxx methods are identified as test cases
 
-// Test the most basic validate case
-func (s *IntegrationTestSuite) TestValidateSuccess(c *C) {
-	req := ValidateRequest{
-		Request: Request{
-			WorkingDir:   s.tempDir,
-			DockerSocket: DockerSocket,
-			Verbose:      true,
-			BaseImage:    FakeBaseImage,
-		},
-		Incremental: false,
-	}
-	resp, err := Validate(req)
-	c.Assert(err, IsNil, Commentf("Validation failed: err"))
-	c.Assert(resp.Success, Equals, true, Commentf("Validation failed: invalid response"))
-}
-
-// Test a basic validation failure
-func (s *IntegrationTestSuite) TestValidateFailure(c *C) {
-	req := ValidateRequest{
-		Request: Request{
-			WorkingDir:   s.tempDir,
-			DockerSocket: DockerSocket,
-			Verbose:      true,
-			BaseImage:    FakeBrokenBaseImage,
-		},
-		Incremental: false,
-	}
-	resp, err := Validate(req)
-	c.Assert(err, IsNil, Commentf("Validation failed: err"))
-	c.Assert(resp.Success, Equals, false, Commentf("Validation should have failed: invalid response"))
-}
-
 // Test a clean build.  The simplest case.
 func (s *IntegrationTestSuite) TestCleanBuild(c *C) {
-	s.exerciseCleanBuild(c, TagCleanBuild, false, false, FakeBaseImage)
+	s.exerciseCleanBuild(c, TagCleanBuild, false, FakeBaseImage)
 }
 
 func (s *IntegrationTestSuite) TestCleanBuildRun(c *C) {
-	s.exerciseCleanBuild(c, TagCleanBuildRun, true, false, FakeBaseImage)
+	s.exerciseCleanBuild(c, TagCleanBuildRun, false, FakeBaseImage)
 }
 
 func (s *IntegrationTestSuite) TestCleanBuildRunUser(c *C) {
-	s.exerciseCleanBuild(c, TagCleanBuildRunUser, true, false, FakeUserImage)
+	s.exerciseCleanBuild(c, TagCleanBuildRunUser, false, FakeUserImage)
 }
 
 // Test that a build request with a callbackUrl will invoke HTTP endpoint
 func (s *IntegrationTestSuite) TestCleanBuildCallbackInvoked(c *C) {
-	s.exerciseCleanBuild(c, TagCleanBuildRun, true, true, FakeBaseImage)
+	s.exerciseCleanBuild(c, TagCleanBuildRun, true, FakeBaseImage)
 }
 
-func (s *IntegrationTestSuite) exerciseCleanBuild(c *C, tag string, useRun bool, verifyCallback bool, imageName string) {
+func (s *IntegrationTestSuite) exerciseCleanBuild(c *C, tag string, verifyCallback bool, imageName string) {
 	callbackUrl := ""
 	callbackInvoked := false
 	callbackHasValidJson := false
@@ -156,12 +124,6 @@ func (s *IntegrationTestSuite) exerciseCleanBuild(c *C, tag string, useRun bool,
 		Writer:      os.Stdout,
 		CallbackUrl: callbackUrl}
 
-	if useRun {
-		req.Method = "run"
-	} else {
-		req.Method = "build"
-	}
-
 	resp, err := Build(req)
 
 	c.Assert(err, IsNil, Commentf("Sti build failed"))
@@ -176,15 +138,11 @@ func (s *IntegrationTestSuite) exerciseCleanBuild(c *C, tag string, useRun bool,
 }
 
 // Test an incremental build.
-func (s *IntegrationTestSuite) TestIncrementalBuild(c *C) {
-	s.exerciseIncrementalBuild(c, TagIncrementalBuild, false)
-}
-
 func (s *IntegrationTestSuite) TestIncrementalBuildRun(c *C) {
-	s.exerciseIncrementalBuild(c, TagIncrementalBuildRun, true)
+	s.exerciseIncrementalBuild(c, TagIncrementalBuildRun)
 }
 
-func (s *IntegrationTestSuite) exerciseIncrementalBuild(c *C, tag string, useRun bool) {
+func (s *IntegrationTestSuite) exerciseIncrementalBuild(c *C, tag string) {
 	req := BuildRequest{
 		Request: Request{
 			WorkingDir:   s.tempDir,
@@ -195,12 +153,6 @@ func (s *IntegrationTestSuite) exerciseIncrementalBuild(c *C, tag string, useRun
 		Tag:    tag,
 		Clean:  true,
 		Writer: os.Stdout}
-
-	if useRun {
-		req.Method = "run"
-	} else {
-		req.Method = "build"
-	}
 
 	resp, err := Build(req)
 	c.Assert(err, IsNil, Commentf("Sti build failed"))
@@ -252,7 +204,7 @@ func (s *IntegrationTestSuite) checkFileExists(c *C, cId string, filePath string
 }
 
 func (s *IntegrationTestSuite) checkBasicBuildState(c *C, cId string) {
-	s.checkFileExists(c, cId, "/sti-fake/prepare-invoked")
+	s.checkFileExists(c, cId, "/sti-fake/assemble-invoked")
 	s.checkFileExists(c, cId, "/sti-fake/run-invoked")
 	s.checkFileExists(c, cId, "/sti-fake/src/index.html")
 }

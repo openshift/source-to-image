@@ -40,10 +40,9 @@ func parseEnvs(envStr string) (map[string]string, error) {
 
 func Execute() {
 	var (
-		req         sti.Request
-		envString   string
-		buildReq    sti.BuildRequest
-		validateReq sti.ValidateRequest
+		req       sti.Request
+		envString string
+		buildReq  sti.BuildRequest
 	)
 
 	stiCmd := &cobra.Command{
@@ -101,34 +100,11 @@ func Execute() {
 	buildCmd.Flags().BoolVar(&(buildReq.Clean), "clean", false, "Perform a clean build")
 	buildCmd.Flags().StringVar(&(req.WorkingDir), "dir", "tempdir", "Directory where generated Dockerfiles and other support scripts are created")
 	buildCmd.Flags().StringVarP(&envString, "env", "e", "", "Specify an environment var NAME=VALUE,NAME2=VALUE2,...")
-	buildCmd.Flags().StringVarP(&(buildReq.Method), "method", "m", "run", "Specify a method to build with. build -> 'docker build', run -> 'docker run'")
 	buildCmd.Flags().StringVarP(&(buildReq.Ref), "ref", "r", "", "Specify a ref to check-out")
 	buildCmd.Flags().StringVar(&(buildReq.CallbackUrl), "callbackUrl", "", "Specify a URL to invoke via HTTP POST upon build completion")
+	buildCmd.Flags().StringVarP(&(buildReq.ScriptsUrl), "scripts", "s", "", "Specify a URL for the assemble and run scripts")
 
 	stiCmd.AddCommand(buildCmd)
-
-	validateCmd := &cobra.Command{
-		Use:   "validate BUILD_IMAGE",
-		Short: "Validate an image",
-		Long:  "Validate an image and optional runtime image",
-		Run: func(cmd *cobra.Command, args []string) {
-			validateReq.Request = req
-			validateReq.BaseImage = args[0]
-			res, err := sti.Validate(validateReq)
-
-			if err != nil {
-				fmt.Printf("An error occured: %s", err.Error())
-				return
-			}
-
-			for _, message := range res.Messages {
-				fmt.Println(message)
-			}
-		},
-	}
-	validateCmd.Flags().BoolVarP(&(validateReq.Incremental), "incremental", "I", false, "Validate for an incremental build")
-	stiCmd.AddCommand(validateCmd)
-
 	stiCmd.Execute()
 }
 
