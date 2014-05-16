@@ -52,7 +52,6 @@ func Build(req BuildRequest) (*BuildResult, error) {
 }
 
 func executeCallback(callbackUrl string, result *BuildResult) {
-
 	buf := new(bytes.Buffer)
 	writer := bufio.NewWriter(buf)
 	for _, message := range result.Messages {
