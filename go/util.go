@@ -3,6 +3,7 @@ package sti
 import (
 	"archive/tar"
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -84,13 +85,20 @@ func tarDirectory(dir string) (*os.File, error) {
 	return fw, nil
 }
 
+func directoryExists(path string) bool {
+	if _, err := os.Stat(path); err == nil {
+		return true
+	}
+	return false
+}
+
 func copy(sourcePath string, targetPath string) error {
 	info, err := os.Stat(sourcePath)
 	if err != nil {
 		return err
 	}
 
-	if !info.IsDir() {
+	if !info.IsDir() && !directoryExists(targetPath) {
 		err = os.Mkdir(targetPath, 0700)
 		if err != nil {
 			return err
@@ -100,7 +108,13 @@ func copy(sourcePath string, targetPath string) error {
 	}
 
 	cmd := exec.Command("cp", "-ad", sourcePath, targetPath)
-	return cmd.Run()
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Println("ERROR: " + string(output))
+		return err
+	} else {
+		return nil
+	}
 }
 
 func imageHasEntryPoint(image *docker.Image) bool {

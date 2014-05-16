@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -130,19 +131,27 @@ func (h requestHandler) build(req BuildRequest) (*BuildResult, error) {
 	}
 
 	if req.ScriptsUrl != "" {
-		h.downloadScripts(req.ScriptsUrl, filepath.Join(req.WorkingDir, "scripts"))
-	}
-
-	defaultUrl, err := h.getDefaultUrl(req, req.BaseImage)
-	if err != nil {
-		return nil, err
-	}
-	if defaultUrl != "" {
-		h.downloadScripts(defaultUrl, filepath.Join(req.WorkingDir, "defaultScripts"))
+		err := h.downloadScripts(req.ScriptsUrl, filepath.Join(req.WorkingDir, "scripts"))
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		defaultUrl, err := h.getDefaultUrl(req, req.BaseImage)
+		if err != nil {
+			return nil, err
+		}
+		if defaultUrl != "" {
+			err := h.downloadScripts(defaultUrl, filepath.Join(req.WorkingDir, "defaultScripts"))
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, errors.New("No assemble script supplied by the image or by the '--scripts' argument")
+		}
 	}
 
 	targetSourceDir := filepath.Join(req.WorkingDir, "src")
-	err = h.prepareSourceDir(req.Source, targetSourceDir, req.Ref)
+	err := h.prepareSourceDir(req.Source, targetSourceDir, req.Ref)
 	if err != nil {
 		return nil, err
 	}
@@ -238,6 +247,14 @@ func (h requestHandler) downloadScripts(url, targetDir string) error {
 	for _, file := range files {
 		if h.verbose {
 			log.Printf("Downloading file %s from url %s to directory %s\n", file, url, targetDir)
+		}
+
+		if strings.HasPrefix(url, "file://") {
+			err := copy(strings.TrimSuffix(strings.TrimPrefix(url, "file://"), "/")+"/"+file, targetDir)
+			if err != nil {
+				return err
+			}
+			continue
 		}
 
 		resp, err := http.Get(url + "/" + file)
