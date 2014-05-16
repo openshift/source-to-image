@@ -216,12 +216,12 @@ func (h requestHandler) determineScriptPath(contextDir string, script string) st
 			log.Printf("Using %s script from user provided url", script)
 		}
 		return filepath.Join("/tmp", "scripts", script)
-	} else if _, err := os.Stat(filepath.Join(contextDir, "src", ".sti", "scripts", script)); err == nil {
+	} else if _, err := os.Stat(filepath.Join(contextDir, "src", ".sti", "bin", script)); err == nil {
 		// if they provided one in the app source, that is preferred next
 		if h.verbose {
 			log.Printf("Using %s script from application source", script)
 		}
-		return filepath.Join("/tmp", "src", ".sti", "scripts", script)
+		return filepath.Join("/tmp", "src", ".sti", "bin", script)
 	} else if _, err := os.Stat(filepath.Join(contextDir, "defaultScripts", script)); err == nil {
 		// lowest priority: script provided by default url reference in the image.
 		if h.verbose {
@@ -406,10 +406,6 @@ func (h requestHandler) prepareSourceDir(source, targetSourceDir, ref string) er
 }
 
 func (h requestHandler) buildDeployableImage(req BuildRequest, image string, contextDir string, incremental bool) (*BuildResult, error) {
-	return h.buildDeployableImageWithDockerRun(req, image, contextDir, incremental)
-}
-
-func (h requestHandler) buildDeployableImageWithDockerRun(req BuildRequest, image string, contextDir string, incremental bool) (*BuildResult, error) {
 	log.Printf("Building with docker run invocation\n")
 	volumeMap := make(map[string]struct{})
 	volumeMap["/tmp/src"] = struct{}{}
