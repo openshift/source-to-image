@@ -67,6 +67,11 @@ func Execute() {
 				log.SetFlags(0)
 			}
 
+			if len(args) == 0 {
+				cmd.Usage()
+				return
+			}
+
 			buildReq.Request = req
 			buildReq.Source = args[0]
 			buildReq.BaseImage = args[1]
