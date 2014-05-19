@@ -80,10 +80,12 @@ under `.sti/bin` within the root of your source directory.
 
 Script precedence
 -----------------
+
 STI selects which location to use for a given script (assemble, run, and save-artifacts) based on the following ordering:
-1) A script found at the --scripts URL
-2) A script found in the application source `.sti/bin` directory
-3) A script found at the default image URL (STI_SCRIPTS_URL)
+
+1. A script found at the --scripts URL
+1. A script found in the application source `.sti/bin` directory
+1. A script found at the default image URL (STI_SCRIPTS_URL)
 
 
 Build from a git ref
