@@ -10,12 +10,17 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
 	"text/template"
 
 	"github.com/fsouza/go-dockerclient"
+)
+
+const (
+	SVirtSandboxFileLabel = "system_u:object_r:svirt_sandbox_file_t:s0"
 )
 
 type BuildRequest struct {
@@ -366,6 +371,15 @@ func (h requestHandler) saveArtifacts(req BuildRequest, image string, tmpDir str
 			return err
 		}
 
+		chconPath, err := exec.LookPath("chcon")
+		if err == nil {
+			chconCmd := exec.Command(chconPath, SVirtSandboxFileLabel, containerInitDir)
+			err = chconCmd.Run()
+			if err != nil {
+				return err
+			}
+		}
+
 		initScriptPath := filepath.Join(containerInitDir, "init.sh")
 		if h.verbose {
 			log.Printf("Writing %+v\n", initScriptPath)
@@ -533,6 +547,15 @@ func (h requestHandler) buildDeployableImage(req BuildRequest, image string, con
 		err := os.MkdirAll(containerInitDir, 0700)
 		if err != nil {
 			return nil, err
+		}
+
+		chconPath, err := exec.LookPath("chcon")
+		if err == nil {
+			chconCmd := exec.Command(chconPath, SVirtSandboxFileLabel, containerInitDir)
+			err = chconCmd.Run()
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		buildScriptPath := filepath.Join(containerInitDir, "init.sh")
