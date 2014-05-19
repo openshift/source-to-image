@@ -35,28 +35,14 @@ image:
 Build methodologies
 -------------------
 
-`sti` implements two methodologies for building Docker images.  The first will be familiar to anyone
-who's built their own Docker image before - it's just `docker build`.  When building this way, `sti`
-generates a Dockerfile and calls `docker build` to produce the output image:
-
-1. `sti` generates a `Dockerfile` to describe the output image:
-    1. Based on the build image
-    1. Adds the application source at `/tmp/src` in the container
-    1. Calls `assemble` in the container
-    1. Sets the image's default command to be `run`
-1. `sti` calls `docker build` to produce the output image
-
-`sti` also supports building images with `docker run`.  When building this way, the workflow is:
+`sti` builds images with `docker run`.  The workflow is:
 
 1. `sti` creates a container based on the build image. with:
     1. The application source bind-mounted to `/tmp/src`
     1. The build artifacts bind-mounted to `/tmp/artifacts` (if applicable - see incremental builds)
     1. Runs the build image's `assemble` script
 1. `sti` starts the container and waits for it to finish running
-1. `sti` commits the container, setting the CMD for the output image to be the `run` script
-
-The build methodology is controlled by the `-m` option, and defaults to `build`.  To build with
-`docker run`, use `-m run`.
+1. `sti` commits the container, setting the CMD for the output image to be the `run` script and tagging the image with the name provided.
 
 Basic (`--clean`) builds
 ------------------------
@@ -81,7 +67,7 @@ Incremental builds
 1. Whether a source image is compatible with incremental building
 1. Whether an incremental build can be formed when an image is compatible
 
-If the source image is compatible, a prior build already exists, and the `--clean` option is not used,
+If a save-artifacts script exists, a prior build already exists, and the `--clean` option is not used,
 the workflow is as follows:
 
 1. `sti` creates a new docker container from the prior build image, with a volume in `/tmp/artifacts`

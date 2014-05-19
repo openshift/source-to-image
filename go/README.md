@@ -40,7 +40,7 @@ Building a Deployable Image
          --dir="tempdir": Directory where generated Dockerfiles and other support scripts are created
      -e, --env="": Specify an environment var NAME=VALUE,NAME2=VALUE2,...
      -r, --ref="": Specify a ref to check-out
-     -s, --scripts="": Specify a URL for the assemble and run scripts
+     -s, --scripts="": Specify a URL for the assemble, run, and save-artifacts scripts
      -R, --runtime="": Set the runtime image to use
      -U, --url="unix:///var/run/docker.sock": Set the url of the docker socket to use
          --verbose=false: Enable verbose output
@@ -53,7 +53,7 @@ The most basic `sti build` uses a single build image:
 If the build is successful, the built image will be tagged with `APP_IMAGE_TAG`.
 
 If the build image is compatible with incremental builds, `sti build` will look for an image tagged
-with `APP_IMAGE_TAG`.  If an image is present with that tag, `sti build` will save the build
+with `APP_IMAGE_TAG`.  If an image is present with that tag, and a `save-artifacts` script is present, `sti build` will save the build
 artifacts from that image and add them to the build container at `/tmp/artifacts` so the `assemble` script can restore them before building the source.
 
 When using an image that supports incremental builds, you can do a clean build with `--clean`:
@@ -71,6 +71,20 @@ To provide a default set of images to use with your image, you can specify the `
 your `Dockerfile`:
 
     ENV STI_SCRIPTS_URL <url>
+
+Using scripts from an application
+----------------------------------
+
+You can also supply assemble/run/save-artifacts scripts in your application source.  The scripts must be located
+under `.sti/bin` within the root of your source directory.
+
+Script precedence
+-----------------
+STI selects which location to use for a given script (assemble, run, and save-artifacts) based on the following ordering:
+1) A script found at the --scripts URL
+2) A script found in the application source `.sti/bin` directory
+3) A script found at the default image URL (STI_SCRIPTS_URL)
+
 
 Build from a git ref
 --------------------
