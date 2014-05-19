@@ -110,6 +110,56 @@ func Execute() {
 	buildCmd.Flags().StringVarP(&(buildReq.ScriptsUrl), "scripts", "s", "", "Specify a URL for the assemble and run scripts")
 
 	stiCmd.AddCommand(buildCmd)
+
+	usageCmd := &cobra.Command{
+		Use:   "usage BUILD_IMAGE",
+		Short: "Print usage for assemble script associated with an image",
+		Long:  "Print usage for assemble script associated with an image",
+		Run: func(cmd *cobra.Command, args []string) {
+			// if we're not verbose, make sure the logger doesn't print out timestamps
+			if !req.Verbose {
+				log.SetFlags(0)
+			}
+
+			if len(args) == 0 {
+				cmd.Usage()
+				return
+			}
+
+			buildReq.Request = req
+			buildReq.BaseImage = args[0]
+			buildReq.Writer = os.Stdout
+
+			envs, _ := parseEnvs(envString)
+			buildReq.Environment = envs
+
+			if buildReq.WorkingDir == "tempdir" {
+				var err error
+				buildReq.WorkingDir, err = ioutil.TempDir("", "sti")
+				if err != nil {
+					fmt.Println(err.Error())
+					return
+				}
+				defer os.Remove(buildReq.WorkingDir)
+			}
+
+			res, err := sti.Usage(buildReq)
+			if err != nil {
+				fmt.Printf("An error occured: %s\n", err.Error())
+				return
+			}
+
+			for _, message := range res.Messages {
+				fmt.Println(message)
+			}
+		},
+	}
+	usageCmd.Flags().StringVar(&(req.WorkingDir), "dir", "tempdir", "Directory where generated Dockerfiles and other support scripts are created")
+	usageCmd.Flags().StringVarP(&envString, "env", "e", "", "Specify an environment var NAME=VALUE,NAME2=VALUE2,...")
+	usageCmd.Flags().StringVarP(&(buildReq.ScriptsUrl), "scripts", "s", "", "Specify a URL for the assemble and run scripts")
+
+	stiCmd.AddCommand(usageCmd)
+
 	stiCmd.Execute()
 }
 
