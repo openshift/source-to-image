@@ -1,6 +1,40 @@
 #!/usr/bin/env bash
+set -e
+set -u
 
-docker pull pmorie/sti-fake
-docker pull pmorie/sti-fake-user
-docker pull pmorie/sti-fake-broken
-go test github.com/openshift/docker-source-to-images/go $@
+function usage() {
+  echo "Usage: "
+  echo "    $0 -s -o <test options>"
+  echo " "
+  echo "-s                Skip test image building"
+  echo "-o <options>      Pass additional flags to integration tests"
+  exit
+}
+
+# Options parsing
+skip_build=false
+test_opts=""
+
+while getopts "so:" o; do
+  case "${o}" in
+    (s) skip_build=true;;
+    (o) test_opts=${OPTARG:-};;
+    (?) usage; break;;
+  esac
+done
+
+if $skip_build ; then
+  echo "Skipping test image build"
+else
+  echo "Building test images"
+  pushd ../test_images >/dev/null
+  ./buildimages.sh
+  popd >/dev/null
+fi
+
+pushd ../test_images &>/dev/null
+export STI_TEST_IMAGES_DIR=$(pwd)
+echo "Setting STI_TEST_IMAGES_DIR=${STI_TEST_IMAGES_DIR}"
+popd &>/dev/null
+
+go test github.com/openshift/docker-source-to-images/go $test_opts
