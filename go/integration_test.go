@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
 	"testing"
 
 	. "launchpad.net/gocheck"
@@ -46,6 +47,12 @@ const (
 	TagIncrementalBuildRun = "test/sti-incremental-app-run"
 )
 
+var (
+	FakeScriptsUrl        = "file://" + path.Join(os.Getenv("STI_TEST_IMAGES_DIR"), "sti-fake", ".sti", "bin")
+	FakeBrokenScriptsUrl  = "file://" + path.Join(os.Getenv("STI_TEST_IMAGES_DIR"), "sti-fake-broken", ".sti", "bin")
+	FakeUserScriptsUrl    = "file://" + path.Join(os.Getenv("STI_TEST_IMAGES_DIR"), "sti-fake-user", ".sti", "bin")
+)
+
 // Suite/Test fixtures are provided by gocheck
 func (s *IntegrationTestSuite) SetUpSuite(c *C) {
 	if !*integration {
@@ -67,23 +74,27 @@ func (s *IntegrationTestSuite) SetUpTest(c *C) {
 
 // Test a clean build.  The simplest case.
 func (s *IntegrationTestSuite) TestCleanBuild(c *C) {
-	s.exerciseCleanBuild(c, TagCleanBuild, false, FakeBaseImage)
+	s.exerciseCleanBuild(c, TagCleanBuild, false, FakeBaseImage, "")
+}
+
+func (s *IntegrationTestSuite) TestCleanBuildFileScriptsUrl(c *C) {
+	s.exerciseCleanBuild(c, TagCleanBuild, false, FakeBaseImage, FakeScriptsUrl)
 }
 
 func (s *IntegrationTestSuite) TestCleanBuildRun(c *C) {
-	s.exerciseCleanBuild(c, TagCleanBuildRun, false, FakeBaseImage)
+	s.exerciseCleanBuild(c, TagCleanBuildRun, false, FakeBaseImage, "")
 }
 
 func (s *IntegrationTestSuite) TestCleanBuildRunUser(c *C) {
-	s.exerciseCleanBuild(c, TagCleanBuildRunUser, false, FakeUserImage)
+	s.exerciseCleanBuild(c, TagCleanBuildRunUser, false, FakeUserImage, "")
 }
 
 // Test that a build request with a callbackUrl will invoke HTTP endpoint
 func (s *IntegrationTestSuite) TestCleanBuildCallbackInvoked(c *C) {
-	s.exerciseCleanBuild(c, TagCleanBuildRun, true, FakeBaseImage)
+	s.exerciseCleanBuild(c, TagCleanBuildRun, true, FakeBaseImage, "")
 }
 
-func (s *IntegrationTestSuite) exerciseCleanBuild(c *C, tag string, verifyCallback bool, imageName string) {
+func (s *IntegrationTestSuite) exerciseCleanBuild(c *C, tag string, verifyCallback bool, imageName string, scriptsUrl string) {
 	callbackUrl := ""
 	callbackInvoked := false
 	callbackHasValidJson := false
@@ -122,7 +133,8 @@ func (s *IntegrationTestSuite) exerciseCleanBuild(c *C, tag string, verifyCallba
 		Tag:         tag,
 		Clean:       true,
 		Writer:      os.Stdout,
-		CallbackUrl: callbackUrl}
+		CallbackUrl: callbackUrl,
+		ScriptsUrl:  scriptsUrl}
 
 	resp, err := Build(req)
 

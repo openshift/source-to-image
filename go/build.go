@@ -8,7 +8,9 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -231,32 +233,78 @@ func (h requestHandler) determineScriptPath(contextDir string, script string) st
 	return ""
 }
 
-func (h requestHandler) downloadScripts(url, targetDir string) error {
+// SchemeReaders create an io.Reader from the given url.
+type SchemeReader func(*url.URL) (io.Reader, error)
+
+var schemeReaders = map[string]SchemeReader{
+	"http":  readerFromHttpUrl,
+	"https": readerFromHttpUrl,
+	"file":  readerFromFileUrl,
+}
+
+// Attempts to download scripts from baseUrl to targetDir by apppending
+// known script filenames to baseUrl and delegating the io.Reader
+// aquisition to a SchemeReader. Failures are ignored per-file.
+func (h requestHandler) downloadScripts(baseUrl, targetDir string) error {
 	os.MkdirAll(targetDir, 0700)
 	files := []string{"save-artifacts", "assemble", "run"}
+
 	for _, file := range files {
-		if h.verbose {
-			log.Printf("Downloading file %s from url %s to directory %s\n", file, url, targetDir)
+		u, err := url.Parse(baseUrl + "/" + file)
+
+		sr := schemeReaders[u.Scheme]
+
+		if sr == nil {
+			log.Printf("Skipping file %s due to unsupported scheme %s\n", file, u.Scheme)
+			continue
 		}
 
-		resp, err := http.Get(url + "/" + file)
-		defer resp.Body.Close()
+		reader, err := sr(u)
+
 		if err != nil {
-			return err
+			log.Printf("Skipping file %s due to read error: %s\n", file, err)
+			continue
 		}
-		if resp.StatusCode == 200 || resp.StatusCode == 201 {
-			out, err := os.Create(targetDir + "/" + file)
-			defer out.Close()
-			if err != nil {
-				return err
-			}
-			_, err = io.Copy(out, resp.Body)
-		} else {
-			//return fmt.Errorf("Failed to retrieve %s from %s, response code %d", targetFile, targetDir, resp.StatusCode)
-			log.Printf("Failed to retrieve %s from %s, response code %d", file, targetDir, resp.StatusCode)
+
+		targetFile := path.Join(targetDir, file)
+		out, err := os.Create(targetFile)
+		defer out.Close()
+
+		if err != nil {
+			defer os.Remove(targetFile)
+			log.Printf("Skipping file %s because the target file %s couldn't be created: %s\n", file, targetFile, err)
+			continue
 		}
+
+		_, err = io.Copy(out, reader)
+
+		if err != nil {
+			defer os.Remove(targetFile)
+			log.Printf("Skipping file %s due to error copying from source: %s\n", file, err)
+		}
+
+		log.Printf("Downloaded script from %s\n", u.String())
 	}
 	return nil
+}
+
+// This SchemeReader can produce an io.Reader from an http/https URL.
+func readerFromHttpUrl(url *url.URL) (io.Reader, error) {
+	resp, err := http.Get(url.String())
+	if err != nil {
+		defer resp.Body.Close()
+		return nil, err
+	}
+	if resp.StatusCode == 200 || resp.StatusCode == 201 {
+		return resp.Body, nil
+	} else {
+		return nil, fmt.Errorf("Failed to retrieve %s, response code %d", url.String(), resp.StatusCode)
+	}
+}
+
+// This SchemeReader can produce an io.Reader from a file URL.
+func readerFromFileUrl(url *url.URL) (io.Reader, error) {
+	return os.Open(url.Path)
 }
 
 func (h requestHandler) saveArtifacts(req BuildRequest, image string, tmpDir string, path string, contextDir string) error {
@@ -427,9 +475,6 @@ func (h requestHandler) buildDeployableImage(req BuildRequest, image string, con
 		return nil, err
 	}
 
-	origCmd := imageMetadata.Config.Cmd
-	origEntrypoint := imageMetadata.Config.Entrypoint
-
 	runPath := h.determineScriptPath(req.WorkingDir, "run")
 	assemblePath := h.determineScriptPath(req.WorkingDir, "assemble")
 	overrideRun := runPath != ""
@@ -437,7 +482,11 @@ func (h requestHandler) buildDeployableImage(req BuildRequest, image string, con
 	log.Printf("Using run script from %s", runPath)
 	log.Printf("Using assemble script from %s", assemblePath)
 
-	user := imageMetadata.Config.User
+	user := ""
+	if imageMetadata.Config != nil {
+		user = imageMetadata.Config.User
+	}
+
 	hasUser := (user != "")
 	if hasUser {
 		log.Printf("Image has username %s", user)
@@ -538,8 +587,8 @@ func (h requestHandler) buildDeployableImage(req BuildRequest, image string, con
 	if overrideRun {
 		config.Cmd = []string{"/opt/sti/bin/run"}
 	} else {
-		config.Cmd = origCmd
-		config.Entrypoint = origEntrypoint
+		config.Cmd = imageMetadata.Config.Cmd
+		config.Entrypoint = imageMetadata.Config.Entrypoint
 	}
 	if hasUser {
 		config.User = user
