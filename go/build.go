@@ -58,6 +58,19 @@ func Build(req BuildRequest) (*BuildResult, error) {
 	return result, err
 }
 
+// Usage processes a build request by starting the container and executing
+// the assemble script with a "-h" argument to print usage information
+// for the script.
+func Usage(req BuildRequest) (*BuildResult, error) {
+	h, err := newHandler(req.Request)
+	if err != nil {
+		return nil, err
+	}
+	var result *BuildResult
+	result, err = h.usage(req)
+	return result, err
+}
+
 func executeCallback(callbackUrl string, result *BuildResult) {
 	buf := new(bytes.Buffer)
 	writer := bufio.NewWriter(buf)
@@ -152,7 +165,6 @@ func (h requestHandler) build(req BuildRequest) (*BuildResult, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	incremental := !req.Clean
 
 	if incremental {
@@ -193,6 +205,31 @@ func (h requestHandler) build(req BuildRequest) (*BuildResult, error) {
 	}
 
 	return h.buildDeployableImage(req, req.BaseImage, req.WorkingDir, incremental)
+}
+
+func (h requestHandler) usage(req BuildRequest) (*BuildResult, error) {
+
+	dirs := []string{"scripts", "defaultScripts"}
+	for _, v := range dirs {
+		err := os.Mkdir(filepath.Join(req.WorkingDir, v), 0700)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if req.ScriptsUrl != "" {
+		h.downloadScripts(req.ScriptsUrl, filepath.Join(req.WorkingDir, "scripts"))
+	}
+
+	defaultUrl, err := h.getDefaultUrl(req, req.BaseImage)
+	if err != nil {
+		return nil, err
+	}
+	if defaultUrl != "" {
+		h.downloadScripts(defaultUrl, filepath.Join(req.WorkingDir, "defaultScripts"))
+	}
+
+	return h.buildDeployableImage(req, req.BaseImage, req.WorkingDir, false)
 }
 
 func (h requestHandler) getDefaultUrl(req BuildRequest, image string) (string, error) {
@@ -467,7 +504,6 @@ func (h requestHandler) prepareSourceDir(source, targetSourceDir, ref string) er
 }
 
 func (h requestHandler) buildDeployableImage(req BuildRequest, image string, contextDir string, incremental bool) (*BuildResult, error) {
-	log.Printf("Building with docker run invocation\n")
 	volumeMap := make(map[string]struct{})
 	volumeMap["/tmp/src"] = struct{}{}
 	volumeMap["/tmp/scripts"] = struct{}{}
@@ -493,8 +529,10 @@ func (h requestHandler) buildDeployableImage(req BuildRequest, image string, con
 	assemblePath := h.determineScriptPath(req.WorkingDir, "assemble")
 	overrideRun := runPath != ""
 
-	log.Printf("Using run script from %s", runPath)
-	log.Printf("Using assemble script from %s", assemblePath)
+	if h.verbose {
+		log.Printf("Using run script from %s", runPath)
+		log.Printf("Using assemble script from %s", assemblePath)
+	}
 
 	user := ""
 	if imageMetadata.Config != nil {
@@ -503,17 +541,26 @@ func (h requestHandler) buildDeployableImage(req BuildRequest, image string, con
 
 	hasUser := (user != "")
 	if hasUser {
-		log.Printf("Image has username %s", user)
+		if h.verbose {
+			log.Printf("Image has username %s", user)
+		}
 	}
 
 	if assemblePath == "" {
 		return nil, fmt.Errorf("No assemble script found in provided url, application source, or default image url.  Aborting.")
 	}
 
-	cmd := []string{"/bin/sh", "-c", "chmod 700 " + assemblePath + " && " + assemblePath + " && mkdir -p /opt/sti/bin && cp " + runPath + " /opt/sti/bin && chmod 700 /opt/sti/bin/run"}
-	if hasUser {
+	var cmd []string
+	if req.Tag == "" {
+		// invoke assemble script with usage argument
+		log.Printf("Assemble script usage requested, invoking assemble script help")
+		cmd = []string{"/bin/sh", "-c", "chmod 700 " + assemblePath + " && " + assemblePath + " -h"}
+	} else if hasUser {
 		cmd = []string{"/.container.init/init.sh"}
 		volumeMap["/.container.init"] = struct{}{}
+	} else {
+		// normal assemble invocation
+		cmd = []string{"/bin/sh", "-c", "chmod 700 " + assemblePath + " && " + assemblePath + " && mkdir -p /opt/sti/bin && cp " + runPath + " /opt/sti/bin && chmod 700 /opt/sti/bin/run"}
 	}
 
 	config := docker.Config{User: "root", Image: image, Cmd: cmd, Volumes: volumeMap}
@@ -606,6 +653,11 @@ func (h requestHandler) buildDeployableImage(req BuildRequest, image string, con
 		return nil, ErrBuildFailed
 	}
 
+	if req.Tag == "" {
+		// this was just a request for assemble usage, so return without committing
+		// a new runnable image.
+		return &BuildResult{true, nil}, nil
+	}
 	config = docker.Config{Image: image, Env: cmdEnv}
 	if overrideRun {
 		config.Cmd = []string{"/opt/sti/bin/run"}
