@@ -1,4 +1,0 @@
-#!/bin/bash
-
-touch /sti-fake/run-invoked
-
