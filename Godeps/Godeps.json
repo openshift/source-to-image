@@ -1,0 +1,22 @@
+{
+	"ImportPath": "github.com/openshift/source-to-image",
+	"GoVersion": "go1.3.1",
+	"Packages": [
+		"github.com/openshift/source-to-image/cmd/sti"
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/fsouza/go-dockerclient",
+			"Comment": "0.2.1-255-g824457e",
+			"Rev": "824457e46721e26272997388bbecdbc4047da31e"
+		},
+		{
+			"ImportPath": "github.com/spf13/cobra",
+			"Rev": "b1e90a7943957b51bb96a13b44b844475bcf95c0"
+		},
+		{
+			"ImportPath": "github.com/spf13/pflag",
+			"Rev": "463bdc838f2b35e9307e91d480878bda5fff7232"
+		}
+	]
+}
