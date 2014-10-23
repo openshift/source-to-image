@@ -5,7 +5,7 @@ set -e
 source $(dirname $0)/config-go.sh
 
 find_test_dirs() {
-  cd src/${OS_GO_PACKAGE}
+  cd src/${STI_GO_PACKAGE}
   find . -not \( \
       \( \
         -wholename './third_party' \
@@ -16,7 +16,7 @@ find_test_dirs() {
         -o -wholename '*/Godeps/*' \
         -o -wholename '*/_output/*' \
       \) -prune \
-    \) -name '*_test.go' -print0 | xargs -0n1 dirname | sort -u | xargs -n1 printf "${OS_GO_PACKAGE}/%s\n"
+    \) -name '*_test.go' -print0 | xargs -0n1 dirname | sort -u | xargs -n1 printf "${STI_GO_PACKAGE}/%s\n"
 }
 
 # there is currently a race in the coverage code in tip.  Remove this when it is fixed
@@ -35,14 +35,14 @@ if [ -z ${STI_RACE+x} ]; then
   STI_RACE="-race"
 fi
 
-cd "${OS_TARGET}"
+cd "${STI_TARGET}"
 
 if [ "$1" != "" ]; then
   if [ -n "${STI_COVER}" ]; then
     STI_COVER="${STI_COVER} -coverprofile=tmp.out"
   fi
 
-  go test $STI_RACE $STI_TIMEOUT $STI_COVER "$OS_GO_PACKAGE/$1" "${@:2}"
+  go test $STI_RACE $STI_TIMEOUT $STI_COVER "$STI_GO_PACKAGE/$1" "${@:2}"
   exit 0
 fi
 
