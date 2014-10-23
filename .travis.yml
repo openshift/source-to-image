@@ -1,0 +1,24 @@
+language: go
+
+go:
+  - 1.3
+  - 1.2
+
+env:
+ - TEST_ASSETS=true
+ - TEST_ASSETS=false
+
+matrix:
+  exclude:
+    - go: 1.2
+      env: TEST_ASSETS=true
+
+install:
+  - go get code.google.com/p/go.tools/cmd/cover
+  - ./hack/build-go.sh
+
+script:
+  - ./hack/test-go.sh
+
+notifications:
+  irc: "chat.freenode.net#openshift-dev"
