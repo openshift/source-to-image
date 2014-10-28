@@ -57,7 +57,7 @@ type RunContainerOptions struct {
 	Stdin        io.Reader
 	Stdout       io.Writer
 	Stderr       io.Writer
-	Started      chan struct{}
+	OnStart      func() error
 	PostExec     postExecutor
 }
 
@@ -213,7 +213,11 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 	}
 
 	wg := sync.WaitGroup{}
-	go func() { wg.Add(1); d.client.AttachToContainer(attachOpts); wg.Done() }()
+	go func() {
+		wg.Add(1)
+		d.client.AttachToContainer(attachOpts)
+		wg.Done()
+	}()
 	attached <- <-attached
 
 	// If attaching both stdin and stdout, attach stdout in
@@ -231,7 +235,11 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 			attachOpts2.Stderr = true
 			attachOpts2.ErrorStream = opts.Stderr
 		}
-		go func() { wg.Add(1); d.client.AttachToContainer(attachOpts2); wg.Done() }()
+		go func() {
+			wg.Add(1)
+			d.client.AttachToContainer(attachOpts2)
+			wg.Done()
+		}()
 		attached2 <- <-attached2
 	}
 
@@ -241,23 +249,23 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 	if err = d.client.StartContainer(container.ID, nil); err != nil {
 		return err
 	}
-	if opts.Started != nil {
-		opts.Started <- struct{}{}
+	if opts.OnStart != nil {
+		if err = opts.OnStart(); err != nil {
+			return err
+		}
 	}
 
 	if d.verbose {
 		log.Printf("Waiting for container")
 	}
 	exitCode, err := d.client.WaitContainer(container.ID)
+	wg.Wait()
 	if err != nil {
 		return err
 	}
 	if d.verbose {
 		log.Printf("Container exited")
 	}
-
-	// Make sure all Attach threads have completed
-	wg.Wait()
 
 	if exitCode != 0 {
 		return errors.StiContainerError{exitCode}

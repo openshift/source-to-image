@@ -1,6 +1,8 @@
 package test
 
 import (
+	"sync"
+
 	"github.com/openshift/source-to-image/pkg/sti/docker"
 )
 
@@ -26,6 +28,8 @@ type FakeDocker struct {
 	CommitContainerError         error
 	RemoveImageName              string
 	RemoveImageError             error
+
+	mutex sync.Mutex
 }
 
 func (f *FakeDocker) IsImageInLocalRegistry(imageName string) (bool, error) {
@@ -48,8 +52,10 @@ func (f *FakeDocker) RunContainer(opts docker.RunContainerOptions) error {
 	if f.RunContainerErrorBeforeStart {
 		return f.RunContainerError
 	}
-	if opts.Started != nil {
-		opts.Started <- struct{}{}
+	if opts.OnStart != nil {
+		if err := opts.OnStart(); err != nil {
+			return err
+		}
 	}
 	if opts.PostExec != nil {
 		opts.PostExec.PostExecute(f.RunContainerContainerID, append(f.RunContainerCmd, opts.Command))
