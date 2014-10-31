@@ -85,7 +85,7 @@ func (b *Builder) Build() (*STIResult, error) {
 
 	if bh.Request().incremental {
 		if err = bh.saveArtifacts(); err != nil {
-			return nil, err
+			log.Printf("Error saving previous build artifacts: %v", err)
 		}
 	}
 
@@ -171,71 +171,31 @@ func (h *buildHandler) saveArtifacts() (err error) {
 	log.Printf("Saving build artifacts from image %s to path %s\n", image, artifactTmpDir)
 
 	reader, writer := io.Pipe()
-	started := make(chan struct{})
-	cancelExtract := make(chan error)
-	extractError := make(chan error)
+
+	extractFunc := func() error {
+		defer reader.Close()
+		return h.tar.ExtractTarStream(artifactTmpDir, reader)
+	}
 
 	opts := docker.RunContainerOptions{
 		Image:        image,
 		OverwriteCmd: true,
 		Command:      "save-artifacts",
 		Stdout:       writer,
-		Started:      started,
+		OnStart:      extractFunc,
 	}
-
-	// Launch thread that will wait for container start
-	// and start extracting output tar from stream
-	go func() {
-		select {
-		case <-started:
-			// Container has started, start extracting
-			defer reader.Close()
-			err := h.tar.ExtractTarStream(artifactTmpDir, reader)
-			if err != nil {
-				log.Printf("An error occurred while extracting the tar stream.")
-			}
-			extractError <- err
-		case <-cancelExtract:
-			// An error occurred before we could start the
-			// container. Simply exit this thread.
-			return
-		}
-	}()
-
 	err = h.docker.RunContainer(opts)
 	writer.Close()
 	if err != nil {
-		// Get result of extract or cancel it if still waiting for
-		// container start
-		select {
-		case <-extractError: // Extract finished and we have an error result. In case
-			// both RunContainer and extract return errors, the error
-			// from RunContainer will be returned. The extract error
-			// will be ignored
-		case cancelExtract <- err: // Extract hasn't started and needs to be canceled
-		}
-
 		switch e := err.(type) {
 		case errors.StiContainerError:
 			if h.request.Verbose {
 				log.Printf("Exit code: %d", e.ExitCode)
 			}
 			return errors.ErrSaveArtifactsFailed
-		default:
-			return err
-		}
-	} else {
-		// In the case of no error from RunContainer
-		// wait for the result of extract.
-		select {
-		case err = <-extractError:
-			if err != nil {
-				return err
-			}
 		}
 	}
-
-	return nil
+	return err
 }
 
 func (h *buildHandler) fetchSource() error {

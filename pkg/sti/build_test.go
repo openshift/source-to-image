@@ -262,7 +262,6 @@ func TestSaveArtifactsRunError(t *testing.T) {
 		errors.ErrSaveArtifactsFailed,
 	}
 	// test with tar extract error or not
-	// the result should remain the same
 	tarError := []bool{true, false}
 	for i, _ := range tests {
 		for _, te := range tarError {
@@ -274,8 +273,10 @@ func TestSaveArtifactsRunError(t *testing.T) {
 				th.ExtractTarError = fmt.Errorf("tar error")
 			}
 			err := bh.saveArtifacts()
-			if err != expected[i] {
+			if !te && err != expected[i] {
 				t.Errorf("Unexpected error returned from saveArtifacts: %v", err)
+			} else if te && err != th.ExtractTarError {
+				t.Errorf("Expected tar error. Got %v", err)
 			}
 		}
 	}
