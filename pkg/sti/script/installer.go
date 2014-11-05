@@ -124,14 +124,16 @@ func (s *handler) download(scripts []string, workingDir string) error {
 	// Wait for the script downloads to finish.
 	wg.Wait()
 	for _, d := range downloads {
-		if len(d) == 0 {
+		if len(d) == 0 && len(defaultUrl) == 0 {
+			return fmt.Errorf("Unable to retrieve STI scripts as provided image does not specify STI_SCRIPTS_URL and '-s' argument was not used")
+		} else if len(d) == 0 {
 			return errors.ErrScriptsDownloadFailed
 		}
 	}
 
 	for _, e := range errs {
 		if len(e) > 0 {
-			return errors.ErrScriptsDownloadFailed
+			return fmt.Errorf("STI script download failed: %#v", e)
 		}
 	}
 
