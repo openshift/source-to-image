@@ -1,10 +1,10 @@
 source-to-image (sti)
 =======
 
-Source-to-image (`sti`) is a tool for building reproducable Docker images.  `sti` produces
+Source-to-image (`sti`) is a tool for building reproducible Docker images.  `sti` produces
 ready-to-run images by injecting source code into a docker image and <i>assembling</i>
 a new Docker image which incorporates the base image and built source, and is ready to use
-with `docker run`.  `sti` supports incremental builds which re-use previously downloaded 
+with `docker run`.  `sti` supports incremental builds which re-use previously downloaded
 dependencies, previously built artifacts, etc.
 
 Interested in learning more?  Read on!
@@ -76,7 +76,7 @@ the workflow is as follows:
 1. `sti` runs `save-artifacts` in this container - this script is responsible for streaming out
    a tar of the artifacts to stdout
 1. `sti` builds the new output image:
-    1. The artifacts from the previous build will be in the `artifacts` directory of the tar 
+    1. The artifacts from the previous build will be in the `artifacts` directory of the tar
        passed to the build
     1. The build image's `assemble` script is responsible for detecting and using the build
        artifacts
