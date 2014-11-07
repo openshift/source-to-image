@@ -2,11 +2,12 @@ package docker
 
 import (
 	"io"
-	"log"
 	"strings"
 	"sync"
 
 	"github.com/fsouza/go-dockerclient"
+	"github.com/golang/glog"
+
 	"github.com/openshift/source-to-image/pkg/sti/errors"
 )
 
@@ -39,8 +40,7 @@ type DockerClient interface {
 }
 
 type stiDocker struct {
-	client  DockerClient
-	verbose bool
+	client DockerClient
 }
 
 type postExecutor interface {
@@ -70,14 +70,13 @@ type CommitContainerOptions struct {
 }
 
 // NewDocker creates a new implementation of the STI Docker interface
-func NewDocker(endpoint string, verbose bool) (Docker, error) {
+func NewDocker(endpoint string) (Docker, error) {
 	client, err := docker.NewClient(endpoint)
 	if err != nil {
 		return nil, err
 	}
 	return &stiDocker{
-		client:  client,
-		verbose: verbose,
+		client: client,
 	}, nil
 }
 
@@ -99,12 +98,12 @@ func (d *stiDocker) IsImageInLocalRegistry(imageName string) (bool, error) {
 func (d *stiDocker) CheckAndPull(imageName string) (image *docker.Image, err error) {
 	if image, err = d.client.InspectImage(imageName); err != nil &&
 		err != docker.ErrNoSuchImage {
-		log.Printf("Error: Unable to get image metadata for %s: %v", imageName, err)
+		glog.Errorf("Unable to get image metadata for %s: %v", imageName, err)
 		return nil, errors.ErrPullImageFailed
 	}
 
 	if image == nil {
-		log.Printf("Pulling image %s\n", imageName)
+		glog.V(1).Infof("Pulling image %s", imageName)
 
 		// TODO: Add authentication support
 		if err = d.client.PullImage(docker.PullImageOptions{Repository: imageName},
@@ -115,8 +114,8 @@ func (d *stiDocker) CheckAndPull(imageName string) (image *docker.Image, err err
 		if image, err = d.client.InspectImage(imageName); err != nil {
 			return nil, err
 		}
-	} else if d.verbose {
-		log.Printf("Image %s available locally\n", imageName)
+	} else {
+		glog.V(2).Infof("Image %s available locally", imageName)
 	}
 
 	return
@@ -141,9 +140,7 @@ func (d *stiDocker) GetDefaultScriptsUrl(image string) (string, error) {
 			break
 		}
 	}
-	if d.verbose {
-		log.Printf("Image contains default script url '%s'", defaultScriptsUrl)
-	}
+	glog.V(2).Infof("Image contains default script URL '%s'", defaultScriptsUrl)
 	return defaultScriptsUrl, nil
 }
 
@@ -158,7 +155,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 		imageMetadata, err = d.client.InspectImage(opts.Image)
 	}
 	if err != nil {
-		log.Printf("Error: Unable to get image metadata for %s: %v", opts.Image, err)
+		glog.Errorf("Unable to get image metadata for %s: %v", opts.Image, err)
 		return err
 	}
 
@@ -176,29 +173,22 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 	if opts.Env != nil {
 		config.Env = opts.Env
 	}
-
 	if opts.Stdin != nil {
 		config.OpenStdin = true
 		config.StdinOnce = true
 	}
-
 	if opts.Stdout != nil {
 		config.AttachStdout = true
 	}
 
-	if d.verbose {
-		log.Printf("Creating container using config: %+v\n", config)
-	}
-
+	glog.V(2).Infof("Creating container using config: %+v", config)
 	container, err := d.client.CreateContainer(docker.CreateContainerOptions{Name: "", Config: &config})
 	if err != nil {
 		return err
 	}
 	defer d.RemoveContainer(container.ID)
 
-	if d.verbose {
-		log.Printf("Attaching to container")
-	}
+	glog.V(2).Infof("Attaching to container")
 	attached := make(chan struct{})
 	attachOpts := docker.AttachToContainerOptions{
 		Container: container.ID,
@@ -244,9 +234,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 		attached2 <- <-attached2
 	}
 
-	if d.verbose {
-		log.Printf("Starting container")
-	}
+	glog.V(2).Infof("Starting container")
 	if err = d.client.StartContainer(container.ID, nil); err != nil {
 		return err
 	}
@@ -256,26 +244,20 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 		}
 	}
 
-	if d.verbose {
-		log.Printf("Waiting for container")
-	}
+	glog.V(2).Infof("Waiting for container")
 	exitCode, err := d.client.WaitContainer(container.ID)
 	wg.Wait()
 	if err != nil {
 		return err
 	}
-	if d.verbose {
-		log.Printf("Container exited")
-	}
+	glog.V(2).Infof("Container exited")
 
 	if exitCode != 0 {
 		return errors.StiContainerError{exitCode}
 	}
 
 	if opts.PostExec != nil {
-		if d.verbose {
-			log.Printf("Invoking postExecution function")
-		}
+		glog.V(2).Infof("Invoking postExecution function")
 		if err = opts.PostExec.PostExecute(container.ID, imageMetadata.Config.Cmd); err != nil {
 			return err
 		}
@@ -308,9 +290,7 @@ func (d *stiDocker) CommitContainer(opts CommitContainerOptions) (string, error)
 			Env: opts.Env,
 		}
 		dockerOpts.Run = &config
-		if d.verbose {
-			log.Printf("Commiting container with config: %+v\n", config)
-		}
+		glog.V(2).Infof("Commiting container with config: %+v", config)
 	}
 
 	if image, err := d.client.CommitContainer(dockerOpts); err == nil && image != nil {
