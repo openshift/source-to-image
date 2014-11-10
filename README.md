@@ -97,6 +97,7 @@ Assuming docker is installed and configured, execute the following commands:
 
     go get github.com/openshift/source-to-image
     cd ${GOPATH}/src/github.com/openshift/source-to-image
+    export PATH=$PATH:${GOPATH}/src/github.com/openshift/source-to-image/_output/go/bin
     hack/build-go.sh
 
 Getting Started
