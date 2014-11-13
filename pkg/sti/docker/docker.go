@@ -133,15 +133,15 @@ func (d *stiDocker) GetDefaultScriptsUrl(image string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	var defaultScriptsUrl string
+	defaultScriptsUrl := ""
 	env := append(imageMetadata.ContainerConfig.Env, imageMetadata.Config.Env...)
 	for _, v := range env {
 		if strings.HasPrefix(v, "STI_SCRIPTS_URL=") {
-			defaultScriptsUrl = v[len("STI_SCRIPTS_URL="):]
+			defaultScriptsUrl = strings.TrimSpace((v[len("STI_SCRIPTS_URL="):]))
 			break
 		}
 	}
-	if d.verbose {
+	if d.verbose && len(defaultScriptsUrl) != 0 {
 		log.Printf("Image contains default script url '%s'", defaultScriptsUrl)
 	}
 	return defaultScriptsUrl, nil
