@@ -1,5 +1,12 @@
 #!/bin/bash
 
+img_count=$(docker images | grep sti_test/sti-fake | wc -l)
+if [ "${img_count}" != "3" ]; then
+  echo "You do not have necessary test images, be sure to run 'hack/build-images.sh' beforehand."
+  exit 1
+fi
+
+
 set -e
 
 function cleanup()

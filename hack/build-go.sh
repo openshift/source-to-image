@@ -32,4 +32,4 @@ if [[ ! -z "$OS_BUILD_TAGS" ]]; then
   build_tags="-tags \"$OS_BUILD_TAGS\""
 fi
 
-go install $build_tags -ldflags "-X github.com/openshift/sti/pkg/version.commitFromGit '${version}'" "${binaries[@]}"
+go install $build_tags -ldflags "-X github.com/openshift/source-to-image/pkg/sti/version.commitFromGit '${version}'" "${binaries[@]}"

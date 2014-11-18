@@ -5,7 +5,6 @@ package integration
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -71,11 +70,10 @@ func (i *integrationTest) setup() {
 		}
 
 		go http.ListenAndServe(":23456", http.FileServer(http.Dir(testImagesDir)))
-		fmt.Printf("Waiting for mock HTTP server to start...")
+		i.t.Logf("Waiting for mock HTTP server to start...")
 		if err := waitForHttpReady(); err != nil {
-			fmt.Printf("[ERROR] Unable to start mock HTTP server: %s\n", err)
+			i.t.Fatalf("Unexpected error: %v", err)
 		}
-		fmt.Println("done")
 		i.setupComplete = true
 	}
 }
@@ -158,7 +156,6 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 
 	req := &sti.STIRequest{
 		DockerSocket: dockerSocket(),
-		Verbose:      true,
 		BaseImage:    imageName,
 		Source:       TestSource,
 		Tag:          tag,
@@ -211,7 +208,6 @@ func (i *integrationTest) exerciseIncrementalBuild(tag string, removePreviousIma
 	t := i.t
 	req := &sti.STIRequest{
 		DockerSocket:        dockerSocket(),
-		Verbose:             true,
 		BaseImage:           FakeBaseImage,
 		Source:              TestSource,
 		Tag:                 tag,

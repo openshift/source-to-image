@@ -11,6 +11,10 @@
 			"Rev": "824457e46721e26272997388bbecdbc4047da31e"
 		},
 		{
+			"ImportPath": "github.com/golang/glog",
+			"Rev": "d1c4472bf2efd3826f2b5bdcc02d8416798d678c"
+		},
+		{
 			"ImportPath": "github.com/spf13/cobra",
 			"Rev": "b1e90a7943957b51bb96a13b44b844475bcf95c0"
 		},

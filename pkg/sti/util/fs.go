@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/golang/glog"
 )
 
 // FileSystem allows STI to work with the file system and
@@ -25,16 +26,14 @@ type FileSystem interface {
 
 // NewFileSystem creates a new instance of the default FileSystem
 // implementation
-func NewFileSystem(verbose bool) FileSystem {
+func NewFileSystem() FileSystem {
 	return &fs{
-		verbose: verbose,
-		runner:  NewCommandRunner(),
+		runner: NewCommandRunner(),
 	}
 }
 
 type fs struct {
-	verbose bool
-	runner  CommandRunner
+	runner CommandRunner
 }
 
 // Chmod sets the file mode
@@ -83,13 +82,11 @@ func (h *fs) Copy(sourcePath string, targetPath string) error {
 
 // RemoveDirectory removes the specified directory and all its contents
 func (h *fs) RemoveDirectory(dir string) error {
-	if h.verbose {
-		log.Printf("Removing directory '%s'\n", dir)
-	}
+	glog.V(2).Infof("Removing directory '%s'", dir)
 
 	err := os.RemoveAll(dir)
 	if err != nil {
-		log.Printf("Error removing directory '%s': %s\n", dir, err.Error())
+		glog.Errorf("Error removing directory '%s': %v", dir, err)
 	}
 	return err
 }
@@ -98,7 +95,7 @@ func (h *fs) RemoveDirectory(dir string) error {
 func (h *fs) CreateWorkingDirectory() (directory string, err error) {
 	directory, err = ioutil.TempDir("", "sti")
 	if err != nil {
-		return "", fmt.Errorf("Error creating temporary directory '%s': %s\n", directory, err.Error())
+		return "", fmt.Errorf("Error creating temporary directory '%s': %v", directory, err)
 	}
 
 	return directory, err
