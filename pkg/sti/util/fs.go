@@ -56,7 +56,7 @@ func (h *fs) Mkdir(dirname string) error {
 	return os.Mkdir(dirname, 0700)
 }
 
-// Exists determines wether the given file exists
+// Exists determines whether the given file exists
 func (h *fs) Exists(file string) bool {
 	_, err := os.Stat(file)
 	return err == nil
