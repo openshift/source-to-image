@@ -22,6 +22,7 @@ type Docker interface {
 	GetImageId(image string) (string, error)
 	CommitContainer(opts CommitContainerOptions) (string, error)
 	RemoveImage(name string) error
+	PullImage(imageName string) error
 }
 
 // DockerClient contains all methods called on the go Docker
@@ -101,16 +102,10 @@ func (d *stiDocker) CheckAndPull(imageName string) (image *docker.Image, err err
 		glog.Errorf("Unable to get image metadata for %s: %v", imageName, err)
 		return nil, errors.ErrPullImageFailed
 	}
-
 	if image == nil {
-		glog.V(1).Infof("Pulling image %s", imageName)
-
-		// TODO: Add authentication support
-		if err = d.client.PullImage(docker.PullImageOptions{Repository: imageName},
-			docker.AuthConfiguration{}); err != nil {
-			return nil, errors.ErrPullImageFailed
+		if err = d.PullImage(imageName); err != nil {
+			return nil, err
 		}
-
 		if image, err = d.client.InspectImage(imageName); err != nil {
 			return nil, err
 		}
@@ -119,6 +114,17 @@ func (d *stiDocker) CheckAndPull(imageName string) (image *docker.Image, err err
 	}
 
 	return
+}
+
+// PullImage pulls an image into the local registry
+func (d *stiDocker) PullImage(imageName string) (err error) {
+	glog.V(1).Infof("Pulling image %s", imageName)
+	// TODO: Add authentication support
+	if err = d.client.PullImage(docker.PullImageOptions{Repository: imageName},
+		docker.AuthConfiguration{}); err != nil {
+		return errors.ErrPullImageFailed
+	}
+	return nil
 }
 
 // RemoveContainer removes a container and its associated volumes.

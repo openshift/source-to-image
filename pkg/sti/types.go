@@ -14,6 +14,7 @@ type STIRequest struct {
 	Environment         map[string]string
 	CallbackUrl         string
 	ScriptsUrl          string
+	ForcePull           bool
 
 	incremental bool
 	workingDir  string

@@ -55,6 +55,12 @@ func (h *requestHandler) setup(requiredScripts, optionalScripts []string) (err e
 		WorkingDir: h.request.workingDir,
 	}
 
+	// immediately pull the image if forcepull is true, that way later code that
+	// references the image will have it pre-pulled and can just inspect the image.
+	if h.request.ForcePull {
+		h.docker.PullImage(h.request.BaseImage)
+	}
+
 	dirs := []string{"upload/scripts", "downloads/scripts", "downloads/defaultScripts"}
 	for _, v := range dirs {
 		if err = h.fs.MkdirAll(filepath.Join(h.request.workingDir, v)); err != nil {
