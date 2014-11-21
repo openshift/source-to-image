@@ -90,6 +90,7 @@ func newCmdBuild(req *sti.STIRequest) *cobra.Command {
 	buildCmd.Flags().StringVarP(&(req.Ref), "ref", "r", "", "Specify a ref to check-out")
 	buildCmd.Flags().StringVar(&(req.CallbackUrl), "callbackUrl", "", "Specify a URL to invoke via HTTP POST upon build completion")
 	buildCmd.Flags().StringVarP(&(req.ScriptsUrl), "scripts", "s", "", "Specify a URL for the assemble and run scripts")
+	buildCmd.Flags().BoolVar(&(req.ForcePull), "forcePull", true, "Always pull the builder image even if it is present locally")
 	return buildCmd
 }
 
