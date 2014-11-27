@@ -12,7 +12,7 @@ hackdir=$(CDPATH="" cd $(dirname $0); pwd)
 . "${hackdir}/config-go.sh"
 
 # Go to the top of the tree.
-cd "${OS_REPO_ROOT}"
+cd "${STI_REPO_ROOT}"
 
 docker build -t sti_test/sti-fake test/integration/images/sti-fake
 docker build -t sti_test/sti-fake-broken test/integration/images/sti-fake-broken 
