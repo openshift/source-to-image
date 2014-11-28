@@ -6,27 +6,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-hackdir=$(CDPATH="" cd $(dirname $0); pwd)
+STI_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${STI_ROOT}/hack/common.sh"
 
-# Set the environment variables required by the build.
-. "${hackdir}/config-go.sh"
+sti::build::build_binaries "$@"
+sti::build::place_bins
 
-# Go to the top of the tree.
-cd "${STI_REPO_ROOT}"
-
-if [[ $# == 0 ]]; then
-  # Update $@ with the default list of targets to build.
-  set -- cmd/sti
-fi
-
-binaries=()
-for arg; do
-  binaries+=("${STI_GO_PACKAGE}/${arg}")
-done
-
-build_tags=""
-if [[ ! -z "$STI_BUILD_TAGS" ]]; then
-  build_tags="-tags \"$STI_BUILD_TAGS\""
-fi
-
-go install $build_tags -ldflags "$(sti::build::ldflags)" "${binaries[@]}"

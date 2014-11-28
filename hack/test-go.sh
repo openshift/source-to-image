@@ -1,18 +1,24 @@
 #!/bin/bash
 
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
-source $(dirname $0)/config-go.sh
+STI_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${STI_ROOT}/hack/common.sh"
+
+# Go to the top of the tree.
+cd "${STI_ROOT}"
+
+sti::build::setup_env
 
 find_test_dirs() {
-  cd src/${STI_GO_PACKAGE}
+  cd "${STI_ROOT}"
   find . -not \( \
       \( \
-        -wholename './third_party' \
         -wholename './Godeps' \
         -o -wholename './release' \
         -o -wholename './target' \
-        -o -wholename '*/third_party/*' \
         -o -wholename '*/Godeps/*' \
         -o -wholename '*/_output/*' \
       \) -prune \
@@ -21,7 +27,7 @@ find_test_dirs() {
 
 # there is currently a race in the coverage code in tip.  Remove this when it is fixed
 # see https://code.google.com/p/go/issues/detail?id=8630 for details.
-if [ "${TRAVIS_GO_VERSION}" == "tip" ]; then
+if [ "${TRAVIS_GO_VERSION-}" == "tip" ]; then
   STI_COVER=""
 else
   # -covermode=atomic becomes default with -race in Go >=1.3
@@ -35,15 +41,29 @@ if [ -z ${STI_RACE+x} ]; then
   STI_RACE="-race"
 fi
 
-cd "${STI_TARGET}"
-
-if [ "$1" != "" ]; then
-  if [ -n "${STI_COVER}" ]; then
-    STI_COVER="${STI_COVER} -coverprofile=tmp.out"
-  fi
-
-  go test $STI_RACE $STI_TIMEOUT $STI_COVER "$STI_GO_PACKAGE/$1" "${@:2}"
-  exit 0
+if [ "${1-}" != "" ]; then
+  test_packages="$STI_GO_PACKAGE/$1"
+else
+  test_packages=`find_test_dirs`
 fi
 
-find_test_dirs | xargs go test $STI_RACE $STI_TIMEOUT $STI_COVER "${@:2}"
+OUTPUT_COVERAGE=${OUTPUT_COVERAGE:-""}
+
+if [[ -n "${STI_COVER}" && -n "${OUTPUT_COVERAGE}" ]]; then
+  # Iterate over packages to run coverage
+  test_packages=( $test_packages )
+  for test_package in "${test_packages[@]}"
+  do
+    mkdir -p "$OUTPUT_COVERAGE/$test_package"
+    STI_COVER_PROFILE="-coverprofile=$OUTPUT_COVERAGE/$test_package/profile.out"
+
+    go test $STI_RACE $STI_TIMEOUT $STI_COVER "$STI_COVER_PROFILE" "$test_package" "${@:2}"
+
+    if [ -f "${OUTPUT_COVERAGE}/$test_package/profile.out" ]; then
+      go tool cover "-html=${OUTPUT_COVERAGE}/$test_package/profile.out" -o "${OUTPUT_COVERAGE}/$test_package/coverage.html"
+      echo "coverage: ${OUTPUT_COVERAGE}/$test_package/coverage.html"
+    fi
+  done
+else
+  go test $STI_RACE $STI_TIMEOUT $STI_COVER "${@:2}" $test_packages
+fi

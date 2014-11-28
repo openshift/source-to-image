@@ -1,18 +1,38 @@
 #!/bin/bash
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 GO_VERSION=($(go version))
 echo "Detected go version: $(go version)"
 
-if [[ ${GO_VERSION[2]} != "go1.2" && ${GO_VERSION[2]} != "go1.3" ]]; then
+if [[ ${GO_VERSION[2]} != "go1.2" && ${GO_VERSION[2]} != "go1.3.1" && ${GO_VERSION[2]} != "go1.3.3" ]]; then
   echo "Unknown go version, skipping gofmt."
   exit 0
 fi
 
-REPO_ROOT="$(cd "$(dirname "$0")/../" && pwd -P)"
+STI_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${STI_ROOT}/hack/common.sh"
 
-files="$(find ${REPO_ROOT} -type f | grep "[.]go$" | grep -v "third_party/\|release/\|_output/\|target/\|Godeps/")"
-bad=$(gofmt -s -l ${files})
-if [[ -n "${bad}" ]]; then
-  echo "$bad"
+cd "${STI_ROOT}"
+
+find_files() {
+  find . -not \( \
+      \( \
+        -wholename './output' \
+        -o -wholename './_output' \
+        -o -wholename './release' \
+        -o -wholename './target' \
+        -o -wholename '*/Godeps/*' \
+      \) -prune \
+    \) -name '*.go'
+}
+
+bad_files=$(find_files | xargs gofmt -s -l)
+if [[ -n "${bad_files}" ]]; then
+  echo "!!! gofmt needs to be run on the following files: "
+  echo "${bad_files}"
+  echo "Try running 'gofmt -s -d [path]'"
   exit 1
 fi
