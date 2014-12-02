@@ -1,37 +1,46 @@
 #!/bin/bash
 
-# This script generates a release script in _output/releases
+# This script generates release zips into _output/releases. It requires the openshift/sti-release
+# image to be built prior to executing this command.
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
-hackdir=$(CDPATH="" cd $(dirname $0); pwd)
-
-
-# Set the environment variables required by the build.
-. "${hackdir}/config-go.sh"
+STI_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${STI_ROOT}/hack/common.sh"
 
 # Go to the top of the tree.
-cd "${OS_REPO_ROOT}"
+cd "${STI_ROOT}"
 
-# Build clean
-make clean
-hack/build-go.sh
+context="${STI_ROOT}/_output/buildenv-context"
 
-# Fetch the version.
-version=$(gitcommit)
+# clean existing output
+rm -rf "${STI_ROOT}/_output/local/releases"
+rm -rf "${STI_ROOT}/_output/local/go/bin"
+rm -rf "${context}"
+mkdir -p "${context}"
+mkdir -p "${STI_ROOT}/_output/local"
 
-# Copy built contents to the release directory
-release="_output/release"
-rm -rf "${release}"
-mkdir -p "${release}"
-cp _output/go/bin/sti "${release}"
+# generate version definitions
+sti::build::get_version_vars
+sti::build::save_version_vars "${context}/sti-version-defs"
 
-releases="_output/releases"
-mkdir -p "${releases}"
-release_file="${releases}/openshift-sti-linux64-${version}.tar.gz"
+# create the input archive
+git archive --format=tar -o "${context}/archive.tar" HEAD
+tar -rf "${context}/archive.tar" -C "${context}" sti-version-defs
+gzip -f "${context}/archive.tar"
 
-tar cvzf "${release_file}" -C "${release}" .
+# build in the clean environment
+cat "${context}/archive.tar.gz" | docker run -i --cidfile="${context}/cid" openshift/sti-release
+docker cp $(cat ${context}/cid):/go/src/github.com/openshift/source-to-image/_output/local/releases "${STI_ROOT}/_output/local"
 
-echo "Built to ${release_file}"
+# copy the linux release back to the _output/go/bin dir
+releases=$(find _output/local/releases/ -print | grep 'source-to-image-.*-linux-' --color=never)
+if [[ $(echo $releases | wc -l) -ne 1 ]]; then
+  echo "There should be exactly one Linux release tar in _output/local/releases"
+  exit 1
+fi
+bindir="_output/local/go/bin"
+mkdir -p "${bindir}"
+tar mxzf "${releases}" -C "${bindir}"

@@ -195,7 +195,7 @@ func TestGetDefaultUrl(t *testing.T) {
 		errExpected bool
 	}
 	tests := map[string]urltest{
-		"not present": urltest{
+		"not present": {
 			image: docker.Image{
 				ContainerConfig: docker.Config{
 					Env: []string{"Env1=value1"},
@@ -207,7 +207,7 @@ func TestGetDefaultUrl(t *testing.T) {
 			result: "",
 		},
 
-		"in containerConfig": urltest{
+		"in containerConfig": {
 			image: docker.Image{
 				ContainerConfig: docker.Config{
 					Env: []string{"Env1=value1", "STI_SCRIPTS_URL=test_url_value"},
@@ -217,7 +217,7 @@ func TestGetDefaultUrl(t *testing.T) {
 			result: "test_url_value",
 		},
 
-		"in image config": urltest{
+		"in image config": {
 			image: docker.Image{
 				ContainerConfig: docker.Config{},
 				Config: &docker.Config{
@@ -231,7 +231,7 @@ func TestGetDefaultUrl(t *testing.T) {
 			result: "test_url_value_2",
 		},
 
-		"contains =": urltest{
+		"contains =": {
 			image: docker.Image{
 				ContainerConfig: docker.Config{
 					Env: []string{"STI_SCRIPTS_URL=http://my.test.url/test?param=one"},
@@ -241,7 +241,7 @@ func TestGetDefaultUrl(t *testing.T) {
 			result: "http://my.test.url/test?param=one",
 		},
 
-		"inspect error": urltest{
+		"inspect error": {
 			image:       docker.Image{},
 			inspectErr:  fmt.Errorf("Inspect error"),
 			errExpected: true,
@@ -271,7 +271,7 @@ func TestGetDefaultUrl(t *testing.T) {
 func TestRunContainer(t *testing.T) {
 	fakeDocker := &test.FakeDockerClient{
 		InspectImageResult: []*docker.Image{
-			&docker.Image{
+			{
 				Config: &docker.Config{
 					Cmd: []string{"test", "command"},
 				},
@@ -333,7 +333,7 @@ func TestRunContainer(t *testing.T) {
 
 func TestGetImageID(t *testing.T) {
 	fakeDocker := &test.FakeDockerClient{
-		InspectImageResult: []*docker.Image{&docker.Image{ID: "test-abcd"}},
+		InspectImageResult: []*docker.Image{{ID: "test-abcd"}},
 	}
 	dh := getDocker(fakeDocker)
 	id, err := dh.GetImageId("test/image")

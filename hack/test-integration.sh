@@ -1,13 +1,10 @@
 #!/bin/bash
 
-img_count=$(docker images | grep sti_test/sti-fake | wc -l)
-if [ "${img_count}" != "3" ]; then
-  echo "You do not have necessary test images, be sure to run 'hack/build-images.sh' beforehand."
-  exit 1
-fi
+set -o errexit
+set -o nounset
+set -o pipefail
 
-
-set -e
+STI_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 function cleanup()
 {
@@ -16,9 +13,15 @@ function cleanup()
     echo "Complete"
 }
 
+img_count=$(docker images | grep sti_test/sti-fake | wc -l)
+if [ "${img_count}" != "3" ]; then
+  echo "You do not have necessary test images, be sure to run 'hack/build-test-images.sh' beforehand."
+  exit 1
+fi
+
 trap cleanup EXIT SIGINT
 
 echo
 echo Integration test cases ...
 echo
-$(dirname $0)/../hack/test-go.sh test/integration -tags 'integration'
+"${STI_ROOT}/hack/test-go.sh" test/integration -tags 'integration' "${@:1}"

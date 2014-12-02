@@ -263,7 +263,7 @@ func TestSaveArtifactsRunError(t *testing.T) {
 	}
 	// test with tar extract error or not
 	tarError := []bool{true, false}
-	for i, _ := range tests {
+	for i := range tests {
 		for _, te := range tarError {
 			bh := testBuildHandler()
 			fd := bh.docker.(*test.FakeDocker)

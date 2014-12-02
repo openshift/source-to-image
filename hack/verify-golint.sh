@@ -4,11 +4,17 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+if ! which golint &>/dev/null; then
+  echo "Unable to detect 'golint' package"
+  echo "To install it, run: 'go get github.com/golang/lint/golint'"
+  exit 1
+fi
+
 GO_VERSION=($(go version))
 echo "Detected go version: $(go version)"
 
 if [[ ${GO_VERSION[2]} != "go1.2" && ${GO_VERSION[2]} != "go1.3.1" && ${GO_VERSION[2]} != "go1.3.3" ]]; then
-  echo "Unknown go version, skipping gofmt."
+  echo "Unknown go version, skipping golint."
   exit 0
 fi
 
@@ -29,10 +35,9 @@ find_files() {
     \) -name '*.go'
 }
 
-bad_files=$(find_files | xargs gofmt -s -l)
+bad_files=$(find_files | xargs golint)
 if [[ -n "${bad_files}" ]]; then
-  echo "!!! gofmt needs to be run on the following files: "
+  echo "golint detected following problems:"
   echo "${bad_files}"
-  echo "Try running 'gofmt -s -d [path]'"
   exit 1
 fi

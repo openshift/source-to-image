@@ -6,30 +6,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-hackdir=$(CDPATH="" cd $(dirname $0); pwd)
+STI_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${STI_ROOT}/hack/common.sh"
 
-# Set the environment variables required by the build.
-. "${hackdir}/config-go.sh"
+sti::build::build_binaries "$@"
+sti::build::place_bins
 
-# Go to the top of the tree.
-cd "${OS_REPO_ROOT}"
-
-# Fetch the version.
-version=$(gitcommit)
-
-if [[ $# == 0 ]]; then
-  # Update $@ with the default list of targets to build.
-  set -- cmd/sti
-fi
-
-binaries=()
-for arg; do
-  binaries+=("${OS_GO_PACKAGE}/${arg}")
-done
-
-build_tags=""
-if [[ ! -z "$OS_BUILD_TAGS" ]]; then
-  build_tags="-tags \"$OS_BUILD_TAGS\""
-fi
-
-go install $build_tags -ldflags "-X github.com/openshift/source-to-image/pkg/sti/version.commitFromGit '${version}'" "${binaries[@]}"
