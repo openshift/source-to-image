@@ -11,7 +11,16 @@ STI_ROOT=$(dirname "${BASH_SOURCE}")/..
 # Go to the top of the tree.
 cd "${STI_ROOT}"
 
-docker build -t sti_test/sti-fake test/integration/images/sti-fake
-docker build -t sti_test/sti-fake-broken test/integration/images/sti-fake-broken
-docker build -t sti_test/sti-fake-user test/integration/images/sti-fake-user
-docker build -t sti_test/sti-fake-with-scripts test/integration/images/sti-fake-with-scripts
+
+function buildimage()
+{
+    tag=$1
+    src=$2
+    cp -R test/integration/scripts $src
+    docker build -t "${tag}" "${src}"
+    rm -rf $src/scripts
+}
+
+buildimage sti_test/sti-fake test/integration/images/sti-fake
+buildimage sti_test/sti-fake-user test/integration/images/sti-fake-user
+buildimage sti_test/sti-fake-with-scripts test/integration/images/sti-fake-with-scripts

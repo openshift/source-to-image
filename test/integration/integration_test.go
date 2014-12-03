@@ -63,8 +63,8 @@ func (i *integrationTest) setup() {
 		// get the full path to this .go file so we can construct the file url
 		// using this file's dirname
 		_, filename, _, _ := runtime.Caller(0)
-		testImagesDir := path.Join(path.Dir(filename), "images")
-		FakeScriptsFileUrl = "file://" + path.Join(testImagesDir, "sti-fake", ".sti", "bin")
+		testImagesDir := path.Join(path.Dir(filename), "scripts")
+		FakeScriptsFileUrl = "file://" + path.Join(testImagesDir, ".sti", "bin")
 
 		for _, image := range []string{TagCleanBuild, TagCleanBuildUser, TagIncrementalBuild, TagIncrementalBuildUser} {
 			i.dockerClient.RemoveImage(image)

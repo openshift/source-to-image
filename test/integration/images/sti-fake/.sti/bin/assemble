@@ -1,8 +1,0 @@
-#!/bin/sh
-
-cp -Rf /tmp/src /sti-fake/
-touch /sti-fake/assemble-invoked
-
-if [ -e /tmp/artifacts/save-artifacts-invoked ]; then
-  touch /sti-fake/save-artifacts-invoked
-fi
