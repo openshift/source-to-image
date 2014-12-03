@@ -24,7 +24,6 @@ const (
 
 	FakeBaseImage        = "sti_test/sti-fake"
 	FakeUserImage        = "sti_test/sti-fake-user"
-	FakeBrokenBaseImage  = "sti_test/sti-fake-broken"
 	FakeImageWithScripts = "sti_test/sti-fake-with-scripts"
 
 	TagCleanBuild            = "test/sti-fake-app"

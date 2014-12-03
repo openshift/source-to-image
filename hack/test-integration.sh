@@ -13,10 +13,13 @@ function cleanup()
     echo "Complete"
 }
 
-img_count=$(docker images | grep sti_test/sti-fake | wc -l)
-if [ "${img_count}" != "4" ]; then
-  echo "You do not have necessary test images, be sure to run 'hack/build-test-images.sh' beforehand."
-  exit 1
+set +e
+img_count=$(docker images | grep -c sti_test/sti-fake)
+set -e
+
+if [ "${img_count}" != "3" ]; then
+    echo "You do not have necessary test images, be sure to run 'hack/build-test-images.sh' beforehand."
+    exit 1
 fi
 
 trap cleanup EXIT SIGINT
