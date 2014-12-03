@@ -14,3 +14,4 @@ cd "${STI_ROOT}"
 docker build -t sti_test/sti-fake test/integration/images/sti-fake
 docker build -t sti_test/sti-fake-broken test/integration/images/sti-fake-broken
 docker build -t sti_test/sti-fake-user test/integration/images/sti-fake-user
+docker build -t sti_test/sti-fake-with-scripts test/integration/images/sti-fake-with-scripts
