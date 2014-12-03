@@ -22,14 +22,16 @@ const (
 	DefaultDockerSocket = "unix:///var/run/docker.sock"
 	TestSource          = "git://github.com/pmorie/simple-html"
 
-	FakeBaseImage       = "sti_test/sti-fake"
-	FakeUserImage       = "sti_test/sti-fake-user"
-	FakeBrokenBaseImage = "sti_test/sti-fake-broken"
+	FakeBaseImage        = "sti_test/sti-fake"
+	FakeUserImage        = "sti_test/sti-fake-user"
+	FakeBrokenBaseImage  = "sti_test/sti-fake-broken"
+	FakeImageWithScripts = "sti_test/sti-fake-with-scripts"
 
-	TagCleanBuild           = "test/sti-fake-app"
-	TagCleanBuildUser       = "test/sti-fake-app-user"
-	TagIncrementalBuild     = "test/sti-incremental-app"
-	TagIncrementalBuildUser = "test/sti-incremental-app-user"
+	TagCleanBuild            = "test/sti-fake-app"
+	TagCleanBuildUser        = "test/sti-fake-app-user"
+	TagIncrementalBuild      = "test/sti-incremental-app"
+	TagIncrementalBuildUser  = "test/sti-incremental-app-user"
+	TagCleanBuildWithScripts = "test/sti-fake-app-with-scripts"
 
 	// Need to serve the scripts from local host so any potential changes to the
 	// scripts are made available for integration testing.
@@ -117,6 +119,10 @@ func TestCleanBuildFileScriptsUrl(t *testing.T) {
 
 func TestCleanBuildHttpScriptsUrl(t *testing.T) {
 	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBaseImage, FakeScriptsHttpUrl)
+}
+
+func TestCleanBuildWithScripts(t *testing.T) {
+	integration(t).exerciseCleanBuild(TagCleanBuildWithScripts, false, FakeImageWithScripts, "")
 }
 
 // Test that a build request with a callbackUrl will invoke HTTP endpoint

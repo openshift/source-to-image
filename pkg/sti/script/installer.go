@@ -45,7 +45,7 @@ type handler struct {
 }
 
 type scriptHandler interface {
-	download(scripts []string, workingDir string) error
+	download(scripts []string, workingDir string) (bool, error)
 	getPath(script string, workingDir string) string
 	install(scriptPath string, workingDir string) error
 }
@@ -57,8 +57,12 @@ type scriptInfo struct {
 
 // Downloads and installs the specified scripts into working directory
 func (i *installer) DownloadAndInstall(scripts []string, workingDir string, required bool) error {
-	if err := i.handler.download(scripts, workingDir); err != nil {
+	download, err := i.handler.download(scripts, workingDir)
+	if err != nil {
 		return err
+	}
+	if !download {
+		return nil
 	}
 
 	for _, script := range scripts {
@@ -74,25 +78,30 @@ func (i *installer) DownloadAndInstall(scripts []string, workingDir string, requ
 	return nil
 }
 
-func (s *handler) download(scripts []string, workingDir string) error {
+func (s *handler) download(scripts []string, workingDir string) (bool, error) {
 	if len(scripts) == 0 {
-		return nil
+		return false, nil
 	}
 
 	wg := sync.WaitGroup{}
 	errs := make(map[string]chan error)
-	downloads := make(map[string]chan struct{})
+	downloads := make(map[string]chan bool)
+
 	for _, s := range scripts {
 		errs[s] = make(chan error, 2)
-		downloads[s] = make(chan struct{}, 2)
+		downloads[s] = make(chan bool, 2)
 	}
 
 	downloadAsync := func(script string, scriptUrl *url.URL, targetFile string) {
 		defer wg.Done()
-		if err := s.downloader.DownloadFile(scriptUrl, targetFile); err != nil {
+		download, err := s.downloader.DownloadFile(scriptUrl, targetFile)
+		if err != nil {
 			return
 		}
-		downloads[script] <- struct{}{}
+		downloads[script] <- download
+		if !download {
+			return
+		}
 
 		if err := s.fs.Chmod(targetFile, 0700); err != nil {
 			errs[script] <- err
@@ -109,7 +118,7 @@ func (s *handler) download(scripts []string, workingDir string) error {
 
 	defaultUrl, err := s.docker.GetDefaultScriptsUrl(s.image)
 	if err != nil {
-		return fmt.Errorf("Unable to retrieve the default STI scripts URL: %v", err)
+		return false, fmt.Errorf("Unable to retrieve the default STI scripts URL: %v", err)
 	}
 
 	if defaultUrl != "" {
@@ -120,21 +129,25 @@ func (s *handler) download(scripts []string, workingDir string) error {
 		}
 	}
 
-	// Wait for the script downloads to finish.
+	// Wait for the script downloads to finish
 	wg.Wait()
 	for _, d := range downloads {
 		if len(d) == 0 {
-			return errors.ErrScriptsDownloadFailed
+			return false, errors.ErrScriptsDownloadFailed
+		} else {
+			if download := <-d; !download {
+				return false, nil
+			}
 		}
 	}
 
 	for _, e := range errs {
 		if len(e) > 0 {
-			return errors.ErrScriptsDownloadFailed
+			return false, errors.ErrScriptsDownloadFailed
 		}
 	}
 
-	return nil
+	return true, nil
 }
 
 func (s *handler) getPath(script string, workingDir string) string {

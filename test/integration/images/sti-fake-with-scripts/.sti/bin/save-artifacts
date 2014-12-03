@@ -1,0 +1,5 @@
+#!/bin/sh
+touch /tmp/src/save-artifacts-invoked
+
+cd /tmp/src
+tar cf - .
