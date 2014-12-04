@@ -58,7 +58,12 @@ func (h *requestHandler) setup(requiredScripts, optionalScripts []string) (err e
 	// immediately pull the image if forcepull is true, that way later code that
 	// references the image will have it pre-pulled and can just inspect the image.
 	if h.request.ForcePull {
-		h.docker.PullImage(h.request.BaseImage)
+		err = h.docker.PullImage(h.request.BaseImage)
+	} else {
+		_, err = h.docker.CheckAndPull(h.request.BaseImage)
+	}
+	if err != nil {
+		return
 	}
 
 	dirs := []string{"upload/scripts", "downloads/scripts", "downloads/defaultScripts"}

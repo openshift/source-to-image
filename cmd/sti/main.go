@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/openshift/source-to-image/pkg/sti"
+	"github.com/openshift/source-to-image/pkg/sti/errors"
 	"github.com/openshift/source-to-image/pkg/sti/version"
 )
 
@@ -58,26 +59,21 @@ func newCmdBuild(req *sti.Request) *cobra.Command {
 		Long:  "Build a new Docker image named <tag> from a source repository and base image.",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 3 {
-				glog.Fatalf("Valid arguments: <source> <image> <tag> ...")
+				cmd.Help()
+				os.Exit(1)
 			}
 
 			req.Source = args[0]
 			req.BaseImage = args[1]
 			req.Tag = args[2]
 			envs, err := parseEnvs(cmd, "env")
-			if err != nil {
-				glog.Fatalf("An error occured: %v", err)
-			}
+			checkErr(err)
 			req.Environment = envs
 
 			b, err := sti.NewBuilder(req)
-			if err != nil {
-				glog.Fatalf("An error occured: %v", err)
-			}
+			checkErr(err)
 			res, err := b.Build()
-			if err != nil {
-				glog.Fatalf("An error occured: %v", err)
-			}
+			checkErr(err)
 			for _, message := range res.Messages {
 				glog.V(1).Infof(message)
 			}
@@ -97,27 +93,22 @@ func newCmdUsage(req *sti.Request) *cobra.Command {
 	usageCmd := &cobra.Command{
 		Use:   "usage <image>",
 		Short: "Print usage of the assemble script associated with the image",
-		Long:  "Create and start a container from the image and invoke it's usage (run `assemble -h' script).",
+		Long:  "Create and start a container from the image and invoke its usage script.",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) == 0 {
-				glog.Fatalf("Valid arguments: <image>")
+				cmd.Help()
+				os.Exit(1)
 			}
 
 			req.BaseImage = args[0]
 			envs, err := parseEnvs(cmd, "env")
-			if err != nil {
-				glog.Fatalf(err.Error())
-			}
+			checkErr(err)
 			req.Environment = envs
 
 			uh, err := sti.NewUsage(req)
-			if err != nil {
-				glog.Fatalf("An error occurred: %v", err)
-			}
+			checkErr(err)
 			err = uh.Show()
-			if err != nil {
-				glog.Fatalf("An error occurred: %v", err)
-			}
+			checkErr(err)
 		},
 	}
 	usageCmd.Flags().StringP("env", "e", "", "Specify an environment var NAME=VALUE,NAME2=VALUE2,...")
@@ -133,8 +124,27 @@ func setupGlog(flags *pflag.FlagSet) {
 		flags.Int32Var(levelPtr, "loglevel", 0, "Set the level of log output (0-3)")
 	}
 	// FIXME currently glog has only option to redirect output to stderr
-	// the preferred for STI wouuld be to redirect to stdout
+	// the preferred for STI would be to redirect to stdout
 	flag.CommandLine.Set("logtostderr", "true")
+}
+
+func checkErr(err error) {
+	if err == nil {
+		return
+	}
+	if e, ok := err.(errors.Error); ok {
+		glog.Errorf("An error occurred: %v", e)
+		glog.Errorf("Suggested solution: %v", e.Suggestion)
+		if e.Details != nil {
+			glog.V(1).Infof("Details: %v", e.Details)
+		}
+		glog.Error("If the problem persists reach us on freenode #openshift " +
+			"or fill an issue at https://github.com/openshift/source-to-image/issues " +
+			"providing us with a log from your build using --loglevel=3")
+		os.Exit(e.ErrorCode)
+	} else {
+		glog.Fatalf("An error occurred: %v", err)
+	}
 }
 
 func main() {
@@ -156,7 +166,6 @@ func main() {
 	stiCmd.AddCommand(newCmdUsage(req))
 	setupGlog(stiCmd.PersistentFlags())
 
-	if err := stiCmd.Execute(); err != nil {
-		glog.Fatalf("Error: %s", err)
-	}
+	err := stiCmd.Execute()
+	checkErr(err)
 }

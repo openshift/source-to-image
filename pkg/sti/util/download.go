@@ -113,7 +113,7 @@ func (d *downloader) DownloadFile(url *url.URL, targetFile string) (bool, error)
 	}
 	reader, err := sr.Read(url)
 	if err != nil {
-		glog.V(2).Infof("Unable to download %s (%s)", url.String(), err)
+		glog.Warningf("Unable to download %s (%s)", url.String(), err)
 		return false, err
 	}
 	defer reader.Close()
