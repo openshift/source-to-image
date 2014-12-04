@@ -7,6 +7,7 @@ import (
 // StiError represents an error thrown during STI execution
 type StiError int
 
+// Common STI errors
 const (
 	ErrPullImageFailed StiError = iota
 	ErrScriptsDownloadFailed

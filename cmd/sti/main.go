@@ -36,9 +36,8 @@ func parseEnvs(cmd *cobra.Command, name string) (map[string]string, error) {
 func dockerSocket() string {
 	if host := os.Getenv("DOCKER_HOST"); host != "" {
 		return host
-	} else {
-		return "unix:///var/run/docker.sock"
 	}
+	return "unix:///var/run/docker.sock"
 }
 
 func newCmdVersion() *cobra.Command {
@@ -52,7 +51,7 @@ func newCmdVersion() *cobra.Command {
 	}
 }
 
-func newCmdBuild(req *sti.STIRequest) *cobra.Command {
+func newCmdBuild(req *sti.Request) *cobra.Command {
 	buildCmd := &cobra.Command{
 		Use:   "build <source> <image> <tag>",
 		Short: "Build a new image",
@@ -88,13 +87,13 @@ func newCmdBuild(req *sti.STIRequest) *cobra.Command {
 	buildCmd.Flags().BoolVar(&(req.RemovePreviousImage), "rm", false, "Remove the previous image during incremental builds")
 	buildCmd.Flags().StringP("env", "e", "", "Specify an environment var NAME=VALUE,NAME2=VALUE2,...")
 	buildCmd.Flags().StringVarP(&(req.Ref), "ref", "r", "", "Specify a ref to check-out")
-	buildCmd.Flags().StringVar(&(req.CallbackUrl), "callbackUrl", "", "Specify a URL to invoke via HTTP POST upon build completion")
-	buildCmd.Flags().StringVarP(&(req.ScriptsUrl), "scripts", "s", "", "Specify a URL for the assemble and run scripts")
+	buildCmd.Flags().StringVar(&(req.CallbackURL), "callbackUrl", "", "Specify a URL to invoke via HTTP POST upon build completion")
+	buildCmd.Flags().StringVarP(&(req.ScriptsURL), "scripts", "s", "", "Specify a URL for the assemble and run scripts")
 	buildCmd.Flags().BoolVar(&(req.ForcePull), "forcePull", true, "Always pull the builder image even if it is present locally")
 	return buildCmd
 }
 
-func newCmdUsage(req *sti.STIRequest) *cobra.Command {
+func newCmdUsage(req *sti.Request) *cobra.Command {
 	usageCmd := &cobra.Command{
 		Use:   "usage <image>",
 		Short: "Print usage of the assemble script associated with the image",
@@ -122,7 +121,7 @@ func newCmdUsage(req *sti.STIRequest) *cobra.Command {
 		},
 	}
 	usageCmd.Flags().StringP("env", "e", "", "Specify an environment var NAME=VALUE,NAME2=VALUE2,...")
-	usageCmd.Flags().StringVarP(&(req.ScriptsUrl), "scripts", "s", "", "Specify a URL for the assemble and run scripts")
+	usageCmd.Flags().StringVarP(&(req.ScriptsURL), "scripts", "s", "", "Specify a URL for the assemble and run scripts")
 	return usageCmd
 }
 
@@ -139,7 +138,7 @@ func setupGlog(flags *pflag.FlagSet) {
 }
 
 func main() {
-	req := &sti.STIRequest{}
+	req := &sti.Request{}
 	stiCmd := &cobra.Command{
 		Use: "sti",
 		Long: "Source-to-image (STI) is a tool for building repeatable docker images.\n\n" +

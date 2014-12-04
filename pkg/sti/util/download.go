@@ -39,7 +39,7 @@ type downloader struct {
 
 // NewDownloader creates an instance of the default Downloader implementation
 func NewDownloader() Downloader {
-	httpReader := NewHttpReader()
+	httpReader := NewHTTPReader()
 	return &downloader{
 		schemeReaders: map[string]schemeReader{
 			"http":  httpReader,
@@ -50,8 +50,8 @@ func NewDownloader() Downloader {
 	}
 }
 
-// NewHttpReader creates an instance of the HttpURLReader
-func NewHttpReader() schemeReader {
+// NewHTTPReader creates an instance of the HttpURLReader
+func NewHTTPReader() schemeReader {
 	r := &HttpURLReader{}
 	r.httpGet = http.Get
 	return r
@@ -73,9 +73,8 @@ func (h *HttpURLReader) Read(url *url.URL) (io.ReadCloser, error) {
 	}
 	if resp.StatusCode == 200 || resp.StatusCode == 201 {
 		return resp.Body, nil
-	} else {
-		return nil, fmt.Errorf("Failed to retrieve %s, response code %d", url.String(), resp.StatusCode)
 	}
+	return nil, fmt.Errorf("Failed to retrieve %s, response code %d", url.String(), resp.StatusCode)
 }
 
 // IsFromImage returns information whether URL is from inside the image

@@ -16,8 +16,8 @@ type FakeBuildHandler struct {
 	SetupError                 error
 	DetermineIncrementalCalled bool
 	DetermineIncrementalError  error
-	BuildRequest               *STIRequest
-	BuildResult                *STIResult
+	BuildRequest               *Request
+	BuildResult                *Result
 	SaveArtifactsCalled        bool
 	SaveArtifactsError         error
 	FetchSourceCalled          bool
@@ -41,11 +41,11 @@ func (f *FakeBuildHandler) determineIncremental() error {
 	return f.DetermineIncrementalError
 }
 
-func (f *FakeBuildHandler) Request() *STIRequest {
+func (f *FakeBuildHandler) Request() *Request {
 	return f.BuildRequest
 }
 
-func (f *FakeBuildHandler) Result() *STIResult {
+func (f *FakeBuildHandler) Result() *Result {
 	return f.BuildResult
 }
 
@@ -68,8 +68,8 @@ func TestBuild(t *testing.T) {
 	for _, incremental := range incrementalTest {
 
 		fh := &FakeBuildHandler{
-			BuildRequest: &STIRequest{incremental: incremental},
-			BuildResult:  &STIResult{},
+			BuildRequest: &Request{incremental: incremental},
+			BuildResult:  &Result{},
 		}
 		builder := Builder{
 			handler: fh,
@@ -108,8 +108,8 @@ func testBuildHandler() *buildHandler {
 		fs:        &test.FakeFileSystem{},
 		tar:       &test.FakeTar{},
 
-		request: &STIRequest{},
-		result:  &STIResult{},
+		request: &Request{},
+		result:  &Result{},
 	}
 	buildHandler := &buildHandler{
 		requestHandler:  requestHandler,
@@ -123,17 +123,17 @@ func testBuildHandler() *buildHandler {
 func TestPostExecute(t *testing.T) {
 	incrementalTest := []bool{true, false}
 	for _, incremental := range incrementalTest {
-		previousImageIdTest := []string{"", "test-image"}
-		for _, previousImageId := range previousImageIdTest {
+		previousImageIDTest := []string{"", "test-image"}
+		for _, previousImageID := range previousImageIDTest {
 			bh := testBuildHandler()
 			bh.result.Messages = []string{"one", "two"}
-			bh.request.CallbackUrl = "https://my.callback.org/test"
+			bh.request.CallbackURL = "https://my.callback.org/test"
 			bh.request.Tag = "test/tag"
 			dh := bh.docker.(*test.FakeDocker)
 			bh.request.incremental = incremental
-			if previousImageId != "" {
+			if previousImageID != "" {
 				bh.request.RemovePreviousImage = true
-				bh.docker.(*test.FakeDocker).GetImageIdResult = previousImageId
+				bh.docker.(*test.FakeDocker).GetImageIDResult = previousImageID
 			}
 			err := bh.PostExecute("test-container-id", []string{"cmd1", "arg1"})
 			if err != nil {
@@ -150,7 +150,7 @@ func TestPostExecute(t *testing.T) {
 					dh.CommitContainerOpts.Repository)
 			}
 
-			if incremental && previousImageId != "" {
+			if incremental && previousImageID != "" {
 				if dh.RemoveImageName != "test-image" {
 					t.Errorf("Previous image was not removed: %s",
 						dh.RemoveImageName)

@@ -140,7 +140,7 @@ func getScriptHandler() *handler {
 	return &handler{
 		docker:     &test.FakeDocker{},
 		image:      "test-image",
-		scriptsUrl: "http://the.scripts.url/scripts",
+		scriptsURL: "http://the.scripts.url/scripts",
 		downloader: &test.FakeDownloader{},
 		fs:         &test.FakeFileSystem{},
 	}
