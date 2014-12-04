@@ -24,7 +24,6 @@ const (
 
 	FakeBaseImage        = "sti_test/sti-fake"
 	FakeUserImage        = "sti_test/sti-fake-user"
-	FakeBrokenBaseImage  = "sti_test/sti-fake-broken"
 	FakeImageWithScripts = "sti_test/sti-fake-with-scripts"
 
 	TagCleanBuild            = "test/sti-fake-app"
@@ -64,8 +63,8 @@ func (i *integrationTest) setup() {
 		// get the full path to this .go file so we can construct the file url
 		// using this file's dirname
 		_, filename, _, _ := runtime.Caller(0)
-		testImagesDir := path.Join(path.Dir(filename), "images")
-		FakeScriptsFileUrl = "file://" + path.Join(testImagesDir, "sti-fake", ".sti", "bin")
+		testImagesDir := path.Join(path.Dir(filename), "scripts")
+		FakeScriptsFileUrl = "file://" + path.Join(testImagesDir, ".sti", "bin")
 
 		for _, image := range []string{TagCleanBuild, TagCleanBuildUser, TagIncrementalBuild, TagIncrementalBuildUser} {
 			i.dockerClient.RemoveImage(image)
@@ -171,24 +170,19 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 
 	b, err := sti.NewBuilder(req)
 	if err != nil {
-		t.Errorf("Cannot create a new builder.")
-		return
+		t.Fatalf("Cannot create a new builder.")
 	}
 	resp, err := b.Build()
 	if err != nil {
-		t.Errorf("An error occurred during the build: %v", err)
-		return
+		t.Fatalf("An error occurred during the build: %v", err)
 	} else if !resp.Success {
-		t.Errorf("The build failed.")
-		return
+		t.Fatalf("The build failed.")
 	}
 	if callbackInvoked != verifyCallback {
-		t.Errorf("Sti build did not invoke callback")
-		return
+		t.Fatalf("Sti build did not invoke callback")
 	}
 	if callbackHasValidJson != verifyCallback {
-		t.Errorf("Sti build did not invoke callback with valid json message")
-		return
+		t.Fatalf("Sti build did not invoke callback with valid json message")
 	}
 
 	i.checkForImage(tag)
@@ -223,17 +217,14 @@ func (i *integrationTest) exerciseIncrementalBuild(tag string, removePreviousIma
 
 	builder, err := sti.NewBuilder(req)
 	if err != nil {
-		t.Errorf("Unable to create builder: %v", err)
-		return
+		t.Fatalf("Unable to create builder: %v", err)
 	}
 	resp, err := builder.Build()
 	if err != nil {
-		t.Errorf("Unexpected error occurred during build: %v", err)
-		return
+		t.Fatalf("Unexpected error occurred during build: %v", err)
 	}
 	if !resp.Success {
-		t.Errorf("STI Build failed.")
-		return
+		t.Fatalf("STI Build failed.")
 	}
 
 	previousImageId := resp.ImageID
@@ -242,17 +233,14 @@ func (i *integrationTest) exerciseIncrementalBuild(tag string, removePreviousIma
 
 	builder, err = sti.NewBuilder(req)
 	if err != nil {
-		t.Errorf("Unable to create incremental builder: %v", err)
-		return
+		t.Fatalf("Unable to create incremental builder: %v", err)
 	}
 	resp, err = builder.Build()
 	if err != nil {
-		t.Errorf("Unexpected error occurred during incremental build: %v", err)
-		return
+		t.Fatalf("Unexpected error occurred during incremental build: %v", err)
 	}
 	if !resp.Success {
-		t.Errorf("STI incremental build failed.")
-		return
+		t.Fatalf("STI incremental build failed.")
 	}
 
 	i.checkForImage(tag)

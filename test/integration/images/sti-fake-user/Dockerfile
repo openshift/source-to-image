@@ -1,3 +1,6 @@
+#
+# This is fake image used for testing STI. It tests running build as non-root user.
+#
 FROM sti_test/sti-fake
 
 RUN mkdir -p /sti-fake && \
