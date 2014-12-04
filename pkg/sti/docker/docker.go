@@ -17,17 +17,17 @@ import (
 type Docker interface {
 	IsImageInLocalRegistry(imageName string) (bool, error)
 	RemoveContainer(id string) error
-	GetDefaultScriptsUrl(image string) (string, error)
+	GetDefaultScriptsURL(image string) (string, error)
 	RunContainer(opts RunContainerOptions) error
-	GetImageId(image string) (string, error)
+	GetImageID(image string) (string, error)
 	CommitContainer(opts CommitContainerOptions) (string, error)
 	RemoveImage(name string) error
 	PullImage(imageName string) error
 }
 
-// DockerClient contains all methods called on the go Docker
+// Client contains all methods called on the go Docker
 // client.
-type DockerClient interface {
+type Client interface {
 	RemoveImage(name string) error
 	InspectImage(name string) (*docker.Image, error)
 	PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error
@@ -41,7 +41,7 @@ type DockerClient interface {
 }
 
 type stiDocker struct {
-	client DockerClient
+	client Client
 }
 
 type postExecutor interface {
@@ -133,21 +133,21 @@ func (d *stiDocker) RemoveContainer(id string) error {
 }
 
 // GetDefaultUrl finds a script URL in the given image's metadata
-func (d *stiDocker) GetDefaultScriptsUrl(image string) (string, error) {
+func (d *stiDocker) GetDefaultScriptsURL(image string) (string, error) {
 	imageMetadata, err := d.CheckAndPull(image)
 	if err != nil {
 		return "", err
 	}
-	var defaultScriptsUrl string
+	defaultScriptsURL := ""
 	env := append(imageMetadata.ContainerConfig.Env, imageMetadata.Config.Env...)
 	for _, v := range env {
 		if strings.HasPrefix(v, "STI_SCRIPTS_URL=") {
-			defaultScriptsUrl = v[len("STI_SCRIPTS_URL="):]
+			defaultScriptsURL = v[len("STI_SCRIPTS_URL="):]
 			break
 		}
 	}
-	glog.V(2).Infof("Image contains default script URL '%s'", defaultScriptsUrl)
-	return defaultScriptsUrl, nil
+	glog.V(2).Infof("Image contains default script URL '%s'", defaultScriptsURL)
+	return defaultScriptsURL, nil
 }
 
 // RunContainer creates and starts a container using the image specified in the options with the ability
@@ -271,13 +271,13 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 	return nil
 }
 
-// GetImageId retrives the ID of the image identified by name
-func (d *stiDocker) GetImageId(imageName string) (string, error) {
-	if image, err := d.client.InspectImage(imageName); err == nil {
-		return image.ID, nil
-	} else {
+// GetImageID retrives the ID of the image identified by name
+func (d *stiDocker) GetImageID(imageName string) (string, error) {
+	image, err := d.client.InspectImage(imageName)
+	if err != nil {
 		return "", err
 	}
+	return image.ID, nil
 }
 
 // CommitContainer commits a container to an image with a specific tag.
@@ -299,11 +299,11 @@ func (d *stiDocker) CommitContainer(opts CommitContainerOptions) (string, error)
 		glog.V(2).Infof("Commiting container with config: %+v", config)
 	}
 
-	if image, err := d.client.CommitContainer(dockerOpts); err == nil && image != nil {
+	image, err := d.client.CommitContainer(dockerOpts)
+	if err == nil && image != nil {
 		return image.ID, nil
-	} else {
-		return "", err
 	}
+	return "", err
 }
 
 // RemoveImage removes the image with specified ID

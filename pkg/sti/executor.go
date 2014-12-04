@@ -14,8 +14,8 @@ import (
 
 // requestHandler encapsulates dependencies needed to fulfill requests.
 type requestHandler struct {
-	request      *STIRequest
-	result       *STIResult
+	request      *Request
+	result       *Result
 	postExecutor postExecutor
 	installer    script.Installer
 	fs           util.FileSystem
@@ -28,7 +28,7 @@ type postExecutor interface {
 }
 
 // newRequestHandler returns a new handler for a given request.
-func newRequestHandler(req *STIRequest) (*requestHandler, error) {
+func newRequestHandler(req *Request) (*requestHandler, error) {
 	glog.V(2).Infof("Using docker socket: %s", req.DockerSocket)
 
 	docker, err := docker.NewDocker(req.DockerSocket)
@@ -39,7 +39,7 @@ func newRequestHandler(req *STIRequest) (*requestHandler, error) {
 	return &requestHandler{
 		request:   req,
 		docker:    docker,
-		installer: script.NewInstaller(req.BaseImage, req.ScriptsUrl, docker),
+		installer: script.NewInstaller(req.BaseImage, req.ScriptsURL, docker),
 		fs:        util.NewFileSystem(),
 		tar:       tar.NewTar(),
 	}, nil
@@ -50,7 +50,7 @@ func (h *requestHandler) setup(requiredScripts, optionalScripts []string) (err e
 		return err
 	}
 
-	h.result = &STIResult{
+	h.result = &Result{
 		Success:    false,
 		WorkingDir: h.request.workingDir,
 	}

@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-type FakeHttpGet struct {
+type FakeHTTPGet struct {
 	url        string
 	content    string
 	err        error
@@ -19,7 +19,7 @@ type FakeHttpGet struct {
 	statusCode int
 }
 
-func (f *FakeHttpGet) get(url string) (*http.Response, error) {
+func (f *FakeHTTPGet) get(url string) (*http.Response, error) {
 	f.url = url
 	f.body = ioutil.NopCloser(strings.NewReader(f.content))
 	return &http.Response{
@@ -28,16 +28,16 @@ func (f *FakeHttpGet) get(url string) (*http.Response, error) {
 	}, f.err
 }
 
-func getHttpReader() (*HttpURLReader, *FakeHttpGet) {
+func getHTTPReader() (*HttpURLReader, *FakeHTTPGet) {
 	sr := &HttpURLReader{}
-	g := &FakeHttpGet{content: "test content", statusCode: 200}
+	g := &FakeHTTPGet{content: "test content", statusCode: 200}
 	sr.httpGet = g.get
 	return sr, g
 }
 
 func TestHTTPRead(t *testing.T) {
 	u, _ := url.Parse("http://test.url/test")
-	sr, fg := getHttpReader()
+	sr, fg := getHTTPReader()
 	rc, err := sr.Read(u)
 	if rc != fg.body {
 		t.Errorf("Unexpected readcloser returned: %#v", rc)
@@ -49,7 +49,7 @@ func TestHTTPRead(t *testing.T) {
 
 func TestHTTPReadGetError(t *testing.T) {
 	u, _ := url.Parse("http://test.url/test")
-	sr, fg := getHttpReader()
+	sr, fg := getHTTPReader()
 	fg.err = fmt.Errorf("URL Error")
 	rc, err := sr.Read(u)
 	if rc != nil {
@@ -62,7 +62,7 @@ func TestHTTPReadGetError(t *testing.T) {
 
 func TestHTTPReadErrorCode(t *testing.T) {
 	u, _ := url.Parse("http://test.url/test")
-	sr, fg := getHttpReader()
+	sr, fg := getHTTPReader()
 	fg.statusCode = 500
 	rc, err := sr.Read(u)
 	if rc != nil {

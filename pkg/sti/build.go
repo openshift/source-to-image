@@ -12,6 +12,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/sti/util"
 )
 
+// Builder provides a simple Build interface
 type Builder struct {
 	handler buildHandlerInterface
 }
@@ -20,8 +21,8 @@ type buildHandlerInterface interface {
 	cleanup()
 	setup(required []string, optional []string) error
 	determineIncremental() error
-	Request() *STIRequest
-	Result() *STIResult
+	Request() *Request
+	Result() *Result
 	saveArtifacts() error
 	fetchSource() error
 	execute(command string) error
@@ -33,7 +34,8 @@ type buildHandler struct {
 	callbackInvoker util.CallbackInvoker
 }
 
-func NewBuilder(req *STIRequest) (*Builder, error) {
+// NewBuilder returns a new Builder
+func NewBuilder(req *Request) (*Builder, error) {
 	handler, err := newBuildHandler(req)
 	if err != nil {
 		return nil, err
@@ -43,7 +45,7 @@ func NewBuilder(req *STIRequest) (*Builder, error) {
 	}, nil
 }
 
-func newBuildHandler(req *STIRequest) (*buildHandler, error) {
+func newBuildHandler(req *Request) (*buildHandler, error) {
 	rh, err := newRequestHandler(req)
 	if err != nil {
 		return nil, err
@@ -61,7 +63,7 @@ func newBuildHandler(req *STIRequest) (*buildHandler, error) {
 // An error represents a failure performing the build rather than a failure
 // of the build itself.  Callers should check the Success field of the result
 // to determine whether a build succeeded or not.
-func (b *Builder) Build() (*STIResult, error) {
+func (b *Builder) Build() (*Result, error) {
 	bh := b.handler
 	defer bh.cleanup()
 
@@ -104,7 +106,7 @@ func (h *buildHandler) PostExecute(containerID string, cmd []string) error {
 		previousImageID string
 	)
 	if h.request.incremental && h.request.RemovePreviousImage {
-		if previousImageID, err = h.docker.GetImageId(h.request.Tag); err != nil {
+		if previousImageID, err = h.docker.GetImageID(h.request.Tag); err != nil {
 			glog.Errorf("Error retrieving previous image's metadata: %v", err)
 		}
 	}
@@ -130,8 +132,8 @@ func (h *buildHandler) PostExecute(containerID string, cmd []string) error {
 		}
 	}
 
-	if h.request.CallbackUrl != "" {
-		h.result.Messages = h.callbackInvoker.ExecuteCallback(h.request.CallbackUrl,
+	if h.request.CallbackURL != "" {
+		h.result.Messages = h.callbackInvoker.ExecuteCallback(h.request.CallbackURL,
 			h.result.Success, h.result.Messages)
 	}
 
@@ -217,10 +219,10 @@ func (h *buildHandler) fetchSource() error {
 	return nil
 }
 
-func (h *buildHandler) Request() *STIRequest {
+func (h *buildHandler) Request() *Request {
 	return h.request
 }
 
-func (h *buildHandler) Result() *STIResult {
+func (h *buildHandler) Result() *Result {
 	return h.result
 }

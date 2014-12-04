@@ -1,8 +1,8 @@
 package sti
 
-// STIRequest contains essential fields for any request: a base image, source directory,
+// Request contains essential fields for any request: a base image, source directory,
 // and tag
-type STIRequest struct {
+type Request struct {
 	BaseImage           string
 	DockerSocket        string
 	PreserveWorkingDir  bool
@@ -12,17 +12,17 @@ type STIRequest struct {
 	Clean               bool
 	RemovePreviousImage bool
 	Environment         map[string]string
-	CallbackUrl         string
-	ScriptsUrl          string
+	CallbackURL         string
+	ScriptsURL          string
 	ForcePull           bool
 
 	incremental bool
 	workingDir  string
 }
 
-// STIResult includes a flag that indicates whether the build was successful
+// Result includes a flag that indicates whether the build was successful
 // and if an image was created, the image ID
-type STIResult struct {
+type Result struct {
 	Success    bool
 	Messages   []string
 	WorkingDir string

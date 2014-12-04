@@ -21,10 +21,10 @@ type Installer interface {
 }
 
 // NewInstaller returns a new instance of the default Installer implementation
-func NewInstaller(image, scriptsUrl string, docker docker.Docker) Installer {
+func NewInstaller(image, scriptsURL string, docker docker.Docker) Installer {
 	handler := &handler{
 		image:      image,
-		scriptsUrl: scriptsUrl,
+		scriptsURL: scriptsURL,
 		docker:     docker,
 		downloader: util.NewDownloader(),
 		fs:         util.NewFileSystem(),
@@ -39,7 +39,7 @@ type installer struct {
 type handler struct {
 	docker     docker.Docker
 	image      string
-	scriptsUrl string
+	scriptsURL string
 	downloader util.Downloader
 	fs         util.FileSystem
 }
@@ -108,22 +108,22 @@ func (s *handler) download(scripts []string, workingDir string) (bool, error) {
 		}
 	}
 
-	if s.scriptsUrl != "" {
+	if s.scriptsURL != "" {
 		destDir := filepath.Join(workingDir, "/downloads/scripts")
-		for file, info := range s.prepareDownload(scripts, destDir, s.scriptsUrl) {
+		for file, info := range s.prepareDownload(scripts, destDir, s.scriptsURL) {
 			wg.Add(1)
 			go downloadAsync(info.name, info.url, file)
 		}
 	}
 
-	defaultUrl, err := s.docker.GetDefaultScriptsUrl(s.image)
+	defaultURL, err := s.docker.GetDefaultScriptsURL(s.image)
 	if err != nil {
 		return false, fmt.Errorf("Unable to retrieve the default STI scripts URL: %v", err)
 	}
 
-	if defaultUrl != "" {
+	if defaultURL != "" {
 		destDir := filepath.Join(workingDir, "/downloads/defaultScripts")
-		for file, info := range s.prepareDownload(scripts, destDir, defaultUrl) {
+		for file, info := range s.prepareDownload(scripts, destDir, defaultURL) {
 			wg.Add(1)
 			go downloadAsync(info.name, info.url, file)
 		}
@@ -134,10 +134,9 @@ func (s *handler) download(scripts []string, workingDir string) (bool, error) {
 	for _, d := range downloads {
 		if len(d) == 0 {
 			return false, errors.ErrScriptsDownloadFailed
-		} else {
-			if download := <-d; !download {
-				return false, nil
-			}
+		}
+		if download := <-d; !download {
+			return false, nil
 		}
 	}
 
@@ -180,14 +179,14 @@ func (s *handler) install(path string, workingDir string) error {
 }
 
 // prepareScriptDownload turns the script name into proper URL
-func (s *handler) prepareDownload(scripts []string, targetDir, baseUrl string) map[string]scriptInfo {
+func (s *handler) prepareDownload(scripts []string, targetDir, baseURL string) map[string]scriptInfo {
 	s.fs.MkdirAll(targetDir)
 	info := make(map[string]scriptInfo)
 
 	for _, script := range scripts {
-		url, err := url.Parse(baseUrl + "/" + script)
+		url, err := url.Parse(baseURL + "/" + script)
 		if err != nil {
-			glog.Warningf("Unable to parse script URL: %s/%s", baseUrl, script)
+			glog.Warningf("Unable to parse script URL: %s/%s", baseURL, script)
 			continue
 		}
 		info[targetDir+"/"+script] = scriptInfo{url, script}

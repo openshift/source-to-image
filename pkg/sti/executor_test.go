@@ -14,8 +14,8 @@ func testRequestHandler() *requestHandler {
 		fs:        &test.FakeFileSystem{},
 		tar:       &test.FakeTar{},
 
-		request: &STIRequest{},
-		result:  &STIResult{},
+		request: &Request{},
+		result:  &Result{},
 	}
 }
 
