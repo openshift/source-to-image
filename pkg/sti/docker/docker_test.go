@@ -53,7 +53,7 @@ func TestCheckAndPull(t *testing.T) {
 	type testDef struct {
 		docker              test.FakeDockerClient
 		expectedImage       *docker.Image
-		expectedError       error
+		expectedError       int
 		expectedPullOptions docker.PullImageOptions
 	}
 	image := &docker.Image{}
@@ -79,7 +79,7 @@ func TestCheckAndPull(t *testing.T) {
 			InspectImageResult: []*docker.Image{nil},
 		},
 		expectedImage: nil,
-		expectedError: errors.ErrPullImageFailed,
+		expectedError: errors.ErrInspectImage,
 	}
 	pullErrorTest := testDef{
 		docker: test.FakeDockerClient{
@@ -88,7 +88,7 @@ func TestCheckAndPull(t *testing.T) {
 			InspectImageResult: []*docker.Image{nil},
 		},
 		expectedImage:       nil,
-		expectedError:       errors.ErrPullImageFailed,
+		expectedError:       errors.ErrPullImage,
 		expectedPullOptions: docker.PullImageOptions{Repository: imageName},
 	}
 	errorAfterPullTest := testDef{
@@ -97,7 +97,7 @@ func TestCheckAndPull(t *testing.T) {
 			InspectImageResult: []*docker.Image{nil, image},
 		},
 		expectedImage:       nil,
-		expectedError:       docker.ErrNoSuchImage,
+		expectedError:       errors.ErrInspectImage,
 		expectedPullOptions: docker.PullImageOptions{Repository: imageName},
 	}
 	tests := map[string]testDef{
@@ -114,7 +114,7 @@ func TestCheckAndPull(t *testing.T) {
 		if resultImage != def.expectedImage {
 			t.Errorf("%s: Unexpected image result -- %v", test, resultImage)
 		}
-		if resultErr != def.expectedError {
+		if e, ok := resultErr.(errors.Error); def.expectedError != 0 && (!ok || e.ErrorCode != def.expectedError) {
 			t.Errorf("%s: Unexpected error result -- %v", test, resultErr)
 		}
 		pullOpts := def.docker.PullImageOpts

@@ -119,7 +119,7 @@ func (h *buildHandler) PostExecute(containerID string, cmd []string) error {
 	}
 	imageID, err := h.docker.CommitContainer(opts)
 	if err != nil {
-		return errors.ErrBuildFailed
+		return errors.NewBuildError(h.request.Tag, err)
 	}
 
 	h.result.ImageID = imageID
@@ -186,12 +186,8 @@ func (h *buildHandler) saveArtifacts() (err error) {
 	}
 	err = h.docker.RunContainer(opts)
 	writer.Close()
-	if err != nil {
-		switch e := err.(type) {
-		case errors.StiContainerError:
-			glog.V(2).Infof("Exit code: %d", e.ExitCode)
-			return errors.ErrSaveArtifactsFailed
-		}
+	if _, ok := err.(errors.ContainerError); ok {
+		return errors.NewSaveArtifactsError(image, err)
 	}
 	return err
 }

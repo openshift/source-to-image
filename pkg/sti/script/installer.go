@@ -131,18 +131,18 @@ func (s *handler) download(scripts []string, workingDir string) (bool, error) {
 
 	// Wait for the script downloads to finish
 	wg.Wait()
-	for _, d := range downloads {
+	for s, d := range downloads {
 		if len(d) == 0 {
-			return false, errors.ErrScriptsDownloadFailed
+			return false, errors.NewScriptDownloadError(s, nil)
 		}
 		if download := <-d; !download {
 			return false, nil
 		}
 	}
 
-	for _, e := range errs {
+	for s, e := range errs {
 		if len(e) > 0 {
-			return false, errors.ErrScriptsDownloadFailed
+			return false, errors.NewScriptDownloadError(s, <-e)
 		}
 	}
 

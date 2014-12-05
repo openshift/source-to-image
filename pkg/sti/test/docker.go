@@ -3,6 +3,8 @@ package test
 import (
 	"sync"
 
+	dockerclient "github.com/fsouza/go-dockerclient"
+
 	"github.com/openshift/source-to-image/pkg/sti/docker"
 )
 
@@ -89,4 +91,8 @@ func (f *FakeDocker) RemoveImage(name string) error {
 // PullImage pulls a fake docker image
 func (f *FakeDocker) PullImage(imageName string) error {
 	return nil
+}
+
+func (f *FakeDocker) CheckAndPull(name string) (*dockerclient.Image, error) {
+	return nil, nil
 }

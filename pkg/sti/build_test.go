@@ -255,11 +255,11 @@ func TestSaveArtifacts(t *testing.T) {
 func TestSaveArtifactsRunError(t *testing.T) {
 	tests := []error{
 		fmt.Errorf("Run error"),
-		errors.StiContainerError{-1},
+		errors.NewContainerError("", -1, nil),
 	}
 	expected := []error{
 		tests[0],
-		errors.ErrSaveArtifactsFailed,
+		errors.NewSaveArtifactsError("", tests[1]),
 	}
 	// test with tar extract error or not
 	tarError := []bool{true, false}
