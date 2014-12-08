@@ -2,13 +2,14 @@ package util
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 
 	"github.com/golang/glog"
+
+	stierr "github.com/openshift/source-to-image/pkg/sti/errors"
 )
 
 // Downloader downloads the specified URL to the target file location
@@ -74,7 +75,7 @@ func (h *HttpURLReader) Read(url *url.URL) (io.ReadCloser, error) {
 	if resp.StatusCode == 200 || resp.StatusCode == 201 {
 		return resp.Body, nil
 	}
-	return nil, fmt.Errorf("Failed to retrieve %s, response code %d", url.String(), resp.StatusCode)
+	return nil, stierr.NewDownloadError(url.String(), resp.StatusCode)
 }
 
 // IsFromImage returns information whether URL is from inside the image
@@ -92,7 +93,7 @@ func (h *ImageReader) IsFromImage() bool {
 	return true
 }
 
-// Read throws ZeroError to notify the input is of length 0.
+// Read throws Not implemented error
 func (f *ImageReader) Read(url *url.URL) (io.ReadCloser, error) {
 	return nil, errors.New("Not implemented")
 }
@@ -105,7 +106,7 @@ func (d *downloader) DownloadFile(url *url.URL, targetFile string) (bool, error)
 
 	if sr == nil {
 		glog.Errorf("No URL handler found for %s", url.String())
-		return false, fmt.Errorf("No URL handler found url %s", url.String())
+		return false, stierr.NewURLHandlerError(url.String())
 	}
 	if sr.IsFromImage() {
 		glog.V(2).Infof("Using image internal scripts from: %s", url.String())

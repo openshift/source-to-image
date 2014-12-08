@@ -23,4 +23,5 @@ function buildimage()
 
 buildimage sti_test/sti-fake test/integration/images/sti-fake
 buildimage sti_test/sti-fake-user test/integration/images/sti-fake-user
-buildimage sti_test/sti-fake-with-scripts test/integration/images/sti-fake-with-scripts
+buildimage sti_test/sti-fake-scripts test/integration/images/sti-fake-scripts
+buildimage sti_test/sti-fake-scripts-no-save-artifacts test/integration/images/sti-fake-scripts-no-save-artifacts

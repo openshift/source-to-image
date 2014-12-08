@@ -17,7 +17,7 @@ set +e
 img_count=$(docker images | grep -c sti_test/sti-fake)
 set -e
 
-if [ "${img_count}" != "3" ]; then
+if [ "${img_count}" != "4" ]; then
     echo "You do not have necessary test images, be sure to run 'hack/build-test-images.sh' beforehand."
     exit 1
 fi
@@ -27,4 +27,5 @@ trap cleanup EXIT SIGINT
 echo
 echo Integration test cases ...
 echo
+export STI_TIMEOUT="-timeout 60s"
 "${STI_ROOT}/hack/test-go.sh" test/integration -tags 'integration' "${@:1}"

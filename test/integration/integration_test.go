@@ -22,15 +22,18 @@ const (
 	DefaultDockerSocket = "unix:///var/run/docker.sock"
 	TestSource          = "git://github.com/pmorie/simple-html"
 
-	FakeBaseImage        = "sti_test/sti-fake"
-	FakeUserImage        = "sti_test/sti-fake-user"
-	FakeImageWithScripts = "sti_test/sti-fake-with-scripts"
+	FakeBaseImage                   = "sti_test/sti-fake"
+	FakeUserImage                   = "sti_test/sti-fake-user"
+	FakeImageScripts                = "sti_test/sti-fake-scripts"
+	FakeImageScriptsNoSaveArtifacts = "sti_test/sti-fake-scripts-no-save-artifacts"
 
-	TagCleanBuild            = "test/sti-fake-app"
-	TagCleanBuildUser        = "test/sti-fake-app-user"
-	TagIncrementalBuild      = "test/sti-incremental-app"
-	TagIncrementalBuildUser  = "test/sti-incremental-app-user"
-	TagCleanBuildWithScripts = "test/sti-fake-app-with-scripts"
+	TagCleanBuild                             = "test/sti-fake-app"
+	TagCleanBuildUser                         = "test/sti-fake-app-user"
+	TagIncrementalBuild                       = "test/sti-incremental-app"
+	TagIncrementalBuildUser                   = "test/sti-incremental-app-user"
+	TagCleanBuildScripts                      = "test/sti-fake-app-scripts"
+	TagIncrementalBuildScripts                = "test/sti-incremental-app-scripts"
+	TagIncrementalBuildScriptsNoSaveArtifacts = "test/sti-incremental-app-scripts-no-save-artifacts"
 
 	// Need to serve the scripts from local host so any potential changes to the
 	// scripts are made available for integration testing.
@@ -120,8 +123,8 @@ func TestCleanBuildHttpScriptsURL(t *testing.T) {
 	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBaseImage, FakeScriptsHttpUrl)
 }
 
-func TestCleanBuildWithScripts(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuildWithScripts, false, FakeImageWithScripts, "")
+func TestCleanBuildScripts(t *testing.T) {
+	integration(t).exerciseCleanBuild(TagCleanBuildScripts, false, FakeImageScripts, "")
 }
 
 // Test that a build request with a callbackURL will invoke HTTP endpoint
@@ -193,22 +196,30 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 
 // Test an incremental build.
 func TestIncrementalBuildAndRemovePreviousImage(t *testing.T) {
-	integration(t).exerciseIncrementalBuild(TagIncrementalBuild, true)
+	integration(t).exerciseIncrementalBuild(TagIncrementalBuild, FakeBaseImage, true, false)
 }
 
 func TestIncrementalBuildAndKeepPreviousImage(t *testing.T) {
-	integration(t).exerciseIncrementalBuild(TagIncrementalBuild, false)
+	integration(t).exerciseIncrementalBuild(TagIncrementalBuild, FakeBaseImage, false, false)
 }
 
 func TestIncrementalBuildUser(t *testing.T) {
-	integration(t).exerciseIncrementalBuild(TagIncrementalBuildUser, true)
+	integration(t).exerciseIncrementalBuild(TagIncrementalBuildUser, FakeBaseImage, true, false)
 }
 
-func (i *integrationTest) exerciseIncrementalBuild(tag string, removePreviousImage bool) {
+func TestIncrementalBuildScripts(t *testing.T) {
+	integration(t).exerciseIncrementalBuild(TagIncrementalBuildScripts, FakeImageScripts, true, false)
+}
+
+func TestIncrementalBuildScriptsNoSaveArtifacts(t *testing.T) {
+	integration(t).exerciseIncrementalBuild(TagIncrementalBuildScriptsNoSaveArtifacts, FakeImageScriptsNoSaveArtifacts, true, true)
+}
+
+func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, removePreviousImage bool, expectClean bool) {
 	t := i.t
 	req := &sti.Request{
 		DockerSocket:        dockerSocket(),
-		BaseImage:           FakeBaseImage,
+		BaseImage:           imageName,
 		Source:              TestSource,
 		Tag:                 tag,
 		Clean:               true,
@@ -246,7 +257,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag string, removePreviousIma
 	i.checkForImage(tag)
 	containerID := i.createContainer(tag)
 	defer i.removeContainer(containerID)
-	i.checkIncrementalBuildState(containerID, resp.WorkingDir)
+	i.checkIncrementalBuildState(containerID, resp.WorkingDir, expectClean)
 
 	_, err = i.dockerClient.InspectImage(previousImageID)
 	if removePreviousImage {
@@ -295,7 +306,7 @@ func (i *integrationTest) removeContainer(cID string) {
 	i.dockerClient.RemoveContainer(docker.RemoveContainerOptions{cID, true, true})
 }
 
-func (i *integrationTest) checkFileExists(cID string, filePath string) {
+func (i *integrationTest) fileExists(cID string, filePath string) {
 	res := fileExistsInContainer(i.dockerClient, cID, filePath)
 
 	if !res {
@@ -303,10 +314,18 @@ func (i *integrationTest) checkFileExists(cID string, filePath string) {
 	}
 }
 
+func (i *integrationTest) fileNotExists(cID string, filePath string) {
+	res := fileExistsInContainer(i.dockerClient, cID, filePath)
+
+	if res {
+		i.t.Errorf("Unexpected file %s in container %s", filePath, cID)
+	}
+}
+
 func (i *integrationTest) checkBasicBuildState(cID string, workingDir string) {
-	i.checkFileExists(cID, "/sti-fake/assemble-invoked")
-	i.checkFileExists(cID, "/sti-fake/run-invoked")
-	i.checkFileExists(cID, "/sti-fake/src/index.html")
+	i.fileExists(cID, "/sti-fake/assemble-invoked")
+	i.fileExists(cID, "/sti-fake/run-invoked")
+	i.fileExists(cID, "/sti-fake/src/index.html")
 
 	_, err := os.Stat(workingDir)
 	if !os.IsNotExist(err) {
@@ -314,9 +333,13 @@ func (i *integrationTest) checkBasicBuildState(cID string, workingDir string) {
 	}
 }
 
-func (i *integrationTest) checkIncrementalBuildState(cID string, workingDir string) {
+func (i *integrationTest) checkIncrementalBuildState(cID string, workingDir string, expectClean bool) {
 	i.checkBasicBuildState(cID, workingDir)
-	i.checkFileExists(cID, "/sti-fake/save-artifacts-invoked")
+	if expectClean {
+		i.fileNotExists(cID, "/sti-fake/save-artifacts-invoked")
+	} else {
+		i.fileExists(cID, "/sti-fake/save-artifacts-invoked")
+	}
 }
 
 func fileExistsInContainer(d *docker.Client, cID string, filePath string) bool {

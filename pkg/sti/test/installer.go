@@ -6,13 +6,14 @@ type FakeInstaller struct {
 	WorkingDir []string
 	Required   []bool
 
-	Err error
+	Download bool
+	Err      error
 }
 
 // DownloadAndInstall downloads and install the fake STI scripts
-func (f *FakeInstaller) DownloadAndInstall(scripts []string, workingDir string, required bool) error {
+func (f *FakeInstaller) DownloadAndInstall(scripts []string, workingDir string, required bool) (bool, error) {
 	f.Scripts = append(f.Scripts, scripts)
 	f.WorkingDir = append(f.WorkingDir, workingDir)
 	f.Required = append(f.Required, required)
-	return f.Err
+	return f.Download, f.Err
 }

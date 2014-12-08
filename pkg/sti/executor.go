@@ -73,11 +73,12 @@ func (h *requestHandler) setup(requiredScripts, optionalScripts []string) (err e
 		}
 	}
 
-	if err = h.installer.DownloadAndInstall(requiredScripts, h.request.workingDir, true); err != nil {
+	if h.request.externalRequiredScripts, err = h.installer.DownloadAndInstall(
+		requiredScripts, h.request.workingDir, true); err != nil {
 		return err
 	}
-
-	if err = h.installer.DownloadAndInstall(optionalScripts, h.request.workingDir, false); err != nil {
+	if h.request.externalOptionalScripts, err = h.installer.DownloadAndInstall(
+		optionalScripts, h.request.workingDir, false); err != nil {
 		return err
 	}
 

@@ -2,6 +2,7 @@ package sti
 
 // Request contains essential fields for any request.
 type Request struct {
+
 	// BaseImage describes which image is used for building the result images.
 	BaseImage string
 
@@ -44,10 +45,17 @@ type Request struct {
 
 	// workingDir describes temporary directory used for downloading sources, scripts and tar operations.
 	workingDir string
+
+	// externalRequiredScripts describes if required scripts are from external URL.
+	externalRequiredScripts bool
+
+	// externalOptionalScripts describes if optional scripts are from external URL.
+	externalOptionalScripts bool
 }
 
 // Result structure contains information from build process.
 type Result struct {
+
 	// Success describes whether the build was successful.
 	Success bool
 
