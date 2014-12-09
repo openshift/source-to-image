@@ -167,5 +167,7 @@ func main() {
 	setupGlog(stiCmd.PersistentFlags())
 
 	err := stiCmd.Execute()
-	checkErr(err)
+	if err != nil {
+		os.Exit(1)
+	}
 }
