@@ -85,7 +85,8 @@ func (b *Builder) Build() (*Result, error) {
 	glog.V(2).Infof("Performing source build from %s", bh.Request().Source)
 	if bh.Request().incremental {
 		if err = bh.saveArtifacts(); err != nil {
-			glog.Errorf("Error saving previous build artifacts: %v", err)
+			glog.Warning("Error saving previous build artifacts: %v", err)
+			glog.Warning("Clean build will be performed!")
 		}
 	}
 
@@ -148,18 +149,17 @@ func (h *buildHandler) determineIncremental() (err error) {
 	}
 
 	// can only do incremental build if runtime image exists
-	incremental, err := h.docker.IsImageInLocalRegistry(h.request.Tag)
+	previousImageExists, err := h.docker.IsImageInLocalRegistry(h.request.Tag)
 	if err != nil {
 		return
 	}
 
-	// check if a save-artifacts script exists in anything provided to the build
-	// without it, we cannot do incremental builds
-	if incremental && h.fs.Exists(
-		filepath.Join(h.request.workingDir, "upload", "scripts", "save-artifacts")) {
-		h.request.incremental = true
-	}
-
+	// we're assuming save-artifacts to exists for embedded scripts (if not we'll
+	// warn a user upon container failure and proceed with clean build)
+	// for external save-artifacts - check its existence
+	saveArtifactsExists := !h.request.externalOptionalScripts ||
+		h.fs.Exists(filepath.Join(h.request.workingDir, "upload", "scripts", "save-artifacts"))
+	h.request.incremental = previousImageExists && saveArtifactsExists
 	return nil
 }
 

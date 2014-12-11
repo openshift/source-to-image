@@ -1,7 +1,6 @@
 package script
 
 import (
-	"fmt"
 	"net/url"
 	"path/filepath"
 	"sync"
@@ -13,11 +12,9 @@ import (
 	"github.com/openshift/source-to-image/pkg/sti/util"
 )
 
-// Installer downloads and installs a set of scripts using the specified
-// working directory. If the required flag is specified and a particular
-// script cannot be found, an error is returned.
+// Installer interface is responsible for installing scripts needed to run the build
 type Installer interface {
-	DownloadAndInstall(scripts []string, workingDir string, required bool) error
+	DownloadAndInstall(scripts []string, workingDir string, required bool) (bool, error)
 }
 
 // NewInstaller returns a new instance of the default Installer implementation
@@ -55,27 +52,29 @@ type scriptInfo struct {
 	name string
 }
 
-// Downloads and installs the specified scripts into working directory
-func (i *installer) DownloadAndInstall(scripts []string, workingDir string, required bool) error {
+// DownloadAndInstall downloads and installs a set of scripts using the specified
+// working directory. If the required flag is specified and a particular script
+// cannot be found, an error is returned, additionally the method returns information
+// whether the download actually happened.
+func (i *installer) DownloadAndInstall(scripts []string, workingDir string, required bool) (bool, error) {
 	download, err := i.handler.download(scripts, workingDir)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if !download {
-		return nil
+		return false, nil
 	}
 
 	for _, script := range scripts {
 		scriptPath := i.handler.getPath(script, workingDir)
 		if required && scriptPath == "" {
-			return fmt.Errorf("No %s script found in provided url, "+
-				"application source, or default image url. Aborting.", script)
+			return false, errors.NewScriptDownloadError(script, nil)
 		}
 		if err := i.handler.install(scriptPath, workingDir); err != nil {
-			return err
+			return false, err
 		}
 	}
-	return nil
+	return true, nil
 }
 
 func (s *handler) download(scripts []string, workingDir string) (bool, error) {
@@ -118,7 +117,7 @@ func (s *handler) download(scripts []string, workingDir string) (bool, error) {
 
 	defaultURL, err := s.docker.GetDefaultScriptsURL(s.image)
 	if err != nil {
-		return false, fmt.Errorf("Unable to retrieve the default STI scripts URL: %v", err)
+		return false, errors.NewDefaultScriptsURLError(err)
 	}
 
 	if defaultURL != "" {

@@ -122,7 +122,7 @@ func TestDownloadAndInstallScripts(t *testing.T) {
 		sh := &installer{
 			handler: test.handler,
 		}
-		err := sh.DownloadAndInstall([]string{"one", "two", "three"}, "/test-working-dir", test.required)
+		_, err := sh.DownloadAndInstall([]string{"one", "two", "three"}, "/test-working-dir", test.required)
 		if !test.errExpected && err != nil {
 			t.Errorf("%s: Unexpected error: %v", desc, err)
 		} else if test.errExpected && err == nil {

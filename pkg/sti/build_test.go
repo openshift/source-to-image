@@ -168,44 +168,56 @@ func TestPostExecute(t *testing.T) {
 
 func TestDetermineIncremental(t *testing.T) {
 	type incrementalTest struct {
-		clean        bool
-		inLocal      bool
+		// clean flag was passed
+		clean bool
+		// previous image existence
+		previousImage bool
+		// script download happened -> external scripts
+		scriptDownload bool
+		// script exists
 		scriptExists bool
-		expected     bool
+		// expected result
+		expected bool
 	}
 
 	tests := []incrementalTest{
-		{
-			clean:        false,
-			inLocal:      true,
-			scriptExists: true,
-			expected:     true,
-		},
-		{
-			clean:        true,
-			inLocal:      true,
-			scriptExists: true,
-			expected:     false,
-		},
-		{
-			clean:        false,
-			inLocal:      false,
-			scriptExists: true,
-			expected:     false,
-		},
-		{
-			clean:        false,
-			inLocal:      true,
-			scriptExists: false,
-			expected:     false,
-		},
+		// 0: external, downloaded scripts and previously image available
+		{false, true, true, true, true},
+
+		// 1: previous image, script downloaded but no save-artifacts
+		{false, true, true, false, false},
+
+		// 2-9: clean build - should always return false no matter what other flags are
+		{true, false, false, false, false},
+		{true, false, false, true, false},
+		{true, false, true, false, false},
+		{true, false, true, true, false},
+		{true, true, false, false, false},
+		{true, true, false, true, false},
+		{true, true, true, false, false},
+		{true, true, true, true, false},
+
+		// 10-17: no previous image - should always return false not matter what other flags are
+		{false, false, false, false, false},
+		{false, false, false, true, false},
+		{false, false, true, false, false},
+		{false, false, true, true, false},
+		{true, false, false, false, false},
+		{true, false, false, true, false},
+		{true, false, true, false, false},
+		{true, false, true, true, false},
+
+		// 18-19: previous image, script inside the image, its existence does not matter
+		{false, true, false, true, true},
+		{false, true, false, false, true},
 	}
 
-	for _, ti := range tests {
+	for i, ti := range tests {
 		bh := testBuildHandler()
 		bh.request.workingDir = "/working-dir"
 		bh.request.Clean = ti.clean
-		bh.docker.(*test.FakeDocker).LocalRegistryResult = ti.inLocal
+		bh.request.externalOptionalScripts = ti.scriptDownload
+		bh.docker.(*test.FakeDocker).LocalRegistryResult = ti.previousImage
 		if ti.scriptExists {
 			bh.fs.(*test.FakeFileSystem).ExistsResult = map[string]bool{
 				"/working-dir/upload/scripts/save-artifacts": true,
@@ -213,15 +225,15 @@ func TestDetermineIncremental(t *testing.T) {
 		}
 		bh.determineIncremental()
 		if bh.request.incremental != ti.expected {
-			t.Errorf("Unexpected incremental result: %v. Expected: %v",
-				bh.request.incremental, ti.expected)
+			t.Errorf("(%d) Unexpected incremental result: %v. Expected: %v",
+				i, bh.request.incremental, ti.expected)
 		}
-		if !ti.clean && ti.inLocal {
+		if !ti.clean && ti.previousImage && ti.scriptDownload {
 			scriptChecked := bh.fs.(*test.FakeFileSystem).ExistsFile[0]
 			expectedScript := "/working-dir/upload/scripts/save-artifacts"
 			if scriptChecked != expectedScript {
-				t.Errorf("Unexpected script checked. Actual: %s. Expected: %s",
-					scriptChecked, expectedScript)
+				t.Errorf("(%d) Unexpected script checked. Actual: %s. Expected: %s",
+					i, scriptChecked, expectedScript)
 			}
 		}
 	}

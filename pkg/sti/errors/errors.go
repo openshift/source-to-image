@@ -12,6 +12,11 @@ const (
 	ErrSaveArtifacts
 	ErrBuild
 	ErrStiContainer
+	ErrTarTimeout
+	ErrWorkDir
+	ErrDownload
+	ErrURLHandler
+	ErrDefaultScriptsURL
 )
 
 // Error represents an error thrown during STI execution
@@ -60,7 +65,7 @@ func NewPullImageError(name string, err error) error {
 		Message:    fmt.Sprintf("unable to get %s", name),
 		Details:    err,
 		ErrorCode:  ErrPullImage,
-		Suggestion: "check image name",
+		Suggestion: "check image name, or if using local image add --forcePull=false flag",
 	}
 }
 
@@ -94,6 +99,61 @@ func NewBuildError(name string, err error) error {
 		Details:    err,
 		ErrorCode:  ErrBuild,
 		Suggestion: "check the assemble script for errors",
+	}
+}
+
+// NewTarTimeoutError returns a new error which indicates there was a problem
+// when sending or receiving tar stream
+func NewTarTimeoutError() error {
+	return Error{
+		Message:    fmt.Sprintf("timeout waiting for tar stream"),
+		Details:    nil,
+		ErrorCode:  ErrTarTimeout,
+		Suggestion: "check the sti-helper script if it accepts tar stream for assemble and sends for save-artifacts",
+	}
+}
+
+// NewWorkDirError returns a new error which indicates there was a problem
+// when creating working directory
+func NewWorkDirError(dir string, err error) error {
+	return Error{
+		Message:    fmt.Sprintf("creating temporary directory %s failed", dir),
+		Details:    err,
+		ErrorCode:  ErrWorkDir,
+		Suggestion: "check if you have access to your system's temporary directory",
+	}
+}
+
+// NewDownloadError returns a new error which indicates there was a problem
+// when downloading a file
+func NewDownloadError(url string, code int) error {
+	return Error{
+		Message:    fmt.Sprintf("failed to retrieve %s, response code %d", url, code),
+		Details:    nil,
+		ErrorCode:  ErrDownload,
+		Suggestion: "check the availability of the address",
+	}
+}
+
+// NewURLHandlerError returns a new error which indicates there was a problem
+// when trying to read scripts URL
+func NewURLHandlerError(url string) error {
+	return Error{
+		Message:    fmt.Sprintf("no URL handler for %s", url),
+		Details:    nil,
+		ErrorCode:  ErrURLHandler,
+		Suggestion: "check the URL",
+	}
+}
+
+// NewDefaultScriptsURLError return a new error which indicates there was a problem
+// when trying to read STI_SCRIPTS_URL
+func NewDefaultScriptsURLError(err error) error {
+	return Error{
+		Message:    fmt.Sprintf("error reading STI_SCRIPTS_URL"),
+		Details:    err,
+		ErrorCode:  ErrDefaultScriptsURL,
+		Suggestion: "check the image",
 	}
 }
 
