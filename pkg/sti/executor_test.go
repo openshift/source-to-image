@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/openshift/source-to-image/pkg/sti/api"
 	"github.com/openshift/source-to-image/pkg/sti/test"
 )
 
@@ -14,15 +15,16 @@ func testRequestHandler() *requestHandler {
 		git:       &test.FakeGit{},
 		fs:        &test.FakeFileSystem{},
 		tar:       &test.FakeTar{},
-		request:   &Request{},
-		result:    &Result{},
+
+		request: &api.Request{},
+		result:  &api.Result{},
 	}
 }
 
 func TestSetup(t *testing.T) {
 	rh := testRequestHandler()
 	rh.fs.(*test.FakeFileSystem).WorkingDirResult = "/working-dir"
-	err := rh.setup([]string{"required1", "required2"}, []string{"optional1", "optional2"})
+	err := rh.setup([]api.Script{api.Assemble, api.Run}, []api.Script{api.SaveArtifacts})
 	if err != nil {
 		t.Errorf("An error occurred setting up the request handler: %v", err)
 	}
@@ -42,10 +44,10 @@ func TestSetup(t *testing.T) {
 		t.Errorf("Unexpected set of required flags: %#v", requiredFlags)
 	}
 	scripts := rh.installer.(*test.FakeInstaller).Scripts
-	if !reflect.DeepEqual(scripts[0], []string{"required1", "required2"}) {
+	if !reflect.DeepEqual(scripts[0], []api.Script{api.Assemble, api.Run}) {
 		t.Errorf("Unexpected set of required scripts: %#v", scripts[0])
 	}
-	if !reflect.DeepEqual(scripts[1], []string{"optional1", "optional2"}) {
+	if !reflect.DeepEqual(scripts[1], []api.Script{api.SaveArtifacts}) {
 		t.Errorf("Unexpected set of optional scripts: %#v", scripts[1])
 	}
 }
@@ -99,7 +101,7 @@ func TestExecute(t *testing.T) {
 	rh := testRequestHandler()
 	pe := &FakePostExecutor{}
 	rh.postExecutor = pe
-	rh.request.workingDir = "/working-dir"
+	rh.request.WorkingDir = "/working-dir"
 	rh.request.BaseImage = "test/image"
 	th := rh.tar.(*test.FakeTar)
 	th.CreateTarResult = "/working-dir/test.tar"
@@ -153,7 +155,7 @@ func TestExecute(t *testing.T) {
 
 func TestCleanup(t *testing.T) {
 	rh := testRequestHandler()
-	rh.request.workingDir = "/working-dir"
+	rh.request.WorkingDir = "/working-dir"
 	preserve := []bool{false, true}
 	for _, p := range preserve {
 		rh.request.PreserveWorkingDir = p

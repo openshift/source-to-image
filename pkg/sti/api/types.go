@@ -1,4 +1,18 @@
-package sti
+package api
+
+// Script defines script names used by STI process.
+type Script string
+
+const (
+	// Assemble is the name of the script responsible for build process of the resulting image.
+	Assemble = "assemble"
+	// Run is the name of the script responsible for running the final application.
+	Run = "run"
+	// SaveArtifacts is the name of the script responsible for storing dependencies etc. between builds.
+	SaveArtifacts = "save-artifacts"
+	// Usage i the name of the script responsible for printing the builder image's short info.
+	Usage = "usage"
+)
 
 // Request contains essential fields for any request.
 type Request struct {
@@ -40,17 +54,17 @@ type Request struct {
 	// ForcePull describes if the builder should pull the images from registry prior to building.
 	ForcePull bool
 
-	// incremental describes incremental status of current build
-	incremental bool
+	// Incremental describes incremental status of current build
+	Incremental bool
 
-	// workingDir describes temporary directory used for downloading sources, scripts and tar operations.
-	workingDir string
+	// WorkingDir describes temporary directory used for downloading sources, scripts and tar operations.
+	WorkingDir string
 
-	// externalRequiredScripts describes if required scripts are from external URL.
-	externalRequiredScripts bool
+	// ExternalRequiredScripts describes if required scripts are from external URL.
+	ExternalRequiredScripts bool
 
-	// externalOptionalScripts describes if optional scripts are from external URL.
-	externalOptionalScripts bool
+	// ExternalOptionalScripts describes if optional scripts are from external URL.
+	ExternalOptionalScripts bool
 }
 
 // Result structure contains information from build process.

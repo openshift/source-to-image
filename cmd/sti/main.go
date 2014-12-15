@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/openshift/source-to-image/pkg/sti"
+	"github.com/openshift/source-to-image/pkg/sti/api"
 	"github.com/openshift/source-to-image/pkg/sti/errors"
 	"github.com/openshift/source-to-image/pkg/sti/version"
 )
@@ -52,7 +53,7 @@ func newCmdVersion() *cobra.Command {
 	}
 }
 
-func newCmdBuild(req *sti.Request) *cobra.Command {
+func newCmdBuild(req *api.Request) *cobra.Command {
 	buildCmd := &cobra.Command{
 		Use:   "build <source> <image> <tag>",
 		Short: "Build a new image",
@@ -90,7 +91,7 @@ func newCmdBuild(req *sti.Request) *cobra.Command {
 	return buildCmd
 }
 
-func newCmdUsage(req *sti.Request) *cobra.Command {
+func newCmdUsage(req *api.Request) *cobra.Command {
 	usageCmd := &cobra.Command{
 		Use:   "usage <image>",
 		Short: "Print usage of the assemble script associated with the image",
@@ -151,7 +152,7 @@ func checkErr(err error) {
 }
 
 func main() {
-	req := &sti.Request{}
+	req := &api.Request{}
 	stiCmd := &cobra.Command{
 		Use: "sti",
 		Long: "Source-to-image (STI) is a tool for building repeatable docker images.\n\n" +

@@ -6,6 +6,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"github.com/openshift/source-to-image/pkg/sti/api"
 	"github.com/openshift/source-to-image/pkg/sti/docker"
 	"github.com/openshift/source-to-image/pkg/sti/errors"
 	"github.com/openshift/source-to-image/pkg/sti/util"
@@ -18,13 +19,13 @@ type Builder struct {
 
 type buildHandlerInterface interface {
 	cleanup()
-	setup(requiredScripts, optionalScripts []string) error
+	setup(required []api.Script, optional []api.Script) error
 	determineIncremental() error
-	Request() *Request
-	Result() *Result
+	Request() *api.Request
+	Result() *api.Result
 	saveArtifacts() error
 	fetchSource() error
-	execute(command string) error
+	execute(command api.Script) error
 }
 
 type buildHandler struct {
@@ -33,7 +34,7 @@ type buildHandler struct {
 }
 
 // NewBuilder returns a new Builder
-func NewBuilder(req *Request) (*Builder, error) {
+func NewBuilder(req *api.Request) (*Builder, error) {
 	handler, err := newBuildHandler(req)
 	if err != nil {
 		return nil, err
@@ -43,7 +44,7 @@ func NewBuilder(req *Request) (*Builder, error) {
 	}, nil
 }
 
-func newBuildHandler(req *Request) (*buildHandler, error) {
+func newBuildHandler(req *api.Request) (*buildHandler, error) {
 	rh, err := newRequestHandler(req)
 	if err != nil {
 		return nil, err
@@ -56,15 +57,15 @@ func newBuildHandler(req *Request) (*buildHandler, error) {
 	return bh, nil
 }
 
-// Build processes a Request and returns a *Result and an error.
+// Build processes a Request and returns a *api.Result and an error.
 // An error represents a failure performing the build rather than a failure
 // of the build itself.  Callers should check the Success field of the result
 // to determine whether a build succeeded or not.
-func (b *Builder) Build() (*Result, error) {
+func (b *Builder) Build() (*api.Result, error) {
 	bh := b.handler
 	defer bh.cleanup()
 
-	err := bh.setup([]string{"assemble", "run"}, []string{"save-artifacts"})
+	err := bh.setup([]api.Script{api.Assemble, api.Run}, []api.Script{api.SaveArtifacts})
 	if err != nil {
 		return nil, err
 	}
@@ -73,21 +74,21 @@ func (b *Builder) Build() (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	if bh.Request().incremental {
+	if bh.Request().Incremental {
 		glog.V(1).Infof("Existing image for tag %s detected for incremental build.", bh.Request().Tag)
 	} else {
 		glog.V(1).Infof("Clean build will be performed")
 	}
 
 	glog.V(2).Infof("Performing source build from %s", bh.Request().Source)
-	if bh.Request().incremental {
+	if bh.Request().Incremental {
 		if err = bh.saveArtifacts(); err != nil {
 			glog.Warning("Error saving previous build artifacts: %v", err)
 			glog.Warning("Clean build will be performed!")
 		}
 	}
 
-	if err = bh.execute("assemble"); err != nil {
+	if err = bh.execute(api.Assemble); err != nil {
 		return nil, err
 	}
 
@@ -99,14 +100,14 @@ func (h *buildHandler) PostExecute(containerID string, cmd []string) error {
 		err             error
 		previousImageID string
 	)
-	if h.request.incremental && h.request.RemovePreviousImage {
+	if h.request.Incremental && h.request.RemovePreviousImage {
 		if previousImageID, err = h.docker.GetImageID(h.request.Tag); err != nil {
 			glog.Errorf("Error retrieving previous image's metadata: %v", err)
 		}
 	}
 
 	opts := docker.CommitContainerOptions{
-		Command:     append(cmd, "run"),
+		Command:     append(cmd, string(api.Run)),
 		Env:         h.generateConfigEnv(),
 		ContainerID: containerID,
 		Repository:  h.request.Tag,
@@ -119,7 +120,7 @@ func (h *buildHandler) PostExecute(containerID string, cmd []string) error {
 	h.result.ImageID = imageID
 	glog.V(1).Infof("Tagged %s as %s", imageID, h.request.Tag)
 
-	if h.request.incremental && h.request.RemovePreviousImage && previousImageID != "" {
+	if h.request.Incremental && h.request.RemovePreviousImage && previousImageID != "" {
 		glog.V(1).Infof("Removing previously-tagged image %s", previousImageID)
 		if err = h.docker.RemoveImage(previousImageID); err != nil {
 			glog.Errorf("Unable to remove previous image: %v", err)
@@ -136,7 +137,7 @@ func (h *buildHandler) PostExecute(containerID string, cmd []string) error {
 }
 
 func (h *buildHandler) determineIncremental() (err error) {
-	h.request.incremental = false
+	h.request.Incremental = false
 	if h.request.Clean {
 		return
 	}
@@ -150,14 +151,14 @@ func (h *buildHandler) determineIncremental() (err error) {
 	// we're assuming save-artifacts to exists for embedded scripts (if not we'll
 	// warn a user upon container failure and proceed with clean build)
 	// for external save-artifacts - check its existence
-	saveArtifactsExists := !h.request.externalOptionalScripts ||
-		h.fs.Exists(filepath.Join(h.request.workingDir, "upload", "scripts", "save-artifacts"))
-	h.request.incremental = previousImageExists && saveArtifactsExists
+	saveArtifactsExists := !h.request.ExternalOptionalScripts ||
+		h.fs.Exists(filepath.Join(h.request.WorkingDir, "upload", "scripts", string(api.SaveArtifacts)))
+	h.request.Incremental = previousImageExists && saveArtifactsExists
 	return nil
 }
 
 func (h *buildHandler) saveArtifacts() (err error) {
-	artifactTmpDir := filepath.Join(h.request.workingDir, "upload", "artifacts")
+	artifactTmpDir := filepath.Join(h.request.WorkingDir, "upload", "artifacts")
 	if err = h.fs.Mkdir(artifactTmpDir); err != nil {
 		return err
 	}
@@ -173,7 +174,7 @@ func (h *buildHandler) saveArtifacts() (err error) {
 	opts := docker.RunContainerOptions{
 		Image:        image,
 		OverwriteCmd: true,
-		Command:      "save-artifacts",
+		Command:      api.SaveArtifacts,
 		Stdout:       writer,
 		OnStart:      extractFunc,
 	}
@@ -185,10 +186,10 @@ func (h *buildHandler) saveArtifacts() (err error) {
 	return err
 }
 
-func (h *buildHandler) Request() *Request {
+func (h *buildHandler) Request() *api.Request {
 	return h.request
 }
 
-func (h *buildHandler) Result() *Result {
+func (h *buildHandler) Result() *api.Result {
 	return h.result
 }

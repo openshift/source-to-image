@@ -187,7 +187,7 @@ func TestCommitContainerError(t *testing.T) {
 	}
 }
 
-func TestGetDefaultUrl(t *testing.T) {
+func TestGetScriptsURL(t *testing.T) {
 	type urltest struct {
 		image       docker.Image
 		result      string

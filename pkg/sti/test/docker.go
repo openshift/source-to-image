@@ -65,7 +65,7 @@ func (f *FakeDocker) RunContainer(opts docker.RunContainerOptions) error {
 		}
 	}
 	if opts.PostExec != nil {
-		opts.PostExec.PostExecute(f.RunContainerContainerID, append(f.RunContainerCmd, opts.Command))
+		opts.PostExec.PostExecute(f.RunContainerContainerID, append(f.RunContainerCmd, string(opts.Command)))
 	}
 	return f.RunContainerError
 }

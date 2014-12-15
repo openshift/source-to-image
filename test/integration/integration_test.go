@@ -9,13 +9,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
 
 	"github.com/fsouza/go-dockerclient"
+
 	"github.com/openshift/source-to-image/pkg/sti"
+	"github.com/openshift/source-to-image/pkg/sti/api"
 )
 
 const (
@@ -66,8 +68,8 @@ func (i *integrationTest) setup() {
 		// get the full path to this .go file so we can construct the file url
 		// using this file's dirname
 		_, filename, _, _ := runtime.Caller(0)
-		testImagesDir := path.Join(path.Dir(filename), "scripts")
-		FakeScriptsFileURL = "file://" + path.Join(testImagesDir, ".sti", "bin")
+		testImagesDir := filepath.Join(filepath.Dir(filename), "scripts")
+		FakeScriptsFileURL = "file://" + filepath.Join(testImagesDir, ".sti", "bin")
 
 		for _, image := range []string{TagCleanBuild, TagCleanBuildUser, TagIncrementalBuild, TagIncrementalBuildUser} {
 			i.dockerClient.RemoveImage(image)
@@ -162,7 +164,7 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 		callbackURL = ts.URL
 	}
 
-	req := &sti.Request{
+	req := &api.Request{
 		DockerSocket: dockerSocket(),
 		BaseImage:    imageName,
 		Source:       TestSource,
@@ -217,7 +219,7 @@ func TestIncrementalBuildScriptsNoSaveArtifacts(t *testing.T) {
 
 func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, removePreviousImage bool, expectClean bool) {
 	t := i.t
-	req := &sti.Request{
+	req := &api.Request{
 		DockerSocket:        dockerSocket(),
 		BaseImage:           imageName,
 		Source:              TestSource,

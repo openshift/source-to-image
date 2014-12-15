@@ -2,6 +2,8 @@ package errors
 
 import (
 	"fmt"
+
+	"github.com/openshift/source-to-image/pkg/sti/api"
 )
 
 // Common STI errors
@@ -71,9 +73,9 @@ func NewPullImageError(name string, err error) error {
 
 // NewScriptDownloadError returns a new error which indicates there was a problem
 // downloading a script
-func NewScriptDownloadError(name string, err error) error {
+func NewScriptDownloadError(name api.Script, err error) error {
 	return Error{
-		Message:    fmt.Sprintf("%s script download failed", name),
+		Message:    fmt.Sprintf("%v script download failed", name),
 		Details:    err,
 		ErrorCode:  ErrScriptDownload,
 		Suggestion: "provide URL with STI scripts with -s flag or check the image if it contains STI_SCRIPTS_URL variable set",

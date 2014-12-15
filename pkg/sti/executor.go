@@ -6,6 +6,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"github.com/openshift/source-to-image/pkg/sti/api"
 	"github.com/openshift/source-to-image/pkg/sti/docker"
 	"github.com/openshift/source-to-image/pkg/sti/git"
 	"github.com/openshift/source-to-image/pkg/sti/script"
@@ -15,8 +16,8 @@ import (
 
 // requestHandler encapsulates dependencies needed to fulfill requests.
 type requestHandler struct {
-	request      *Request
-	result       *Result
+	request      *api.Request
+	result       *api.Result
 	postExecutor postExecutor
 	installer    script.Installer
 	git          git.Git
@@ -30,7 +31,7 @@ type postExecutor interface {
 }
 
 // newRequestHandler returns a new handler for a given request.
-func newRequestHandler(req *Request) (*requestHandler, error) {
+func newRequestHandler(req *api.Request) (*requestHandler, error) {
 	glog.V(2).Infof("Using docker socket: %s", req.DockerSocket)
 
 	docker, err := docker.NewDocker(req.DockerSocket)
@@ -48,14 +49,14 @@ func newRequestHandler(req *Request) (*requestHandler, error) {
 	}, nil
 }
 
-func (h *requestHandler) setup(requiredScripts, optionalScripts []string) (err error) {
-	if h.request.workingDir, err = h.fs.CreateWorkingDirectory(); err != nil {
+func (h *requestHandler) setup(requiredScripts, optionalScripts []api.Script) (err error) {
+	if h.request.WorkingDir, err = h.fs.CreateWorkingDirectory(); err != nil {
 		return err
 	}
 
-	h.result = &Result{
+	h.result = &api.Result{
 		Success:    false,
-		WorkingDir: h.request.workingDir,
+		WorkingDir: h.request.WorkingDir,
 	}
 
 	// immediately pull the image if forcepull is true, that way later code that
@@ -78,17 +79,17 @@ func (h *requestHandler) setup(requiredScripts, optionalScripts []string) (err e
 
 	dirs := []string{"upload/scripts", "downloads/scripts", "downloads/defaultScripts"}
 	for _, v := range dirs {
-		if err = h.fs.MkdirAll(filepath.Join(h.request.workingDir, v)); err != nil {
+		if err = h.fs.MkdirAll(filepath.Join(h.request.WorkingDir, v)); err != nil {
 			return err
 		}
 	}
 
-	if h.request.externalRequiredScripts, err = h.installer.DownloadAndInstall(
-		requiredScripts, h.request.workingDir, true); err != nil {
+	if h.request.ExternalRequiredScripts, err = h.installer.DownloadAndInstall(
+		requiredScripts, h.request.WorkingDir, true); err != nil {
 		return err
 	}
-	if h.request.externalOptionalScripts, err = h.installer.DownloadAndInstall(
-		optionalScripts, h.request.workingDir, false); err != nil {
+	if h.request.ExternalOptionalScripts, err = h.installer.DownloadAndInstall(
+		optionalScripts, h.request.WorkingDir, false); err != nil {
 		return err
 	}
 
@@ -104,11 +105,11 @@ func (h *requestHandler) generateConfigEnv() (configEnv []string) {
 	return
 }
 
-func (h *requestHandler) execute(command string) error {
+func (h *requestHandler) execute(command api.Script) error {
 	glog.V(2).Infof("Using image name %s", h.request.BaseImage)
 
-	uploadDir := filepath.Join(h.request.workingDir, "upload")
-	tarFileName, err := h.tar.CreateTarFile(h.request.workingDir, uploadDir)
+	uploadDir := filepath.Join(h.request.WorkingDir, "upload")
+	tarFileName, err := h.tar.CreateTarFile(h.request.WorkingDir, uploadDir)
 	if err != nil {
 		return err
 	}
@@ -145,9 +146,9 @@ func (h *requestHandler) PostExecute(containerID string, cmd []string) (err erro
 
 func (h *requestHandler) cleanup() {
 	if h.request.PreserveWorkingDir {
-		glog.Infof("Temporary directory '%s' will be saved, not deleted", h.request.workingDir)
+		glog.Infof("Temporary directory '%s' will be saved, not deleted", h.request.WorkingDir)
 	} else {
-		h.fs.RemoveDirectory(h.request.workingDir)
+		h.fs.RemoveDirectory(h.request.WorkingDir)
 	}
 }
 

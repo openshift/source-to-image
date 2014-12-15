@@ -8,6 +8,7 @@ import (
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 
+	"github.com/openshift/source-to-image/pkg/sti/api"
 	"github.com/openshift/source-to-image/pkg/sti/errors"
 )
 
@@ -54,7 +55,7 @@ type RunContainerOptions struct {
 	Image        string
 	PullImage    bool
 	OverwriteCmd bool
-	Command      string
+	Command      api.Script
 	Env          []string
 	Stdin        io.Reader
 	Stdout       io.Writer
@@ -168,9 +169,9 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 
 	cmd := imageMetadata.Config.Cmd
 	if opts.OverwriteCmd {
-		cmd[len(cmd)-1] = opts.Command
+		cmd[len(cmd)-1] = string(opts.Command)
 	} else {
-		cmd = append(cmd, opts.Command)
+		cmd = append(cmd, string(opts.Command))
 	}
 	config := docker.Config{
 		Image: opts.Image,

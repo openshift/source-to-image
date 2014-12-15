@@ -5,24 +5,25 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/openshift/source-to-image/pkg/sti/api"
 	"github.com/openshift/source-to-image/pkg/sti/errors"
 	"github.com/openshift/source-to-image/pkg/sti/test"
 )
 
 type FakeBuildHandler struct {
 	CleanupCalled              bool
-	SetupRequired              []string
-	SetupOptional              []string
+	SetupRequired              []api.Script
+	SetupOptional              []api.Script
 	SetupError                 error
 	DetermineIncrementalCalled bool
 	DetermineIncrementalError  error
-	BuildRequest               *Request
-	BuildResult                *Result
+	BuildRequest               *api.Request
+	BuildResult                *api.Result
 	SaveArtifactsCalled        bool
 	SaveArtifactsError         error
 	FetchSourceCalled          bool
 	FetchSourceError           error
-	ExecuteCommand             string
+	ExecuteCommand             api.Script
 	ExecuteError               error
 }
 
@@ -30,7 +31,7 @@ func (f *FakeBuildHandler) cleanup() {
 	f.CleanupCalled = true
 }
 
-func (f *FakeBuildHandler) setup(required []string, optional []string) error {
+func (f *FakeBuildHandler) setup(required []api.Script, optional []api.Script) error {
 	f.SetupRequired = required
 	f.SetupOptional = optional
 	return f.SetupError
@@ -41,11 +42,11 @@ func (f *FakeBuildHandler) determineIncremental() error {
 	return f.DetermineIncrementalError
 }
 
-func (f *FakeBuildHandler) Request() *Request {
+func (f *FakeBuildHandler) Request() *api.Request {
 	return f.BuildRequest
 }
 
-func (f *FakeBuildHandler) Result() *Result {
+func (f *FakeBuildHandler) Result() *api.Result {
 	return f.BuildResult
 }
 
@@ -58,7 +59,7 @@ func (f *FakeBuildHandler) fetchSource() error {
 	return f.FetchSourceError
 }
 
-func (f *FakeBuildHandler) execute(command string) error {
+func (f *FakeBuildHandler) execute(command api.Script) error {
 	f.ExecuteCommand = command
 	return f.ExecuteError
 }
@@ -68,8 +69,8 @@ func TestBuild(t *testing.T) {
 	for _, incremental := range incrementalTest {
 
 		fh := &FakeBuildHandler{
-			BuildRequest: &Request{incremental: incremental},
-			BuildResult:  &Result{},
+			BuildRequest: &api.Request{Incremental: incremental},
+			BuildResult:  &api.Result{},
 		}
 		builder := Builder{
 			handler: fh,
@@ -77,10 +78,10 @@ func TestBuild(t *testing.T) {
 		builder.Build()
 
 		// Verify the right scripts were requested
-		if !reflect.DeepEqual(fh.SetupRequired, []string{"assemble", "run"}) {
+		if !reflect.DeepEqual(fh.SetupRequired, []api.Script{api.Assemble, api.Run}) {
 			t.Errorf("Unexpected required scripts requested: %#v", fh.SetupRequired)
 		}
-		if !reflect.DeepEqual(fh.SetupOptional, []string{"save-artifacts"}) {
+		if !reflect.DeepEqual(fh.SetupOptional, []api.Script{api.SaveArtifacts}) {
 			t.Errorf("Unexpected optional scripts requested: %#v", fh.SetupOptional)
 		}
 
@@ -108,8 +109,9 @@ func testBuildHandler() *buildHandler {
 		git:       &test.FakeGit{},
 		fs:        &test.FakeFileSystem{},
 		tar:       &test.FakeTar{},
-		request:   &Request{},
-		result:    &Result{},
+
+		request: &api.Request{},
+		result:  &api.Result{},
 	}
 	buildHandler := &buildHandler{
 		requestHandler:  requestHandler,
@@ -129,7 +131,7 @@ func TestPostExecute(t *testing.T) {
 			bh.request.CallbackURL = "https://my.callback.org/test"
 			bh.request.Tag = "test/tag"
 			dh := bh.docker.(*test.FakeDocker)
-			bh.request.incremental = incremental
+			bh.request.Incremental = incremental
 			if previousImageID != "" {
 				bh.request.RemovePreviousImage = true
 				bh.docker.(*test.FakeDocker).GetImageIDResult = previousImageID
@@ -213,9 +215,9 @@ func TestDetermineIncremental(t *testing.T) {
 
 	for i, ti := range tests {
 		bh := testBuildHandler()
-		bh.request.workingDir = "/working-dir"
+		bh.request.WorkingDir = "/working-dir"
 		bh.request.Clean = ti.clean
-		bh.request.externalOptionalScripts = ti.scriptDownload
+		bh.request.ExternalOptionalScripts = ti.scriptDownload
 		bh.docker.(*test.FakeDocker).LocalRegistryResult = ti.previousImage
 		if ti.scriptExists {
 			bh.fs.(*test.FakeFileSystem).ExistsResult = map[string]bool{
@@ -223,9 +225,9 @@ func TestDetermineIncremental(t *testing.T) {
 			}
 		}
 		bh.determineIncremental()
-		if bh.request.incremental != ti.expected {
+		if bh.request.Incremental != ti.expected {
 			t.Errorf("(%d) Unexpected incremental result: %v. Expected: %v",
-				i, bh.request.incremental, ti.expected)
+				i, bh.request.Incremental, ti.expected)
 		}
 		if !ti.clean && ti.previousImage && ti.scriptDownload {
 			scriptChecked := bh.fs.(*test.FakeFileSystem).ExistsFile[0]
@@ -240,7 +242,7 @@ func TestDetermineIncremental(t *testing.T) {
 
 func TestSaveArtifacts(t *testing.T) {
 	bh := testBuildHandler()
-	bh.request.workingDir = "/working-dir"
+	bh.request.WorkingDir = "/working-dir"
 	bh.request.Tag = "image/tag"
 	fs := bh.fs.(*test.FakeFileSystem)
 	fd := bh.docker.(*test.FakeDocker)
@@ -354,7 +356,7 @@ func TestFetchSource(t *testing.T) {
 		gh := bh.git.(*test.FakeGit)
 		fh := bh.fs.(*test.FakeFileSystem)
 
-		bh.request.workingDir = "/working-dir"
+		bh.request.WorkingDir = "/working-dir"
 		gh.ValidCloneSpecResult = ft.validCloneSpec
 		if ft.refSpecified {
 			bh.request.Ref = "a-branch"
