@@ -1,12 +1,13 @@
 package sti
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/sti/api"
-	"github.com/openshift/source-to-image/pkg/sti/errors"
+	stierr "github.com/openshift/source-to-image/pkg/sti/errors"
 	"github.com/openshift/source-to-image/pkg/sti/test"
 )
 
@@ -25,6 +26,9 @@ type FakeBuildHandler struct {
 	FetchSourceError           error
 	ExecuteCommand             api.Script
 	ExecuteError               error
+	ExpectedError              bool
+	LayeredBuildCalled         bool
+	LayeredBuildError          error
 }
 
 func (f *FakeBuildHandler) cleanup() {
@@ -64,6 +68,15 @@ func (f *FakeBuildHandler) execute(command api.Script) error {
 	return f.ExecuteError
 }
 
+func (f *FakeBuildHandler) wasExpectedError(text string) bool {
+	return f.ExpectedError
+}
+
+func (f *FakeBuildHandler) build() error {
+	f.LayeredBuildCalled = true
+	return f.LayeredBuildError
+}
+
 func TestBuild(t *testing.T) {
 	incrementalTest := []bool{false, true}
 	for _, incremental := range incrementalTest {
@@ -96,8 +109,79 @@ func TestBuild(t *testing.T) {
 		}
 
 		// Verify that execute was called with the right script
-		if fh.ExecuteCommand != "assemble" {
+		if fh.ExecuteCommand != api.Assemble {
 			t.Errorf("Unexpected execute command: %s", fh.ExecuteCommand)
+		}
+	}
+}
+
+func TestLayeredBuild(t *testing.T) {
+	fh := &FakeBuildHandler{
+		BuildRequest: &api.Request{
+			BaseImage: "testimage",
+		},
+		BuildResult:   &api.Result{},
+		ExecuteError:  stierr.NewContainerError("", 1, `/bin/sh: tar: not found`),
+		ExpectedError: true,
+	}
+	builder := Builder{
+		handler: fh,
+	}
+	builder.Build()
+	// Verify layered build
+	if !fh.LayeredBuildCalled {
+		t.Errorf("Layered build was not called.")
+	}
+}
+
+func TestBuildErrorExecute(t *testing.T) {
+	fh := &FakeBuildHandler{
+		BuildRequest: &api.Request{
+			BaseImage: "testimage",
+		},
+		BuildResult:   &api.Result{},
+		ExecuteError:  errors.New("ExecuteError"),
+		ExpectedError: false,
+	}
+	builder := Builder{
+		handler: fh,
+	}
+	_, err := builder.Build()
+	if err == nil || err.Error() != "ExecuteError" {
+		t.Errorf("An error was expected, but got different %v", err)
+	}
+}
+
+func TestWasExpectedError(t *testing.T) {
+	type expErr struct {
+		text     string
+		expected bool
+	}
+
+	tests := []expErr{
+		{ // 0 - tar error
+			text:     `/bin/sh: tar: not found`,
+			expected: true,
+		},
+		{ // 1 - tar error
+			text:     `/bin/sh: tar: command not found`,
+			expected: true,
+		},
+		{ // 2 - /bin/sh error
+			text:     `exec: "/bin/sh": stat /bin/sh: no such file or directory`,
+			expected: true,
+		},
+		{ // 3 - non container error
+			text:     "other error",
+			expected: false,
+		},
+	}
+
+	for i, ti := range tests {
+		bh := &buildHandler{}
+		result := bh.wasExpectedError(ti.text)
+		if result != ti.expected {
+			t.Errorf("(%d) Unexpected result: %v. Expected: %v", i, result, ti.expected)
 		}
 	}
 }
@@ -136,30 +220,25 @@ func TestPostExecute(t *testing.T) {
 				bh.request.RemovePreviousImage = true
 				bh.docker.(*test.FakeDocker).GetImageIDResult = previousImageID
 			}
-			err := bh.PostExecute("test-container-id", []string{"cmd1", "arg1"})
+			err := bh.PostExecute("test-container-id", "cmd1")
 			if err != nil {
 				t.Errorf("Unexpected errror from postExecute: %v", err)
 			}
 			// Ensure CommitContainer was called with the right parameters
-			if !reflect.DeepEqual(dh.CommitContainerOpts.Command,
-				[]string{"cmd1", "arg1", "run"}) {
-				t.Errorf("Unexpected commit container command: %#v",
-					dh.CommitContainerOpts.Command)
+			if !reflect.DeepEqual(dh.CommitContainerOpts.Command, []string{"cmd1/run"}) {
+				t.Errorf("Unexpected commit container command: %#v", dh.CommitContainerOpts.Command)
 			}
 			if dh.CommitContainerOpts.Repository != bh.request.Tag {
-				t.Errorf("Unexpected tag commited: %s",
-					dh.CommitContainerOpts.Repository)
+				t.Errorf("Unexpected tag commited: %s", dh.CommitContainerOpts.Repository)
 			}
 
 			if incremental && previousImageID != "" {
 				if dh.RemoveImageName != "test-image" {
-					t.Errorf("Previous image was not removed: %s",
-						dh.RemoveImageName)
+					t.Errorf("Previous image was not removed: %s", dh.RemoveImageName)
 				}
 			} else {
 				if dh.RemoveImageName != "" {
-					t.Errorf("Unexpected image removed: %s",
-						dh.RemoveImageName)
+					t.Errorf("Unexpected image removed: %s", dh.RemoveImageName)
 				}
 			}
 
@@ -268,11 +347,11 @@ func TestSaveArtifacts(t *testing.T) {
 func TestSaveArtifactsRunError(t *testing.T) {
 	tests := []error{
 		fmt.Errorf("Run error"),
-		errors.NewContainerError("", -1, nil),
+		stierr.NewContainerError("", -1, ""),
 	}
 	expected := []error{
 		tests[0],
-		errors.NewSaveArtifactsError("", tests[1]),
+		stierr.NewSaveArtifactsError("", tests[1]),
 	}
 	// test with tar extract error or not
 	tarError := []bool{true, false}

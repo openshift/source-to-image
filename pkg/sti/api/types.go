@@ -1,19 +1,5 @@
 package api
 
-// Script defines script names used by STI process.
-type Script string
-
-const (
-	// Assemble is the name of the script responsible for build process of the resulting image.
-	Assemble = "assemble"
-	// Run is the name of the script responsible for running the final application.
-	Run = "run"
-	// SaveArtifacts is the name of the script responsible for storing dependencies etc. between builds.
-	SaveArtifacts = "save-artifacts"
-	// Usage i the name of the script responsible for printing the builder image's short info.
-	Usage = "usage"
-)
-
 // Request contains essential fields for any request.
 type Request struct {
 
@@ -51,6 +37,9 @@ type Request struct {
 	// ScriptsURL is a URL describing the localization of STI scripts used during build process.
 	ScriptsURL string
 
+	// Location specifies a location where the untar operation will place its artifacts.
+	Location string
+
 	// ForcePull describes if the builder should pull the images from registry prior to building.
 	ForcePull bool
 
@@ -65,6 +54,9 @@ type Request struct {
 
 	// ExternalOptionalScripts describes if optional scripts are from external URL.
 	ExternalOptionalScripts bool
+
+	// LayeredBuild describes if this is build which layered scripts and sources on top of BaseImage.
+	LayeredBuild bool
 }
 
 // Result structure contains information from build process.

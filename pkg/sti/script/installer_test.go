@@ -178,12 +178,12 @@ func TestDownload(t *testing.T) {
 			len(dl.URL))
 	}
 	expectedUrls := []string{
-		"http://the.scripts.url/scripts/" + api.Assemble,
-		"http://the.scripts.url/scripts/" + api.Run,
-		"http://the.scripts.url/scripts/" + api.SaveArtifacts,
-		"http://image.url/scripts/" + api.Assemble,
-		"http://image.url/scripts/" + api.Run,
-		"http://image.url/scripts/" + api.SaveArtifacts,
+		fmt.Sprintf("http://the.scripts.url/scripts/%s", api.Assemble),
+		fmt.Sprintf("http://the.scripts.url/scripts/%s", api.Run),
+		fmt.Sprintf("http://the.scripts.url/scripts/%s", api.SaveArtifacts),
+		fmt.Sprintf("http://image.url/scripts/%s", api.Assemble),
+		fmt.Sprintf("http://image.url/scripts/%s", api.Run),
+		fmt.Sprintf("http://image.url/scripts/%s", api.SaveArtifacts),
 	}
 	actualUrls := []string{}
 	for _, u := range dl.URL {
@@ -194,12 +194,12 @@ func TestDownload(t *testing.T) {
 	}
 
 	expectedFiles := []string{
-		"/working-dir/downloads/scripts/" + api.Assemble,
-		"/working-dir/downloads/scripts/" + api.Run,
-		"/working-dir/downloads/scripts/" + api.SaveArtifacts,
-		"/working-dir/downloads/defaultScripts/" + api.Assemble,
-		"/working-dir/downloads/defaultScripts/" + api.Run,
-		"/working-dir/downloads/defaultScripts/" + api.SaveArtifacts,
+		fmt.Sprintf("/working-dir/downloads/scripts/%s", api.Assemble),
+		fmt.Sprintf("/working-dir/downloads/scripts/%s", api.Run),
+		fmt.Sprintf("/working-dir/downloads/scripts/%s", api.SaveArtifacts),
+		fmt.Sprintf("/working-dir/downloads/defaultScripts/%s", api.Assemble),
+		fmt.Sprintf("/working-dir/downloads/defaultScripts/%s", api.Run),
+		fmt.Sprintf("/working-dir/downloads/defaultScripts/%s", api.SaveArtifacts),
 	}
 
 	if !equalArrayContents(dl.File, expectedFiles) {
@@ -232,12 +232,12 @@ func TestDownloadErrors2(t *testing.T) {
 	sh.docker.(*test.FakeDocker).DefaultURLResult = "http://image.url/scripts"
 	dlErr := fmt.Errorf("Download Error")
 	dl.Err = map[string]error{
-		"http://the.scripts.url/scripts/" + api.Assemble:      dlErr,
-		"http://the.scripts.url/scripts/" + api.Run:           nil,
-		"http://the.scripts.url/scripts/" + api.SaveArtifacts: nil,
-		"http://image.url/scripts/" + api.Assemble:            dlErr,
-		"http://image.url/scripts/" + api.Run:                 dlErr,
-		"http://image.url/scripts/" + api.SaveArtifacts:       nil,
+		fmt.Sprintf("http://the.scripts.url/scripts/%s", api.Assemble):      dlErr,
+		fmt.Sprintf("http://the.scripts.url/scripts/%s", api.Run):           nil,
+		fmt.Sprintf("http://the.scripts.url/scripts/%s", api.SaveArtifacts): nil,
+		fmt.Sprintf("http://image.url/scripts/%s", api.Assemble):            dlErr,
+		fmt.Sprintf("http://image.url/scripts/%s", api.Run):                 dlErr,
+		fmt.Sprintf("http://image.url/scripts/%s", api.SaveArtifacts):       nil,
 	}
 	_, err := sh.download([]api.Script{api.Assemble, api.Run, api.SaveArtifacts}, "/working-dir")
 	if err == nil {
@@ -250,12 +250,12 @@ func TestDownloadChmodError(t *testing.T) {
 	fsErr := fmt.Errorf("Chmod Error")
 	sh.docker.(*test.FakeDocker).DefaultURLResult = "http://image.url/scripts"
 	sh.fs.(*test.FakeFileSystem).ChmodError = map[string]error{
-		"/working-dir/downloads/scripts/" + api.Assemble:             nil,
-		"/working-dir/downloads/scripts/" + api.Run:                  nil,
-		"/working-dir/downloads/scripts/" + api.SaveArtifacts:        fsErr,
-		"/working-dir/downloads/defaultScripts/" + api.Assemble:      nil,
-		"/working-dir/downloads/defaultScripts/" + api.Run:           nil,
-		"/working-dir/downloads/defaultScripts/" + api.SaveArtifacts: nil,
+		fmt.Sprintf("/working-dir/downloads/scripts/%s", api.Assemble):             nil,
+		fmt.Sprintf("/working-dir/downloads/scripts/%s", api.Run):                  nil,
+		fmt.Sprintf("/working-dir/downloads/scripts/%s", api.SaveArtifacts):        fsErr,
+		fmt.Sprintf("/working-dir/downloads/defaultScripts/%s", api.Assemble):      nil,
+		fmt.Sprintf("/working-dir/downloads/defaultScripts/%s", api.Run):           nil,
+		fmt.Sprintf("/working-dir/downloads/defaultScripts/%s", api.SaveArtifacts): nil,
 	}
 	_, err := sh.download([]api.Script{api.Assemble, api.Run, api.SaveArtifacts}, "/working-dir")
 	if err == nil {

@@ -12,11 +12,8 @@ RUN mkdir -p /sti-fake/src && \
 
 WORKDIR /
 
-ADD scripts/sti-helper /tmp/sti-helper
 ADD scripts/.sti/bin/run /tmp/scripts/
 ADD scripts/.sti/bin/assemble /tmp/scripts/
 
 # Scripts are already in the image and this is their location
-ENV STI_SCRIPTS_URL image:///tmp/scripts/.sti/bin
-
-CMD ["/tmp/sti-helper"]
+ENV STI_SCRIPTS_URL image:///tmp/scripts/

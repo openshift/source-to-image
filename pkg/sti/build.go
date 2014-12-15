@@ -3,6 +3,7 @@ package sti
 import (
 	"io"
 	"path/filepath"
+	"regexp"
 
 	"github.com/golang/glog"
 
@@ -26,6 +27,8 @@ type buildHandlerInterface interface {
 	saveArtifacts() error
 	fetchSource() error
 	execute(command api.Script) error
+	wasExpectedError(text string) bool
+	build() error
 }
 
 type buildHandler struct {
@@ -54,6 +57,7 @@ func newBuildHandler(req *api.Request) (*buildHandler, error) {
 		callbackInvoker: util.NewCallbackInvoker(),
 	}
 	rh.postExecutor = bh
+	rh.errorChecker = bh
 	return bh, nil
 }
 
@@ -88,14 +92,34 @@ func (b *Builder) Build() (*api.Result, error) {
 		}
 	}
 
-	if err = bh.execute(api.Assemble); err != nil {
+	glog.V(1).Infof("Building %s", bh.Request().Tag)
+	err = bh.execute(api.Assemble)
+	if e, ok := err.(errors.ContainerError); ok && bh.wasExpectedError(e.ExpectedError) {
+		glog.Warningf("Image %s does not have tar! Performing additional build to add the scripts and sources.",
+			bh.Request().BaseImage)
+		if err := bh.build(); err != nil {
+			return nil, err
+		}
+		glog.V(2).Infof("Building %s using sti-enabled image", bh.Request().Tag)
+		if err := bh.execute(api.Assemble); err != nil {
+			return nil, err
+		}
+	} else if err != nil {
 		return nil, err
 	}
 
 	return bh.Result(), nil
 }
 
-func (h *buildHandler) PostExecute(containerID string, cmd []string) error {
+// wasExpectedError is used for determining whether the error that appeared
+// authorizes us to do the additional build injecting the scripts and sources.
+func (h *buildHandler) wasExpectedError(text string) bool {
+	tar, _ := regexp.MatchString(`.*tar.*not found`, text)
+	sh, _ := regexp.MatchString(`.*/bin/sh.*no such file or directory`, text)
+	return tar || sh
+}
+
+func (h *buildHandler) PostExecute(containerID string, location string) error {
 	var (
 		err             error
 		previousImageID string
@@ -106,8 +130,9 @@ func (h *buildHandler) PostExecute(containerID string, cmd []string) error {
 		}
 	}
 
+	cmd := []string{}
 	opts := docker.CommitContainerOptions{
-		Command:     append(cmd, string(api.Run)),
+		Command:     append(cmd, filepath.Join(location, string(api.Run))),
 		Env:         h.generateConfigEnv(),
 		ContainerID: containerID,
 		Repository:  h.request.Tag,
@@ -172,11 +197,13 @@ func (h *buildHandler) saveArtifacts() (err error) {
 	}
 
 	opts := docker.RunContainerOptions{
-		Image:        image,
-		OverwriteCmd: true,
-		Command:      api.SaveArtifacts,
-		Stdout:       writer,
-		OnStart:      extractFunc,
+		Image:           image,
+		ExternalScripts: h.request.ExternalRequiredScripts,
+		ScriptsURL:      h.request.ScriptsURL,
+		Location:        h.request.Location,
+		Command:         api.SaveArtifacts,
+		Stdout:          writer,
+		OnStart:         extractFunc,
 	}
 	err = h.docker.RunContainer(opts)
 	writer.Close()

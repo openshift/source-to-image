@@ -28,6 +28,7 @@ const (
 	FakeUserImage                   = "sti_test/sti-fake-user"
 	FakeImageScripts                = "sti_test/sti-fake-scripts"
 	FakeImageScriptsNoSaveArtifacts = "sti_test/sti-fake-scripts-no-save-artifacts"
+	FakeImageNoTar                  = "sti_test/sti-fake-no-tar"
 
 	TagCleanBuild                             = "test/sti-fake-app"
 	TagCleanBuildUser                         = "test/sti-fake-app-user"
@@ -36,12 +37,13 @@ const (
 	TagCleanBuildScripts                      = "test/sti-fake-app-scripts"
 	TagIncrementalBuildScripts                = "test/sti-incremental-app-scripts"
 	TagIncrementalBuildScriptsNoSaveArtifacts = "test/sti-incremental-app-scripts-no-save-artifacts"
+	TagCleanLayeredBuildNoTar                 = "test/sti-fake-no-tar"
 
 	// Need to serve the scripts from local host so any potential changes to the
 	// scripts are made available for integration testing.
 	//
 	// Port 23456 must match the port used in the fake image Dockerfiles
-	FakeScriptsHttpUrl = "http://127.0.0.1:23456/sti-fake/.sti/bin"
+	FakeScriptsHttpURL = "http://127.0.0.1:23456/sti-fake/.sti/bin"
 )
 
 type integrationTest struct {
@@ -122,11 +124,15 @@ func TestCleanBuildFileScriptsURL(t *testing.T) {
 }
 
 func TestCleanBuildHttpScriptsURL(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBaseImage, FakeScriptsHttpUrl)
+	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBaseImage, FakeScriptsHttpURL)
 }
 
 func TestCleanBuildScripts(t *testing.T) {
 	integration(t).exerciseCleanBuild(TagCleanBuildScripts, false, FakeImageScripts, "")
+}
+
+func TestLayeredBuildNoTar(t *testing.T) {
+	integration(t).exerciseCleanBuild(TagCleanLayeredBuildNoTar, false, FakeImageNoTar, FakeScriptsFileURL)
 }
 
 // Test that a build request with a callbackURL will invoke HTTP endpoint

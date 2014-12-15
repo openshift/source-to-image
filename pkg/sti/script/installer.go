@@ -116,7 +116,7 @@ func (s *handler) download(scripts []api.Script, workingDir string) (bool, error
 		}
 	}
 
-	defaultURL, err := s.docker.GetDefaultScriptsURL(s.image)
+	defaultURL, err := s.docker.GetScriptsURL(s.image)
 	if err != nil {
 		return false, errors.NewDefaultScriptsURLError(err)
 	}
@@ -186,7 +186,7 @@ func (s *handler) prepareDownload(scripts []api.Script, targetDir, baseURL strin
 	for _, script := range scripts {
 		url, err := url.Parse(baseURL + "/" + string(script))
 		if err != nil {
-			glog.Warningf("Unable to parse script URL: %s/%v", baseURL, script)
+			glog.Warningf("Unable to parse script URL: %s/%s", baseURL, script)
 			continue
 		}
 		info[targetDir+"/"+string(script)] = scriptInfo{url, script}

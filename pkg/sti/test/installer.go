@@ -1,6 +1,7 @@
 package test
 
 import (
+	"errors"
 	"github.com/openshift/source-to-image/pkg/sti/api"
 )
 
@@ -10,8 +11,8 @@ type FakeInstaller struct {
 	WorkingDir []string
 	Required   []bool
 
-	Download bool
-	Err      error
+	Download  bool
+	ErrScript api.Script
 }
 
 // DownloadAndInstall downloads and install the fake STI scripts
@@ -19,5 +20,10 @@ func (f *FakeInstaller) DownloadAndInstall(scripts []api.Script, workingDir stri
 	f.Scripts = append(f.Scripts, scripts)
 	f.WorkingDir = append(f.WorkingDir, workingDir)
 	f.Required = append(f.Required, required)
-	return f.Download, f.Err
+	for _, s := range scripts {
+		if f.ErrScript == s {
+			return f.Download, errors.New(string(f.ErrScript))
+		}
+	}
+	return f.Download, nil
 }
