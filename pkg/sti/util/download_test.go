@@ -82,7 +82,7 @@ func (f *FakeSchemeReader) Read(url *url.URL) (io.ReadCloser, error) {
 	return ioutil.NopCloser(strings.NewReader(f.content)), f.err
 }
 
-func (h *FakeSchemeReader) IsFromImage() bool {
+func (f *FakeSchemeReader) IsFromImage() bool {
 	return false
 }
 
@@ -92,7 +92,7 @@ func (f *FakeImageSchemeReader) Read(url *url.URL) (io.ReadCloser, error) {
 	return nil, nil
 }
 
-func (h *FakeImageSchemeReader) IsFromImage() bool {
+func (f *FakeImageSchemeReader) IsFromImage() bool {
 	return true
 }
 

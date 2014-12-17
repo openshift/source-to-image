@@ -79,22 +79,22 @@ func (h *HttpURLReader) Read(url *url.URL) (io.ReadCloser, error) {
 }
 
 // IsFromImage returns information whether URL is from inside the image
-func (h *FileURLReader) IsFromImage() bool {
+func (*FileURLReader) IsFromImage() bool {
 	return false
 }
 
 // Read produces an io.Reader from a file URL
-func (f *FileURLReader) Read(url *url.URL) (io.ReadCloser, error) {
+func (*FileURLReader) Read(url *url.URL) (io.ReadCloser, error) {
 	return os.Open(url.Path)
 }
 
 // IsFromImage returns information whether URL is from inside the image
-func (h *ImageReader) IsFromImage() bool {
+func (*ImageReader) IsFromImage() bool {
 	return true
 }
 
 // Read throws Not implemented error
-func (f *ImageReader) Read(url *url.URL) (io.ReadCloser, error) {
+func (*ImageReader) Read(url *url.URL) (io.ReadCloser, error) {
 	return nil, errors.New("Not implemented")
 }
 

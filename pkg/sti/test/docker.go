@@ -15,9 +15,9 @@ type FakeDocker struct {
 	LocalRegistryError           error
 	RemoveContainerID            string
 	RemoveContainerError         error
-	DefaultUrlImage              string
-	DefaultUrlResult             string
-	DefaultUrlError              error
+	DefaultURLImage              string
+	DefaultURLResult             string
+	DefaultURLError              error
 	RunContainerOpts             docker.RunContainerOptions
 	RunContainerError            error
 	RunContainerErrorBeforeStart bool
@@ -49,8 +49,8 @@ func (f *FakeDocker) RemoveContainer(id string) error {
 
 // GetDefaultScriptsURL returns a default STI scripts URL
 func (f *FakeDocker) GetDefaultScriptsURL(image string) (string, error) {
-	f.DefaultUrlImage = image
-	return f.DefaultUrlResult, f.DefaultUrlError
+	f.DefaultURLImage = image
+	return f.DefaultURLResult, f.DefaultURLError
 }
 
 // RunContainer runs a fake Docker container
@@ -93,6 +93,7 @@ func (f *FakeDocker) PullImage(imageName string) error {
 	return nil
 }
 
+// CheckAndPull pulls a fake docker image
 func (f *FakeDocker) CheckAndPull(name string) (*dockerclient.Image, error) {
 	return nil, nil
 }

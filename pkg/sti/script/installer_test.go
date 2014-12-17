@@ -167,7 +167,7 @@ func equalArrayContents(a []string, b []string) bool {
 func TestDownload(t *testing.T) {
 	sh := getScriptHandler()
 	dl := sh.downloader.(*test.FakeDownloader)
-	sh.docker.(*test.FakeDocker).DefaultUrlResult = "http://image.url/scripts"
+	sh.docker.(*test.FakeDocker).DefaultURLResult = "http://image.url/scripts"
 	_, err := sh.download([]string{"one", "two", "three"}, "/working-dir")
 	if err != nil {
 		t.Errorf("Got unexpected error: %v", err)
@@ -209,7 +209,7 @@ func TestDownload(t *testing.T) {
 func TestDownloadErrors1(t *testing.T) {
 	sh := getScriptHandler()
 	dl := sh.downloader.(*test.FakeDownloader)
-	sh.docker.(*test.FakeDocker).DefaultUrlResult = "http://image.url/scripts"
+	sh.docker.(*test.FakeDocker).DefaultURLResult = "http://image.url/scripts"
 	dlErr := fmt.Errorf("Download Error")
 	dl.Err = map[string]error{
 		"http://the.scripts.url/scripts/one":   dlErr,
@@ -228,7 +228,7 @@ func TestDownloadErrors1(t *testing.T) {
 func TestDownloadErrors2(t *testing.T) {
 	sh := getScriptHandler()
 	dl := sh.downloader.(*test.FakeDownloader)
-	sh.docker.(*test.FakeDocker).DefaultUrlResult = "http://image.url/scripts"
+	sh.docker.(*test.FakeDocker).DefaultURLResult = "http://image.url/scripts"
 	dlErr := fmt.Errorf("Download Error")
 	dl.Err = map[string]error{
 		"http://the.scripts.url/scripts/one":   dlErr,
@@ -247,7 +247,7 @@ func TestDownloadErrors2(t *testing.T) {
 func TestDownloadChmodError(t *testing.T) {
 	sh := getScriptHandler()
 	fsErr := fmt.Errorf("Chmod Error")
-	sh.docker.(*test.FakeDocker).DefaultUrlResult = "http://image.url/scripts"
+	sh.docker.(*test.FakeDocker).DefaultURLResult = "http://image.url/scripts"
 	sh.fs.(*test.FakeFileSystem).ChmodError = map[string]error{
 		"/working-dir/downloads/scripts/one":          nil,
 		"/working-dir/downloads/scripts/two":          nil,
