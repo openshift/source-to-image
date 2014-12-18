@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -o errexit
-set -o nounset
 set -o pipefail
 
 if ! which golint &>/dev/null; then
@@ -23,19 +22,31 @@ source "${STI_ROOT}/hack/common.sh"
 
 cd "${STI_ROOT}"
 
-find_files() {
-  find . -not \( \
+arg="${1:-""}"
+bad_files=""
+
+if [ "$arg" == "-m" ]; then
+  head=$(git rev-parse --short HEAD | xargs echo -n)
+  bad_files=$(git diff-tree --no-commit-id --name-only -r master..$head | \
+    grep "^pkg" | grep ".go$" | grep -v "bindata.go$" | grep -v "Godeps" | \
+    grep -v "third_party" | xargs golint)
+else
+  find_files() {
+    find . -not \( \
       \( \
-        -wholename './output' \
-        -o -wholename './_output' \
+        -wholename './Godeps' \
         -o -wholename './release' \
         -o -wholename './target' \
+        -o -wholename './test' \
         -o -wholename '*/Godeps/*' \
+        -o -wholename '*/third_party/*' \
+        -o -wholename '*/_output/*' \
       \) -prune \
-    \) -name '*.go'
-}
+    \) -name '*.go' | sort -u | sed 's/^.{2}//' | xargs -n1 printf "${GOPATH}/src/${STI_GO_PACKAGE}/%s\n"
+  }
+  bad_files=$(find_files | xargs -n1 golint)
+fi
 
-bad_files=$(find_files | xargs golint)
 if [[ -n "${bad_files}" ]]; then
   echo "golint detected following problems:"
   echo "${bad_files}"

@@ -91,7 +91,7 @@ func NewSaveArtifactsError(name string, err error) error {
 	}
 }
 
-// NewBuildFailed returns a new error which indicates there was a problem
+// NewBuildError returns a new error which indicates there was a problem
 // building the image
 func NewBuildError(name string, err error) error {
 	return Error{
