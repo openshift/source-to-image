@@ -105,15 +105,14 @@ func testBuildHandler() *buildHandler {
 	requestHandler := &requestHandler{
 		docker:    &test.FakeDocker{},
 		installer: &test.FakeInstaller{},
+		git:       &test.FakeGit{},
 		fs:        &test.FakeFileSystem{},
 		tar:       &test.FakeTar{},
-
-		request: &Request{},
-		result:  &Result{},
+		request:   &Request{},
+		result:    &Result{},
 	}
 	buildHandler := &buildHandler{
 		requestHandler:  requestHandler,
-		git:             &test.FakeGit{},
 		callbackInvoker: &test.FakeCallbackInvoker{},
 	}
 

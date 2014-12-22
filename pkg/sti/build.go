@@ -8,7 +8,6 @@ import (
 
 	"github.com/openshift/source-to-image/pkg/sti/docker"
 	"github.com/openshift/source-to-image/pkg/sti/errors"
-	"github.com/openshift/source-to-image/pkg/sti/git"
 	"github.com/openshift/source-to-image/pkg/sti/util"
 )
 
@@ -19,7 +18,7 @@ type Builder struct {
 
 type buildHandlerInterface interface {
 	cleanup()
-	setup(required []string, optional []string) error
+	setup(requiredScripts, optionalScripts []string) error
 	determineIncremental() error
 	Request() *Request
 	Result() *Result
@@ -30,7 +29,6 @@ type buildHandlerInterface interface {
 
 type buildHandler struct {
 	*requestHandler
-	git             git.Git
 	callbackInvoker util.CallbackInvoker
 }
 
@@ -52,7 +50,6 @@ func newBuildHandler(req *Request) (*buildHandler, error) {
 	}
 	bh := &buildHandler{
 		requestHandler:  rh,
-		git:             git.NewGit(),
 		callbackInvoker: util.NewCallbackInvoker(),
 	}
 	rh.postExecutor = bh
@@ -88,10 +85,6 @@ func (b *Builder) Build() (*Result, error) {
 			glog.Warning("Error saving previous build artifacts: %v", err)
 			glog.Warning("Clean build will be performed!")
 		}
-	}
-
-	if err = bh.fetchSource(); err != nil {
-		return nil, err
 	}
 
 	if err = bh.execute("assemble"); err != nil {
@@ -190,29 +183,6 @@ func (h *buildHandler) saveArtifacts() (err error) {
 		return errors.NewSaveArtifactsError(image, err)
 	}
 	return err
-}
-
-func (h *buildHandler) fetchSource() error {
-	targetSourceDir := filepath.Join(h.request.workingDir, "upload", "src")
-	glog.V(1).Infof("Downloading %s to directory %s", h.request.Source, targetSourceDir)
-	if h.git.ValidCloneSpec(h.request.Source) {
-		if err := h.git.Clone(h.request.Source, targetSourceDir); err != nil {
-			glog.Errorf("Git clone failed: %+v", err)
-			return err
-		}
-
-		if h.request.Ref != "" {
-			glog.V(1).Infof("Checking out ref %s", h.request.Ref)
-
-			if err := h.git.Checkout(targetSourceDir, h.request.Ref); err != nil {
-				return err
-			}
-		}
-	} else {
-		h.fs.Copy(h.request.Source, targetSourceDir)
-	}
-
-	return nil
 }
 
 func (h *buildHandler) Request() *Request {

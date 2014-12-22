@@ -7,6 +7,7 @@ import (
 	"github.com/golang/glog"
 
 	"github.com/openshift/source-to-image/pkg/sti/docker"
+	"github.com/openshift/source-to-image/pkg/sti/git"
 	"github.com/openshift/source-to-image/pkg/sti/script"
 	"github.com/openshift/source-to-image/pkg/sti/tar"
 	"github.com/openshift/source-to-image/pkg/sti/util"
@@ -18,6 +19,7 @@ type requestHandler struct {
 	result       *Result
 	postExecutor postExecutor
 	installer    script.Installer
+	git          git.Git
 	fs           util.FileSystem
 	docker       docker.Docker
 	tar          tar.Tar
@@ -40,6 +42,7 @@ func newRequestHandler(req *Request) (*requestHandler, error) {
 		request:   req,
 		docker:    docker,
 		installer: script.NewInstaller(req.BaseImage, req.ScriptsURL, docker),
+		git:       git.NewGit(),
 		fs:        util.NewFileSystem(),
 		tar:       tar.NewTar(),
 	}, nil
@@ -64,6 +67,13 @@ func (h *requestHandler) setup(requiredScripts, optionalScripts []string) (err e
 	}
 	if err != nil {
 		return
+	}
+
+	// fetch sources, for theirs .sti/bin might contain sti scripts
+	if len(h.request.Source) > 0 {
+		if err = h.fetchSource(); err != nil {
+			return err
+		}
 	}
 
 	dirs := []string{"upload/scripts", "downloads/scripts", "downloads/defaultScripts"}
@@ -139,4 +149,27 @@ func (h *requestHandler) cleanup() {
 	} else {
 		h.fs.RemoveDirectory(h.request.workingDir)
 	}
+}
+
+func (h *requestHandler) fetchSource() error {
+	targetSourceDir := filepath.Join(h.request.workingDir, "upload", "src")
+	glog.V(1).Infof("Downloading %s to directory %s", h.request.Source, targetSourceDir)
+	if h.git.ValidCloneSpec(h.request.Source) {
+		if err := h.git.Clone(h.request.Source, targetSourceDir); err != nil {
+			glog.Errorf("Git clone failed: %+v", err)
+			return err
+		}
+
+		if h.request.Ref != "" {
+			glog.V(1).Infof("Checking out ref %s", h.request.Ref)
+
+			if err := h.git.Checkout(targetSourceDir, h.request.Ref); err != nil {
+				return err
+			}
+		}
+	} else {
+		h.fs.Copy(h.request.Source, targetSourceDir)
+	}
+
+	return nil
 }

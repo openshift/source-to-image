@@ -3,7 +3,7 @@ package sti
 // UsageHandler handles a request to display usage
 type usageHandler interface {
 	cleanup()
-	setup(required []string, optional []string) error
+	setup(requiredScripts, optionalScripts []string) error
 	execute(command string) error
 }
 
