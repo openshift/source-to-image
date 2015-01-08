@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/openshift/source-to-image/pkg/sti"
+	"github.com/openshift/source-to-image/pkg/sti/api"
 	"github.com/openshift/source-to-image/pkg/sti/errors"
 	"github.com/openshift/source-to-image/pkg/sti/version"
 )
@@ -52,7 +53,7 @@ func newCmdVersion() *cobra.Command {
 	}
 }
 
-func newCmdBuild(req *sti.Request) *cobra.Command {
+func newCmdBuild(req *api.Request) *cobra.Command {
 	buildCmd := &cobra.Command{
 		Use:   "build <source> <image> <tag>",
 		Short: "Build a new image",
@@ -85,12 +86,13 @@ func newCmdBuild(req *sti.Request) *cobra.Command {
 	buildCmd.Flags().StringVarP(&(req.Ref), "ref", "r", "", "Specify a ref to check-out")
 	buildCmd.Flags().StringVar(&(req.CallbackURL), "callbackURL", "", "Specify a URL to invoke via HTTP POST upon build completion")
 	buildCmd.Flags().StringVarP(&(req.ScriptsURL), "scripts", "s", "", "Specify a URL for the assemble and run scripts")
+	buildCmd.Flags().StringVarP(&(req.Location), "location", "l", "", "Specify a destination location for untar operation")
 	buildCmd.Flags().BoolVar(&(req.ForcePull), "forcePull", true, "Always pull the builder image even if it is present locally")
 	buildCmd.Flags().BoolVar(&(req.PreserveWorkingDir), "saveTempDir", false, "Save the temporary directory used by STI instead of deleting it")
 	return buildCmd
 }
 
-func newCmdUsage(req *sti.Request) *cobra.Command {
+func newCmdUsage(req *api.Request) *cobra.Command {
 	usageCmd := &cobra.Command{
 		Use:   "usage <image>",
 		Short: "Print usage of the assemble script associated with the image",
@@ -116,6 +118,7 @@ func newCmdUsage(req *sti.Request) *cobra.Command {
 	usageCmd.Flags().StringVarP(&(req.ScriptsURL), "scripts", "s", "", "Specify a URL for the assemble and run scripts")
 	usageCmd.Flags().BoolVar(&(req.ForcePull), "forcePull", true, "Always pull the builder image even if it is present locally")
 	usageCmd.Flags().BoolVar(&(req.PreserveWorkingDir), "saveTempDir", false, "Save the temporary directory used by STI instead of deleting it")
+	usageCmd.Flags().StringVarP(&(req.Location), "location", "l", "", "Specify a destination location for untar operation")
 	return usageCmd
 }
 
@@ -151,7 +154,7 @@ func checkErr(err error) {
 }
 
 func main() {
-	req := &sti.Request{}
+	req := &api.Request{}
 	stiCmd := &cobra.Command{
 		Use: "sti",
 		Long: "Source-to-image (STI) is a tool for building repeatable docker images.\n\n" +

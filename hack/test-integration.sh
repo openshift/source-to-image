@@ -17,7 +17,7 @@ set +e
 img_count=$(docker images | grep -c sti_test/sti-fake)
 set -e
 
-if [ "${img_count}" != "4" ]; then
+if [ "${img_count}" != "5" ]; then
     echo "You do not have necessary test images, be sure to run 'hack/build-test-images.sh' beforehand."
     exit 1
 fi

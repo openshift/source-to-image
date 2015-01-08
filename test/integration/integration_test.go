@@ -9,13 +9,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
 
 	"github.com/fsouza/go-dockerclient"
+
 	"github.com/openshift/source-to-image/pkg/sti"
+	"github.com/openshift/source-to-image/pkg/sti/api"
 )
 
 const (
@@ -26,6 +28,7 @@ const (
 	FakeUserImage                   = "sti_test/sti-fake-user"
 	FakeImageScripts                = "sti_test/sti-fake-scripts"
 	FakeImageScriptsNoSaveArtifacts = "sti_test/sti-fake-scripts-no-save-artifacts"
+	FakeImageNoTar                  = "sti_test/sti-fake-no-tar"
 
 	TagCleanBuild                             = "test/sti-fake-app"
 	TagCleanBuildUser                         = "test/sti-fake-app-user"
@@ -34,12 +37,13 @@ const (
 	TagCleanBuildScripts                      = "test/sti-fake-app-scripts"
 	TagIncrementalBuildScripts                = "test/sti-incremental-app-scripts"
 	TagIncrementalBuildScriptsNoSaveArtifacts = "test/sti-incremental-app-scripts-no-save-artifacts"
+	TagCleanLayeredBuildNoTar                 = "test/sti-fake-no-tar"
 
 	// Need to serve the scripts from local host so any potential changes to the
 	// scripts are made available for integration testing.
 	//
 	// Port 23456 must match the port used in the fake image Dockerfiles
-	FakeScriptsHttpUrl = "http://127.0.0.1:23456/sti-fake/.sti/bin"
+	FakeScriptsHttpURL = "http://127.0.0.1:23456/sti-fake/.sti/bin"
 )
 
 type integrationTest struct {
@@ -66,8 +70,8 @@ func (i *integrationTest) setup() {
 		// get the full path to this .go file so we can construct the file url
 		// using this file's dirname
 		_, filename, _, _ := runtime.Caller(0)
-		testImagesDir := path.Join(path.Dir(filename), "scripts")
-		FakeScriptsFileURL = "file://" + path.Join(testImagesDir, ".sti", "bin")
+		testImagesDir := filepath.Join(filepath.Dir(filename), "scripts")
+		FakeScriptsFileURL = "file://" + filepath.Join(testImagesDir, ".sti", "bin")
 
 		for _, image := range []string{TagCleanBuild, TagCleanBuildUser, TagIncrementalBuild, TagIncrementalBuildUser} {
 			i.dockerClient.RemoveImage(image)
@@ -120,11 +124,15 @@ func TestCleanBuildFileScriptsURL(t *testing.T) {
 }
 
 func TestCleanBuildHttpScriptsURL(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBaseImage, FakeScriptsHttpUrl)
+	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBaseImage, FakeScriptsHttpURL)
 }
 
 func TestCleanBuildScripts(t *testing.T) {
 	integration(t).exerciseCleanBuild(TagCleanBuildScripts, false, FakeImageScripts, "")
+}
+
+func TestLayeredBuildNoTar(t *testing.T) {
+	integration(t).exerciseCleanBuild(TagCleanLayeredBuildNoTar, false, FakeImageNoTar, FakeScriptsFileURL)
 }
 
 // Test that a build request with a callbackURL will invoke HTTP endpoint
@@ -162,7 +170,7 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 		callbackURL = ts.URL
 	}
 
-	req := &sti.Request{
+	req := &api.Request{
 		DockerSocket: dockerSocket(),
 		BaseImage:    imageName,
 		Source:       TestSource,
@@ -217,7 +225,7 @@ func TestIncrementalBuildScriptsNoSaveArtifacts(t *testing.T) {
 
 func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, removePreviousImage bool, expectClean bool) {
 	t := i.t
-	req := &sti.Request{
+	req := &api.Request{
 		DockerSocket:        dockerSocket(),
 		BaseImage:           imageName,
 		Source:              TestSource,
