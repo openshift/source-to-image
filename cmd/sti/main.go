@@ -83,9 +83,10 @@ func newCmdBuild(req *sti.Request) *cobra.Command {
 	buildCmd.Flags().BoolVar(&(req.RemovePreviousImage), "rm", false, "Remove the previous image during incremental builds")
 	buildCmd.Flags().StringP("env", "e", "", "Specify an environment var NAME=VALUE,NAME2=VALUE2,...")
 	buildCmd.Flags().StringVarP(&(req.Ref), "ref", "r", "", "Specify a ref to check-out")
-	buildCmd.Flags().StringVar(&(req.CallbackURL), "callbackUrl", "", "Specify a URL to invoke via HTTP POST upon build completion")
+	buildCmd.Flags().StringVar(&(req.CallbackURL), "callbackURL", "", "Specify a URL to invoke via HTTP POST upon build completion")
 	buildCmd.Flags().StringVarP(&(req.ScriptsURL), "scripts", "s", "", "Specify a URL for the assemble and run scripts")
 	buildCmd.Flags().BoolVar(&(req.ForcePull), "forcePull", true, "Always pull the builder image even if it is present locally")
+	buildCmd.Flags().BoolVar(&(req.PreserveWorkingDir), "saveTempDir", false, "Save the temporary directory used by STI instead of deleting it")
 	return buildCmd
 }
 
@@ -113,6 +114,8 @@ func newCmdUsage(req *sti.Request) *cobra.Command {
 	}
 	usageCmd.Flags().StringP("env", "e", "", "Specify an environment var NAME=VALUE,NAME2=VALUE2,...")
 	usageCmd.Flags().StringVarP(&(req.ScriptsURL), "scripts", "s", "", "Specify a URL for the assemble and run scripts")
+	usageCmd.Flags().BoolVar(&(req.ForcePull), "forcePull", true, "Always pull the builder image even if it is present locally")
+	usageCmd.Flags().BoolVar(&(req.PreserveWorkingDir), "saveTempDir", false, "Save the temporary directory used by STI instead of deleting it")
 	return usageCmd
 }
 
@@ -159,7 +162,6 @@ func main() {
 		},
 	}
 	stiCmd.PersistentFlags().StringVarP(&(req.DockerSocket), "url", "U", dockerSocket(), "Set the url of the docker socket to use")
-	stiCmd.PersistentFlags().BoolVar(&(req.PreserveWorkingDir), "savetempdir", false, "Save the temporary directory used by STI instead of deleting it")
 
 	stiCmd.AddCommand(newCmdVersion())
 	stiCmd.AddCommand(newCmdBuild(req))
