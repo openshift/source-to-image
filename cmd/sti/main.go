@@ -92,6 +92,24 @@ func newCmdBuild(req *api.Request) *cobra.Command {
 	return buildCmd
 }
 
+func newCmdCreate() *cobra.Command {
+	return &cobra.Command{
+		Use:   "create <imageName> <destination>",
+		Short: "Bootstrap a new STI image repository",
+		Long:  "Bootstrap a new STI image with given imageName inside the destination directory",
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) < 2 {
+				cmd.Help()
+				os.Exit(1)
+			}
+			b := sti.NewCreate(args[0], args[1])
+			b.AddSTIScripts()
+			b.AddDockerfile()
+			b.AddTests()
+		},
+	}
+}
+
 func newCmdUsage(req *api.Request) *cobra.Command {
 	usageCmd := &cobra.Command{
 		Use:   "usage <image>",
@@ -169,6 +187,7 @@ func main() {
 	stiCmd.AddCommand(newCmdVersion())
 	stiCmd.AddCommand(newCmdBuild(req))
 	stiCmd.AddCommand(newCmdUsage(req))
+	stiCmd.AddCommand(newCmdCreate())
 	setupGlog(stiCmd.PersistentFlags())
 
 	err := stiCmd.Execute()
