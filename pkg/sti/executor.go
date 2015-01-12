@@ -274,7 +274,8 @@ func (h *requestHandler) cleanup() {
 }
 
 func (h *requestHandler) fetchSource() error {
-	targetSourceDir := filepath.Join(h.request.WorkingDir, "upload", "src")
+	uploadDir := filepath.Join(h.request.WorkingDir, "upload");
+	targetSourceDir := filepath.Join(uploadDir, "src")
 	glog.V(1).Infof("Downloading %s to directory %s", h.request.Source, targetSourceDir)
 	if h.git.ValidCloneSpec(h.request.Source) {
 		if err := h.git.Clone(h.request.Source, targetSourceDir); err != nil {
@@ -290,7 +291,12 @@ func (h *requestHandler) fetchSource() error {
 			}
 		}
 	} else {
-		h.fs.Copy(h.request.Source, targetSourceDir)
+		if err := h.fs.Mkdir(uploadDir); err != nil {
+			return err
+		}
+		if err := h.fs.Copy(h.request.Source, targetSourceDir); err != nil {
+			return err
+		}
 	}
 
 	return nil
