@@ -69,6 +69,7 @@ func (b *Builder) Build() (*api.Result, error) {
 	bh := b.handler
 	defer bh.cleanup()
 
+	glog.Infof("Building %s", bh.Request().Tag)
 	err := bh.setup([]api.Script{api.Assemble, api.Run}, []api.Script{api.SaveArtifacts})
 	if err != nil {
 		return nil, err
@@ -87,7 +88,7 @@ func (b *Builder) Build() (*api.Result, error) {
 	glog.V(2).Infof("Performing source build from %s", bh.Request().Source)
 	if bh.Request().Incremental {
 		if err = bh.saveArtifacts(); err != nil {
-			glog.Warning("Error saving previous build artifacts: %v", err)
+			glog.Warningf("Error saving previous build artifacts: %v", err)
 			glog.Warning("Clean build will be performed!")
 		}
 	}

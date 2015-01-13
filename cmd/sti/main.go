@@ -162,8 +162,8 @@ func checkErr(err error) {
 		if e.Details != nil {
 			glog.V(1).Infof("Details: %v", e.Details)
 		}
-		glog.Error("If the problem persists reach us on freenode #openshift " +
-			"or fill an issue at https://github.com/openshift/source-to-image/issues " +
+		glog.Error("If the problem persists consult the docs at https://github.com/openshift/source-to-image/tree/master/docs." +
+			"Eventually reach us on freenode #openshift or file an issue at https://github.com/openshift/source-to-image/issues " +
 			"providing us with a log from your build using --loglevel=3")
 		os.Exit(e.ErrorCode)
 	} else {
