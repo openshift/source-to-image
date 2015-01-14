@@ -26,6 +26,11 @@ const (
 	defaultLocation = "/tmp"
 )
 
+var (
+	// a list of directories that needs to be present inside workign dir
+	workingDirs = []string{"upload/scripts", "upload/src", "downloads/scripts", "downloads/defaultScripts"}
+)
+
 // requestHandler encapsulates dependencies needed to fulfill requests.
 type requestHandler struct {
 	request      *api.Request
@@ -87,6 +92,11 @@ func (h *requestHandler) setup(requiredScripts, optionalScripts []api.Script) (e
 		return
 	}
 
+	// create the workingDir structure
+	if err := h.setupWorkingDirs(); err != nil {
+		return err
+	}
+
 	// fetch sources, for theirs .sti/bin might contain sti scripts
 	if len(h.request.Source) > 0 {
 		if err = h.fetchSource(); err != nil {
@@ -94,13 +104,7 @@ func (h *requestHandler) setup(requiredScripts, optionalScripts []api.Script) (e
 		}
 	}
 
-	dirs := []string{"upload/scripts", "downloads/scripts", "downloads/defaultScripts"}
-	for _, v := range dirs {
-		if err = h.fs.MkdirAll(filepath.Join(h.request.WorkingDir, v)); err != nil {
-			return err
-		}
-	}
-
+	// get the scripts
 	if h.request.ExternalRequiredScripts, err = h.installer.DownloadAndInstall(
 		requiredScripts, h.request.WorkingDir, true); err != nil {
 		return err
@@ -110,6 +114,15 @@ func (h *requestHandler) setup(requiredScripts, optionalScripts []api.Script) (e
 		glog.Warningf("Failed downloading optional scripts: %v", err)
 	}
 
+	return nil
+}
+
+func (h *requestHandler) setupWorkingDirs() error {
+	for _, v := range workingDirs {
+		if err := h.fs.MkdirAll(filepath.Join(h.request.WorkingDir, v)); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -274,8 +287,7 @@ func (h *requestHandler) cleanup() {
 }
 
 func (h *requestHandler) fetchSource() error {
-	uploadDir := filepath.Join(h.request.WorkingDir, "upload");
-	targetSourceDir := filepath.Join(uploadDir, "src")
+	targetSourceDir := filepath.Join(h.request.WorkingDir, "upload", "src")
 	glog.V(1).Infof("Downloading %s to directory %s", h.request.Source, targetSourceDir)
 	if h.git.ValidCloneSpec(h.request.Source) {
 		if err := h.git.Clone(h.request.Source, targetSourceDir); err != nil {
@@ -290,13 +302,8 @@ func (h *requestHandler) fetchSource() error {
 				return err
 			}
 		}
-	} else {
-		if err := h.fs.Mkdir(uploadDir); err != nil {
-			return err
-		}
-		if err := h.fs.Copy(h.request.Source, targetSourceDir); err != nil {
-			return err
-		}
+	} else if err := h.fs.Copy(h.request.Source, targetSourceDir); err != nil {
+		return err
 	}
 
 	return nil

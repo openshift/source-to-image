@@ -34,12 +34,12 @@ func TestSetupOK(t *testing.T) {
 	if !rh.fs.(*test.FakeFileSystem).WorkingDirCalled {
 		t.Errorf("Working directory was not created.")
 	}
+	var expected []string
+	for _, dir := range workingDirs {
+		expected = append(expected, "/working-dir/"+dir)
+	}
 	mkdirs := rh.fs.(*test.FakeFileSystem).MkdirAllDir
-	if !reflect.DeepEqual(
-		mkdirs,
-		[]string{"/working-dir/upload/scripts",
-			"/working-dir/downloads/scripts",
-			"/working-dir/downloads/defaultScripts"}) {
+	if !reflect.DeepEqual(mkdirs, expected) {
 		t.Errorf("Unexpected set of MkdirAll calls: %#v", mkdirs)
 	}
 	requiredFlags := rh.installer.(*test.FakeInstaller).Required
