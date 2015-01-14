@@ -12,6 +12,7 @@ import (
 
 	"github.com/openshift/source-to-image/pkg/sti"
 	"github.com/openshift/source-to-image/pkg/sti/api"
+	"github.com/openshift/source-to-image/pkg/sti/config"
 	"github.com/openshift/source-to-image/pkg/sti/errors"
 	"github.com/openshift/source-to-image/pkg/sti/version"
 )
@@ -42,6 +43,10 @@ func dockerSocket() string {
 	return "unix:///var/run/docker.sock"
 }
 
+func validRequest(r *api.Request) bool {
+	return !(len(r.Source) == 0 || len(r.BaseImage) == 0 || len(r.Tag) == 0)
+}
+
 func newCmdVersion() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
@@ -54,19 +59,35 @@ func newCmdVersion() *cobra.Command {
 }
 
 func newCmdBuild(req *api.Request) *cobra.Command {
+	useConfig := false
+
 	buildCmd := &cobra.Command{
 		Use:   "build <source> <image> <tag>",
 		Short: "Build a new image",
 		Long:  "Build a new Docker image named <tag> from a source repository and base image.",
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) < 3 {
+			// Attempt to restore the build command from the configuration file
+			if useConfig {
+				config.Restore(req, cmd)
+			}
+
+			// If user specifies the arguments, then we override the stored ones
+			if len(args) >= 3 {
+				req.Source = args[0]
+				req.BaseImage = args[1]
+				req.Tag = args[2]
+			}
+
+			if !validRequest(req) {
 				cmd.Help()
 				os.Exit(1)
 			}
 
-			req.Source = args[0]
-			req.BaseImage = args[1]
-			req.Tag = args[2]
+			// Persists the current command line options and request into .stifile
+			if useConfig {
+				config.Save(req, cmd)
+			}
+
 			envs, err := parseEnvs(cmd, "env")
 			checkErr(err)
 			req.Environment = envs
@@ -80,6 +101,7 @@ func newCmdBuild(req *api.Request) *cobra.Command {
 			}
 		},
 	}
+
 	buildCmd.Flags().BoolVar(&(req.Clean), "clean", false, "Perform a clean build")
 	buildCmd.Flags().BoolVar(&(req.RemovePreviousImage), "rm", false, "Remove the previous image during incremental builds")
 	buildCmd.Flags().StringP("env", "e", "", "Specify an environment var NAME=VALUE,NAME2=VALUE2,...")
@@ -89,6 +111,8 @@ func newCmdBuild(req *api.Request) *cobra.Command {
 	buildCmd.Flags().StringVarP(&(req.Location), "location", "l", "", "Specify a destination location for untar operation")
 	buildCmd.Flags().BoolVar(&(req.ForcePull), "forcePull", true, "Always pull the builder image even if it is present locally")
 	buildCmd.Flags().BoolVar(&(req.PreserveWorkingDir), "saveTempDir", false, "Save the temporary directory used by STI instead of deleting it")
+	buildCmd.Flags().BoolVar(&(useConfig), "use-config", false, "Store command line options to .stifile")
+
 	return buildCmd
 }
 
