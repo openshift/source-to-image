@@ -30,6 +30,17 @@ There are four log levels:
 
 **NOTE**: All of the commands and flags are case sensitive!
 
+# sti create
+
+The `sti create` command is responsible for bootstrapping a new STI enabled
+image repository. This command will generate example `.sti` directory and
+populate it with sample STI scripts you can start hacking on.
+
+Usage:
+
+```
+$ sti create <image name> <destination directory>
+```
 
 # sti build
 
