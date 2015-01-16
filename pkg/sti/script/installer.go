@@ -65,11 +65,12 @@ func (i *installer) DownloadAndInstall(scripts []api.Script, workingDir string, 
 	if !download {
 		return false, nil
 	}
-
 	for _, script := range scripts {
 		scriptPath := i.handler.getPath(script, workingDir)
 		if required && scriptPath == "" {
 			return false, errors.NewScriptDownloadError(script, nil)
+		} else if scriptPath == "" {
+			continue
 		}
 		if err := i.handler.install(scriptPath, workingDir); err != nil {
 			return false, err
@@ -108,6 +109,18 @@ func (s *handler) download(scripts []api.Script, workingDir string) (bool, error
 		}
 	}
 
+	// check for the scripts inside the sources
+	scriptsDir := filepath.Join(workingDir, "/upload/src/.sti/bin")
+	if s.fs.Exists(scriptsDir) {
+		for _, script := range scripts {
+			file := filepath.Join(scriptsDir, string(script))
+			if s.fs.Exists(file) {
+				downloads[script] <- true
+			}
+		}
+	}
+
+	// check for the scripts from parameter
 	if s.scriptsURL != "" {
 		destDir := filepath.Join(workingDir, "/downloads/scripts")
 		for file, info := range s.prepareDownload(scripts, destDir, s.scriptsURL) {
@@ -116,11 +129,11 @@ func (s *handler) download(scripts []api.Script, workingDir string) (bool, error
 		}
 	}
 
+	// check for the scripts from default URL
 	defaultURL, err := s.docker.GetScriptsURL(s.image)
 	if err != nil {
 		return false, errors.NewDefaultScriptsURLError(err)
 	}
-
 	if defaultURL != "" {
 		destDir := filepath.Join(workingDir, "/downloads/defaultScripts")
 		for file, info := range s.prepareDownload(scripts, destDir, defaultURL) {
