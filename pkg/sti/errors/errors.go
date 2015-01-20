@@ -32,11 +32,11 @@ type Error struct {
 // ContainerError is an error returned when a container exits with a non-zero code.
 // ExitCode contains the exit code from the container
 type ContainerError struct {
-	Message       string
-	ExpectedError string
-	ErrorCode     int
-	Suggestion    string
-	ExitCode      int
+	Message    string
+	Output     string
+	ErrorCode  int
+	Suggestion string
+	ExitCode   int
 }
 
 // Error returns a string for a given error
@@ -84,12 +84,23 @@ func NewScriptDownloadError(name api.Script, err error) error {
 
 // NewSaveArtifactsError returns a new error which indicates there was a problem
 // calling save-artifacts script
-func NewSaveArtifactsError(name string, err error) error {
+func NewSaveArtifactsError(name, output string, err error) error {
 	return Error{
-		Message:    fmt.Sprintf("saving artifacts for %s failed", name),
+		Message:    fmt.Sprintf("saving artifacts for %s failed:\n%s", name, output),
 		Details:    err,
 		ErrorCode:  ErrSaveArtifacts,
 		Suggestion: "check the save-artifacts script for errors",
+	}
+}
+
+// NewAssembleError returns a new error which indicates there was a problem
+// running assemble script
+func NewAssembleError(name, output string, err error) error {
+	return Error{
+		Message:    fmt.Sprintf("assemble for %s failed:\n%s", name, output),
+		Details:    err,
+		ErrorCode:  ErrBuild,
+		Suggestion: "check the assemble script output for errors",
 	}
 }
 
@@ -100,7 +111,7 @@ func NewBuildError(name string, err error) error {
 		Message:    fmt.Sprintf("building %s failed", name),
 		Details:    err,
 		ErrorCode:  ErrBuild,
-		Suggestion: "check the assemble script for errors",
+		Suggestion: "check the build output for errors",
 	}
 }
 
@@ -161,12 +172,12 @@ func NewDefaultScriptsURLError(err error) error {
 
 // NewContainerError return a new error which indicates there was a problem
 // invoking command inside container
-func NewContainerError(name string, code int, expected string) error {
+func NewContainerError(name string, code int, output string) error {
 	return ContainerError{
-		Message:       fmt.Sprintf("non-zero (%d) exit code from %s", code, name),
-		ExpectedError: expected,
-		ErrorCode:     ErrSTIContainer,
-		Suggestion:    "check the container logs for more information on the failure",
-		ExitCode:      code,
+		Message:    fmt.Sprintf("non-zero (%d) exit code from %s", code, name),
+		Output:     output,
+		ErrorCode:  ErrSTIContainer,
+		Suggestion: "check the container logs for more information on the failure",
+		ExitCode:   code,
 	}
 }

@@ -351,7 +351,7 @@ func TestSaveArtifactsRunError(t *testing.T) {
 	}
 	expected := []error{
 		tests[0],
-		stierr.NewSaveArtifactsError("", tests[1]),
+		stierr.NewSaveArtifactsError("", "", tests[1]),
 	}
 	// test with tar extract error or not
 	tarError := []bool{true, false}

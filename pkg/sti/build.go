@@ -57,7 +57,6 @@ func newBuildHandler(req *api.Request) (*buildHandler, error) {
 		callbackInvoker: util.NewCallbackInvoker(),
 	}
 	rh.postExecutor = bh
-	rh.errorChecker = bh
 	return bh, nil
 }
 
@@ -94,8 +93,23 @@ func (b *Builder) Build() (*api.Result, error) {
 	}
 
 	glog.V(1).Infof("Building %s", bh.Request().Tag)
-	err = bh.execute(api.Assemble)
-	if e, ok := err.(errors.ContainerError); ok && bh.wasExpectedError(e.ExpectedError) {
+	if err := bh.execute(api.Assemble); err != nil {
+		switch e := err.(type) {
+		case errors.ContainerError:
+			return b.handleContainerError(e)
+		default:
+			return nil, err
+		}
+	}
+
+	return bh.Result(), nil
+}
+
+// handleContainerError is responsible for checking container output to see if
+// the error is one of the expected that should trigger layered build
+func (b *Builder) handleContainerError(cerr errors.ContainerError) (*api.Result, error) {
+	bh := b.handler
+	if bh.wasExpectedError(cerr.Output) {
 		glog.Warningf("Image %s does not have tar! Performing additional build to add the scripts and sources.",
 			bh.Request().BaseImage)
 		if err := bh.build(); err != nil {
@@ -103,10 +117,15 @@ func (b *Builder) Build() (*api.Result, error) {
 		}
 		glog.V(2).Infof("Building %s using sti-enabled image", bh.Request().Tag)
 		if err := bh.execute(api.Assemble); err != nil {
-			return nil, err
+			switch e := err.(type) {
+			case errors.ContainerError:
+				return nil, errors.NewAssembleError(bh.Request().Tag, e.Output, e)
+			default:
+				return nil, err
+			}
 		}
-	} else if err != nil {
-		return nil, err
+	} else {
+		return nil, errors.NewAssembleError(bh.Request().Tag, cerr.Output, cerr)
 	}
 
 	return bh.Result(), nil
@@ -208,8 +227,8 @@ func (h *buildHandler) saveArtifacts() (err error) {
 	}
 	err = h.docker.RunContainer(opts)
 	writer.Close()
-	if _, ok := err.(errors.ContainerError); ok {
-		return errors.NewSaveArtifactsError(image, err)
+	if e, ok := err.(errors.ContainerError); ok {
+		return errors.NewSaveArtifactsError(image, e.Output, err)
 	}
 	return err
 }
