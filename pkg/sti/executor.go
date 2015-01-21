@@ -36,7 +36,6 @@ type requestHandler struct {
 	request      *api.Request
 	result       *api.Result
 	postExecutor postExecutor
-	errorChecker errorChecker
 	installer    script.Installer
 	git          git.Git
 	fs           util.FileSystem
@@ -46,10 +45,6 @@ type requestHandler struct {
 
 type postExecutor interface {
 	PostExecute(containerID string, location string) error
-}
-
-type errorChecker interface {
-	wasExpectedError(text string) bool
 }
 
 // newRequestHandler returns a new handler for a given request.
@@ -150,7 +145,7 @@ func (h *requestHandler) execute(command api.Script) error {
 	}
 	defer tarFile.Close()
 
-	expectedError := ""
+	errOutput := ""
 	outReader, outWriter := io.Pipe()
 	errReader, errWriter := io.Pipe()
 	defer outReader.Close()
@@ -189,16 +184,15 @@ func (h *requestHandler) execute(command api.Script) error {
 			if glog.V(1) {
 				glog.Errorf(text)
 			}
-			if h.errorChecker != nil && h.errorChecker.wasExpectedError(text) &&
-				len(expectedError) < maxErrorOutput {
-				expectedError += text + "; "
+			if len(errOutput) < maxErrorOutput {
+				errOutput += text + "\n"
 			}
 		}
 	}(errReader)
 
 	err = h.docker.RunContainer(opts)
 	if e, ok := err.(errors.ContainerError); ok {
-		return errors.NewContainerError(h.request.BaseImage, e.ErrorCode, expectedError)
+		return errors.NewContainerError(h.request.BaseImage, e.ErrorCode, errOutput)
 	}
 	return err
 }
