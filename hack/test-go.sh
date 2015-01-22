@@ -21,6 +21,7 @@ find_test_dirs() {
         -o -wholename './target' \
         -o -wholename '*/Godeps/*' \
         -o -wholename '*/_output/*' \
+        -o -wholename './.git' \
       \) -prune \
     \) -name '*_test.go' -print0 | xargs -0n1 dirname | sort -u | xargs -n1 printf "${STI_GO_PACKAGE}/%s\n"
 }
