@@ -69,7 +69,7 @@ func (b *Builder) Build() (*api.Result, error) {
 	defer bh.cleanup()
 
 	glog.Infof("Building %s", bh.Request().Tag)
-	err := bh.setup([]api.Script{api.Assemble, api.Run}, []api.Script{api.SaveArtifacts})
+	err := bh.setup([]api.Script{api.Assemble}, []api.Script{api.Run, api.SaveArtifacts})
 	if err != nil {
 		return nil, err
 	}
@@ -150,9 +150,16 @@ func (h *buildHandler) PostExecute(containerID string, location string) error {
 		}
 	}
 
-	cmd := []string{}
+	image, err := h.docker.GetBuilderImage(containerID)
+
+	if err != nil {
+		return errors.NewBuildError(h.request.Tag, err)
+	}
+
+	// cmd := []string{}
 	opts := docker.CommitContainerOptions{
-		Command:     append(cmd, filepath.Join(location, string(api.Run))),
+		Command:     image.Config.Cmd,
+		//append(cmd, filepath.Join(location, string(api.Run))),
 		Env:         h.generateConfigEnv(),
 		ContainerID: containerID,
 		Repository:  h.request.Tag,
