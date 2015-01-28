@@ -43,6 +43,7 @@ sources are already there.
 * optional:
     * [save-artifacts](#save-artifacts)
     * [usage](#usage)
+    * [test/run](#test/run)
 
 All of the scripts can be written in any programming language, as long as it is
 executable inside the builder image.
@@ -99,7 +100,7 @@ The `run` script is responsible for executing your application.
 ## save-artifacts
 
 The `save-artifacts` script is responsible for gathering all the dependencies which
-existence can speed up the following build processes (eg. for Ruby - Gemfiles,
+existence can speed up the following build processes (eg. for Ruby - gems installed by Bundler,
 for Java - `.m2` contents, etc.) into a tar file and stream it to the standard output.
 
 #### Example `save-artifacts` script:
@@ -132,3 +133,20 @@ This is a STI sample builder image, to use it, install
 https://github.com/openshift/source-to-image
 EOF
 ```
+
+## test/run
+
+The `test/run` script is for you, as the builder image author, to create a simple
+process to checks if the image is working correctly. The proposed flow of that process
+should be following:
+
+1. Build the image.
+1. Run the image to verify `usage` script.
+1. Run `sti build` to verify `assemble` script.
+1. (optional) Run `sti build` once more to verify `save-artifacts` script and
+   `assemble`'s restore artifacts functionality.
+1. Run the image to verify the test application is working.
+
+**NOTE** The suggested place to put your test application which should be built by your
+`test/run` script is `test/test-app` in your image repository, see
+[sti create](https://github.com/openshift/source-to-image/blob/master/docs/cli.md#sti-create).
