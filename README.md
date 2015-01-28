@@ -1,4 +1,8 @@
-# source-to-image (sti) [![Build Status](https://travis-ci.org/openshift/source-to-image.svg?branch=master)](https://travis-ci.org/openshift/source-to-image)
+# source-to-image (sti)
+
+[![GoDoc](https://godoc.org/github.com/openshift/source-to-image?status.png)](https://godoc.org/github.com/openshift/source-to-image)
+[![Travis](https://travis-ci.org/openshift/source-to-image.svg?branch=master)](https://travis-ci.org/openshift/source-to-image)
+
 
 Source-to-image (`sti`) is a tool for building reproducible docker images. `sti` produces
 ready-to-run images by injecting source code into a docker image and *assembling*
@@ -93,7 +97,8 @@ $ hack/build-go.sh
 
 # Getting Started
 
-You can start using `sti` right away with the following test sources and publicly available images:
+You can start using `sti` right away (see [releases](https://github.com/openshift/source-to-image/releases))
+with the following test sources and publicly available images:
 
 ```
 $ sti build git://github.com/pmorie/simple-ruby openshift/ruby-20-centos test-ruby-app
