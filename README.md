@@ -1,4 +1,4 @@
-# source-to-image (sti)
+# source-to-image (sti) [![Build Status](https://travis-ci.org/openshift/source-to-image.svg?branch=master)](https://travis-ci.org/openshift/source-to-image)
 
 Source-to-image (`sti`) is a tool for building reproducible docker images. `sti` produces
 ready-to-run images by injecting source code into a docker image and *assembling*
