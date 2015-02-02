@@ -28,9 +28,9 @@ func Save(req *api.Request, cmd *cobra.Command) {
 		BaseImage: req.BaseImage,
 		Source:    req.Source,
 		Tag:       req.Tag,
+		Flags:     make(map[string]string),
 	}
-	c.Flags = make(map[string]string)
-	// Store only flags that has changed
+	// Store only flags that have changed
 	cmd.Flags().Visit(func(f *pflag.Flag) {
 		c.Flags[f.Name] = f.Value.String()
 	})
