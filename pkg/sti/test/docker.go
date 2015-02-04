@@ -26,6 +26,9 @@ type FakeDocker struct {
 	GetImageIDImage              string
 	GetImageIDResult             string
 	GetImageIDError              error
+	GetImageUserImage            string
+	GetImageUserResult           string
+	GetImageUserError            error
 	CommitContainerOpts          docker.CommitContainerOptions
 	CommitContainerResult        string
 	CommitContainerError         error
@@ -76,6 +79,12 @@ func (f *FakeDocker) RunContainer(opts docker.RunContainerOptions) error {
 func (f *FakeDocker) GetImageID(image string) (string, error) {
 	f.GetImageIDImage = image
 	return f.GetImageIDResult, f.GetImageIDError
+}
+
+// GetImageUser returns a fake user
+func (f *FakeDocker) GetImageUser(image string) (string, error) {
+	f.GetImageUserImage = image
+	return f.GetImageUserResult, f.GetImageUserError
 }
 
 // CommitContainer commits a fake Docker container

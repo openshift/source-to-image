@@ -198,6 +198,10 @@ func (h *requestHandler) execute(command api.Script) error {
 }
 
 func (h *requestHandler) build() error {
+	user, err := h.docker.GetImageUser(h.request.BaseImage)
+	if err != nil {
+		return err
+	}
 	// create Dockerfile
 	buffer := bytes.Buffer{}
 	location := h.request.Location
@@ -205,8 +209,15 @@ func (h *requestHandler) build() error {
 		location = defaultLocation
 	}
 	buffer.WriteString(fmt.Sprintf("FROM %s\n", h.request.BaseImage))
-	buffer.WriteString(fmt.Sprintf("ADD scripts %s\n", filepath.Join(location, "scripts")))
-	buffer.WriteString(fmt.Sprintf("ADD src %s\n", filepath.Join(location, "src")))
+	buffer.WriteString(fmt.Sprintf("COPY scripts %s\n", filepath.Join(location, "scripts")))
+	buffer.WriteString(fmt.Sprintf("COPY src %s\n", filepath.Join(location, "src")))
+	//TODO: We need to account for images that may not have chown. There is a proposal
+	//      to specify the owner for COPY here: https://github.com/docker/docker/pull/9934
+	if len(user) > 0 {
+		buffer.WriteString("USER root\n")
+		buffer.WriteString(fmt.Sprintf("RUN chown -R %s %s %s\n", user, filepath.Join(location, "scripts"), filepath.Join(location, "src")))
+		buffer.WriteString(fmt.Sprintf("USER %s\n", user))
+	}
 	uploadDir := filepath.Join(h.request.WorkingDir, "upload")
 	if err := h.fs.WriteFile(filepath.Join(uploadDir, "Dockerfile"), buffer.Bytes()); err != nil {
 		return err
