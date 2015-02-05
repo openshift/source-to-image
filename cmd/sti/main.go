@@ -20,7 +20,7 @@ import (
 func parseEnvs(cmd *cobra.Command, name string) (map[string]string, error) {
 	env := cmd.Flags().Lookup(name)
 	if env == nil || len(env.Value.String()) == 0 {
-		return nil, fmt.Errorf("no env %s found", name)
+		return nil, fmt.Errorf("no env %s found", strings.ToUpper(name))
 	}
 
 	envs := make(map[string]string)
@@ -28,7 +28,7 @@ func parseEnvs(cmd *cobra.Command, name string) (map[string]string, error) {
 	for _, pair := range pairs {
 		atoms := strings.Split(pair, "=")
 		if len(atoms) != 2 {
-			return nil, fmt.Errorf("malformed env string: %s", pair)
+			return nil, fmt.Errorf("malformed env string: %s", strings.ToUpper(pair))
 		}
 		envs[atoms[0]] = atoms[1]
 	}
