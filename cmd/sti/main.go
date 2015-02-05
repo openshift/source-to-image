@@ -20,7 +20,7 @@ import (
 func parseEnvs(cmd *cobra.Command, name string) (map[string]string, error) {
 	env := cmd.Flags().Lookup(name)
 	if env == nil || len(env.Value.String()) == 0 {
-		return nil, nil
+		return nil, fmt.Errorf("no env %s found", name)
 	}
 
 	envs := make(map[string]string)
