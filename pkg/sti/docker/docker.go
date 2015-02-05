@@ -33,6 +33,7 @@ type Docker interface {
 	PullImage(name string) error
 	CheckAndPull(name string) (*docker.Image, error)
 	BuildImage(opts BuildImageOptions) error
+	GetImageUser(name string) (string, error)
 }
 
 // Client contains all methods called on the go Docker
@@ -113,6 +114,20 @@ func (d *stiDocker) IsImageInLocalRegistry(name string) (bool, error) {
 	return false, err
 }
 
+// GetImageUser finds and retrieves the user associated with
+// an image if one has been specified
+func (d *stiDocker) GetImageUser(name string) (string, error) {
+	image, err := d.client.InspectImage(name)
+	if err != nil {
+		return "", errors.NewInspectImageError(name, err)
+	}
+	user := image.ContainerConfig.User
+	if len(user) == 0 {
+		user = image.Config.User
+	}
+	return user, nil
+}
+
 // CheckAndPull pulls an image into the local registry if not present
 // and returns the image metadata
 func (d *stiDocker) CheckAndPull(name string) (image *docker.Image, err error) {
@@ -138,6 +153,7 @@ func (d *stiDocker) PullImage(name string) (err error) {
 	// TODO: Add authentication support
 	if err = d.client.PullImage(docker.PullImageOptions{Repository: name},
 		docker.AuthConfiguration{}); err != nil {
+		glog.V(3).Infof("An error was received from the PullImage call: %v", err)
 		return errors.NewPullImageError(name, err)
 	}
 	return nil
