@@ -102,12 +102,12 @@ with the following test sources and publicly available images:
 
 ```
 $ sti build git://github.com/pmorie/simple-ruby openshift/ruby-20-centos test-ruby-app
-$ docker run -rm -i -p :9292 -t test-ruby-app
+$ docker run --rm -i -p :9292 -t test-ruby-app
 ```
 
 ```
 $ sti build git://github.com/bparees/openshift-jee-sample openshift/wildfly-8-centos test-jee-app
-$ docker run -rm -i -p :8080 -t test-jee-app
+$ docker run --rm -i -p :8080 -t test-jee-app
 ```
 
 Interested in more advanced `sti` usage? See [cli.md](https://github.com/openshift/source-to-image/blob/master/docs/cli.md)
