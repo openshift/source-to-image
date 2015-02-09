@@ -39,8 +39,8 @@ sources are already there.
 
 * required:
     * [assemble](#assemble)
-    * [run](#run)
 * optional:
+    * [run](#run)
     * [save-artifacts](#save-artifacts)
     * [usage](#usage)
     * [test/run](#test/run)
@@ -86,7 +86,7 @@ popd
 
 ## run
 
-The `run` script is responsible for executing your application.
+The `run` script is responsible for executing your application. If the script is not provided, the `CMD` specified in the STI builder image will be used as-is.
 
 #### Example `run` script:
 

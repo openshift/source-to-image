@@ -28,6 +28,7 @@ type Docker interface {
 	GetScriptsURL(name string) (string, error)
 	RunContainer(opts RunContainerOptions) error
 	GetImageID(name string) (string, error)
+	GetBuilderImage(name string) (*docker.Image, error)
 	CommitContainer(opts CommitContainerOptions) (string, error)
 	RemoveImage(name string) error
 	PullImage(name string) error
@@ -41,6 +42,7 @@ type Docker interface {
 type Client interface {
 	RemoveImage(name string) error
 	InspectImage(name string) (*docker.Image, error)
+	InspectContainer(name string) (*docker.Container, error)
 	PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error
 	CreateContainer(opts docker.CreateContainerOptions) (*docker.Container, error)
 	AttachToContainer(opts docker.AttachToContainerOptions) error
@@ -352,6 +354,23 @@ func (d *stiDocker) GetImageID(name string) (string, error) {
 		return "", err
 	}
 	return image.ID, nil
+}
+
+// This function resolves the original (ie. not created by STI) parent image
+// and returns it for the container specified as the input.
+func (d *stiDocker) GetBuilderImage(name string) (*docker.Image, error) {
+	container, err := d.client.InspectContainer(name)
+	if err != nil {
+		return nil, err
+	}
+
+	image, err := d.client.InspectImage(container.Image)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return image, nil
 }
 
 // CommitContainer commits a container to an image with a specific tag.
