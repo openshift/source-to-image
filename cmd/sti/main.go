@@ -10,11 +10,13 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/openshift/source-to-image/pkg/sti"
-	"github.com/openshift/source-to-image/pkg/sti/api"
-	"github.com/openshift/source-to-image/pkg/sti/config"
-	"github.com/openshift/source-to-image/pkg/sti/errors"
-	"github.com/openshift/source-to-image/pkg/sti/version"
+	"github.com/openshift/source-to-image/pkg/api"
+	"github.com/openshift/source-to-image/pkg/build/strategies"
+	"github.com/openshift/source-to-image/pkg/build/strategies/sti"
+	"github.com/openshift/source-to-image/pkg/config"
+	"github.com/openshift/source-to-image/pkg/create"
+	"github.com/openshift/source-to-image/pkg/errors"
+	"github.com/openshift/source-to-image/pkg/version"
 )
 
 func parseEnvs(cmd *cobra.Command, name string) (map[string]string, error) {
@@ -92,13 +94,15 @@ func newCmdBuild(req *api.Request) *cobra.Command {
 			checkErr(err)
 			req.Environment = envs
 
-			b, err := sti.NewBuilder(req)
+			builder, err := strategies.GetBuilder(req)
 			checkErr(err)
-			res, err := b.Build()
+			result, err := builder.Build(req)
 			checkErr(err)
-			for _, message := range res.Messages {
+
+			for _, message := range result.Messages {
 				glog.V(1).Infof(message)
 			}
+
 		},
 	}
 
@@ -110,6 +114,7 @@ func newCmdBuild(req *api.Request) *cobra.Command {
 	buildCmd.Flags().StringVarP(&(req.ScriptsURL), "scripts", "s", "", "Specify a URL for the assemble and run scripts")
 	buildCmd.Flags().StringVarP(&(req.Location), "location", "l", "", "Specify a destination location for untar operation")
 	buildCmd.Flags().BoolVar(&(req.ForcePull), "forcePull", true, "Always pull the builder image even if it is present locally")
+	buildCmd.Flags().BoolVar(&(req.OnBuild), "onBuild", false, "Execute simple Docker build instead of STI build")
 	buildCmd.Flags().BoolVar(&(req.PreserveWorkingDir), "saveTempDir", false, "Save the temporary directory used by STI instead of deleting it")
 	buildCmd.Flags().BoolVar(&(useConfig), "use-config", false, "Store command line options to .stifile")
 
@@ -126,7 +131,7 @@ func newCmdCreate() *cobra.Command {
 				cmd.Help()
 				os.Exit(1)
 			}
-			b := sti.NewCreate(args[0], args[1])
+			b := create.NewCreate(args[0], args[1])
 			b.AddSTIScripts()
 			b.AddDockerfile()
 			b.AddTests()
@@ -150,7 +155,7 @@ func newCmdUsage(req *api.Request) *cobra.Command {
 			checkErr(err)
 			req.Environment = envs
 
-			uh, err := sti.NewUsage(req)
+			uh, err := sti.NewSTIUsage(req)
 			checkErr(err)
 			err = uh.Show()
 			checkErr(err)
