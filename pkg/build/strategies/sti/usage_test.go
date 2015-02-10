@@ -17,19 +17,26 @@ type FakeUsageHandler struct {
 	executeError   error
 }
 
-func (f *FakeUsageHandler) cleanup() {
+func (f *FakeUsageHandler) Cleanup(*api.Request) {
 	f.cleanupCalled = true
 }
 
-func (f *FakeUsageHandler) setup(required []api.Script, optional []api.Script) error {
-	f.setupRequired = required
-	f.setupOptional = optional
+func (f *FakeUsageHandler) Prepare(*api.Request) error {
 	return f.setupError
 }
 
-func (f *FakeUsageHandler) execute(command api.Script) error {
+func (f *FakeUsageHandler) SetScripts(r, o []api.Script) {
+	f.setupRequired = r
+	f.setupOptional = o
+}
+
+func (f *FakeUsageHandler) Execute(command api.Script, r *api.Request) error {
 	f.executeCommand = command
 	return f.executeError
+}
+
+func (f *FakeUsageHandler) Download(*api.Request) error {
+	return nil
 }
 
 func newTestUsage() *Usage {

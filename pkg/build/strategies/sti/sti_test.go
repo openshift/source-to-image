@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/api"
@@ -11,8 +12,9 @@ import (
 	"github.com/openshift/source-to-image/pkg/test"
 )
 
-type FakeBuildHandler struct {
+type FakeSTI struct {
 	CleanupCalled              bool
+	PrepareCalled              bool
 	SetupRequired              []api.Script
 	SetupOptional              []api.Script
 	SetupError                 error
@@ -29,65 +31,112 @@ type FakeBuildHandler struct {
 	ExpectedError              bool
 	LayeredBuildCalled         bool
 	LayeredBuildError          error
+	PostExecuteLocation        string
+	PostExecuteContainerID     string
+	PostExecuteError           error
 }
 
-func (f *FakeBuildHandler) cleanup() {
+func newFakeBaseSTI() *STI {
+	return &STI{
+		request:   &api.Request{},
+		result:    &api.Result{},
+		docker:    &test.FakeDocker{},
+		installer: &test.FakeInstaller{},
+		git:       &test.FakeGit{},
+		fs:        &test.FakeFileSystem{},
+		tar:       &test.FakeTar{},
+	}
+}
+
+func newFakeSTI(f *FakeSTI) *STI {
+	s := &STI{
+		request:     &api.Request{},
+		result:      &api.Result{},
+		docker:      &test.FakeDocker{},
+		installer:   &test.FakeInstaller{},
+		git:         &test.FakeGit{},
+		fs:          &test.FakeFileSystem{},
+		tar:         &test.FakeTar{},
+		cleaner:     f,
+		preparer:    f,
+		incremental: f,
+		scripts:     f,
+		builder:     &FakeDockerBuild{f},
+	}
+	return s
+}
+
+func (f *FakeSTI) Cleanup(*api.Request) {
 	f.CleanupCalled = true
 }
 
-func (f *FakeBuildHandler) setup(required []api.Script, optional []api.Script) error {
-	f.SetupRequired = required
-	f.SetupOptional = optional
-	return f.SetupError
+func (f *FakeSTI) Prepare(*api.Request) error {
+	f.PrepareCalled = true
+	f.SetupRequired = []api.Script{api.Assemble, api.Run}
+	f.SetupOptional = []api.Script{api.SaveArtifacts}
+	return nil
 }
 
-func (f *FakeBuildHandler) determineIncremental() error {
+func (f *FakeSTI) Determine(*api.Request) error {
 	f.DetermineIncrementalCalled = true
 	return f.DetermineIncrementalError
 }
 
-func (f *FakeBuildHandler) Request() *api.Request {
+func (f *FakeSTI) Request() *api.Request {
 	return f.BuildRequest
 }
 
-func (f *FakeBuildHandler) Result() *api.Result {
+func (f *FakeSTI) Result() *api.Result {
 	return f.BuildResult
 }
 
-func (f *FakeBuildHandler) saveArtifacts() error {
+func (f *FakeSTI) Save(*api.Request) error {
 	f.SaveArtifactsCalled = true
 	return f.SaveArtifactsError
 }
 
-func (f *FakeBuildHandler) fetchSource() error {
+func (f *FakeSTI) fetchSource() error {
 	return f.FetchSourceError
 }
 
-func (f *FakeBuildHandler) execute(command api.Script) error {
+func (f *FakeSTI) Download(*api.Request) error {
+	return nil
+}
+
+func (f *FakeSTI) Execute(command api.Script, r *api.Request) error {
 	f.ExecuteCommand = command
 	return f.ExecuteError
 }
 
-func (f *FakeBuildHandler) wasExpectedError(text string) bool {
+func (f *FakeSTI) wasExpectedError(text string) bool {
 	return f.ExpectedError
 }
 
-func (f *FakeBuildHandler) build() error {
+func (f *FakeSTI) PostExecute(id, location string) error {
+	f.PostExecuteContainerID = id
+	f.PostExecuteLocation = location
+	return f.PostExecuteError
+}
+
+type FakeDockerBuild struct {
+	*FakeSTI
+}
+
+func (f *FakeDockerBuild) Build(*api.Request) (*api.Result, error) {
 	f.LayeredBuildCalled = true
-	return f.LayeredBuildError
+	return nil, f.LayeredBuildError
 }
 
 func TestBuild(t *testing.T) {
 	incrementalTest := []bool{false, true}
 	for _, incremental := range incrementalTest {
 
-		fh := &FakeBuildHandler{
+		fh := &FakeSTI{
 			BuildRequest: &api.Request{Incremental: incremental},
 			BuildResult:  &api.Result{},
 		}
-		builder := STI{
-			handler: fh,
-		}
+
+		builder := newFakeSTI(fh)
 		builder.Build(&api.Request{Incremental: incremental})
 
 		// Verify the right scripts were requested
@@ -116,7 +165,7 @@ func TestBuild(t *testing.T) {
 }
 
 func TestLayeredBuild(t *testing.T) {
-	fh := &FakeBuildHandler{
+	fh := &FakeSTI{
 		BuildRequest: &api.Request{
 			BaseImage: "testimage",
 		},
@@ -124,9 +173,7 @@ func TestLayeredBuild(t *testing.T) {
 		ExecuteError:  stierr.NewContainerError("", 1, `/bin/sh: tar: not found`),
 		ExpectedError: true,
 	}
-	builder := STI{
-		handler: fh,
-	}
+	builder := newFakeSTI(fh)
 	builder.Build(&api.Request{BaseImage: "testimage"})
 	// Verify layered build
 	if !fh.LayeredBuildCalled {
@@ -135,7 +182,7 @@ func TestLayeredBuild(t *testing.T) {
 }
 
 func TestBuildErrorExecute(t *testing.T) {
-	fh := &FakeBuildHandler{
+	fh := &FakeSTI{
 		BuildRequest: &api.Request{
 			BaseImage: "testimage",
 		},
@@ -143,9 +190,7 @@ func TestBuildErrorExecute(t *testing.T) {
 		ExecuteError:  errors.New("ExecuteError"),
 		ExpectedError: false,
 	}
-	builder := STI{
-		handler: fh,
-	}
+	builder := newFakeSTI(fh)
 	_, err := builder.Build(&api.Request{BaseImage: "testimage"})
 	if err == nil || err.Error() != "ExecuteError" {
 		t.Errorf("An error was expected, but got different %v", err)
@@ -178,31 +223,24 @@ func TestWasExpectedError(t *testing.T) {
 	}
 
 	for i, ti := range tests {
-		bh := &buildHandler{}
-		result := bh.wasExpectedError(ti.text)
+		result := wasExpectedError(ti.text)
 		if result != ti.expected {
 			t.Errorf("(%d) Unexpected result: %v. Expected: %v", i, result, ti.expected)
 		}
 	}
 }
 
-func testBuildHandler() *buildHandler {
-	requestHandler := &requestHandler{
-		docker:    &test.FakeDocker{},
-		installer: &test.FakeInstaller{},
-		git:       &test.FakeGit{},
-		fs:        &test.FakeFileSystem{},
-		tar:       &test.FakeTar{},
-
-		request: &api.Request{},
-		result:  &api.Result{},
-	}
-	buildHandler := &buildHandler{
-		requestHandler:  requestHandler,
+func testBuildHandler() *STI {
+	return &STI{
+		docker:          &test.FakeDocker{},
+		installer:       &test.FakeInstaller{},
+		git:             &test.FakeGit{},
+		fs:              &test.FakeFileSystem{},
+		tar:             &test.FakeTar{},
+		request:         &api.Request{},
+		result:          &api.Result{},
 		callbackInvoker: &test.FakeCallbackInvoker{},
 	}
-
-	return buildHandler
 }
 
 func TestPostExecute(t *testing.T) {
@@ -303,7 +341,7 @@ func TestDetermineIncremental(t *testing.T) {
 				"/working-dir/upload/scripts/save-artifacts": true,
 			}
 		}
-		bh.determineIncremental()
+		bh.Determine(bh.request)
 		if bh.request.Incremental != ti.expected {
 			t.Errorf("(%d) Unexpected incremental result: %v. Expected: %v",
 				i, bh.request.Incremental, ti.expected)
@@ -326,7 +364,7 @@ func TestSaveArtifacts(t *testing.T) {
 	fs := bh.fs.(*test.FakeFileSystem)
 	fd := bh.docker.(*test.FakeDocker)
 	th := bh.tar.(*test.FakeTar)
-	err := bh.saveArtifacts()
+	err := bh.Save(bh.request)
 	if err != nil {
 		t.Errorf("Unexpected error when saving artifacts: %v", err)
 	}
@@ -364,7 +402,7 @@ func TestSaveArtifactsRunError(t *testing.T) {
 			if te {
 				th.ExtractTarError = fmt.Errorf("tar error")
 			}
-			err := bh.saveArtifacts()
+			err := bh.Save(bh.request)
 			if !te && err != expected[i] {
 				t.Errorf("Unexpected error returned from saveArtifacts: %v", err)
 			} else if te && err != th.ExtractTarError {
@@ -380,7 +418,7 @@ func TestSaveArtifactsErrorBeforeStart(t *testing.T) {
 	expected := fmt.Errorf("run error")
 	fd.RunContainerError = expected
 	fd.RunContainerErrorBeforeStart = true
-	err := bh.saveArtifacts()
+	err := bh.Save(bh.request)
 	if err != expected {
 		t.Errorf("Unexpected error returned from saveArtifacts: %v", err)
 	}
@@ -391,7 +429,7 @@ func TestSaveArtifactsExtractError(t *testing.T) {
 	th := bh.tar.(*test.FakeTar)
 	expected := fmt.Errorf("extract error")
 	th.ExtractTarError = expected
-	err := bh.saveArtifacts()
+	err := bh.Save(bh.request)
 	if err != expected {
 		t.Errorf("Unexpected error returned from saveArtifacts: %v", err)
 	}
@@ -442,7 +480,7 @@ func TestFetchSource(t *testing.T) {
 		}
 		bh.request.Source = "a-repo-source"
 		expectedTargetDir := "/working-dir/upload/src"
-		bh.fetchSource()
+		bh.Download(bh.request)
 		if ft.cloneExpected {
 			if gh.CloneSource != "a-repo-source" {
 				t.Errorf("Clone was not called with the expected source.")
@@ -466,6 +504,267 @@ func TestFetchSource(t *testing.T) {
 			if fh.CopyDest != expectedTargetDir {
 				t.Errorf("Unexpected target director for copy operation.")
 			}
+		}
+	}
+}
+
+func TestPrepareOK(t *testing.T) {
+	rh := newFakeSTI(&FakeSTI{})
+	rh.SetScripts([]api.Script{api.Assemble, api.Run}, []api.Script{api.SaveArtifacts})
+	rh.fs.(*test.FakeFileSystem).WorkingDirResult = "/working-dir"
+	err := rh.Prepare(rh.request)
+	if err != nil {
+		t.Errorf("An error occurred setting up the request handler: %v", err)
+	}
+	if !rh.fs.(*test.FakeFileSystem).WorkingDirCalled {
+		t.Errorf("Working directory was not created.")
+	}
+	var expected []string
+	for _, dir := range workingDirs {
+		expected = append(expected, "/working-dir/"+dir)
+	}
+	mkdirs := rh.fs.(*test.FakeFileSystem).MkdirAllDir
+	if !reflect.DeepEqual(mkdirs, expected) {
+		t.Errorf("Unexpected set of MkdirAll calls: %#v", mkdirs)
+	}
+	requiredFlags := rh.installer.(*test.FakeInstaller).Required
+	if !reflect.DeepEqual(requiredFlags, []bool{true, false}) {
+		t.Errorf("Unexpected set of required flags: %#v", requiredFlags)
+	}
+	scripts := rh.installer.(*test.FakeInstaller).Scripts
+	if !reflect.DeepEqual(scripts[0], []api.Script{api.Assemble, api.Run}) {
+		t.Errorf("Unexpected set of required scripts: %#v", scripts[0])
+	}
+	if !reflect.DeepEqual(scripts[1], []api.Script{api.SaveArtifacts}) {
+		t.Errorf("Unexpected set of optional scripts: %#v", scripts[1])
+	}
+}
+
+func TestPrepareErrorCreatingWorkingDir(t *testing.T) {
+	rh := newFakeSTI(&FakeSTI{})
+	rh.fs.(*test.FakeFileSystem).WorkingDirError = errors.New("WorkingDirError")
+	err := rh.Prepare(rh.request)
+	if err == nil || err.Error() != "WorkingDirError" {
+		t.Errorf("An error was expected for WorkingDir, but got different: %v", err)
+	}
+}
+
+func TestPrepareErrorMkdirAll(t *testing.T) {
+	rh := newFakeSTI(&FakeSTI{})
+	rh.fs.(*test.FakeFileSystem).MkdirAllError = errors.New("MkdirAllError")
+	err := rh.Prepare(rh.request)
+	if err == nil || err.Error() != "MkdirAllError" {
+		t.Errorf("An error was expected for MkdirAll, but got different: %v", err)
+	}
+}
+
+func TestPrepareErrorRequiredDownloadAndInstall(t *testing.T) {
+	rh := newFakeSTI(&FakeSTI{})
+	rh.SetScripts([]api.Script{api.Assemble, api.Run}, []api.Script{api.SaveArtifacts})
+	rh.installer.(*test.FakeInstaller).ErrScript = api.Assemble
+	err := rh.Prepare(rh.request)
+	if err == nil || err.Error() != string(api.Assemble) {
+		t.Errorf("An error was expected for required DownloadAndInstall, but got different: %v", err)
+	}
+}
+
+func TestPrepareErrorOptionalDownloadAndInstall(t *testing.T) {
+	rh := newFakeSTI(&FakeSTI{})
+	rh.SetScripts([]api.Script{api.Assemble, api.Run}, []api.Script{api.SaveArtifacts})
+	rh.installer.(*test.FakeInstaller).ErrScript = api.SaveArtifacts
+	err := rh.Prepare(rh.request)
+	if err != nil {
+		t.Errorf("Unexpected error when downloading optional scripts: %v", err)
+	}
+}
+
+func equalArrayContents(a []string, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for _, e := range a {
+		found := false
+		for _, f := range b {
+			if f == e {
+				found = true
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+func TestGenerateConfigEnv(t *testing.T) {
+	rh := newFakeSTI(&FakeSTI{})
+	testEnv := map[string]string{
+		"Key1": "Value1",
+		"Key2": "Value2",
+		"Key3": "Value3",
+	}
+	rh.request.Environment = testEnv
+	result := rh.generateConfigEnv()
+	expected := []string{"Key1=Value1", "Key2=Value2", "Key3=Value3"}
+	if !equalArrayContents(result, expected) {
+		t.Errorf("Unexpected result. Expected: %#v. Actual: %#v",
+			expected, result)
+	}
+}
+
+func TestExecuteOK(t *testing.T) {
+	rh := newFakeBaseSTI()
+	pe := &FakeSTI{}
+	rh.postExecutor = pe
+	rh.request.WorkingDir = "/working-dir"
+	rh.request.BaseImage = "test/image"
+	rh.request.ForcePull = true
+	th := rh.tar.(*test.FakeTar)
+	th.CreateTarResult = "/working-dir/test.tar"
+	fd := rh.docker.(*test.FakeDocker)
+	fd.RunContainerContainerID = "1234"
+	fd.RunContainerCmd = []string{"one", "two"}
+
+	err := rh.Execute("test-command", rh.request)
+	if err != nil {
+		t.Errorf("Unexpected error returned: %v", err)
+	}
+	if th.CreateTarBase != "/working-dir" {
+		t.Errorf("Unexpected tar base directory: %s", th.CreateTarBase)
+	}
+	if th.CreateTarDir != "/working-dir/upload" {
+		t.Errorf("Unexpected tar directory: %s", th.CreateTarDir)
+	}
+	fh, ok := rh.fs.(*test.FakeFileSystem)
+	if !ok {
+		t.Fatalf("Unable to convert %v to FakeFilesystem", rh.fs)
+	}
+	if fh.OpenFile != "/working-dir/test.tar" {
+		t.Errorf("Unexpected file opened: %s", fh.OpenFile)
+	}
+	if !fh.OpenFileResult.CloseCalled {
+		t.Errorf("Tar file was not closed.")
+	}
+	ro := fd.RunContainerOpts
+
+	if ro.Image != rh.request.BaseImage {
+		t.Errorf("Unexpected Image passed to RunContainer")
+	}
+	if ro.Stdin != fh.OpenFileResult {
+		t.Errorf("Unexpected input stream: %#v", fd.RunContainerOpts.Stdin)
+	}
+	if !ro.PullImage {
+		t.Errorf("PullImage is not true for RunContainer")
+	}
+	if ro.Command != "test-command" {
+		t.Errorf("Unexpected command passed to RunContainer: %s",
+			fd.RunContainerOpts.Command)
+	}
+	if pe.PostExecuteContainerID != "1234" {
+		t.Errorf("PostExecutor not called with expected ID: %s",
+			pe.PostExecuteContainerID)
+	}
+	if !reflect.DeepEqual(pe.PostExecuteLocation, "test-command") {
+		t.Errorf("PostExecutor not called with expected command: %s", pe.PostExecuteLocation)
+	}
+}
+
+func TestExecuteErrorCreateTarFile(t *testing.T) {
+	rh := newFakeSTI(&FakeSTI{})
+	rh.tar.(*test.FakeTar).CreateTarError = errors.New("CreateTarError")
+	err := rh.Execute("test-command", rh.request)
+	if err == nil || err.Error() != "CreateTarError" {
+		t.Errorf("An error was expected for CreateTarFile, but got different: %v", err)
+	}
+}
+
+func TestExecuteErrorOpenTarFile(t *testing.T) {
+	rh := newFakeSTI(&FakeSTI{})
+	rh.fs.(*test.FakeFileSystem).OpenError = errors.New("OpenTarError")
+	err := rh.Execute("test-command", rh.request)
+	if err == nil || err.Error() != "OpenTarError" {
+		t.Errorf("An error was expected for OpenTarFile, but got different: %v", err)
+	}
+}
+
+func TestBuildOK(t *testing.T) {
+	rh := newFakeBaseSTI()
+	rh.builder = &DockerBuild{rh}
+	rh.request.BaseImage = "test/image"
+	_, err := rh.builder.Build(rh.request)
+	if err != nil {
+		t.Errorf("Unexpected error returned: %v", err)
+	}
+	if !rh.request.LayeredBuild {
+		t.Errorf("Expected LayeredBuild to be true!")
+	}
+	if m, _ := regexp.MatchString(`test/image-\d+`, rh.request.BaseImage); !m {
+		t.Errorf("Expected BaseImage test/image-withnumbers, but got %s", rh.request.BaseImage)
+	}
+	if rh.request.ExternalRequiredScripts {
+		t.Errorf("Expected ExternalRequiredScripts to be false!")
+	}
+	if rh.request.ScriptsURL != "image:///tmp/scripts" {
+		t.Error("Expected ScriptsURL image:///tmp/scripts, but got %s", rh.request.ScriptsURL)
+	}
+	if rh.request.Location != "/tmp/src" {
+		t.Errorf("Expected Location /tmp/src, but got %s", rh.request.Location)
+	}
+}
+
+func TestBuildErrorWriteDockerfile(t *testing.T) {
+	rh := newFakeBaseSTI()
+	rh.builder = &DockerBuild{rh}
+	rh.fs.(*test.FakeFileSystem).WriteFileError = errors.New("WriteDockerfileError")
+	_, err := rh.builder.Build(rh.request)
+	if err == nil || err.Error() != "WriteDockerfileError" {
+		t.Errorf("An error was expected for WriteDockerfile, but got different: %v", err)
+	}
+}
+
+func TestBuildErrorCreateTarFile(t *testing.T) {
+	rh := newFakeBaseSTI()
+	rh.builder = &DockerBuild{rh}
+	rh.tar.(*test.FakeTar).CreateTarError = errors.New("CreateTarError")
+	_, err := rh.builder.Build(rh.request)
+	if err == nil || err.Error() != "CreateTarError" {
+		t.Error("An error was expected for CreateTar, but got different: %v", err)
+	}
+}
+
+func TestBuildErrorOpenTarFile(t *testing.T) {
+	rh := newFakeBaseSTI()
+	rh.builder = &DockerBuild{rh}
+	rh.fs.(*test.FakeFileSystem).OpenError = errors.New("OpenTarError")
+	_, err := rh.builder.Build(rh.request)
+	if err == nil || err.Error() != "OpenTarError" {
+		t.Errorf("An error was expected for OpenTarFile, but got different: %v", err)
+	}
+}
+
+func TestBuildErrorBuildImage(t *testing.T) {
+	rh := newFakeBaseSTI()
+	rh.builder = &DockerBuild{rh}
+	rh.docker.(*test.FakeDocker).BuildImageError = errors.New("BuildImageError")
+	_, err := rh.builder.Build(rh.request)
+	if err == nil || err.Error() != "BuildImageError" {
+		t.Errorf("An error was expected for BuildImage, but got different: %v", err)
+	}
+}
+
+func TestCleanup(t *testing.T) {
+	rh := newFakeSTI(&FakeSTI{})
+	rh.request.WorkingDir = "/working-dir"
+	preserve := []bool{false, true}
+	for _, p := range preserve {
+		rh.request.PreserveWorkingDir = p
+		rh.fs = &test.FakeFileSystem{}
+		rh.Cleanup(rh.request)
+		removedDir := rh.fs.(*test.FakeFileSystem).RemoveDirName
+		if p && removedDir != "" {
+			t.Errorf("Expected working directory to be preserved, but it was removed.")
+		} else if !p && removedDir == "" {
+			t.Errorf("Expected working directory to be removed, but it was preserved.")
 		}
 	}
 }

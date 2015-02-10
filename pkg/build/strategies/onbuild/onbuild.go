@@ -97,7 +97,7 @@ func (b *OnBuild) CreateDockerfile(request *api.Request) error {
 	if err != nil {
 		return err
 	}
-	buffer.WriteString(fmt.Sprintf(`CMD ["%s"]`+"\n", entrypoint))
+	buffer.WriteString(fmt.Sprintf(`CMD ["./%s"]`+"\n", entrypoint))
 	return b.fs.WriteFile(filepath.Join(uploadDir, "Dockerfile"), buffer.Bytes())
 }
 

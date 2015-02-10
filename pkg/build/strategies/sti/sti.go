@@ -1,9 +1,23 @@
 package sti
 
 import (
+	"bufio"
+	"bytes"
+	"fmt"
+	"io"
+	"path/filepath"
+	"regexp"
+	"time"
+
 	"github.com/golang/glog"
 	"github.com/openshift/source-to-image/pkg/api"
+	"github.com/openshift/source-to-image/pkg/build"
+	"github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/errors"
+	"github.com/openshift/source-to-image/pkg/git"
+	"github.com/openshift/source-to-image/pkg/script"
+	"github.com/openshift/source-to-image/pkg/tar"
+	"github.com/openshift/source-to-image/pkg/util"
 )
 
 const (
@@ -24,18 +38,57 @@ var (
 )
 
 type STI struct {
-	handler buildHandlerInterface
+	request         *api.Request
+	result          *api.Result
+	postExecutor    postExecutor
+	installer       script.Installer
+	git             git.Git
+	fs              util.FileSystem
+	docker          docker.Docker
+	tar             tar.Tar
+	callbackInvoker util.CallbackInvoker
+	requiredScripts []api.Script
+	optionalScripts []api.Script
+
+	// Interfaces
+	builder     build.DockerBuilder
+	preparer    build.Preparer
+	incremental build.IncrementalBuilder
+	scripts     build.ScriptsHandler
+	cleaner     build.Cleaner
+}
+
+type postExecutor interface {
+	PostExecute(containerID string, location string) error
 }
 
 // NewSTI returns a new STI builder
 func NewSTI(req *api.Request) (*STI, error) {
-	handler, err := NewBuildHandler(req)
+	docker, err := docker.NewDocker(req.DockerSocket)
 	if err != nil {
 		return nil, err
 	}
-	return &STI{
-		handler: handler,
-	}, nil
+
+	b := STI{
+		request:         req,
+		docker:          docker,
+		installer:       script.NewInstaller(req.BaseImage, req.ScriptsURL, docker),
+		git:             git.NewGit(),
+		fs:              util.NewFileSystem(),
+		tar:             tar.NewTar(),
+		callbackInvoker: util.NewCallbackInvoker(),
+		requiredScripts: []api.Script{api.Assemble, api.Run},
+		optionalScripts: []api.Script{api.SaveArtifacts},
+	}
+
+	// Set interfaces
+	b.preparer = &b
+	b.incremental = &b
+	b.scripts = &b
+	b.postExecutor = &b
+	b.cleaner = &b
+	b.builder = &DockerBuild{&b}
+	return &b, nil
 }
 
 // Build processes a Request and returns a *api.Result and an error.
@@ -43,35 +96,33 @@ func NewSTI(req *api.Request) (*STI, error) {
 // of the build itself.  Callers should check the Success field of the result
 // to determine whether a build succeeded or not.
 func (b *STI) Build(request *api.Request) (*api.Result, error) {
-	bh := b.handler
-	defer bh.cleanup()
+	defer b.cleaner.Cleanup(request)
 
-	glog.Infof("Building %s", bh.Request().Tag)
-	err := bh.setup([]api.Script{api.Assemble, api.Run}, []api.Script{api.SaveArtifacts})
-	if err != nil {
+	glog.Infof("Building %s", request.Tag)
+	if err := b.preparer.Prepare(request); err != nil {
 		return nil, err
 	}
 
-	err = bh.determineIncremental()
-	if err != nil {
+	if err := b.incremental.Determine(request); err != nil {
 		return nil, err
 	}
-	if bh.Request().Incremental {
-		glog.V(1).Infof("Existing image for tag %s detected for incremental build.", bh.Request().Tag)
+
+	if request.Incremental {
+		glog.V(1).Infof("Existing image for tag %s detected for incremental build.", request.Tag)
 	} else {
 		glog.V(1).Infof("Clean build will be performed")
 	}
 
-	glog.V(2).Infof("Performing source build from %s", bh.Request().Source)
-	if bh.Request().Incremental {
-		if err = bh.saveArtifacts(); err != nil {
+	glog.V(2).Infof("Performing source build from %s", request.Source)
+	if request.Incremental {
+		if err := b.incremental.Save(request); err != nil {
 			glog.Warningf("Error saving previous build artifacts: %v", err)
 			glog.Warning("Clean build will be performed!")
 		}
 	}
 
-	glog.V(1).Infof("Building %s", bh.Request().Tag)
-	if err := bh.execute(api.Assemble); err != nil {
+	glog.V(1).Infof("Building %s", request.Tag)
+	if err := b.scripts.Execute(api.Assemble, request); err != nil {
 		switch e := err.(type) {
 		case errors.ContainerError:
 			return b.handleContainerError(e)
@@ -80,32 +131,379 @@ func (b *STI) Build(request *api.Request) (*api.Result, error) {
 		}
 	}
 
-	return bh.Result(), nil
+	return b.result, nil
+}
+
+// Prepare prepares the source code and tar for build
+func (b *STI) Prepare(request *api.Request) error {
+	var err error
+	if request.WorkingDir, err = b.fs.CreateWorkingDirectory(); err != nil {
+		return err
+	}
+
+	b.result = &api.Result{
+		Success:    false,
+		WorkingDir: request.WorkingDir,
+	}
+
+	// immediately pull the image if forcepull is true, that way later code that
+	// references the image will have it pre-pulled and can just inspect the image.
+	if request.ForcePull {
+		err = b.docker.PullImage(request.BaseImage)
+	} else {
+		_, err = b.docker.CheckAndPull(request.BaseImage)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	// Setup working directories
+	for _, v := range workingDirs {
+		if err := b.fs.MkdirAll(filepath.Join(request.WorkingDir, v)); err != nil {
+			return err
+		}
+	}
+
+	// fetch sources, for theirs .sti/bin might contain sti scripts
+	if len(request.Source) > 0 {
+		if err = b.scripts.Download(request); err != nil {
+			return err
+		}
+	}
+
+	// get the scripts
+	if request.ExternalRequiredScripts, err = b.installer.DownloadAndInstall(
+		b.requiredScripts, request.WorkingDir, true); err != nil {
+		return err
+	}
+
+	if request.ExternalOptionalScripts, err = b.installer.DownloadAndInstall(
+		b.optionalScripts, request.WorkingDir, false); err != nil {
+		glog.Warningf("Failed downloading optional scripts: %v", err)
+	}
+
+	return nil
+}
+
+func (b *STI) Cleanup(request *api.Request) {
+	if request.PreserveWorkingDir {
+		glog.Infof("Temporary directory '%s' will be saved, not deleted", request.WorkingDir)
+	} else {
+		glog.V(2).Infof("Removing temporary directory %s", request.WorkingDir)
+		b.fs.RemoveDirectory(request.WorkingDir)
+	}
+	if request.LayeredBuild {
+		glog.V(2).Infof("Removing temporary image %s", request.BaseImage)
+		b.docker.RemoveImage(request.BaseImage)
+	}
+}
+
+// SetScripts allows to overide default required and optional scripts
+func (b *STI) SetScripts(required, optional []api.Script) {
+	b.requiredScripts = required
+	b.optionalScripts = optional
+}
+
+func (b *STI) PostExecute(containerID string, location string) error {
+	var (
+		err             error
+		previousImageID string
+	)
+	if b.request.Incremental && b.request.RemovePreviousImage {
+		if previousImageID, err = b.docker.GetImageID(b.request.Tag); err != nil {
+			glog.Errorf("Error retrieving previous image's metadata: %v", err)
+		}
+	}
+
+	cmd := []string{}
+	opts := docker.CommitContainerOptions{
+		Command:     append(cmd, filepath.Join(location, string(api.Run))),
+		Env:         b.generateConfigEnv(),
+		ContainerID: containerID,
+		Repository:  b.request.Tag,
+	}
+	imageID, err := b.docker.CommitContainer(opts)
+	if err != nil {
+		return errors.NewBuildError(b.request.Tag, err)
+	}
+
+	b.result.ImageID = imageID
+	glog.V(1).Infof("Tagged %s as %s", imageID, b.request.Tag)
+
+	if b.request.Incremental && b.request.RemovePreviousImage && previousImageID != "" {
+		glog.V(1).Infof("Removing previously-tagged image %s", previousImageID)
+		if err = b.docker.RemoveImage(previousImageID); err != nil {
+			glog.Errorf("Unable to remove previous image: %v", err)
+		}
+	}
+
+	if b.request.CallbackURL != "" {
+		b.result.Messages = b.callbackInvoker.ExecuteCallback(b.request.CallbackURL,
+			b.result.Success, b.result.Messages)
+	}
+
+	glog.Infof("Successfully built %s", b.request.Tag)
+	b.result.Success = true
+	return nil
+}
+
+func (b *STI) Download(request *api.Request) error {
+	targetSourceDir := filepath.Join(request.WorkingDir, "upload", "src")
+	glog.V(1).Infof("Downloading %s to directory %s", request.Source, targetSourceDir)
+	if b.git.ValidCloneSpec(request.Source) {
+		if err := b.git.Clone(request.Source, targetSourceDir); err != nil {
+			glog.Errorf("Git clone failed: %+v", err)
+			return err
+		}
+
+		if request.Ref != "" {
+			glog.V(1).Infof("Checking out ref %s", request.Ref)
+
+			if err := b.git.Checkout(targetSourceDir, request.Ref); err != nil {
+				return err
+			}
+		}
+	} else if err := b.fs.Copy(request.Source, targetSourceDir); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (b *STI) Determine(request *api.Request) (err error) {
+	request.Incremental = false
+
+	if request.Clean {
+		return
+	}
+
+	// can only do incremental build if runtime image exists
+	previousImageExists, err := b.docker.IsImageInLocalRegistry(request.Tag)
+	if err != nil {
+		return
+	}
+
+	// we're assuming save-artifacts to exists for embedded scripts (if not we'll
+	// warn a user upon container failure and proceed with clean build)
+	// for external save-artifacts - check its existence
+	saveArtifactsExists := !request.ExternalOptionalScripts ||
+		b.fs.Exists(filepath.Join(request.WorkingDir, "upload", "scripts", string(api.SaveArtifacts)))
+	request.Incremental = previousImageExists && saveArtifactsExists
+	return nil
+}
+
+func (b *STI) Save(request *api.Request) (err error) {
+	artifactTmpDir := filepath.Join(request.WorkingDir, "upload", "artifacts")
+	if err = b.fs.Mkdir(artifactTmpDir); err != nil {
+		return err
+	}
+
+	image := request.Tag
+	reader, writer := io.Pipe()
+	glog.V(1).Infof("Saving build artifacts from image %s to path %s", image, artifactTmpDir)
+	extractFunc := func() error {
+		defer reader.Close()
+		return b.tar.ExtractTarStream(artifactTmpDir, reader)
+	}
+
+	opts := docker.RunContainerOptions{
+		Image:           image,
+		ExternalScripts: request.ExternalRequiredScripts,
+		ScriptsURL:      request.ScriptsURL,
+		Location:        request.Location,
+		Command:         api.SaveArtifacts,
+		Stdout:          writer,
+		OnStart:         extractFunc,
+	}
+	err = b.docker.RunContainer(opts)
+	writer.Close()
+
+	if e, ok := err.(errors.ContainerError); ok {
+		return errors.NewSaveArtifactsError(image, e.Output, err)
+	}
+	return err
+}
+
+func (b *STI) Execute(command api.Script, request *api.Request) error {
+	glog.V(2).Infof("Using image name %s", request.BaseImage)
+
+	uploadDir := filepath.Join(request.WorkingDir, "upload")
+	tarFileName, err := b.tar.CreateTarFile(request.WorkingDir, uploadDir)
+	if err != nil {
+		return err
+	}
+
+	tarFile, err := b.fs.Open(tarFileName)
+	if err != nil {
+		return err
+	}
+	defer tarFile.Close()
+
+	errOutput := ""
+	outReader, outWriter := io.Pipe()
+	errReader, errWriter := io.Pipe()
+	defer outReader.Close()
+	defer outWriter.Close()
+	defer errReader.Close()
+	defer errWriter.Close()
+	opts := docker.RunContainerOptions{
+		Image:           b.request.BaseImage,
+		Stdout:          outWriter,
+		Stderr:          errWriter,
+		PullImage:       request.ForcePull,
+		ExternalScripts: request.ExternalRequiredScripts,
+		ScriptsURL:      request.ScriptsURL,
+		Location:        request.Location,
+		Command:         command,
+		Env:             b.generateConfigEnv(),
+		PostExec:        b.postExecutor,
+	}
+	if !request.LayeredBuild {
+		opts.Stdin = tarFile
+	}
+	// goroutine to stream container's output
+	go func(reader io.Reader) {
+		scanner := bufio.NewScanner(reader)
+		for scanner.Scan() {
+			if glog.V(2) || command == api.Usage {
+				glog.Info(scanner.Text())
+			}
+		}
+	}(outReader)
+	// goroutine to stream container's error
+	go func(reader io.Reader) {
+		scanner := bufio.NewScanner(reader)
+		for scanner.Scan() {
+			text := scanner.Text()
+			if glog.V(1) {
+				glog.Errorf(text)
+			}
+			if len(errOutput) < maxErrorOutput {
+				errOutput += text + "\n"
+			}
+		}
+	}(errReader)
+
+	err = b.docker.RunContainer(opts)
+	if e, ok := err.(errors.ContainerError); ok {
+		return errors.NewContainerError(request.BaseImage, e.ErrorCode, errOutput)
+	}
+	return err
+}
+
+func (b *STI) generateConfigEnv() (configEnv []string) {
+	if len(b.request.Environment) > 0 {
+		for key, val := range b.request.Environment {
+			configEnv = append(configEnv, key+"="+val)
+		}
+	}
+	return
 }
 
 // handleContainerError is responsible for checking container output to see if
 // the error is one of the expected that should trigger layered build
 func (b *STI) handleContainerError(cerr errors.ContainerError) (*api.Result, error) {
-	bh := b.handler
-	if bh.wasExpectedError(cerr.Output) {
+	if wasExpectedError(cerr.Output) {
 		glog.Warningf("Image %s does not have tar! Performing additional build to add the scripts and sources.",
-			bh.Request().BaseImage)
-		if err := bh.build(); err != nil {
+			b.request.BaseImage)
+		if _, err := b.builder.Build(b.request); err != nil {
 			return nil, err
 		}
-		glog.V(2).Infof("Building %s using sti-enabled image", bh.Request().Tag)
-		if err := bh.execute(api.Assemble); err != nil {
+		glog.V(2).Infof("Building %s using sti-enabled image", b.request.Tag)
+		if err := b.scripts.Execute(api.Assemble, b.request); err != nil {
 			glog.V(2).Infof("FOOOO\n")
 			switch e := err.(type) {
 			case errors.ContainerError:
-				return nil, errors.NewAssembleError(bh.Request().Tag, e.Output, e)
+				return nil, errors.NewAssembleError(b.request.Tag, e.Output, e)
 			default:
 				return nil, err
 			}
 		}
 	} else {
-		return nil, errors.NewAssembleError(bh.Request().Tag, cerr.Output, cerr)
+		return nil, errors.NewAssembleError(b.request.Tag, cerr.Output, cerr)
 	}
 
-	return bh.Result(), nil
+	return b.result, nil
+}
+
+type DockerBuild struct {
+	*STI
+}
+
+func (b *DockerBuild) Build(request *api.Request) (*api.Result, error) {
+	user, err := b.docker.GetImageUser(b.request.BaseImage)
+	if err != nil {
+		return nil, err
+	}
+	// create Dockerfile
+	buffer := bytes.Buffer{}
+	location := b.request.Location
+	if len(location) == 0 {
+		location = defaultLocation
+	}
+	buffer.WriteString(fmt.Sprintf("FROM %s\n", b.request.BaseImage))
+	buffer.WriteString(fmt.Sprintf("COPY scripts %s\n", filepath.Join(location, "scripts")))
+	buffer.WriteString(fmt.Sprintf("COPY src %s\n", filepath.Join(location, "src")))
+	//TODO: We need to account for images that may not have chown. There is a proposal
+	//      to specify the owner for COPY here: https://github.com/docker/docker/pull/9934
+	if len(user) > 0 {
+		buffer.WriteString("USER root\n")
+		buffer.WriteString(fmt.Sprintf("RUN chown -R %s %s %s\n", user, filepath.Join(location, "scripts"), filepath.Join(location, "src")))
+		buffer.WriteString(fmt.Sprintf("USER %s\n", user))
+	}
+	uploadDir := filepath.Join(b.request.WorkingDir, "upload")
+	if err := b.fs.WriteFile(filepath.Join(uploadDir, "Dockerfile"), buffer.Bytes()); err != nil {
+		return nil, err
+	}
+	glog.V(2).Infof("Writing custom Dockerfile to %s", uploadDir)
+
+	tarFileName, err := b.tar.CreateTarFile(b.request.WorkingDir, uploadDir)
+	if err != nil {
+		return nil, err
+	}
+	tarFile, err := b.fs.Open(tarFileName)
+	if err != nil {
+		return nil, err
+	}
+	defer tarFile.Close()
+
+	newBaseImage := fmt.Sprintf("%s-%d", b.request.BaseImage, time.Now().UnixNano())
+	outReader, outWriter := io.Pipe()
+	defer outReader.Close()
+	defer outWriter.Close()
+	opts := docker.BuildImageOptions{
+		Name:   newBaseImage,
+		Stdin:  tarFile,
+		Stdout: outWriter,
+	}
+	// goroutine to stream container's output
+	go func(reader io.Reader) {
+		scanner := bufio.NewScanner(reader)
+		for scanner.Scan() {
+			glog.V(2).Info(scanner.Text())
+		}
+	}(outReader)
+	glog.V(2).Infof("Building new image %s with scripts and sources already inside", newBaseImage)
+	if err = b.docker.BuildImage(opts); err != nil {
+		return nil, err
+	}
+
+	// upon successful build we need to modify current request
+	b.request.LayeredBuild = true
+	// new image name
+	b.request.BaseImage = newBaseImage
+	// the scripts are inside the image
+	b.request.ExternalRequiredScripts = false
+	b.request.ScriptsURL = "image://" + filepath.Join(location, "scripts")
+	// the source is also inside the image
+	b.request.Location = filepath.Join(location, "src")
+
+	return nil, nil
+}
+
+func wasExpectedError(text string) bool {
+	tar, _ := regexp.MatchString(`.*tar.*not found`, text)
+	sh, _ := regexp.MatchString(`.*/bin/sh.*no such file or directory`, text)
+	return tar || sh
 }
