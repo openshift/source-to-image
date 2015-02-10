@@ -50,16 +50,17 @@ func (b *OnBuild) SourceTar(request *api.Request) (io.ReadCloser, error) {
 
 // Build executes the ONBUILD kind of build
 func (b *OnBuild) Build(request *api.Request) (*api.Result, error) {
-	glog.V(2).Info("Preparing source code")
+	glog.V(2).Info("Preparing the source code for build")
 	if err := b.Prepare(request); err != nil {
 		return nil, err
 	}
 
-	glog.V(2).Info("Creating Dockerfile")
+	glog.V(2).Info("Creating application Dockerfile")
 	if err := b.CreateDockerfile(request); err != nil {
 		return nil, err
 	}
 
+	glog.V(2).Info("Creating application source code image")
 	tarStream, err := b.SourceTar(request)
 	if err != nil {
 		return nil, err
@@ -72,12 +73,12 @@ func (b *OnBuild) Build(request *api.Request) (*api.Result, error) {
 		Stdout: os.Stdout,
 	}
 
-	glog.V(2).Info("Building Docker image")
+	glog.V(2).Info("Building the application source")
 	if err := b.docker.BuildImage(opts); err != nil {
 		return nil, err
 	}
 
-	glog.V(2).Info("Cleaning up")
+	glog.V(2).Info("Cleaning up temporary containers")
 	b.Cleanup(request)
 
 	return &api.Result{
@@ -90,13 +91,13 @@ func (b *OnBuild) Build(request *api.Request) (*api.Result, error) {
 // CreateDockerfile creates the ONBUILD Dockerfile
 func (b *OnBuild) CreateDockerfile(request *api.Request) error {
 	buffer := bytes.Buffer{}
-
-	buffer.WriteString(fmt.Sprintf("FROM %s\n", request.BaseImage))
-	buffer.WriteString(fmt.Sprintf("USER nobody\n"))
-	// FIXME:
-	buffer.WriteString(fmt.Sprintf("CMD rackup\n"))
-
 	uploadDir := filepath.Join(request.WorkingDir, "upload", "src")
+	buffer.WriteString(fmt.Sprintf("FROM %s\n", request.BaseImage))
+	entrypoint, err := GuessEntrypoint(uploadDir)
+	if err != nil {
+		return err
+	}
+	buffer.WriteString(fmt.Sprintf(`CMD ["%s"]`+"\n", entrypoint))
 	return b.fs.WriteFile(filepath.Join(uploadDir, "Dockerfile"), buffer.Bytes())
 }
 

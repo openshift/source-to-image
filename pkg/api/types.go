@@ -3,9 +3,6 @@ package api
 // Request contains essential fields for any request.
 type Request struct {
 
-	// Define whether the build should be simple ONBUILD or STI build
-	OnBuild bool
-
 	// BaseImage describes which image is used for building the result images.
 	BaseImage string
 

@@ -16,7 +16,8 @@ func GetBuilder(request *api.Request) (build.Builder, error) {
 	// we do OnBuild build.
 	if strings.Contains(request.BaseImage, "-onbuild") {
 		return onbuild.NewOnBuild(request)
-	} else {
-		return sti.NewSTI(request)
 	}
+
+	// The default builder is STI builder
+	return sti.NewSTI(request)
 }
