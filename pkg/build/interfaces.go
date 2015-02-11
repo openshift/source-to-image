@@ -6,7 +6,6 @@ import "github.com/openshift/source-to-image/pkg/api"
 // should have.
 // Build method executes the build based on Request and returns the Result.
 type Builder interface {
-	Preparer
 	Build(*api.Request) (*api.Result, error)
 }
 

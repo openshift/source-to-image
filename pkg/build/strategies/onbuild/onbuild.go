@@ -48,7 +48,7 @@ func New(request *api.Request) (*OnBuild, error) {
 	// Use STI Prepare() and download the 'run' script optionally.
 	request.InstallDestination = "upload/src"
 	s, err := sti.New(request)
-	s.SetScripts([]api.Script{}, []api.Script{api.Run})
+	s.SetScripts([]api.Script{}, []api.Script{api.Assemble, api.Run})
 
 	b.source = SourceHandler{&git.Clone{b.git, b.fs}, s}
 	b.garbage = &build.DefaultCleaner{b.fs, b.docker}
@@ -116,26 +116,20 @@ func (b *OnBuild) CreateDockerfile(request *api.Request) error {
 	if err != nil {
 		return err
 	}
+	// If there is an assemble script present, run it as part of the build process
+	// as the last thing.
+	if b.hasAssembleScript(request) {
+		buffer.WriteString(fmt.Sprintf("RUN sh assemble\n"))
+	}
 	// FIXME: This assumes that the WORKDIR is set to the application source root
 	//        directory.
 	buffer.WriteString(fmt.Sprintf(`CMD ["./%s"]`+"\n", entrypoint))
 	return b.fs.WriteFile(filepath.Join(uploadDir, "Dockerfile"), buffer.Bytes())
 }
 
-// Prepare prepares the source code and the Docker image image for the build
-func (b *OnBuild) Prepare(request *api.Request) error {
-	// Pull the Docker image if it does not exists in local Docker
-	if request.ForcePull {
-		b.docker.PullImage(request.BaseImage)
-	} else {
-		b.docker.CheckAndPull(request.BaseImage)
-	}
-
-	tempDir, err := b.fs.CreateWorkingDirectory()
-	if err != nil {
-		return err
-	}
-	request.WorkingDir = tempDir
-
-	return b.source.Download(request)
+// hasAssembleScript checks if the the assemble script is available
+func (b *OnBuild) hasAssembleScript(request *api.Request) bool {
+	assemblePath := filepath.Join(request.WorkingDir, "upload", "src", "assemble")
+	_, err := os.Stat(assemblePath)
+	return err == nil
 }

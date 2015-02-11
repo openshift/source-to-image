@@ -58,6 +58,9 @@ type Request struct {
 	// LayeredBuild describes if this is build which layered scripts and sources on top of BaseImage.
 	LayeredBuild bool
 
+	// InstallDestination allows to override the default destination of the STI
+	// scripts. It allows to place the scripts into application root directory
+	// (see ONBUILD strategy). The default value is "upload/scripts".
 	InstallDestination string
 }
 

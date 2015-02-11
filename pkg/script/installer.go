@@ -47,7 +47,7 @@ type handler struct {
 }
 
 type scriptHandler interface {
-	download(scripts []api.Script, workingDir string) (bool, error)
+	download(scripts []api.Script, workingDir string, required bool) (bool, error)
 	getPath(script api.Script, workingDir string) string
 	install(scriptPath string, workingDir string) error
 }
@@ -62,7 +62,7 @@ type scriptInfo struct {
 // cannot be found, an error is returned, additionally the method returns information
 // whether the download actually happened.
 func (i *installer) DownloadAndInstall(scripts []api.Script, workingDir string, required bool) (bool, error) {
-	download, err := i.handler.download(scripts, workingDir)
+	download, err := i.handler.download(scripts, workingDir, required)
 	if err != nil {
 		return false, err
 	}
@@ -73,7 +73,8 @@ func (i *installer) DownloadAndInstall(scripts []api.Script, workingDir string, 
 		scriptPath := i.handler.getPath(script, workingDir)
 		if required && scriptPath == "" {
 			return false, errors.NewScriptDownloadError(script, nil)
-		} else if scriptPath == "" {
+		}
+		if scriptPath == "" {
 			continue
 		}
 		if err := i.handler.install(scriptPath, workingDir); err != nil {
@@ -83,7 +84,7 @@ func (i *installer) DownloadAndInstall(scripts []api.Script, workingDir string, 
 	return true, nil
 }
 
-func (s *handler) download(scripts []api.Script, workingDir string) (bool, error) {
+func (s *handler) download(scripts []api.Script, workingDir string, required bool) (bool, error) {
 	if len(scripts) == 0 {
 		return false, nil
 	}
@@ -148,6 +149,11 @@ func (s *handler) download(scripts []api.Script, workingDir string) (bool, error
 
 	// Wait for the script downloads to finish
 	wg.Wait()
+
+	// If the script is not required, ignore errors
+	if !required {
+		return true, nil
+	}
 	for s, d := range downloads {
 		if len(d) == 0 {
 			return false, errors.NewScriptDownloadError(s, nil)

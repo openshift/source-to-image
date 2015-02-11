@@ -22,7 +22,7 @@ type FakeScriptHandler struct {
 	InstallError        error
 }
 
-func (f *FakeScriptHandler) download(scripts []api.Script, workingDir string) (bool, error) {
+func (f *FakeScriptHandler) download(scripts []api.Script, workingDir string, required bool) (bool, error) {
 	f.DownloadScripts = scripts
 	f.DownloadWorkingDir = workingDir
 	return f.DownloadResult, f.DownloadError
@@ -169,7 +169,7 @@ func TestDownload(t *testing.T) {
 	sh := getScriptHandler()
 	dl := sh.downloader.(*test.FakeDownloader)
 	sh.docker.(*test.FakeDocker).DefaultURLResult = "http://image.url/scripts"
-	_, err := sh.download([]api.Script{api.Assemble, api.Run, api.SaveArtifacts}, "/working-dir")
+	_, err := sh.download([]api.Script{api.Assemble, api.Run, api.SaveArtifacts}, "/working-dir", true)
 	if err != nil {
 		t.Errorf("Got unexpected error: %v", err)
 	}
@@ -220,7 +220,7 @@ func TestDownloadErrors1(t *testing.T) {
 		"http://image.url/scripts/two":         dlErr,
 		"http://image.url/scripts/three":       nil,
 	}
-	_, err := sh.download([]api.Script{api.Assemble, api.Run, api.SaveArtifacts}, "/working-dir")
+	_, err := sh.download([]api.Script{api.Assemble, api.Run, api.SaveArtifacts}, "/working-dir", true)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -239,7 +239,7 @@ func TestDownloadErrors2(t *testing.T) {
 		fmt.Sprintf("http://image.url/scripts/%s", api.Run):                 dlErr,
 		fmt.Sprintf("http://image.url/scripts/%s", api.SaveArtifacts):       nil,
 	}
-	_, err := sh.download([]api.Script{api.Assemble, api.Run, api.SaveArtifacts}, "/working-dir")
+	_, err := sh.download([]api.Script{api.Assemble, api.Run, api.SaveArtifacts}, "/working-dir", true)
 	if err == nil {
 		t.Errorf("Expected an error because script could not be downloaded")
 	}
@@ -257,7 +257,7 @@ func TestDownloadChmodError(t *testing.T) {
 		fmt.Sprintf("/working-dir/downloads/defaultScripts/%s", api.Run):           nil,
 		fmt.Sprintf("/working-dir/downloads/defaultScripts/%s", api.SaveArtifacts): nil,
 	}
-	_, err := sh.download([]api.Script{api.Assemble, api.Run, api.SaveArtifacts}, "/working-dir")
+	_, err := sh.download([]api.Script{api.Assemble, api.Run, api.SaveArtifacts}, "/working-dir", true)
 	if err == nil {
 		t.Errorf("Expected an error because chmod returned an error.")
 	}
