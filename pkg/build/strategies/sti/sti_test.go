@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/api"
+	"github.com/openshift/source-to-image/pkg/build"
 	stierr "github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/git"
 	"github.com/openshift/source-to-image/pkg/test"
@@ -58,10 +59,10 @@ func newFakeSTI(f *FakeSTI) *STI {
 		git:         &test.FakeGit{},
 		fs:          &test.FakeFileSystem{},
 		tar:         &test.FakeTar{},
-		cleaner:     f,
 		preparer:    f,
 		incremental: f,
 		scripts:     f,
+		garbage:     f,
 		builder:     &FakeDockerBuild{f},
 	}
 	s.source = &git.Clone{s.git, s.fs}
@@ -758,13 +759,15 @@ func TestBuildErrorBuildImage(t *testing.T) {
 }
 
 func TestCleanup(t *testing.T) {
-	rh := newFakeSTI(&FakeSTI{})
+	rh := newFakeBaseSTI()
+
 	rh.request.WorkingDir = "/working-dir"
 	preserve := []bool{false, true}
 	for _, p := range preserve {
 		rh.request.PreserveWorkingDir = p
 		rh.fs = &test.FakeFileSystem{}
-		rh.Cleanup(rh.request)
+		rh.garbage = &build.DefaultCleaner{rh.fs, rh.docker}
+		rh.garbage.Cleanup(rh.request)
 		removedDir := rh.fs.(*test.FakeFileSystem).RemoveDirName
 		if p && removedDir != "" {
 			t.Errorf("Expected working directory to be preserved, but it was removed.")

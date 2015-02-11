@@ -58,7 +58,7 @@ type STI struct {
 	incremental build.IncrementalBuilder
 	scripts     build.ScriptsHandler
 	source      build.Downloader
-	cleaner     build.Cleaner
+	garbage     build.Cleaner
 }
 
 // NewSTI returns a new STI builder
@@ -84,12 +84,13 @@ func NewSTI(req *api.Request) (*STI, error) {
 	// TODO: Add more SCM in future.
 	b.source = &git.Clone{b.git, b.fs}
 
+	b.garbage = &build.DefaultCleaner{b.fs, b.docker}
+
 	// Set interfaces
 	b.preparer = &b
 	b.incremental = &b
 	b.scripts = &b
 	b.postExecutor = &b
-	b.cleaner = &b
 	b.builder = &DockerBuild{&b}
 	return &b, nil
 }
@@ -99,7 +100,7 @@ func NewSTI(req *api.Request) (*STI, error) {
 // of the build itself.  Callers should check the Success field of the result
 // to determine whether a build succeeded or not.
 func (b *STI) Build(request *api.Request) (*api.Result, error) {
-	defer b.cleaner.Cleanup(request)
+	defer b.garbage.Cleanup(request)
 
 	glog.Infof("Building %s", request.Tag)
 	if err := b.preparer.Prepare(request); err != nil {
@@ -187,21 +188,6 @@ func (b *STI) Prepare(request *api.Request) error {
 	}
 
 	return nil
-}
-
-// Cleanup removes the temporary source code repository and the temporary Docker
-// images
-func (b *STI) Cleanup(request *api.Request) {
-	if request.PreserveWorkingDir {
-		glog.Infof("Temporary directory '%s' will be saved, not deleted", request.WorkingDir)
-	} else {
-		glog.V(2).Infof("Removing temporary directory %s", request.WorkingDir)
-		b.fs.RemoveDirectory(request.WorkingDir)
-	}
-	if request.LayeredBuild {
-		glog.V(2).Infof("Removing temporary image %s", request.BaseImage)
-		b.docker.RemoveImage(request.BaseImage)
-	}
 }
 
 // SetScripts allows to overide default required and optional scripts

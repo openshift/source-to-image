@@ -17,7 +17,11 @@ type FakeUsageHandler struct {
 	executeError   error
 }
 
-func (f *FakeUsageHandler) Cleanup(*api.Request) {
+type FakeCleaner struct {
+	cleanupCalled bool
+}
+
+func (f *FakeCleaner) Cleanup(*api.Request) {
 	f.cleanupCalled = true
 }
 
@@ -47,6 +51,8 @@ func newTestUsage() *Usage {
 
 func TestUsage(t *testing.T) {
 	u := newTestUsage()
+	g := &FakeCleaner{}
+	u.garbage = g
 	fh := u.handler.(*FakeUsageHandler)
 	err := u.Show()
 	if err != nil {
@@ -61,13 +67,14 @@ func TestUsage(t *testing.T) {
 	if fh.executeCommand != "usage" {
 		t.Errorf("execute called with unexpected command: %#v", fh.executeCommand)
 	}
-	if !fh.cleanupCalled {
+	if !g.cleanupCalled {
 		t.Errorf("cleanup was not called from usage.")
 	}
 }
 
 func TestUsageSetupError(t *testing.T) {
 	u := newTestUsage()
+	u.garbage = &FakeCleaner{}
 	fh := u.handler.(*FakeUsageHandler)
 	fh.setupError = fmt.Errorf("setup error")
 	err := u.Show()
@@ -81,6 +88,7 @@ func TestUsageSetupError(t *testing.T) {
 
 func TestUsageExecuteError(t *testing.T) {
 	u := newTestUsage()
+	u.garbage = &FakeCleaner{}
 	fh := u.handler.(*FakeUsageHandler)
 	fh.executeError = fmt.Errorf("execute error")
 	err := u.Show()

@@ -9,6 +9,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/openshift/source-to-image/pkg/api"
+	"github.com/openshift/source-to-image/pkg/build"
 	"github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/git"
 	"github.com/openshift/source-to-image/pkg/tar"
@@ -18,10 +19,12 @@ import (
 // OnBuild strategy executes the simple Docker build in case the image does not
 // support STI scripts but has ONBUILD instructions recorded.
 type OnBuild struct {
-	docker docker.Docker
-	git    git.Git
-	fs     util.FileSystem
-	tar    tar.Tar
+	docker  docker.Docker
+	git     git.Git
+	fs      util.FileSystem
+	tar     tar.Tar
+	source  build.Downloader
+	garbage build.Cleaner
 }
 
 // NewOnBuild returns a new instance of OnBuild builder
@@ -30,12 +33,15 @@ func NewOnBuild(request *api.Request) (*OnBuild, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &OnBuild{
+	b := &OnBuild{
 		docker: dockerHandler,
 		git:    git.NewGit(),
 		fs:     util.NewFileSystem(),
 		tar:    tar.NewTar(),
-	}, nil
+	}
+	b.source = &git.Clone{b.git, b.fs}
+	b.garbage = &build.DefaultCleaner{b.fs, b.docker}
+	return b, nil
 }
 
 // SourceTar produces a tar archive containing application source and stream it
@@ -114,28 +120,11 @@ func (b *OnBuild) Prepare(request *api.Request) error {
 	if err != nil {
 		return err
 	}
-
 	request.WorkingDir = tempDir
-	targetSourceDir := filepath.Join(request.WorkingDir, "upload", "src")
 
-	// If the source is not remote GIT repository, use filesystem Copy
-	if !b.git.ValidCloneSpec(request.Source) {
-		return b.fs.Copy(request.Source, targetSourceDir)
-	}
-
-	if err := b.git.Clone(request.Source, targetSourceDir); err != nil {
-		return err
-	}
-
-	if len(request.Ref) == 0 {
-		return nil
-	}
-
-	return b.git.Checkout(targetSourceDir, request.Ref)
+	return b.source.Download(request)
 }
 
-// Cleanup removes the temporary directories where the sources were stored for
-// build.
 func (b *OnBuild) Cleanup(request *api.Request) {
 	if request.PreserveWorkingDir {
 		return
