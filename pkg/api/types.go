@@ -57,6 +57,8 @@ type Request struct {
 
 	// LayeredBuild describes if this is build which layered scripts and sources on top of BaseImage.
 	LayeredBuild bool
+
+	InstallDestination string
 }
 
 // Result structure contains information from build process.

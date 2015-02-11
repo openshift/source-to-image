@@ -67,11 +67,12 @@ func New(req *api.Request) (*STI, error) {
 	if err != nil {
 		return nil, err
 	}
+	inst := script.NewInstaller(req.BaseImage, req.ScriptsURL, req.InstallDestination, docker)
 
 	b := STI{
+		installer:       inst,
 		request:         req,
 		docker:          docker,
-		installer:       script.NewInstaller(req.BaseImage, req.ScriptsURL, docker),
 		git:             git.New(),
 		fs:              util.NewFileSystem(),
 		tar:             tar.New(),

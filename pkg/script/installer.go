@@ -13,15 +13,18 @@ import (
 	"github.com/openshift/source-to-image/pkg/util"
 )
 
+const defaultInstallDir = "upload/scripts"
+
 // Installer interface is responsible for installing scripts needed to run the build
 type Installer interface {
 	DownloadAndInstall(scripts []api.Script, workingDir string, required bool) (bool, error)
 }
 
 // NewInstaller returns a new instance of the default Installer implementation
-func NewInstaller(image, scriptsURL string, docker docker.Docker) Installer {
+func NewInstaller(image, scriptsURL, dstDir string, docker docker.Docker) Installer {
 	handler := &handler{
 		image:      image,
+		destDir:    dstDir,
 		scriptsURL: scriptsURL,
 		docker:     docker,
 		downloader: util.NewDownloader(),
@@ -38,6 +41,7 @@ type handler struct {
 	docker     docker.Docker
 	image      string
 	scriptsURL string
+	destDir    string
 	downloader util.Downloader
 	fs         util.FileSystem
 }
@@ -188,7 +192,10 @@ func (s *handler) getPath(script api.Script, workingDir string) string {
 
 func (s *handler) install(path string, workingDir string) error {
 	script := filepath.Base(path)
-	return s.fs.Rename(path, filepath.Join(workingDir, "upload/scripts", script))
+	if len(s.destDir) == 0 {
+		s.destDir = defaultInstallDir
+	}
+	return s.fs.Rename(path, filepath.Join(workingDir, s.destDir, script))
 }
 
 // prepareScriptDownload turns the script name into proper URL

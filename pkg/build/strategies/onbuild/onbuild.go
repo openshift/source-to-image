@@ -10,11 +10,17 @@ import (
 	"github.com/golang/glog"
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/build"
+	"github.com/openshift/source-to-image/pkg/build/strategies/sti"
 	"github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/git"
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
 )
+
+type SourceHandler struct {
+	build.Downloader
+	build.Preparer
+}
 
 // OnBuild strategy executes the simple Docker build in case the image does not
 // support STI scripts but has ONBUILD instructions recorded.
@@ -23,7 +29,7 @@ type OnBuild struct {
 	git     git.Git
 	fs      util.FileSystem
 	tar     tar.Tar
-	source  build.Downloader
+	source  SourceHandler
 	garbage build.Cleaner
 }
 
@@ -39,7 +45,12 @@ func New(request *api.Request) (*OnBuild, error) {
 		fs:     util.NewFileSystem(),
 		tar:    tar.New(),
 	}
-	b.source = &git.Clone{b.git, b.fs}
+	// Use STI Prepare() and download the 'run' script optionally.
+	request.InstallDestination = "upload/src"
+	s, err := sti.New(request)
+	s.SetScripts([]api.Script{}, []api.Script{api.Run})
+
+	b.source = SourceHandler{&git.Clone{b.git, b.fs}, s}
 	b.garbage = &build.DefaultCleaner{b.fs, b.docker}
 	return b, nil
 }
@@ -57,7 +68,9 @@ func (b *OnBuild) SourceTar(request *api.Request) (io.ReadCloser, error) {
 // Build executes the ONBUILD kind of build
 func (b *OnBuild) Build(request *api.Request) (*api.Result, error) {
 	glog.V(2).Info("Preparing the source code for build")
-	if err := b.Prepare(request); err != nil {
+	// Change the installation directory for this request to store scripts inside
+	// the application root directory.
+	if err := b.source.Prepare(request); err != nil {
 		return nil, err
 	}
 
@@ -103,6 +116,8 @@ func (b *OnBuild) CreateDockerfile(request *api.Request) error {
 	if err != nil {
 		return err
 	}
+	// FIXME: This assumes that the WORKDIR is set to the application source root
+	//        directory.
 	buffer.WriteString(fmt.Sprintf(`CMD ["./%s"]`+"\n", entrypoint))
 	return b.fs.WriteFile(filepath.Join(uploadDir, "Dockerfile"), buffer.Bytes())
 }
