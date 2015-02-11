@@ -57,6 +57,7 @@ type STI struct {
 	preparer    build.Preparer
 	incremental build.IncrementalBuilder
 	scripts     build.ScriptsHandler
+	source      build.Downloader
 	cleaner     build.Cleaner
 }
 
@@ -78,6 +79,10 @@ func NewSTI(req *api.Request) (*STI, error) {
 		requiredScripts: []api.Script{api.Assemble, api.Run},
 		optionalScripts: []api.Script{api.SaveArtifacts},
 	}
+
+	// The sources are downloaded using the GIT downloader.
+	// TODO: Add more SCM in future.
+	b.source = &git.Clone{b.git, b.fs}
 
 	// Set interfaces
 	b.preparer = &b
@@ -165,7 +170,7 @@ func (b *STI) Prepare(request *api.Request) error {
 
 	// fetch sources, for theirs .sti/bin might contain sti scripts
 	if len(request.Source) > 0 {
-		if err = b.scripts.Download(request); err != nil {
+		if err = b.source.Download(request); err != nil {
 			return err
 		}
 	}
@@ -184,6 +189,8 @@ func (b *STI) Prepare(request *api.Request) error {
 	return nil
 }
 
+// Cleanup removes the temporary source code repository and the temporary Docker
+// images
 func (b *STI) Cleanup(request *api.Request) {
 	if request.PreserveWorkingDir {
 		glog.Infof("Temporary directory '%s' will be saved, not deleted", request.WorkingDir)
@@ -203,6 +210,8 @@ func (b *STI) SetScripts(required, optional []api.Script) {
 	b.optionalScripts = optional
 }
 
+// PostExecute allows to execute post-build actions after the Docker build
+// finishes.
 func (b *STI) PostExecute(containerID string, location string) error {
 	var (
 		err             error
@@ -243,29 +252,6 @@ func (b *STI) PostExecute(containerID string, location string) error {
 
 	glog.Infof("Successfully built %s", b.request.Tag)
 	b.result.Success = true
-	return nil
-}
-
-func (b *STI) Download(request *api.Request) error {
-	targetSourceDir := filepath.Join(request.WorkingDir, "upload", "src")
-	glog.V(1).Infof("Downloading %s to directory %s", request.Source, targetSourceDir)
-	if b.git.ValidCloneSpec(request.Source) {
-		if err := b.git.Clone(request.Source, targetSourceDir); err != nil {
-			glog.Errorf("Git clone failed: %+v", err)
-			return err
-		}
-
-		if request.Ref != "" {
-			glog.V(1).Infof("Checking out ref %s", request.Ref)
-
-			if err := b.git.Checkout(targetSourceDir, request.Ref); err != nil {
-				return err
-			}
-		}
-	} else if err := b.fs.Copy(request.Source, targetSourceDir); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -346,7 +332,7 @@ func (b *STI) Execute(command api.Script, request *api.Request) error {
 	defer errReader.Close()
 	defer errWriter.Close()
 	opts := docker.RunContainerOptions{
-		Image:           b.request.BaseImage,
+		Image:           request.BaseImage,
 		Stdout:          outWriter,
 		Stderr:          errWriter,
 		PullImage:       request.ForcePull,

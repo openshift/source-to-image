@@ -9,6 +9,7 @@ import (
 
 	"github.com/openshift/source-to-image/pkg/api"
 	stierr "github.com/openshift/source-to-image/pkg/errors"
+	"github.com/openshift/source-to-image/pkg/git"
 	"github.com/openshift/source-to-image/pkg/test"
 )
 
@@ -63,6 +64,7 @@ func newFakeSTI(f *FakeSTI) *STI {
 		scripts:     f,
 		builder:     &FakeDockerBuild{f},
 	}
+	s.source = &git.Clone{s.git, s.fs}
 	return s
 }
 
@@ -231,7 +233,7 @@ func TestWasExpectedError(t *testing.T) {
 }
 
 func testBuildHandler() *STI {
-	return &STI{
+	s := &STI{
 		docker:          &test.FakeDocker{},
 		installer:       &test.FakeInstaller{},
 		git:             &test.FakeGit{},
@@ -241,6 +243,9 @@ func testBuildHandler() *STI {
 		result:          &api.Result{},
 		callbackInvoker: &test.FakeCallbackInvoker{},
 	}
+
+	s.source = &git.Clone{s.git, s.fs}
+	return s
 }
 
 func TestPostExecute(t *testing.T) {
@@ -480,7 +485,7 @@ func TestFetchSource(t *testing.T) {
 		}
 		bh.request.Source = "a-repo-source"
 		expectedTargetDir := "/working-dir/upload/src"
-		bh.Download(bh.request)
+		bh.source.Download(bh.request)
 		if ft.cloneExpected {
 			if gh.CloneSource != "a-repo-source" {
 				t.Errorf("Clone was not called with the expected source.")

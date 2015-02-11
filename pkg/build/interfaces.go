@@ -37,6 +37,10 @@ type IncrementalBuilder interface {
 // and also for executing them.
 type ScriptsHandler interface {
 	Execute(api.Script, *api.Request) error
+}
+
+// Downloader provides methods for downloading the source code
+type Downloader interface {
 	Download(*api.Request) error
 }
 
