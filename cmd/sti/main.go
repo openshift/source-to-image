@@ -94,7 +94,7 @@ func newCmdBuild(req *api.Request) *cobra.Command {
 			checkErr(err)
 			req.Environment = envs
 
-			builder, err := strategies.GetBuilder(req)
+			builder, err := strategies.GetStrategy(req)
 			checkErr(err)
 			result, err := builder.Build(req)
 			checkErr(err)

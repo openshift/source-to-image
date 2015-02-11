@@ -10,8 +10,7 @@ type Builder interface {
 }
 
 // Preparer provides the Prepare method for builders that need to prepare source
-// code before it gets passed to the build. All builders must comfort this
-// method.
+// code before it gets passed to the build.
 type Preparer interface {
 	Prepare(*api.Request) error
 }
@@ -32,19 +31,18 @@ type IncrementalBuilder interface {
 	Save(*api.Request) error
 }
 
-// ScriptsHandler provides interface for downloading the source code and scripts
-// and also for executing them.
+// ScriptsHandler provides an interface for executing the scripts
 type ScriptsHandler interface {
 	Execute(api.Script, *api.Request) error
 }
 
-// Downloader provides methods for downloading the source code
+// Downloader provides methods for downloading the application source code
 type Downloader interface {
 	Download(*api.Request) error
 }
 
-// DockerBuilder interface represents the generic Docker Builder and the Build
-// method is used to execute the Docker build.
-type DockerBuilder interface {
+// LayeredDockerBuilder represents a minimal Docker builder interface that is
+// used to execute the layered Docker build with the application source.
+type LayeredDockerBuilder interface {
 	Builder
 }

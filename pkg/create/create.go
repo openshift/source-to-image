@@ -14,7 +14,7 @@ type Bootstrap struct {
 	ImageName      string
 }
 
-// NewCreate returns a new bootstrap for giben image name and destination
+// NewCreate returns a new bootstrap for given image name and destination
 // directory
 func New(name, dst string) *Bootstrap {
 	return &Bootstrap{ImageName: name, DestinationDir: dst}

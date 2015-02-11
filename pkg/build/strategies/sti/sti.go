@@ -53,7 +53,7 @@ type STI struct {
 	optionalScripts []api.Script
 
 	// Interfaces
-	builder     build.DockerBuilder
+	builder     build.LayeredDockerBuilder
 	preparer    build.Preparer
 	incremental build.IncrementalBuilder
 	scripts     build.ScriptsHandler
@@ -69,7 +69,7 @@ func New(req *api.Request) (*STI, error) {
 	}
 	inst := script.NewInstaller(req.BaseImage, req.ScriptsURL, req.InstallDestination, docker)
 
-	b := STI{
+	b := &STI{
 		installer:       inst,
 		request:         req,
 		docker:          docker,
@@ -88,12 +88,12 @@ func New(req *api.Request) (*STI, error) {
 	b.garbage = &build.DefaultCleaner{b.fs, b.docker}
 
 	// Set interfaces
-	b.preparer = &b
-	b.incremental = &b
-	b.scripts = &b
-	b.postExecutor = &b
-	b.builder = &DockerBuild{&b}
-	return &b, nil
+	b.preparer = b
+	b.incremental = b
+	b.scripts = b
+	b.postExecutor = b
+	b.builder = &DockerBuild{b}
+	return b, nil
 }
 
 // Build processes a Request and returns a *api.Result and an error.
