@@ -20,7 +20,7 @@ func TestValidCloneSpec(t *testing.T) {
 		"/home/user/code/repo.git",
 	}
 
-	gh := NewGit()
+	gh := New()
 
 	for _, scenario := range scenarios {
 		result := gh.ValidCloneSpec(scenario)
@@ -31,7 +31,7 @@ func TestValidCloneSpec(t *testing.T) {
 }
 
 func getGit() (*stiGit, *test.FakeCmdRunner) {
-	gh := NewGit().(*stiGit)
+	gh := New().(*stiGit)
 	cr := &test.FakeCmdRunner{}
 	gh.runner = cr
 

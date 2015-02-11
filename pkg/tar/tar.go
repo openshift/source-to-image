@@ -38,7 +38,7 @@ type Tar interface {
 }
 
 // NewTar creates a new Tar
-func NewTar() Tar {
+func New() Tar {
 	return &stiTar{
 		exclude: defaultExclusionPattern,
 		timeout: defaultTimeout,

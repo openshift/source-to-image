@@ -27,17 +27,17 @@ type OnBuild struct {
 	garbage build.Cleaner
 }
 
-// NewOnBuild returns a new instance of OnBuild builder
-func NewOnBuild(request *api.Request) (*OnBuild, error) {
-	dockerHandler, err := docker.NewDocker(request.DockerSocket)
+// New returns a new instance of OnBuild builder
+func New(request *api.Request) (*OnBuild, error) {
+	dockerHandler, err := docker.New(request.DockerSocket)
 	if err != nil {
 		return nil, err
 	}
 	b := &OnBuild{
 		docker: dockerHandler,
-		git:    git.NewGit(),
+		git:    git.New(),
 		fs:     util.NewFileSystem(),
-		tar:    tar.NewTar(),
+		tar:    tar.New(),
 	}
 	b.source = &git.Clone{b.git, b.fs}
 	b.garbage = &build.DefaultCleaner{b.fs, b.docker}

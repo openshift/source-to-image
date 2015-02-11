@@ -21,7 +21,7 @@ type Usage struct {
 
 // NewUsage creates a new instance of the default Usage implementation
 func NewUsage(req *api.Request) (*Usage, error) {
-	b, err := NewSTI(req)
+	b, err := New(req)
 	if err != nil {
 		return nil, err
 	}

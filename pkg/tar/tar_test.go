@@ -122,7 +122,7 @@ func verifyTarFile(t *testing.T, filename string, files []fileDesc, links []link
 }
 
 func TestCreateTar(t *testing.T) {
-	th := NewTar()
+	th := New()
 	tempDir, err := ioutil.TempDir("", "testtar")
 	defer os.RemoveAll(tempDir)
 	if err != nil {
@@ -228,7 +228,7 @@ func TestExtractTarStream(t *testing.T) {
 	defer os.RemoveAll(destDir)
 	wg := sync.WaitGroup{}
 	wg.Add(2)
-	th := NewTar()
+	th := New()
 
 	go func() {
 		defer wg.Done()
@@ -252,7 +252,7 @@ func TestExtractTarStreamTimeout(t *testing.T) {
 	defer os.RemoveAll(destDir)
 	wg := sync.WaitGroup{}
 	wg.Add(2)
-	th := NewTar()
+	th := New()
 	th.(*stiTar).timeout = 10 * time.Millisecond
 	go func() {
 		defer wg.Done()

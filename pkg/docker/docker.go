@@ -91,8 +91,8 @@ type BuildImageOptions struct {
 	Stdout io.Writer
 }
 
-// NewDocker creates a new implementation of the STI Docker interface
-func NewDocker(endpoint string) (Docker, error) {
+// New creates a new implementation of the STI Docker interface
+func New(endpoint string) (Docker, error) {
 	client, err := docker.NewClient(endpoint)
 	if err != nil {
 		return nil, err

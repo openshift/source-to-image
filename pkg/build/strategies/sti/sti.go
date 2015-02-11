@@ -61,9 +61,9 @@ type STI struct {
 	garbage     build.Cleaner
 }
 
-// NewSTI returns a new STI builder
-func NewSTI(req *api.Request) (*STI, error) {
-	docker, err := docker.NewDocker(req.DockerSocket)
+// New returns a new STI builder
+func New(req *api.Request) (*STI, error) {
+	docker, err := docker.New(req.DockerSocket)
 	if err != nil {
 		return nil, err
 	}
@@ -72,9 +72,9 @@ func NewSTI(req *api.Request) (*STI, error) {
 		request:         req,
 		docker:          docker,
 		installer:       script.NewInstaller(req.BaseImage, req.ScriptsURL, docker),
-		git:             git.NewGit(),
+		git:             git.New(),
 		fs:              util.NewFileSystem(),
-		tar:             tar.NewTar(),
+		tar:             tar.New(),
 		callbackInvoker: util.NewCallbackInvoker(),
 		requiredScripts: []api.Script{api.Assemble, api.Run},
 		optionalScripts: []api.Script{api.SaveArtifacts},
