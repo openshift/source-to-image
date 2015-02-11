@@ -56,7 +56,7 @@ type stiDocker struct {
 	client Client
 }
 
-type postExecutor interface {
+type PostExecutor interface {
 	PostExecute(containerID string, location string) error
 }
 
@@ -73,7 +73,7 @@ type RunContainerOptions struct {
 	Stdout          io.Writer
 	Stderr          io.Writer
 	OnStart         func() error
-	PostExec        postExecutor
+	PostExec        PostExecutor
 }
 
 // CommitContainerOptions are options passed in to the CommitContainer method

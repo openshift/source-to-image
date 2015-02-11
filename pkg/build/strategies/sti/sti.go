@@ -37,10 +37,12 @@ var (
 	}
 )
 
+// STI strategy executes the STI build.
+// For more details about STI, visit https://github.com/openshift/source-to-image
 type STI struct {
 	request         *api.Request
 	result          *api.Result
-	postExecutor    postExecutor
+	postExecutor    docker.PostExecutor
 	installer       script.Installer
 	git             git.Git
 	fs              util.FileSystem
@@ -56,10 +58,6 @@ type STI struct {
 	incremental build.IncrementalBuilder
 	scripts     build.ScriptsHandler
 	cleaner     build.Cleaner
-}
-
-type postExecutor interface {
-	PostExecute(containerID string, location string) error
 }
 
 // NewSTI returns a new STI builder
