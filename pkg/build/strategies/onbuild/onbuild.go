@@ -85,7 +85,7 @@ func (b *OnBuild) Build(request *api.Request) (*api.Result, error) {
 	}
 
 	glog.V(2).Info("Cleaning up temporary containers")
-	b.Cleanup(request)
+	b.garbage.Cleanup(request)
 
 	return &api.Result{
 		Success:    true,
@@ -123,11 +123,4 @@ func (b *OnBuild) Prepare(request *api.Request) error {
 	request.WorkingDir = tempDir
 
 	return b.source.Download(request)
-}
-
-func (b *OnBuild) Cleanup(request *api.Request) {
-	if request.PreserveWorkingDir {
-		return
-	}
-	b.fs.RemoveDirectory(request.WorkingDir)
 }
