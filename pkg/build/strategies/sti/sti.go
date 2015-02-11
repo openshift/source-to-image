@@ -389,7 +389,6 @@ func (b *STI) handleContainerError(cerr errors.ContainerError) (*api.Result, err
 		}
 		glog.V(2).Infof("Building %s using sti-enabled image", b.request.Tag)
 		if err := b.scripts.Execute(api.Assemble, b.request); err != nil {
-			glog.V(2).Infof("FOOOO\n")
 			switch e := err.(type) {
 			case errors.ContainerError:
 				return nil, errors.NewAssembleError(b.request.Tag, e.Output, e)

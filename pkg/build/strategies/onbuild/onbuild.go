@@ -123,7 +123,7 @@ func (b *OnBuild) CreateDockerfile(request *api.Request) error {
 	}
 	// FIXME: This assumes that the WORKDIR is set to the application source root
 	//        directory.
-	buffer.WriteString(fmt.Sprintf(`CMD ["./%s"]`+"\n", entrypoint))
+	buffer.WriteString(fmt.Sprintf(`ENTRYPOINT ["./%s"]`+"\n", entrypoint))
 	return b.fs.WriteFile(filepath.Join(uploadDir, "Dockerfile"), buffer.Bytes())
 }
 
