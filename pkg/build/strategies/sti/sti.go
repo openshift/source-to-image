@@ -46,8 +46,8 @@ type STI struct {
 	installer       script.Installer
 	git             git.Git
 	fs              util.FileSystem
-	docker          docker.Docker
 	tar             tar.Tar
+	docker          docker.Docker
 	callbackInvoker util.CallbackInvoker
 	requiredScripts []api.Script
 	optionalScripts []api.Script
@@ -241,6 +241,9 @@ func (b *STI) PostExecute(containerID string, location string) error {
 	return nil
 }
 
+// Determine determines if the current build supports incremental workflow.
+// It checks if the previous image exists in the system and if so, then it
+// verifies that the save-artifacts scripts is present.
 func (b *STI) Determine(request *api.Request) (err error) {
 	request.Incremental = false
 
@@ -263,6 +266,8 @@ func (b *STI) Determine(request *api.Request) (err error) {
 	return nil
 }
 
+// Save extracts and store the build artifacts from the previous build to a
+// current build.
 func (b *STI) Save(request *api.Request) (err error) {
 	artifactTmpDir := filepath.Join(request.WorkingDir, "upload", "artifacts")
 	if err = b.fs.Mkdir(artifactTmpDir); err != nil {
@@ -295,6 +300,7 @@ func (b *STI) Save(request *api.Request) (err error) {
 	return err
 }
 
+// Execute runs the specified STI script in the builder image.
 func (b *STI) Execute(command api.Script, request *api.Request) error {
 	glog.V(2).Infof("Using image name %s", request.BaseImage)
 

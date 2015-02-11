@@ -16,7 +16,7 @@ type Bootstrap struct {
 
 // NewCreate returns a new bootstrap for giben image name and destination
 // directory
-func NewCreate(name, dst string) *Bootstrap {
+func New(name, dst string) *Bootstrap {
 	return &Bootstrap{ImageName: name, DestinationDir: dst}
 }
 

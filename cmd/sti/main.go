@@ -130,7 +130,7 @@ func newCmdCreate() *cobra.Command {
 				cmd.Help()
 				os.Exit(1)
 			}
-			b := create.NewCreate(args[0], args[1])
+			b := create.New(args[0], args[1])
 			b.AddSTIScripts()
 			b.AddDockerfile()
 			b.AddTests()
@@ -154,7 +154,7 @@ func newCmdUsage(req *api.Request) *cobra.Command {
 			checkErr(err)
 			req.Environment = envs
 
-			uh, err := sti.NewSTIUsage(req)
+			uh, err := sti.NewUsage(req)
 			checkErr(err)
 			err = uh.Show()
 			checkErr(err)
