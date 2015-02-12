@@ -79,6 +79,7 @@ func (h *fs) Copy(sourcePath string, targetPath string) error {
 
 		targetPath = filepath.Join(targetPath, filepath.Base(sourcePath))
 	}
+	glog.V(5).Infof("cp -ad %s %s", sourcePath, targetPath)
 	return h.runner.Run("cp", "-ad", sourcePath, targetPath)
 }
 

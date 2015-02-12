@@ -62,6 +62,10 @@ type Request struct {
 	// scripts. It allows to place the scripts into application root directory
 	// (see ONBUILD strategy). The default value is "upload/scripts".
 	InstallDestination string
+
+	// Specify a relative directory inside the application repository that should
+	// be used as a root directory for the application.
+	ContextDir string
 }
 
 // Result structure contains information from build process.

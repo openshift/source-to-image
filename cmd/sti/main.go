@@ -116,6 +116,7 @@ func newCmdBuild(req *api.Request) *cobra.Command {
 	buildCmd.Flags().BoolVar(&(req.ForcePull), "forcePull", true, "Always pull the builder image even if it is present locally")
 	buildCmd.Flags().BoolVar(&(req.PreserveWorkingDir), "saveTempDir", false, "Save the temporary directory used by STI instead of deleting it")
 	buildCmd.Flags().BoolVar(&(useConfig), "use-config", false, "Store command line options to .stifile")
+	buildCmd.Flags().StringVarP(&(req.ContextDir), "contextDir", "", "", "Specify the sub-directory inside the repository with the application sources")
 
 	return buildCmd
 }

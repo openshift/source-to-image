@@ -17,9 +17,13 @@ type Clone struct {
 // and checkout the Ref specified in the request.
 func (c *Clone) Download(request *api.Request) error {
 	targetSourceDir := filepath.Join(request.WorkingDir, "upload", "src")
-	glog.V(1).Infof("Downloading %s to directory %s", request.Source, targetSourceDir)
 
 	if c.ValidCloneSpec(request.Source) {
+
+		if len(request.ContextDir) > 0 {
+			targetSourceDir = filepath.Join(request.WorkingDir, "upload", "tmp")
+		}
+		glog.V(2).Infof("Cloning into %s", targetSourceDir)
 		if err := c.Clone(request.Source, targetSourceDir); err != nil {
 			glog.Errorf("Git clone failed: %+v", err)
 			return err
@@ -32,9 +36,19 @@ func (c *Clone) Download(request *api.Request) error {
 				return err
 			}
 		}
-	} else if err := c.Copy(request.Source, targetSourceDir); err != nil {
-		return err
+
+		if len(request.ContextDir) > 0 {
+			originalTargetDir := filepath.Join(request.WorkingDir, "upload", "src")
+			c.RemoveDirectory(originalTargetDir)
+			err := c.Copy(filepath.Join(targetSourceDir, request.ContextDir), originalTargetDir)
+			if err != nil {
+				return err
+			}
+			c.RemoveDirectory(targetSourceDir)
+		}
+
+		return nil
 	}
 
-	return nil
+	return c.Copy(filepath.Join(request.Source, request.ContextDir), targetSourceDir)
 }
