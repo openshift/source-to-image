@@ -145,5 +145,8 @@ func (b *Layered) Build(request *api.Request) (*api.Result, error) {
 			return nil, err
 		}
 	}
-	return &api.Result{}, nil
+
+	return &api.Result{
+		Success: true,
+	}, nil
 }

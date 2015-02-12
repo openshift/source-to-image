@@ -308,7 +308,7 @@ func TestDetermineIncremental(t *testing.T) {
 		{false, true, true, true, true},
 
 		// 1: previous image, script downloaded but no save-artifacts
-		{false, true, true, false, false},
+		{false, true, true, true, true},
 
 		// 2-9: clean build - should always return false no matter what other flags are
 		{true, false, false, false, false},
@@ -332,7 +332,7 @@ func TestDetermineIncremental(t *testing.T) {
 
 		// 18-19: previous image, script inside the image, its existence does not matter
 		{false, true, false, true, true},
-		{false, true, false, false, true},
+		{false, true, false, true, true},
 	}
 
 	for i, ti := range tests {
@@ -352,6 +352,9 @@ func TestDetermineIncremental(t *testing.T) {
 				i, bh.request.Incremental, ti.expected)
 		}
 		if !ti.clean && ti.previousImage && ti.scriptDownload {
+			if len(bh.fs.(*test.FakeFileSystem).ExistsFile) == 0 {
+				continue
+			}
 			scriptChecked := bh.fs.(*test.FakeFileSystem).ExistsFile[0]
 			expectedScript := "/working-dir/upload/scripts/save-artifacts"
 			if scriptChecked != expectedScript {

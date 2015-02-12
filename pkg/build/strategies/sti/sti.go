@@ -207,6 +207,7 @@ func (b *STI) PostExecute(containerID string, location string) error {
 		err             error
 		previousImageID string
 	)
+
 	if b.request.Incremental && b.request.RemovePreviousImage {
 		if previousImageID, err = b.docker.GetImageID(b.request.Tag); err != nil {
 			glog.Errorf("Error retrieving previous image's metadata: %v", err)
@@ -224,6 +225,8 @@ func (b *STI) PostExecute(containerID string, location string) error {
 	if err != nil {
 		return errors.NewBuildError(b.request.Tag, err)
 	}
+	b.result.Success = true
+	glog.Infof("Successfully built %s", b.request.Tag)
 
 	b.result.ImageID = imageID
 	glog.V(1).Infof("Tagged %s as %s", imageID, b.request.Tag)
@@ -240,8 +243,6 @@ func (b *STI) PostExecute(containerID string, location string) error {
 			b.result.Success, b.result.Messages)
 	}
 
-	glog.Infof("Successfully built %s", b.request.Tag)
-	b.result.Success = true
 	return nil
 }
 
@@ -249,7 +250,7 @@ func (b *STI) PostExecute(containerID string, location string) error {
 // It checks if the previous image exists in the system and if so, then it
 // verifies that the save-artifacts scripts is present.
 func (b *STI) Determine(request *api.Request) (err error) {
-	request.Incremental = false
+	//request.Incremental = false
 
 	if request.Clean {
 		return
@@ -264,8 +265,9 @@ func (b *STI) Determine(request *api.Request) (err error) {
 	// we're assuming save-artifacts to exists for embedded scripts (if not we'll
 	// warn a user upon container failure and proceed with clean build)
 	// for external save-artifacts - check its existence
-	saveArtifactsExists := !request.ExternalOptionalScripts ||
+	saveArtifactsExists := request.ExternalOptionalScripts ||
 		b.fs.Exists(filepath.Join(request.WorkingDir, "upload", "scripts", string(api.SaveArtifacts)))
+
 	request.Incremental = previousImageExists && saveArtifactsExists
 	return nil
 }
