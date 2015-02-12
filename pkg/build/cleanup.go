@@ -7,6 +7,9 @@ import (
 	"github.com/openshift/source-to-image/pkg/util"
 )
 
+// DefaultCleaner provides a cleaner for most STI build use-cases. It cleans the
+// temporary directories created by STI build and it also cleans the temporary
+// Docker images produced by LayeredBuild
 type DefaultCleaner struct {
 	util.FileSystem
 	docker.Docker

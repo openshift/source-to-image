@@ -2,16 +2,14 @@ package sti
 
 import (
 	"bufio"
-	"bytes"
-	"fmt"
 	"io"
 	"path/filepath"
 	"regexp"
-	"time"
 
 	"github.com/golang/glog"
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/build"
+	"github.com/openshift/source-to-image/pkg/build/strategies/layered"
 	"github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/git"
@@ -53,15 +51,18 @@ type STI struct {
 	optionalScripts []api.Script
 
 	// Interfaces
-	builder     build.LayeredDockerBuilder
 	preparer    build.Preparer
 	incremental build.IncrementalBuilder
 	scripts     build.ScriptsHandler
 	source      build.Downloader
 	garbage     build.Cleaner
+	layered     build.Builder
 }
 
-// New returns a new STI builder
+// New returns the instance of STI builder strategy for the given request.
+// If the layeredBuilder parameter is specified, then the builder provided will
+// be used for the case that the base Docker image does not have 'tar' or 'bash'
+// installed.
 func New(req *api.Request) (*STI, error) {
 	docker, err := docker.New(req.DockerSocket)
 	if err != nil {
@@ -84,16 +85,15 @@ func New(req *api.Request) (*STI, error) {
 	// The sources are downloaded using the GIT downloader.
 	// TODO: Add more SCM in future.
 	b.source = &git.Clone{b.git, b.fs}
-
 	b.garbage = &build.DefaultCleaner{b.fs, b.docker}
+	b.layered, err = layered.New(req, b)
 
 	// Set interfaces
 	b.preparer = b
 	b.incremental = b
 	b.scripts = b
 	b.postExecutor = b
-	b.builder = &DockerBuild{b}
-	return b, nil
+	return b, err
 }
 
 // Build processes a Request and returns a *api.Result and an error.
@@ -130,7 +130,10 @@ func (b *STI) Build(request *api.Request) (*api.Result, error) {
 	if err := b.scripts.Execute(api.Assemble, request); err != nil {
 		switch e := err.(type) {
 		case errors.ContainerError:
-			return b.handleContainerError(e)
+			if !isMissingRequirements(e.Output) {
+				return nil, err
+			}
+			return b.layered.Build(request)
 		default:
 			return nil, err
 		}
@@ -378,107 +381,7 @@ func (b *STI) generateConfigEnv() (configEnv []string) {
 	return
 }
 
-// handleContainerError is responsible for checking container output to see if
-// the error is one of the expected that should trigger layered build
-func (b *STI) handleContainerError(cerr errors.ContainerError) (*api.Result, error) {
-	if wasExpectedError(cerr.Output) {
-		glog.Warningf("Image %s does not have tar! Performing additional build to add the scripts and sources.",
-			b.request.BaseImage)
-		if _, err := b.builder.Build(b.request); err != nil {
-			return nil, err
-		}
-		glog.V(2).Infof("Building %s using sti-enabled image", b.request.Tag)
-		if err := b.scripts.Execute(api.Assemble, b.request); err != nil {
-			switch e := err.(type) {
-			case errors.ContainerError:
-				return nil, errors.NewAssembleError(b.request.Tag, e.Output, e)
-			default:
-				return nil, err
-			}
-		}
-	} else {
-		return nil, errors.NewAssembleError(b.request.Tag, cerr.Output, cerr)
-	}
-
-	return b.result, nil
-}
-
-type DockerBuild struct {
-	*STI
-}
-
-func (b *DockerBuild) Build(request *api.Request) (*api.Result, error) {
-	user, err := b.docker.GetImageUser(b.request.BaseImage)
-	if err != nil {
-		return nil, err
-	}
-	// create Dockerfile
-	buffer := bytes.Buffer{}
-	location := b.request.Location
-	if len(location) == 0 {
-		location = defaultLocation
-	}
-	buffer.WriteString(fmt.Sprintf("FROM %s\n", b.request.BaseImage))
-	buffer.WriteString(fmt.Sprintf("COPY scripts %s\n", filepath.Join(location, "scripts")))
-	buffer.WriteString(fmt.Sprintf("COPY src %s\n", filepath.Join(location, "src")))
-	//TODO: We need to account for images that may not have chown. There is a proposal
-	//      to specify the owner for COPY here: https://github.com/docker/docker/pull/9934
-	if len(user) > 0 {
-		buffer.WriteString("USER root\n")
-		buffer.WriteString(fmt.Sprintf("RUN chown -R %s %s %s\n", user, filepath.Join(location, "scripts"), filepath.Join(location, "src")))
-		buffer.WriteString(fmt.Sprintf("USER %s\n", user))
-	}
-	uploadDir := filepath.Join(b.request.WorkingDir, "upload")
-	if err := b.fs.WriteFile(filepath.Join(uploadDir, "Dockerfile"), buffer.Bytes()); err != nil {
-		return nil, err
-	}
-	glog.V(2).Infof("Writing custom Dockerfile to %s", uploadDir)
-
-	tarFileName, err := b.tar.CreateTarFile(b.request.WorkingDir, uploadDir)
-	if err != nil {
-		return nil, err
-	}
-	tarFile, err := b.fs.Open(tarFileName)
-	if err != nil {
-		return nil, err
-	}
-	defer tarFile.Close()
-
-	newBaseImage := fmt.Sprintf("%s-%d", b.request.BaseImage, time.Now().UnixNano())
-	outReader, outWriter := io.Pipe()
-	defer outReader.Close()
-	defer outWriter.Close()
-	opts := docker.BuildImageOptions{
-		Name:   newBaseImage,
-		Stdin:  tarFile,
-		Stdout: outWriter,
-	}
-	// goroutine to stream container's output
-	go func(reader io.Reader) {
-		scanner := bufio.NewScanner(reader)
-		for scanner.Scan() {
-			glog.V(2).Info(scanner.Text())
-		}
-	}(outReader)
-	glog.V(2).Infof("Building new image %s with scripts and sources already inside", newBaseImage)
-	if err = b.docker.BuildImage(opts); err != nil {
-		return nil, err
-	}
-
-	// upon successful build we need to modify current request
-	b.request.LayeredBuild = true
-	// new image name
-	b.request.BaseImage = newBaseImage
-	// the scripts are inside the image
-	b.request.ExternalRequiredScripts = false
-	b.request.ScriptsURL = "image://" + filepath.Join(location, "scripts")
-	// the source is also inside the image
-	b.request.Location = filepath.Join(location, "src")
-
-	return nil, nil
-}
-
-func wasExpectedError(text string) bool {
+func isMissingRequirements(text string) bool {
 	tar, _ := regexp.MatchString(`.*tar.*not found`, text)
 	sh, _ := regexp.MatchString(`.*/bin/sh.*no such file or directory`, text)
 	return tar || sh

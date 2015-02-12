@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"regexp"
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/api"
@@ -63,7 +62,7 @@ func newFakeSTI(f *FakeSTI) *STI {
 		incremental: f,
 		scripts:     f,
 		garbage:     f,
-		builder:     &FakeDockerBuild{f},
+		layered:     &FakeDockerBuild{f},
 	}
 	s.source = &git.Clone{s.git, s.fs}
 	return s
@@ -226,7 +225,7 @@ func TestWasExpectedError(t *testing.T) {
 	}
 
 	for i, ti := range tests {
-		result := wasExpectedError(ti.text)
+		result := isMissingRequirements(ti.text)
 		if result != ti.expected {
 			t.Errorf("(%d) Unexpected result: %v. Expected: %v", i, result, ti.expected)
 		}
@@ -690,71 +689,6 @@ func TestExecuteErrorOpenTarFile(t *testing.T) {
 	err := rh.Execute("test-command", rh.request)
 	if err == nil || err.Error() != "OpenTarError" {
 		t.Errorf("An error was expected for OpenTarFile, but got different: %v", err)
-	}
-}
-
-func TestBuildOK(t *testing.T) {
-	rh := newFakeBaseSTI()
-	rh.builder = &DockerBuild{rh}
-	rh.request.BaseImage = "test/image"
-	_, err := rh.builder.Build(rh.request)
-	if err != nil {
-		t.Errorf("Unexpected error returned: %v", err)
-	}
-	if !rh.request.LayeredBuild {
-		t.Errorf("Expected LayeredBuild to be true!")
-	}
-	if m, _ := regexp.MatchString(`test/image-\d+`, rh.request.BaseImage); !m {
-		t.Errorf("Expected BaseImage test/image-withnumbers, but got %s", rh.request.BaseImage)
-	}
-	if rh.request.ExternalRequiredScripts {
-		t.Errorf("Expected ExternalRequiredScripts to be false!")
-	}
-	if rh.request.ScriptsURL != "image:///tmp/scripts" {
-		t.Error("Expected ScriptsURL image:///tmp/scripts, but got %s", rh.request.ScriptsURL)
-	}
-	if rh.request.Location != "/tmp/src" {
-		t.Errorf("Expected Location /tmp/src, but got %s", rh.request.Location)
-	}
-}
-
-func TestBuildErrorWriteDockerfile(t *testing.T) {
-	rh := newFakeBaseSTI()
-	rh.builder = &DockerBuild{rh}
-	rh.fs.(*test.FakeFileSystem).WriteFileError = errors.New("WriteDockerfileError")
-	_, err := rh.builder.Build(rh.request)
-	if err == nil || err.Error() != "WriteDockerfileError" {
-		t.Errorf("An error was expected for WriteDockerfile, but got different: %v", err)
-	}
-}
-
-func TestBuildErrorCreateTarFile(t *testing.T) {
-	rh := newFakeBaseSTI()
-	rh.builder = &DockerBuild{rh}
-	rh.tar.(*test.FakeTar).CreateTarError = errors.New("CreateTarError")
-	_, err := rh.builder.Build(rh.request)
-	if err == nil || err.Error() != "CreateTarError" {
-		t.Error("An error was expected for CreateTar, but got different: %v", err)
-	}
-}
-
-func TestBuildErrorOpenTarFile(t *testing.T) {
-	rh := newFakeBaseSTI()
-	rh.builder = &DockerBuild{rh}
-	rh.fs.(*test.FakeFileSystem).OpenError = errors.New("OpenTarError")
-	_, err := rh.builder.Build(rh.request)
-	if err == nil || err.Error() != "OpenTarError" {
-		t.Errorf("An error was expected for OpenTarFile, but got different: %v", err)
-	}
-}
-
-func TestBuildErrorBuildImage(t *testing.T) {
-	rh := newFakeBaseSTI()
-	rh.builder = &DockerBuild{rh}
-	rh.docker.(*test.FakeDocker).BuildImageError = errors.New("BuildImageError")
-	_, err := rh.builder.Build(rh.request)
-	if err == nil || err.Error() != "BuildImageError" {
-		t.Errorf("An error was expected for BuildImage, but got different: %v", err)
 	}
 }
 

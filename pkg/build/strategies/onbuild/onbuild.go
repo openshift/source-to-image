@@ -17,6 +17,8 @@ import (
 	"github.com/openshift/source-to-image/pkg/util"
 )
 
+// SourceHandler is a wrapper for STI strategy Downloader and Preparer which
+// allows to use Download and Prepare functions from the STI strategy.
 type SourceHandler struct {
 	build.Downloader
 	build.Preparer
