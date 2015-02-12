@@ -16,8 +16,8 @@ import (
 
 	"github.com/fsouza/go-dockerclient"
 
-	"github.com/openshift/source-to-image/pkg/sti"
-	"github.com/openshift/source-to-image/pkg/sti/api"
+	"github.com/openshift/source-to-image/pkg/api"
+	"github.com/openshift/source-to-image/pkg/build/strategies"
 )
 
 const (
@@ -179,11 +179,11 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 		CallbackURL:  callbackURL,
 		ScriptsURL:   scriptsURL}
 
-	b, err := sti.NewBuilder(req)
+	b, err := strategies.GetStrategy(req)
 	if err != nil {
 		t.Fatalf("Cannot create a new builder.")
 	}
-	resp, err := b.Build()
+	resp, err := b.Build(req)
 	if err != nil {
 		t.Fatalf("An error occurred during the build: %v", err)
 	} else if !resp.Success {
@@ -234,11 +234,11 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 		RemovePreviousImage: removePreviousImage,
 	}
 
-	builder, err := sti.NewBuilder(req)
+	builder, err := strategies.GetStrategy(req)
 	if err != nil {
 		t.Fatalf("Unable to create builder: %v", err)
 	}
-	resp, err := builder.Build()
+	resp, err := builder.Build(req)
 	if err != nil {
 		t.Fatalf("Unexpected error occurred during build: %v", err)
 	}
@@ -247,14 +247,20 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 	}
 
 	previousImageID := resp.ImageID
+	req = &api.Request{
+		DockerSocket:        dockerSocket(),
+		BaseImage:           imageName,
+		Source:              TestSource,
+		Tag:                 tag,
+		Clean:               false,
+		RemovePreviousImage: removePreviousImage,
+	}
 
-	req.Clean = false
-
-	builder, err = sti.NewBuilder(req)
+	builder, err = strategies.GetStrategy(req)
 	if err != nil {
 		t.Fatalf("Unable to create incremental builder: %v", err)
 	}
-	resp, err = builder.Build()
+	resp, err = builder.Build(req)
 	if err != nil {
 		t.Fatalf("Unexpected error occurred during incremental build: %v", err)
 	}
