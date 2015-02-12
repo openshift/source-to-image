@@ -32,10 +32,10 @@ Want to just get started now? Check out the [instructions](#getting-started).
 Creating builder images is easy. `sti` expects you to supply the following scripts to use with an
 image:
 
-1. `assemble` - this script builds and/or deploys the source
-1. `run`- this script runs the deployed source
-1. `save-artifacts` (optional) - this script saves the build context for an incremental build
-1. `usage` (optional) - this script displays builder image usage information
+1. `assemble` - builds and/or deploys the source
+1. `run`- runs the assembled artifacts
+1. `save-artifacts` (optional) - captures the artifacts from a previous build into the next incremental build
+1. `usage` (optional) - displays builder image usage information
 
 Additionally for the best user experience and optimized sti operation we suggest image
 to have `/bin/sh` and tar command inside.
