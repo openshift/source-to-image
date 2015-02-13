@@ -154,18 +154,6 @@ func (b *STI) Prepare(request *api.Request) error {
 		WorkingDir: request.WorkingDir,
 	}
 
-	// immediately pull the image if forcepull is true, that way later code that
-	// references the image will have it pre-pulled and can just inspect the image.
-	if request.ForcePull {
-		err = b.docker.PullImage(request.BaseImage)
-	} else {
-		_, err = b.docker.CheckAndPull(request.BaseImage)
-	}
-
-	if err != nil {
-		return err
-	}
-
 	// Setup working directories
 	for _, v := range workingDirs {
 		if err := b.fs.MkdirAll(filepath.Join(request.WorkingDir, v)); err != nil {
