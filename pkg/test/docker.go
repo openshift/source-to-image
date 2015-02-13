@@ -46,6 +46,10 @@ func (f *FakeDocker) IsImageInLocalRegistry(imageName string) (bool, error) {
 	return f.LocalRegistryResult, f.LocalRegistryError
 }
 
+func (f *FakeDocker) IsImageOnBuild(imageName string) bool {
+	return false
+}
+
 // RemoveContainer removes a fake Docker container
 func (f *FakeDocker) RemoveContainer(id string) error {
 	f.RemoveContainerID = id
@@ -100,8 +104,8 @@ func (f *FakeDocker) RemoveImage(name string) error {
 }
 
 // PullImage pulls a fake docker image
-func (f *FakeDocker) PullImage(imageName string) error {
-	return nil
+func (f *FakeDocker) PullImage(imageName string) (*dockerclient.Image, error) {
+	return nil, nil
 }
 
 // CheckAndPull pulls a fake docker image

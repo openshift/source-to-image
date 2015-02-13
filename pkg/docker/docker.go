@@ -24,13 +24,14 @@ const (
 // build or usage commands
 type Docker interface {
 	IsImageInLocalRegistry(name string) (bool, error)
+	IsImageOnBuild(string) bool
 	RemoveContainer(id string) error
 	GetScriptsURL(name string) (string, error)
 	RunContainer(opts RunContainerOptions) error
 	GetImageID(name string) (string, error)
 	CommitContainer(opts CommitContainerOptions) (string, error)
 	RemoveImage(name string) error
-	PullImage(name string) error
+	PullImage(name string) (*docker.Image, error)
 	CheckAndPull(name string) (*docker.Image, error)
 	BuildImage(opts BuildImageOptions) error
 	GetImageUser(name string) (string, error)
@@ -58,6 +59,11 @@ type stiDocker struct {
 
 type PostExecutor interface {
 	PostExecute(containerID string, location string) error
+}
+
+type PullResult struct {
+	OnBuild bool
+	Image   *docker.Image
 }
 
 // RunContainerOptions are options passed in to the RunContainer method
@@ -128,6 +134,16 @@ func (d *stiDocker) GetImageUser(name string) (string, error) {
 	return user, nil
 }
 
+// IsImageOnBuild provides information about whether the Docker image has
+// OnBuild intruction recorded in the Image Config.
+func (d *stiDocker) IsImageOnBuild(name string) bool {
+	image, err := d.client.InspectImage(name)
+	if err != nil {
+		return false
+	}
+	return len(image.Config.OnBuild) > 0
+}
+
 // CheckAndPull pulls an image into the local registry if not present
 // and returns the image metadata
 func (d *stiDocker) CheckAndPull(name string) (image *docker.Image, err error) {
@@ -135,11 +151,8 @@ func (d *stiDocker) CheckAndPull(name string) (image *docker.Image, err error) {
 		return nil, errors.NewInspectImageError(name, err)
 	}
 	if image == nil {
-		if err = d.PullImage(name); err != nil {
+		if image, err = d.PullImage(name); err != nil {
 			return nil, err
-		}
-		if image, err = d.client.InspectImage(name); err != nil {
-			return nil, errors.NewInspectImageError(name, err)
 		}
 	} else {
 		glog.V(2).Infof("Image %s available locally", name)
@@ -148,15 +161,18 @@ func (d *stiDocker) CheckAndPull(name string) (image *docker.Image, err error) {
 }
 
 // PullImage pulls an image into the local registry
-func (d *stiDocker) PullImage(name string) (err error) {
+func (d *stiDocker) PullImage(name string) (image *docker.Image, err error) {
 	glog.V(1).Infof("Pulling image %s", name)
 	// TODO: Add authentication support
 	if err = d.client.PullImage(docker.PullImageOptions{Repository: name},
 		docker.AuthConfiguration{}); err != nil {
 		glog.V(3).Infof("An error was received from the PullImage call: %v", err)
-		return errors.NewPullImageError(name, err)
+		return nil, errors.NewPullImageError(name, err)
 	}
-	return nil
+	if image, err = d.client.InspectImage(name); err != nil {
+		return nil, errors.NewInspectImageError(name, err)
+	}
+	return
 }
 
 // RemoveContainer removes a container and its associated volumes.
