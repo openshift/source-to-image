@@ -149,17 +149,17 @@ func TestBuild(t *testing.T) {
 			t.Errorf("Unexpected optional scripts requested: %#v", fh.SetupOptional)
 		}
 
-		// Verify that determineIncremental was called
+		// Verify that Determine was called
 		if !fh.DetermineIncrementalCalled {
 			t.Errorf("Determine incremental was not called.")
 		}
 
-		// Verify that saveartifacts was called for an incremental build
+		// Verify that Save was called for an incremental build
 		if incremental && !fh.SaveArtifactsCalled {
-			t.Errorf("SaveArtifacts was not called for an incremental build")
+			t.Errorf("Save artifacts was not called for an incremental build")
 		}
 
-		// Verify that execute was called with the right script
+		// Verify that Execute was called with the right script
 		if fh.ExecuteCommand != api.Assemble {
 			t.Errorf("Unexpected execute command: %s", fh.ExecuteCommand)
 		}

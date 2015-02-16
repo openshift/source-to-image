@@ -204,7 +204,7 @@ func (s *handler) install(path string, workingDir string) error {
 	return s.fs.Rename(path, filepath.Join(workingDir, s.destDir, script))
 }
 
-// prepareScriptDownload turns the script name into proper URL
+// prepareDownload turns the script name into a proper URL
 func (s *handler) prepareDownload(scripts []api.Script, targetDir, baseURL string) map[string]scriptInfo {
 	s.fs.MkdirAll(targetDir)
 	info := make(map[string]scriptInfo)

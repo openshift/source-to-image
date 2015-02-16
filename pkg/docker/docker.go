@@ -135,7 +135,7 @@ func (d *stiDocker) GetImageUser(name string) (string, error) {
 }
 
 // IsImageOnBuild provides information about whether the Docker image has
-// OnBuild intruction recorded in the Image Config.
+// OnBuild instruction recorded in the Image Config.
 func (d *stiDocker) IsImageOnBuild(name string) bool {
 	image, err := d.client.InspectImage(name)
 	if err != nil {
