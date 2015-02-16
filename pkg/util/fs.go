@@ -109,7 +109,7 @@ func (h *fs) Open(filename string) (io.ReadCloser, error) {
 	return os.Open(filename)
 }
 
-// Write opens a file and writes data to it, returning error if such occured
+// Write opens a file and writes data to it, returning error if such occurred
 func (h *fs) WriteFile(filename string, data []byte) error {
 	return ioutil.WriteFile(filename, data, 0700)
 }

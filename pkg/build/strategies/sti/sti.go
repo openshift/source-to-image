@@ -26,7 +26,7 @@ const (
 )
 
 var (
-	// List of directories that needs to be present inside workign dir
+	// List of directories that needs to be present inside working dir
 	workingDirs = []string{
 		"upload/scripts",
 		"upload/src",
@@ -182,7 +182,7 @@ func (b *STI) Prepare(request *api.Request) error {
 	return nil
 }
 
-// SetScripts allows to overide default required and optional scripts
+// SetScripts allows to override default required and optional scripts
 func (b *STI) SetScripts(required, optional []api.Script) {
 	b.requiredScripts = required
 	b.optionalScripts = optional
