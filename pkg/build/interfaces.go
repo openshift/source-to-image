@@ -41,6 +41,13 @@ type Downloader interface {
 	Download(*api.Request) error
 }
 
+// SourceHandler is a wrapper for STI strategy Downloader and Preparer which
+// allows to use Download and Prepare functions from the STI strategy.
+type SourceHandler interface {
+	Downloader
+	Preparer
+}
+
 // LayeredDockerBuilder represents a minimal Docker builder interface that is
 // used to execute the layered Docker build with the application source.
 type LayeredDockerBuilder interface {
