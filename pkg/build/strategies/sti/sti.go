@@ -236,7 +236,7 @@ func (b *STI) PostExecute(containerID string, location string) error {
 
 // Determine determines if the current build supports incremental workflow.
 // It checks if the previous image exists in the system and if so, then it
-// verifies that the save-artifacts scripts is present.
+// verifies that the save-artifacts script is present.
 func (b *STI) Determine(request *api.Request) (err error) {
 	//request.Incremental = false
 
@@ -250,8 +250,8 @@ func (b *STI) Determine(request *api.Request) (err error) {
 		return
 	}
 
-	// we're assuming save-artifacts to exists for embedded scripts (if not we'll
-	// warn a user upon container failure and proceed with clean build)
+	// we're assuming save-artifacts to exist for embedded scripts (if not we'll
+	// warn a user upon container failure and proceed with a clean build)
 	// for external save-artifacts - check its existence
 	saveArtifactsExists := request.ExternalOptionalScripts ||
 		b.fs.Exists(filepath.Join(request.WorkingDir, "upload", "scripts", string(api.SaveArtifacts)))
@@ -260,7 +260,7 @@ func (b *STI) Determine(request *api.Request) (err error) {
 	return nil
 }
 
-// Save extracts and store the build artifacts from the previous build to a
+// Save extracts and restores the build artifacts from the previous build to a
 // current build.
 func (b *STI) Save(request *api.Request) (err error) {
 	artifactTmpDir := filepath.Join(request.WorkingDir, "upload", "artifacts")

@@ -304,7 +304,7 @@ func TestDetermineIncremental(t *testing.T) {
 	}
 
 	tests := []incrementalTest{
-		// 0: external, downloaded scripts and previously image available
+		// 0: external, downloaded scripts and previous image available
 		{false, true, true, true, true},
 
 		// 1: previous image, script downloaded but no save-artifacts
