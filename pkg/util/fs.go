@@ -24,6 +24,8 @@ type FileSystem interface {
 	CreateWorkingDirectory() (string, error)
 	Open(file string) (io.ReadCloser, error)
 	WriteFile(file string, data []byte) error
+	ReadDir(string) ([]os.FileInfo, error)
+	Stat(string) (os.FileInfo, error)
 }
 
 // NewFileSystem creates a new instance of the default FileSystem
@@ -36,6 +38,14 @@ func NewFileSystem() FileSystem {
 
 type fs struct {
 	runner CommandRunner
+}
+
+func (h *fs) Stat(path string) (os.FileInfo, error) {
+	return os.Stat(path)
+}
+
+func (h *fs) ReadDir(path string) ([]os.FileInfo, error) {
+	return ioutil.ReadDir(path)
 }
 
 // Chmod sets the file mode
