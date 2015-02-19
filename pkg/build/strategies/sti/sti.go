@@ -13,7 +13,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/git"
-	"github.com/openshift/source-to-image/pkg/script"
+	"github.com/openshift/source-to-image/pkg/scripts"
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
 )
@@ -28,27 +28,29 @@ const (
 var (
 	// List of directories that needs to be present inside working dir
 	workingDirs = []string{
-		"upload/scripts",
-		"upload/src",
-		"downloads/scripts",
-		"downloads/defaultScripts",
+		api.UploadScripts,
+		api.Source,
+		api.DefaultScripts,
+		api.UserScripts,
 	}
 )
 
 // STI strategy executes the STI build.
 // For more details about STI, visit https://github.com/openshift/source-to-image
 type STI struct {
-	request         *api.Request
-	result          *api.Result
-	postExecutor    docker.PostExecutor
-	installer       script.Installer
-	git             git.Git
-	fs              util.FileSystem
-	tar             tar.Tar
-	docker          docker.Docker
-	callbackInvoker util.CallbackInvoker
-	requiredScripts []api.Script
-	optionalScripts []api.Script
+	request          *api.Request
+	result           *api.Result
+	postExecutor     docker.PostExecutor
+	installer        scripts.Installer
+	git              git.Git
+	fs               util.FileSystem
+	tar              tar.Tar
+	docker           docker.Docker
+	callbackInvoker  util.CallbackInvoker
+	requiredScripts  []api.Script
+	optionalScripts  []api.Script
+	externalScripts  map[api.Script]bool
+	installedScripts map[api.Script]bool
 
 	// Interfaces
 	preparer    build.Preparer
@@ -68,18 +70,20 @@ func New(req *api.Request) (*STI, error) {
 	if err != nil {
 		return nil, err
 	}
-	inst := script.NewInstaller(req.BaseImage, req.ScriptsURL, req.InstallDestination, docker)
+	inst := scripts.NewInstaller(req.BaseImage, req.ScriptsURL, docker)
 
 	b := &STI{
-		installer:       inst,
-		request:         req,
-		docker:          docker,
-		git:             git.New(),
-		fs:              util.NewFileSystem(),
-		tar:             tar.New(),
-		callbackInvoker: util.NewCallbackInvoker(),
-		requiredScripts: []api.Script{api.Assemble, api.Run},
-		optionalScripts: []api.Script{api.SaveArtifacts},
+		installer:        inst,
+		request:          req,
+		docker:           docker,
+		git:              git.New(),
+		fs:               util.NewFileSystem(),
+		tar:              tar.New(),
+		callbackInvoker:  util.NewCallbackInvoker(),
+		requiredScripts:  []api.Script{api.Assemble, api.Run},
+		optionalScripts:  []api.Script{api.SaveArtifacts},
+		externalScripts:  map[api.Script]bool{},
+		installedScripts: map[api.Script]bool{},
 	}
 
 	// The sources are downloaded using the GIT downloader.
@@ -169,14 +173,20 @@ func (b *STI) Prepare(request *api.Request) error {
 	}
 
 	// get the scripts
-	if request.ExternalRequiredScripts, err = b.installer.DownloadAndInstall(
-		b.requiredScripts, request.WorkingDir, true); err != nil {
+	required, err := b.installer.InstallRequired(b.requiredScripts, request.WorkingDir)
+	if err != nil {
 		return err
 	}
+	optional := b.installer.InstallOptional(b.optionalScripts, request.WorkingDir)
 
-	if request.ExternalOptionalScripts, err = b.installer.DownloadAndInstall(
-		b.optionalScripts, request.WorkingDir, false); err != nil {
-		glog.Warningf("Failed downloading optional scripts: %v", err)
+	for _, r := range append(required, optional...) {
+		if r.Error == nil {
+			glog.V(1).Infof("Using %v from %s", r.Script, r.URL)
+			b.externalScripts[r.Script] = r.Downloaded
+			b.installedScripts[r.Script] = r.Installed
+		} else {
+			glog.Warningf("Error getting %v from %s: %v", r.Script, r.URL, r.Error)
+		}
 	}
 
 	return nil
@@ -238,8 +248,6 @@ func (b *STI) PostExecute(containerID string, location string) error {
 // It checks if the previous image exists in the system and if so, then it
 // verifies that the save-artifacts script is present.
 func (b *STI) Determine(request *api.Request) (err error) {
-	//request.Incremental = false
-
 	if request.Clean {
 		return
 	}
@@ -250,13 +258,7 @@ func (b *STI) Determine(request *api.Request) (err error) {
 		return
 	}
 
-	// we're assuming save-artifacts to exist for embedded scripts (if not we'll
-	// warn a user upon container failure and proceed with a clean build)
-	// for external save-artifacts - check its existence
-	saveArtifactsExists := request.ExternalOptionalScripts ||
-		b.fs.Exists(filepath.Join(request.WorkingDir, "upload", "scripts", string(api.SaveArtifacts)))
-
-	request.Incremental = previousImageExists && saveArtifactsExists
+	request.Incremental = previousImageExists && b.installedScripts[api.SaveArtifacts]
 	return nil
 }
 
@@ -278,7 +280,7 @@ func (b *STI) Save(request *api.Request) (err error) {
 
 	opts := docker.RunContainerOptions{
 		Image:           image,
-		ExternalScripts: request.ExternalRequiredScripts,
+		ExternalScripts: b.externalScripts[api.SaveArtifacts],
 		ScriptsURL:      request.ScriptsURL,
 		Location:        request.Location,
 		Command:         api.SaveArtifacts,
@@ -317,12 +319,17 @@ func (b *STI) Execute(command api.Script, request *api.Request) error {
 	defer outWriter.Close()
 	defer errReader.Close()
 	defer errWriter.Close()
+	externalScripts := b.externalScripts[command]
+	// if LayeredBuild is called then all the scripts will be placed inside the image
+	if request.LayeredBuild {
+		externalScripts = false
+	}
 	opts := docker.RunContainerOptions{
 		Image:           request.BaseImage,
 		Stdout:          outWriter,
 		Stderr:          errWriter,
 		PullImage:       request.ForcePull,
-		ExternalScripts: request.ExternalRequiredScripts,
+		ExternalScripts: externalScripts,
 		ScriptsURL:      request.ScriptsURL,
 		Location:        request.Location,
 		Command:         command,

@@ -10,15 +10,17 @@ import (
 const (
 	ErrInspectImage int = 1 + iota
 	ErrPullImage
-	ErrScriptDownload
 	ErrSaveArtifacts
-	ErrBuild
-	ErrSTIContainer
-	ErrTarTimeout
+	ErrAssemble
 	ErrWorkDir
+	ErrBuild
+	ErrTarTimeout
 	ErrDownload
+	ErrScriptsInsideImage
+	ErrInstall
+	ErrInstallRequired
 	ErrURLHandler
-	ErrDefaultScriptsURL
+	ErrSTIContainer
 )
 
 // Error represents an error thrown during STI execution
@@ -71,17 +73,6 @@ func NewPullImageError(name string, err error) error {
 	}
 }
 
-// NewScriptDownloadError returns a new error which indicates there was a problem
-// downloading a script
-func NewScriptDownloadError(name api.Script, err error) error {
-	return Error{
-		Message:    fmt.Sprintf("%s script download failed", name),
-		Details:    err,
-		ErrorCode:  ErrScriptDownload,
-		Suggestion: "provide URL with STI scripts with -s flag or check the image if it contains STI_SCRIPTS_URL variable set",
-	}
-}
-
 // NewSaveArtifactsError returns a new error which indicates there was a problem
 // calling save-artifacts script
 func NewSaveArtifactsError(name, output string, err error) error {
@@ -99,8 +90,19 @@ func NewAssembleError(name, output string, err error) error {
 	return Error{
 		Message:    fmt.Sprintf("assemble for %s failed:\n%s", name, output),
 		Details:    err,
-		ErrorCode:  ErrBuild,
+		ErrorCode:  ErrAssemble,
 		Suggestion: "check the assemble script output for errors",
+	}
+}
+
+// NewWorkDirError returns a new error which indicates there was a problem
+// when creating working directory
+func NewWorkDirError(dir string, err error) error {
+	return Error{
+		Message:    fmt.Sprintf("creating temporary directory %s failed", dir),
+		Details:    err,
+		ErrorCode:  ErrWorkDir,
+		Suggestion: "check if you have access to your system's temporary directory",
 	}
 }
 
@@ -126,17 +128,6 @@ func NewTarTimeoutError() error {
 	}
 }
 
-// NewWorkDirError returns a new error which indicates there was a problem
-// when creating working directory
-func NewWorkDirError(dir string, err error) error {
-	return Error{
-		Message:    fmt.Sprintf("creating temporary directory %s failed", dir),
-		Details:    err,
-		ErrorCode:  ErrWorkDir,
-		Suggestion: "check if you have access to your system's temporary directory",
-	}
-}
-
 // NewDownloadError returns a new error which indicates there was a problem
 // when downloading a file
 func NewDownloadError(url string, code int) error {
@@ -148,6 +139,39 @@ func NewDownloadError(url string, code int) error {
 	}
 }
 
+// NewScriptsInsideImageError returns a new error which informs of scripts
+// being placed inside the image
+func NewScriptsInsideImageError(url string) error {
+	return Error{
+		Message:    fmt.Sprintf("scripts inside the image: %s", url),
+		Details:    nil,
+		ErrorCode:  ErrScriptsInsideImage,
+		Suggestion: "",
+	}
+}
+
+// NewInstallError returns a new error which indicates there was a problem
+// when downloading a script
+func NewInstallError(script api.Script) error {
+	return Error{
+		Message:    fmt.Sprintf("failed to install %v", script),
+		Details:    nil,
+		ErrorCode:  ErrInstall,
+		Suggestion: "provide URL with STI scripts with -s flag or check the image if it contains STI_SCRIPTS_URL variable set",
+	}
+}
+
+// NewInstallRequiredError returns a new error which indicates there was a problem
+// when downloading a required script
+func NewInstallRequiredError(scripts []api.Script) error {
+	return Error{
+		Message:    fmt.Sprintf("failed to install %v", scripts),
+		Details:    nil,
+		ErrorCode:  ErrInstallRequired,
+		Suggestion: "provide URL with STI scripts with -s flag or check the image if it contains STI_SCRIPTS_URL variable set",
+	}
+}
+
 // NewURLHandlerError returns a new error which indicates there was a problem
 // when trying to read scripts URL
 func NewURLHandlerError(url string) error {
@@ -156,17 +180,6 @@ func NewURLHandlerError(url string) error {
 		Details:    nil,
 		ErrorCode:  ErrURLHandler,
 		Suggestion: "check the URL",
-	}
-}
-
-// NewDefaultScriptsURLError return a new error which indicates there was a problem
-// when trying to read STI_SCRIPTS_URL
-func NewDefaultScriptsURLError(err error) error {
-	return Error{
-		Message:    fmt.Sprintf("error reading STI_SCRIPTS_URL"),
-		Details:    err,
-		ErrorCode:  ErrDefaultScriptsURL,
-		Suggestion: "check the image",
 	}
 }
 
