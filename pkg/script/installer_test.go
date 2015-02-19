@@ -165,7 +165,7 @@ func equalArrayContents(a []string, b []string) bool {
 	return true
 }
 
-func TestDownload(t *testing.T) {
+func TestDownloadInstaller(t *testing.T) {
 	sh := getScriptHandler()
 	dl := sh.downloader.(*test.FakeDownloader)
 	sh.docker.(*test.FakeDocker).DefaultURLResult = "http://image.url/scripts"

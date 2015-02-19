@@ -17,6 +17,7 @@ const (
 	ErrTarTimeout
 	ErrWorkDir
 	ErrDownload
+	ErrScriptsInsideImage
 	ErrURLHandler
 	ErrDefaultScriptsURL
 )
@@ -145,6 +146,17 @@ func NewDownloadError(url string, code int) error {
 		Details:    nil,
 		ErrorCode:  ErrDownload,
 		Suggestion: "check the availability of the address",
+	}
+}
+
+// NewScriptsInsideImageError returns a new error which informs of scripts
+// being placed inside the image
+func NewScriptsInsideImageError(url string) error {
+	return Error{
+		Message:    fmt.Sprintf("scripts inside the image: %s", url),
+		Details:    nil,
+		ErrorCode:  ErrScriptsInsideImage,
+		Suggestion: "",
 	}
 }
 
