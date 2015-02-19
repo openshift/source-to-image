@@ -12,8 +12,8 @@ fi
 GO_VERSION=($(go version))
 echo "Detected go version: $(go version)"
 
-if [[ ${GO_VERSION[2]} != "go1.2" && ${GO_VERSION[2]} != "go1.3.1" && ${GO_VERSION[2]} != "go1.3.3" ]]; then
-  echo "Unknown go version, skipping golint."
+if [[ -z $(echo "${GO_VERSION[2]}" | grep -E 'go1.2|go1.3|go1.4') ]]; then
+  echo "Unknown go version '${GO_VERSION}', skipping golint."
   exit 0
 fi
 
