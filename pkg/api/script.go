@@ -14,6 +14,20 @@ const (
 	Usage Script = "usage"
 )
 
+const (
+	// UserScripts is the location of scripts downloaded from user provided URL (-s flag).
+	UserScripts = "downloads/scripts"
+	// DefaultScripts is the location of scripts downloaded from default location (STI_SCRIPTS_URL environment variable).
+	DefaultScripts = "downloads/defaultScripts"
+	// SourceScripts is the location of scripts downloaded with application sources.
+	SourceScripts = "upload/src/.sti/bin"
+
+	// UploadScripts is the location of scripts that will be uploaded to the image during STI build.
+	UploadScripts = "upload/scripts"
+	// Source is the location of application sources.
+	Source = "upload/src"
+)
+
 // String returns name of the script.
 func (s Script) String() string {
 	return string(s)

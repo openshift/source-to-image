@@ -339,7 +339,7 @@ func TestDetermineIncremental(t *testing.T) {
 		bh := testBuildHandler()
 		bh.request.WorkingDir = "/working-dir"
 		bh.request.Clean = ti.clean
-		bh.request.ExternalOptionalScripts = ti.scriptDownload
+		bh.externalScripts = map[api.Script]bool{api.SaveArtifacts: ti.scriptDownload}
 		bh.docker.(*test.FakeDocker).LocalRegistryResult = ti.previousImage
 		if ti.scriptExists {
 			bh.fs.(*test.FakeFileSystem).ExistsResult = map[string]bool{
@@ -529,15 +529,11 @@ func TestPrepareOK(t *testing.T) {
 	}
 	var expected []string
 	for _, dir := range workingDirs {
-		expected = append(expected, "/working-dir/"+dir)
+		expected = append(expected, "/working-dir/"+string(dir))
 	}
 	mkdirs := rh.fs.(*test.FakeFileSystem).MkdirAllDir
 	if !reflect.DeepEqual(mkdirs, expected) {
 		t.Errorf("Unexpected set of MkdirAll calls: %#v", mkdirs)
-	}
-	requiredFlags := rh.installer.(*test.FakeInstaller).Required
-	if !reflect.DeepEqual(requiredFlags, []bool{true, false}) {
-		t.Errorf("Unexpected set of required flags: %#v", requiredFlags)
 	}
 	scripts := rh.installer.(*test.FakeInstaller).Scripts
 	if !reflect.DeepEqual(scripts[0], []api.Script{api.Assemble, api.Run}) {
@@ -569,7 +565,7 @@ func TestPrepareErrorMkdirAll(t *testing.T) {
 func TestPrepareErrorRequiredDownloadAndInstall(t *testing.T) {
 	rh := newFakeSTI(&FakeSTI{})
 	rh.SetScripts([]api.Script{api.Assemble, api.Run}, []api.Script{api.SaveArtifacts})
-	rh.installer.(*test.FakeInstaller).ErrScript = api.Assemble
+	rh.installer.(*test.FakeInstaller).Error = fmt.Errorf("%v", api.Assemble)
 	err := rh.Prepare(rh.request)
 	if err == nil || err.Error() != string(api.Assemble) {
 		t.Errorf("An error was expected for required DownloadAndInstall, but got different: %v", err)
@@ -579,7 +575,6 @@ func TestPrepareErrorRequiredDownloadAndInstall(t *testing.T) {
 func TestPrepareErrorOptionalDownloadAndInstall(t *testing.T) {
 	rh := newFakeSTI(&FakeSTI{})
 	rh.SetScripts([]api.Script{api.Assemble, api.Run}, []api.Script{api.SaveArtifacts})
-	rh.installer.(*test.FakeInstaller).ErrScript = api.SaveArtifacts
 	err := rh.Prepare(rh.request)
 	if err != nil {
 		t.Errorf("Unexpected error when downloading optional scripts: %v", err)

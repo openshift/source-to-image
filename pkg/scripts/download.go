@@ -1,4 +1,4 @@
-package script
+package scripts
 
 import (
 	"io"
