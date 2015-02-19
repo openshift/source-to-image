@@ -38,18 +38,19 @@ var (
 // STI strategy executes the STI build.
 // For more details about STI, visit https://github.com/openshift/source-to-image
 type STI struct {
-	request         *api.Request
-	result          *api.Result
-	postExecutor    docker.PostExecutor
-	installer       scripts.Installer
-	git             git.Git
-	fs              util.FileSystem
-	tar             tar.Tar
-	docker          docker.Docker
-	callbackInvoker util.CallbackInvoker
-	requiredScripts []api.Script
-	optionalScripts []api.Script
-	externalScripts map[api.Script]bool
+	request          *api.Request
+	result           *api.Result
+	postExecutor     docker.PostExecutor
+	installer        scripts.Installer
+	git              git.Git
+	fs               util.FileSystem
+	tar              tar.Tar
+	docker           docker.Docker
+	callbackInvoker  util.CallbackInvoker
+	requiredScripts  []api.Script
+	optionalScripts  []api.Script
+	externalScripts  map[api.Script]bool
+	installedScripts map[api.Script]bool
 
 	// Interfaces
 	preparer    build.Preparer
@@ -72,16 +73,17 @@ func New(req *api.Request) (*STI, error) {
 	inst := scripts.NewInstaller(req.BaseImage, req.ScriptsURL, docker)
 
 	b := &STI{
-		installer:       inst,
-		request:         req,
-		docker:          docker,
-		git:             git.New(),
-		fs:              util.NewFileSystem(),
-		tar:             tar.New(),
-		callbackInvoker: util.NewCallbackInvoker(),
-		requiredScripts: []api.Script{api.Assemble, api.Run},
-		optionalScripts: []api.Script{api.SaveArtifacts},
-		externalScripts: map[api.Script]bool{},
+		installer:        inst,
+		request:          req,
+		docker:           docker,
+		git:              git.New(),
+		fs:               util.NewFileSystem(),
+		tar:              tar.New(),
+		callbackInvoker:  util.NewCallbackInvoker(),
+		requiredScripts:  []api.Script{api.Assemble, api.Run},
+		optionalScripts:  []api.Script{api.SaveArtifacts},
+		externalScripts:  map[api.Script]bool{},
+		installedScripts: map[api.Script]bool{},
 	}
 
 	// The sources are downloaded using the GIT downloader.
@@ -181,6 +183,7 @@ func (b *STI) Prepare(request *api.Request) error {
 		if r.Error == nil {
 			glog.V(1).Infof("Using %v from %s", r.Script, r.URL)
 			b.externalScripts[r.Script] = r.Downloaded
+			b.installedScripts[r.Script] = r.Installed
 		} else {
 			glog.Warningf("Error getting %v from %s: %v", r.Script, r.URL, r.Error)
 		}
@@ -245,8 +248,6 @@ func (b *STI) PostExecute(containerID string, location string) error {
 // It checks if the previous image exists in the system and if so, then it
 // verifies that the save-artifacts script is present.
 func (b *STI) Determine(request *api.Request) (err error) {
-	//request.Incremental = false
-
 	if request.Clean {
 		return
 	}
@@ -257,13 +258,7 @@ func (b *STI) Determine(request *api.Request) (err error) {
 		return
 	}
 
-	// we're assuming save-artifacts to exist for embedded scripts (if not we'll
-	// warn a user upon container failure and proceed with a clean build)
-	// for external save-artifacts - check its existence
-	saveArtifactsExists := !b.externalScripts[api.SaveArtifacts] ||
-		b.fs.Exists(filepath.Join(request.WorkingDir, "upload", "scripts", string(api.SaveArtifacts)))
-
-	request.Incremental = previousImageExists && saveArtifactsExists
+	request.Incremental = previousImageExists && b.installedScripts[api.SaveArtifacts]
 	return nil
 }
 
