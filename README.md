@@ -55,6 +55,20 @@ For detailed description of the requirements and the scripts along with examples
 1. `sti` waits for the container to finish
 1. `sti` commits the container, setting the CMD for the output image to be the `run` script and tagging the image with the name provided.
 
+# Using ONBUILD images
+
+In case you want to use one of the official Docker language stack images for
+your build you don't have do anything extra. The STI is capable to recognize the
+Docker image with ONBUILD instructions and choose the OnBuild strategy. This
+strategy will trigger all ONBUILD instructions and execute the assemble script
+(if it exists) as the last instruction.
+
+Since the ONBUILD images usually don't provide any entrypoint, in order to use
+this build strategy you have to provide it. You can either include the 'run',
+'start' or 'execute' script in your application source root folder or you can
+specify a valid STI scripts URL and the 'run' script will be fetched and set as
+an entrypoint in that case.
+
 ## Incremental builds
 
 `sti` automatically detects:
