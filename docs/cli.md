@@ -3,9 +3,10 @@
 This document describes thoroughly all `sti` subcommands and flags with explanation
 of their purpose as well as an example usage.
 
-Currently `sti` has four subcommands, each of which will be described in the
+Currently `sti` has five subcommands, each of which will be described in the
 following sections of this document:
 
+* [create](#sti-create)
 * [build](#sti-build)
 * [usage](#sti-usage)
 * [version](#sti-version)
