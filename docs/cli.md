@@ -69,8 +69,15 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 | `-l (--location)`          | Location where the scripts and sources will be placed prior doing build (see [STI Scripts](#sti-scripts))|
 | `-r (--ref)`               | A branch/tag from which the build should happen (applies only to GIT source) |
 | `--rm`                     | Remove previous image during incremental build |
-| `--saveTempDir`            | Save the working directory used for fetching scripts and sources |
+| `--saveTempDir`            | Save the working directory used for fetching scripts and sources|
+| `--contextDir`             | Allow to specify directory name with your application |
 | `-s (--scripts)`           | URL of STI scripts (see [STI Scripts](#sti-scripts))|
+
+#### Context directory
+
+In case your application reside in directory other than your repository root
+folder, you can specify that directory using the `--contextDir` parameter. In
+that case, the specified directory will be used as your application root folder.
 
 #### Callback URL
 
