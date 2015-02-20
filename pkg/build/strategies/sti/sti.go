@@ -53,12 +53,12 @@ type STI struct {
 	installedScripts map[api.Script]bool
 
 	// Interfaces
-	preparer    build.Preparer
-	incremental build.IncrementalBuilder
-	scripts     build.ScriptsHandler
-	source      build.Downloader
-	garbage     build.Cleaner
-	layered     build.Builder
+	preparer  build.Preparer
+	artifacts build.IncrementalBuilder
+	scripts   build.ScriptsHandler
+	source    build.Downloader
+	garbage   build.Cleaner
+	layered   build.Builder
 }
 
 // New returns the instance of STI builder strategy for the given request.
@@ -94,7 +94,7 @@ func New(req *api.Request) (*STI, error) {
 
 	// Set interfaces
 	b.preparer = b
-	b.incremental = b
+	b.artifacts = b
 	b.scripts = b
 	b.postExecutor = b
 	return b, err
@@ -112,19 +112,15 @@ func (b *STI) Build(request *api.Request) (*api.Result, error) {
 		return nil, err
 	}
 
-	if err := b.incremental.Determine(request); err != nil {
-		return nil, err
-	}
-
-	if request.Incremental {
-		glog.V(1).Infof("Existing image for tag %s detected for incremental build.", request.Tag)
+	if b.request.Incremental = b.artifacts.Exists(request); b.request.Incremental {
+		glog.V(1).Infof("Existing image for tag %s detected for incremental build", request.Tag)
 	} else {
 		glog.V(1).Infof("Clean build will be performed")
 	}
 
 	glog.V(2).Infof("Performing source build from %s", request.Source)
 	if request.Incremental {
-		if err := b.incremental.Save(request); err != nil {
+		if err := b.artifacts.Save(request); err != nil {
 			glog.Warningf("Error saving previous build artifacts: %v", err)
 			glog.Warning("Clean build will be performed!")
 		}
@@ -244,22 +240,21 @@ func (b *STI) PostExecute(containerID string, location string) error {
 	return nil
 }
 
-// Determine determines if the current build supports incremental workflow.
+// Exists determines if the current build supports incremental workflow.
 // It checks if the previous image exists in the system and if so, then it
 // verifies that the save-artifacts script is present.
-func (b *STI) Determine(request *api.Request) (err error) {
+func (b *STI) Exists(request *api.Request) bool {
 	if request.Clean {
-		return
+		return false
 	}
 
-	// can only do incremental build if runtime image exists
-	previousImageExists, err := b.docker.IsImageInLocalRegistry(request.Tag)
-	if err != nil {
-		return
+	// can only do incremental build if runtime image exists, so always pull image
+	previousImageExists, _ := b.docker.IsImageInLocalRegistry(request.Tag)
+	if image, _ := b.docker.PullImage(request.Tag); image != nil {
+		previousImageExists = true
 	}
 
-	request.Incremental = previousImageExists && b.installedScripts[api.SaveArtifacts]
-	return nil
+	return previousImageExists && b.installedScripts[api.SaveArtifacts]
 }
 
 // Save extracts and restores the build artifacts from the previous build to a

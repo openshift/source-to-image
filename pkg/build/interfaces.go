@@ -23,11 +23,11 @@ type Cleaner interface {
 
 // IncrementalBuilder provides methods that is used for builders that implements
 // the 'incremental' build workflow.
-// The Determine method checks if the artifacts from the previous build exists
+// The Exists method checks if the artifacts from the previous build exists
 // and if they can be used in the current build.
 // The Save method stores the artifacts for the next build.
 type IncrementalBuilder interface {
-	Determine(*api.Request) error
+	Exists(*api.Request) bool
 	Save(*api.Request) error
 }
 

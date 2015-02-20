@@ -14,27 +14,27 @@ import (
 )
 
 type FakeSTI struct {
-	CleanupCalled              bool
-	PrepareCalled              bool
-	SetupRequired              []api.Script
-	SetupOptional              []api.Script
-	SetupError                 error
-	DetermineIncrementalCalled bool
-	DetermineIncrementalError  error
-	BuildRequest               *api.Request
-	BuildResult                *api.Result
-	SaveArtifactsCalled        bool
-	SaveArtifactsError         error
-	FetchSourceCalled          bool
-	FetchSourceError           error
-	ExecuteCommand             api.Script
-	ExecuteError               error
-	ExpectedError              bool
-	LayeredBuildCalled         bool
-	LayeredBuildError          error
-	PostExecuteLocation        string
-	PostExecuteContainerID     string
-	PostExecuteError           error
+	CleanupCalled          bool
+	PrepareCalled          bool
+	SetupRequired          []api.Script
+	SetupOptional          []api.Script
+	SetupError             error
+	ExistsCalled           bool
+	ExistsError            error
+	BuildRequest           *api.Request
+	BuildResult            *api.Result
+	SaveArtifactsCalled    bool
+	SaveArtifactsError     error
+	FetchSourceCalled      bool
+	FetchSourceError       error
+	ExecuteCommand         api.Script
+	ExecuteError           error
+	ExpectedError          bool
+	LayeredBuildCalled     bool
+	LayeredBuildError      error
+	PostExecuteLocation    string
+	PostExecuteContainerID string
+	PostExecuteError       error
 }
 
 func newFakeBaseSTI() *STI {
@@ -51,18 +51,18 @@ func newFakeBaseSTI() *STI {
 
 func newFakeSTI(f *FakeSTI) *STI {
 	s := &STI{
-		request:     &api.Request{},
-		result:      &api.Result{},
-		docker:      &test.FakeDocker{},
-		installer:   &test.FakeInstaller{},
-		git:         &test.FakeGit{},
-		fs:          &test.FakeFileSystem{},
-		tar:         &test.FakeTar{},
-		preparer:    f,
-		incremental: f,
-		scripts:     f,
-		garbage:     f,
-		layered:     &FakeDockerBuild{f},
+		request:   &api.Request{},
+		result:    &api.Result{},
+		docker:    &test.FakeDocker{},
+		installer: &test.FakeInstaller{},
+		git:       &test.FakeGit{},
+		fs:        &test.FakeFileSystem{},
+		tar:       &test.FakeTar{},
+		preparer:  f,
+		artifacts: f,
+		scripts:   f,
+		garbage:   f,
+		layered:   &FakeDockerBuild{f},
 	}
 	s.source = &git.Clone{s.git, s.fs}
 	return s
@@ -79,9 +79,9 @@ func (f *FakeSTI) Prepare(*api.Request) error {
 	return nil
 }
 
-func (f *FakeSTI) Determine(*api.Request) error {
-	f.DetermineIncrementalCalled = true
-	return f.DetermineIncrementalError
+func (f *FakeSTI) Exists(*api.Request) bool {
+	f.ExistsCalled = true
+	return false
 }
 
 func (f *FakeSTI) Request() *api.Request {
@@ -149,9 +149,9 @@ func TestBuild(t *testing.T) {
 			t.Errorf("Unexpected optional scripts requested: %#v", fh.SetupOptional)
 		}
 
-		// Verify that Determine was called
-		if !fh.DetermineIncrementalCalled {
-			t.Errorf("Determine incremental was not called.")
+		// Verify that Exists was called
+		if !fh.ExistsCalled {
+			t.Errorf("Exists was not called.")
 		}
 
 		// Verify that Save was called for an incremental build
@@ -289,7 +289,7 @@ func TestPostExecute(t *testing.T) {
 	}
 }
 
-func TestDetermineIncremental(t *testing.T) {
+func TestExists(t *testing.T) {
 	type incrementalTest struct {
 		// clean flag was passed
 		clean bool
@@ -323,12 +323,12 @@ func TestDetermineIncremental(t *testing.T) {
 		bh.request.WorkingDir = "/working-dir"
 		bh.request.Clean = ti.clean
 		bh.installedScripts = map[api.Script]bool{api.SaveArtifacts: ti.scriptInstalled}
-		bh.docker.(*test.FakeDocker).LocalRegistryResult = ti.previousImage
+		bh.docker.(*test.FakeDocker).PullResult = ti.previousImage
 
-		bh.Determine(bh.request)
-		if bh.request.Incremental != ti.expected {
+		incremental := bh.Exists(bh.request)
+		if incremental != ti.expected {
 			t.Errorf("(%d) Unexpected incremental result: %v. Expected: %v",
-				i, bh.request.Incremental, ti.expected)
+				i, incremental, ti.expected)
 		}
 		if !ti.clean && ti.previousImage && ti.scriptInstalled {
 			if len(bh.fs.(*test.FakeFileSystem).ExistsFile) == 0 {
