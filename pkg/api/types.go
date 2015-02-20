@@ -82,7 +82,7 @@ type Result struct {
 type InstallResult struct {
 
 	// Script describes which script this result refers to
-	Script Script
+	Script string
 
 	// URL describes from where the script was taken
 	URL string

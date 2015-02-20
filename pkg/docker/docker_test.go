@@ -273,7 +273,7 @@ func TestGetScriptsURL(t *testing.T) {
 func TestRunContainer(t *testing.T) {
 	type runtest struct {
 		image           docker.Image
-		cmd             api.Script
+		cmd             string
 		externalScripts bool
 		paramScriptsURL string
 		paramLocation   string

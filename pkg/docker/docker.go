@@ -73,7 +73,7 @@ type RunContainerOptions struct {
 	ExternalScripts bool
 	ScriptsURL      string
 	Location        string
-	Command         api.Script
+	Command         string
 	Env             []string
 	Stdin           io.Reader
 	Stdout          io.Writer
@@ -152,9 +152,9 @@ func (d *stiDocker) CheckAndPull(name string) (image *docker.Image, err error) {
 	}
 	if image == nil {
 		return d.PullImage(name)
-	} else {
-		glog.V(2).Infof("Image %s available locally", name)
 	}
+
+	glog.V(2).Infof("Image %s available locally", name)
 	return
 }
 
