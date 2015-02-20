@@ -81,7 +81,7 @@ func TestCheckAndPull(t *testing.T) {
 			InspectImageResult: []*docker.Image{nil},
 		},
 		expectedImage: nil,
-		expectedError: errors.ErrInspectImage,
+		expectedError: errors.InspectImageError,
 	}
 	pullErrorTest := testDef{
 		docker: test.FakeDockerClient{
@@ -90,7 +90,7 @@ func TestCheckAndPull(t *testing.T) {
 			InspectImageResult: []*docker.Image{nil},
 		},
 		expectedImage:       nil,
-		expectedError:       errors.ErrPullImage,
+		expectedError:       errors.PullImageError,
 		expectedPullOptions: docker.PullImageOptions{Repository: imageName},
 	}
 	errorAfterPullTest := testDef{
@@ -99,7 +99,7 @@ func TestCheckAndPull(t *testing.T) {
 			InspectImageResult: []*docker.Image{nil, image},
 		},
 		expectedImage:       nil,
-		expectedError:       errors.ErrInspectImage,
+		expectedError:       errors.InspectImageError,
 		expectedPullOptions: docker.PullImageOptions{Repository: imageName},
 	}
 	tests := map[string]testDef{
