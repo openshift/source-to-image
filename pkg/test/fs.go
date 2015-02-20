@@ -162,7 +162,7 @@ func (f *FakeFileSystem) Open(file string) (io.ReadCloser, error) {
 	return f.OpenFileResult, f.OpenError
 }
 
-// Write writes a file
+// WriteFile writes a file
 func (f *FakeFileSystem) WriteFile(file string, data []byte) error {
 	f.WriteFileName = file
 	f.WriteFileContent = string(data)

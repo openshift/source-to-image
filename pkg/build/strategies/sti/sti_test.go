@@ -16,8 +16,8 @@ import (
 type FakeSTI struct {
 	CleanupCalled          bool
 	PrepareCalled          bool
-	SetupRequired          []api.Script
-	SetupOptional          []api.Script
+	SetupRequired          []string
+	SetupOptional          []string
 	SetupError             error
 	ExistsCalled           bool
 	ExistsError            error
@@ -27,7 +27,7 @@ type FakeSTI struct {
 	SaveArtifactsError     error
 	FetchSourceCalled      bool
 	FetchSourceError       error
-	ExecuteCommand         api.Script
+	ExecuteCommand         string
 	ExecuteError           error
 	ExpectedError          bool
 	LayeredBuildCalled     bool
@@ -74,8 +74,8 @@ func (f *FakeSTI) Cleanup(*api.Request) {
 
 func (f *FakeSTI) Prepare(*api.Request) error {
 	f.PrepareCalled = true
-	f.SetupRequired = []api.Script{api.Assemble, api.Run}
-	f.SetupOptional = []api.Script{api.SaveArtifacts}
+	f.SetupRequired = []string{api.Assemble, api.Run}
+	f.SetupOptional = []string{api.SaveArtifacts}
 	return nil
 }
 
@@ -105,7 +105,7 @@ func (f *FakeSTI) Download(*api.Request) error {
 	return nil
 }
 
-func (f *FakeSTI) Execute(command api.Script, r *api.Request) error {
+func (f *FakeSTI) Execute(command string, r *api.Request) error {
 	f.ExecuteCommand = command
 	return f.ExecuteError
 }
@@ -142,10 +142,10 @@ func TestBuild(t *testing.T) {
 		builder.Build(&api.Request{Incremental: incremental})
 
 		// Verify the right scripts were requested
-		if !reflect.DeepEqual(fh.SetupRequired, []api.Script{api.Assemble, api.Run}) {
+		if !reflect.DeepEqual(fh.SetupRequired, []string{api.Assemble, api.Run}) {
 			t.Errorf("Unexpected required scripts requested: %#v", fh.SetupRequired)
 		}
-		if !reflect.DeepEqual(fh.SetupOptional, []api.Script{api.SaveArtifacts}) {
+		if !reflect.DeepEqual(fh.SetupOptional, []string{api.SaveArtifacts}) {
 			t.Errorf("Unexpected optional scripts requested: %#v", fh.SetupOptional)
 		}
 
@@ -322,7 +322,7 @@ func TestExists(t *testing.T) {
 		bh := testBuildHandler()
 		bh.request.WorkingDir = "/working-dir"
 		bh.request.Clean = ti.clean
-		bh.installedScripts = map[api.Script]bool{api.SaveArtifacts: ti.scriptInstalled}
+		bh.installedScripts = map[string]bool{api.SaveArtifacts: ti.scriptInstalled}
 		bh.docker.(*test.FakeDocker).PullResult = ti.previousImage
 
 		incremental := bh.Exists(bh.request)
@@ -497,7 +497,7 @@ func TestFetchSource(t *testing.T) {
 
 func TestPrepareOK(t *testing.T) {
 	rh := newFakeSTI(&FakeSTI{})
-	rh.SetScripts([]api.Script{api.Assemble, api.Run}, []api.Script{api.SaveArtifacts})
+	rh.SetScripts([]string{api.Assemble, api.Run}, []string{api.SaveArtifacts})
 	rh.fs.(*test.FakeFileSystem).WorkingDirResult = "/working-dir"
 	err := rh.Prepare(rh.request)
 	if err != nil {
@@ -508,17 +508,17 @@ func TestPrepareOK(t *testing.T) {
 	}
 	var expected []string
 	for _, dir := range workingDirs {
-		expected = append(expected, "/working-dir/"+string(dir))
+		expected = append(expected, "/working-dir/"+dir)
 	}
 	mkdirs := rh.fs.(*test.FakeFileSystem).MkdirAllDir
 	if !reflect.DeepEqual(mkdirs, expected) {
 		t.Errorf("Unexpected set of MkdirAll calls: %#v", mkdirs)
 	}
 	scripts := rh.installer.(*test.FakeInstaller).Scripts
-	if !reflect.DeepEqual(scripts[0], []api.Script{api.Assemble, api.Run}) {
+	if !reflect.DeepEqual(scripts[0], []string{api.Assemble, api.Run}) {
 		t.Errorf("Unexpected set of required scripts: %#v", scripts[0])
 	}
-	if !reflect.DeepEqual(scripts[1], []api.Script{api.SaveArtifacts}) {
+	if !reflect.DeepEqual(scripts[1], []string{api.SaveArtifacts}) {
 		t.Errorf("Unexpected set of optional scripts: %#v", scripts[1])
 	}
 }
@@ -543,17 +543,17 @@ func TestPrepareErrorMkdirAll(t *testing.T) {
 
 func TestPrepareErrorRequiredDownloadAndInstall(t *testing.T) {
 	rh := newFakeSTI(&FakeSTI{})
-	rh.SetScripts([]api.Script{api.Assemble, api.Run}, []api.Script{api.SaveArtifacts})
+	rh.SetScripts([]string{api.Assemble, api.Run}, []string{api.SaveArtifacts})
 	rh.installer.(*test.FakeInstaller).Error = fmt.Errorf("%v", api.Assemble)
 	err := rh.Prepare(rh.request)
-	if err == nil || err.Error() != string(api.Assemble) {
+	if err == nil || err.Error() != api.Assemble {
 		t.Errorf("An error was expected for required DownloadAndInstall, but got different: %v", err)
 	}
 }
 
 func TestPrepareErrorOptionalDownloadAndInstall(t *testing.T) {
 	rh := newFakeSTI(&FakeSTI{})
-	rh.SetScripts([]api.Script{api.Assemble, api.Run}, []api.Script{api.SaveArtifacts})
+	rh.SetScripts([]string{api.Assemble, api.Run}, []string{api.SaveArtifacts})
 	err := rh.Prepare(rh.request)
 	if err != nil {
 		t.Errorf("Unexpected error when downloading optional scripts: %v", err)

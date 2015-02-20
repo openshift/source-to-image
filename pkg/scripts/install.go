@@ -12,8 +12,8 @@ import (
 
 // Installer interface is responsible for installing scripts needed to run the build
 type Installer interface {
-	InstallRequired(scripts []api.Script, dstDir string) ([]api.InstallResult, error)
-	InstallOptional(scripts []api.Script, dstDir string) []api.InstallResult
+	InstallRequired(scripts []string, dstDir string) ([]api.InstallResult, error)
+	InstallOptional(scripts []string, dstDir string) []api.InstallResult
 }
 
 // NewInstaller returns a new instance of the default Installer implementation
@@ -44,9 +44,9 @@ var locationsOrder = []string{api.UserScripts, api.SourceScripts, api.DefaultScr
 // InstallRequired downloads and installs required scripts into dstDir, the result is a
 // map of scripts with detailed information about each of the scripts install process
 // with error if installing some of them failed
-func (i *installer) InstallRequired(scripts []api.Script, dstDir string) (results []api.InstallResult, err error) {
+func (i *installer) InstallRequired(scripts []string, dstDir string) (results []api.InstallResult, err error) {
 	results = i.run(scripts, dstDir)
-	failedScripts := []api.Script{}
+	failedScripts := []string{}
 	for _, r := range results {
 		if !r.Installed && r.Error != nil {
 			failedScripts = append(failedScripts, r.Script)
@@ -61,7 +61,7 @@ func (i *installer) InstallRequired(scripts []api.Script, dstDir string) (result
 
 // InstallOptional downloads and installs a set of scripts into dstDir, the result is a
 // map of scripts with detailed information about each of the scripts install process
-func (i *installer) InstallOptional(scripts []api.Script, dstDir string) []api.InstallResult {
+func (i *installer) InstallOptional(scripts []string, dstDir string) []api.InstallResult {
 	return i.run(scripts, dstDir)
 }
 
@@ -70,8 +70,8 @@ type downloadResult struct {
 	err      error
 }
 
-func (i *installer) run(scripts []api.Script, dstDir string) []api.InstallResult {
-	var userResults, sourceResults, defaultResults map[api.Script]*downloadResult
+func (i *installer) run(scripts []string, dstDir string) []api.InstallResult {
+	var userResults, sourceResults, defaultResults map[string]*downloadResult
 
 	// get scripts from user provided URL
 	if i.scriptsURL != "" {
@@ -79,10 +79,10 @@ func (i *installer) run(scripts []api.Script, dstDir string) []api.InstallResult
 	}
 
 	// get scripts from source
-	sourceResults = make(map[api.Script]*downloadResult, len(scripts))
+	sourceResults = make(map[string]*downloadResult, len(scripts))
 	for _, script := range scripts {
 		sourceResults[script] = &downloadResult{location: api.SourceScripts}
-		file := filepath.Join(dstDir, api.SourceScripts, string(script))
+		file := filepath.Join(dstDir, api.SourceScripts, script)
 		if !i.fs.Exists(file) {
 			sourceResults[script].err = errors.NewDownloadError(file, -1)
 		}
@@ -97,26 +97,26 @@ func (i *installer) run(scripts []api.Script, dstDir string) []api.InstallResult
 	return i.install(scripts, userResults, sourceResults, defaultResults, dstDir)
 }
 
-func (i *installer) download(scriptsURL string, scripts []api.Script, dstDir string) map[api.Script]*downloadResult {
-	result := make(map[api.Script]*downloadResult, len(scripts))
+func (i *installer) download(scriptsURL string, scripts []string, dstDir string) map[string]*downloadResult {
+	result := make(map[string]*downloadResult, len(scripts))
 
 	for _, script := range scripts {
 		result[script] = &downloadResult{location: scriptsURL}
-		url, err := url.Parse(scriptsURL + "/" + string(script))
+		url, err := url.Parse(scriptsURL + "/" + script)
 		if err != nil {
 			result[script].err = err
 			continue
 		}
-		result[script].err = i.downloader.Download(url, filepath.Join(dstDir, string(script)))
+		result[script].err = i.downloader.Download(url, filepath.Join(dstDir, script))
 	}
 
 	return result
 }
 
-func (i *installer) install(scripts []api.Script, userResults, sourceResults, defaultResults map[api.Script]*downloadResult, dstDir string) []api.InstallResult {
+func (i *installer) install(scripts []string, userResults, sourceResults, defaultResults map[string]*downloadResult, dstDir string) []api.InstallResult {
 	resultList := make([]api.InstallResult, len(scripts))
 
-	locationsResultsMap := map[string]map[api.Script]*downloadResult{
+	locationsResultsMap := map[string]map[string]*downloadResult{
 		api.UserScripts:    userResults,
 		api.SourceScripts:  sourceResults,
 		api.DefaultScripts: defaultResults,
@@ -155,8 +155,8 @@ func (i *installer) install(scripts []api.Script, userResults, sourceResults, de
 			}
 
 			// if there was no error
-			src := filepath.Join(dstDir, location, string(script))
-			dst := filepath.Join(dstDir, api.UploadScripts, string(script))
+			src := filepath.Join(dstDir, location, script)
+			dst := filepath.Join(dstDir, api.UploadScripts, script)
 			// move script to upload directory
 			if err := i.fs.Rename(src, dst); err != nil {
 				result.Error = err

@@ -48,7 +48,7 @@ func New(request *api.Request) (*OnBuild, error) {
 	// Use STI Prepare() and download the 'run' script optionally.
 	request.InstallDestination = "upload/src"
 	s, err := sti.New(request)
-	s.SetScripts([]api.Script{}, []api.Script{api.Assemble, api.Run})
+	s.SetScripts([]string{}, []string{api.Assemble, api.Run})
 
 	b.source = onBuildSourceHandler{
 		&git.Clone{b.git, b.fs},

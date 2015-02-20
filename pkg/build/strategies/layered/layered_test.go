@@ -11,7 +11,7 @@ import (
 
 type FakeExecutor struct{}
 
-func (f *FakeExecutor) Execute(api.Script, *api.Request) error {
+func (f *FakeExecutor) Execute(string, *api.Request) error {
 	return nil
 }
 

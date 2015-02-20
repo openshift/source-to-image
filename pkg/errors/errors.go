@@ -2,8 +2,6 @@ package errors
 
 import (
 	"fmt"
-
-	"github.com/openshift/source-to-image/pkg/api"
 )
 
 // Common STI errors
@@ -152,7 +150,7 @@ func NewScriptsInsideImageError(url string) error {
 
 // NewInstallError returns a new error which indicates there was a problem
 // when downloading a script
-func NewInstallError(script api.Script) error {
+func NewInstallError(script string) error {
 	return Error{
 		Message:    fmt.Sprintf("failed to install %v", script),
 		Details:    nil,
@@ -163,7 +161,7 @@ func NewInstallError(script api.Script) error {
 
 // NewInstallRequiredError returns a new error which indicates there was a problem
 // when downloading a required script
-func NewInstallRequiredError(scripts []api.Script) error {
+func NewInstallRequiredError(scripts []string) error {
 	return Error{
 		Message:    fmt.Sprintf("failed to install %v", scripts),
 		Details:    nil,

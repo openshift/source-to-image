@@ -23,10 +23,10 @@ func getFakeInstaller() *installer {
 func TestInstallRequiredError(t *testing.T) {
 	inst := getFakeInstaller()
 	inst.downloader.(*test.FakeDownloader).Err = map[string]error{
-		inst.scriptsURL + "/" + string(api.Assemble): fmt.Errorf("Download Error"),
+		inst.scriptsURL + "/" + api.Assemble: fmt.Errorf("Download Error"),
 	}
 
-	_, err := inst.InstallRequired([]api.Script{api.Assemble, api.Run}, "/working-dir/")
+	_, err := inst.InstallRequired([]string{api.Assemble, api.Run}, "/working-dir/")
 	if err == nil {
 		t.Error("Expected error but none got!")
 	}
@@ -41,13 +41,13 @@ func TestRun(t *testing.T) {
 	workingDir := "/working-dir/"
 	fs := inst.fs.(*test.FakeFileSystem)
 	fs.ExistsResult = map[string]bool{
-		filepath.Join(workingDir, api.UserScripts, string(api.Assemble)):    true,
-		filepath.Join(workingDir, api.UserScripts, string(api.Run)):         true,
-		filepath.Join(workingDir, api.DefaultScripts, string(api.Assemble)): true,
-		filepath.Join(workingDir, api.DefaultScripts, string(api.Run)):      true,
+		filepath.Join(workingDir, api.UserScripts, api.Assemble):    true,
+		filepath.Join(workingDir, api.UserScripts, api.Run):         true,
+		filepath.Join(workingDir, api.DefaultScripts, api.Assemble): true,
+		filepath.Join(workingDir, api.DefaultScripts, api.Run):      true,
 	}
 
-	result := inst.run([]api.Script{api.Assemble, api.Run}, workingDir)
+	result := inst.run([]string{api.Assemble, api.Run}, workingDir)
 	if len(result) != 2 {
 		t.Errorf("Unexpected result length, expected 2, got %d", len(result))
 	}
@@ -71,11 +71,11 @@ func TestRunNoDefaultURL(t *testing.T) {
 	workingDir := "/working-dir/"
 	fs := inst.fs.(*test.FakeFileSystem)
 	fs.ExistsResult = map[string]bool{
-		filepath.Join(workingDir, api.UserScripts, string(api.Assemble)): true,
-		filepath.Join(workingDir, api.UserScripts, string(api.Run)):      true,
+		filepath.Join(workingDir, api.UserScripts, api.Assemble): true,
+		filepath.Join(workingDir, api.UserScripts, api.Run):      true,
 	}
 
-	result := inst.run([]api.Script{api.Assemble, api.Run}, workingDir)
+	result := inst.run([]string{api.Assemble, api.Run}, workingDir)
 	if len(result) != 2 {
 		t.Errorf("Unexpected result length, expected 2, got %d", len(result))
 	}
@@ -94,7 +94,7 @@ func TestRunNoDefaultURL(t *testing.T) {
 
 func TestRunEmpty(t *testing.T) {
 	inst := getFakeInstaller()
-	result := inst.run([]api.Script{}, "")
+	result := inst.run([]string{}, "")
 	if result == nil || len(result) != 0 {
 		t.Error("Unexpected result from run!")
 	}
@@ -106,14 +106,14 @@ func TestDownloadErrors(t *testing.T) {
 	dl := inst.downloader.(*test.FakeDownloader)
 	dlErr := fmt.Errorf("Download Error")
 	dl.Err = map[string]error{
-		baseURL + "/" + string(api.Assemble):      dlErr,
-		baseURL + "/" + string(api.Run):           nil,
-		baseURL + "/" + string(api.SaveArtifacts): dlErr,
+		baseURL + "/" + api.Assemble:      dlErr,
+		baseURL + "/" + api.Run:           nil,
+		baseURL + "/" + api.SaveArtifacts: dlErr,
 	}
 
-	result := inst.download(baseURL, []api.Script{api.Assemble, api.Run, api.SaveArtifacts}, "")
+	result := inst.download(baseURL, []string{api.Assemble, api.Run, api.SaveArtifacts}, "")
 	for s, r := range result {
-		e := dl.Err[baseURL+"/"+string(s)]
+		e := dl.Err[baseURL+"/"+s]
 		a := r.err
 		if e != a {
 			t.Errorf("Expected download error '%v' for %v, but got %v", e, s, a)
@@ -123,59 +123,59 @@ func TestDownloadErrors(t *testing.T) {
 
 func TestInstallFromDefaultURL(t *testing.T) {
 	defaultURL := "http://the.default.url"
-	defaultResults := map[api.Script]*downloadResult{
+	defaultResults := map[string]*downloadResult{
 		api.Assemble: {defaultURL, nil},
 		api.Run:      {defaultURL, nil},
 	}
 
-	testInstall(t, getFakeInstaller(), []api.Script{api.Assemble, api.Run},
+	testInstall(t, getFakeInstaller(), []string{api.Assemble, api.Run},
 		nil, nil, defaultResults, "/working-dir/",
 		defaultURL, true, true, nil)
 }
 
 func TestInstallFromScriptsURL(t *testing.T) {
 	scriptsURL := "http://the.scripts.url"
-	userResults := map[api.Script]*downloadResult{
+	userResults := map[string]*downloadResult{
 		api.Assemble: {scriptsURL, nil},
 		api.Run:      {scriptsURL, nil},
 	}
 
 	defaultURL := "http://the.default.url"
-	defaultResults := map[api.Script]*downloadResult{
+	defaultResults := map[string]*downloadResult{
 		api.Assemble: {defaultURL, nil},
 		api.Run:      {defaultURL, nil},
 	}
 
-	testInstall(t, getFakeInstaller(), []api.Script{api.Assemble, api.Run},
+	testInstall(t, getFakeInstaller(), []string{api.Assemble, api.Run},
 		userResults, nil, defaultResults, "/working-dir/",
 		scriptsURL, true, true, nil)
 }
 
 func TestInstallFromSourceURL(t *testing.T) {
-	sourceResults := map[api.Script]*downloadResult{
+	sourceResults := map[string]*downloadResult{
 		api.Assemble: {api.SourceScripts, nil},
 		api.Run:      {api.SourceScripts, nil},
 	}
 
 	defaultURL := "http://the.default.url"
-	defaultResults := map[api.Script]*downloadResult{
+	defaultResults := map[string]*downloadResult{
 		api.Assemble: {defaultURL, nil},
 		api.Run:      {defaultURL, nil},
 	}
 
-	testInstall(t, getFakeInstaller(), []api.Script{api.Assemble, api.Run},
+	testInstall(t, getFakeInstaller(), []string{api.Assemble, api.Run},
 		nil, sourceResults, defaultResults, "/working-dir/",
 		api.SourceScripts, true, true, nil)
 }
 
 func TestInstallScriptsFromImage(t *testing.T) {
 	defaultURL := "image:///path/in/image"
-	defaultResults := map[api.Script]*downloadResult{
+	defaultResults := map[string]*downloadResult{
 		api.Assemble: {defaultURL, errors.NewScriptsInsideImageError(defaultURL)},
 		api.Run:      {defaultURL, errors.NewScriptsInsideImageError(defaultURL)},
 	}
 
-	testInstall(t, getFakeInstaller(), []api.Script{api.Assemble, api.Run},
+	testInstall(t, getFakeInstaller(), []string{api.Assemble, api.Run},
 		nil, nil, defaultResults, "/working-dir/",
 		defaultURL, false, true, nil)
 }
@@ -183,25 +183,25 @@ func TestInstallScriptsFromImage(t *testing.T) {
 func TestInstallJustErrors(t *testing.T) {
 	err1 := fmt.Errorf("Just errors")
 	scriptsURL := "http://the.scripts.url"
-	userResults := map[api.Script]*downloadResult{
+	userResults := map[string]*downloadResult{
 		api.Assemble: {scriptsURL, err1},
 		api.Run:      {scriptsURL, err1},
 	}
 
 	err2 := fmt.Errorf("Just errors")
 	defaultURL := "image:///path/in/image"
-	defaultResults := map[api.Script]*downloadResult{
+	defaultResults := map[string]*downloadResult{
 		api.Assemble: {defaultURL, err2},
 		api.Run:      {defaultURL, err2},
 	}
 
-	testInstall(t, getFakeInstaller(), []api.Script{api.Assemble, api.Run},
+	testInstall(t, getFakeInstaller(), []string{api.Assemble, api.Run},
 		userResults, nil, defaultResults, "/working-dir/",
 		defaultURL, false, false, err2)
 }
 
 func TestInstallEmpty(t *testing.T) {
-	testInstall(t, getFakeInstaller(), []api.Script{api.Assemble, api.Run},
+	testInstall(t, getFakeInstaller(), []string{api.Assemble, api.Run},
 		nil, nil, nil, "/working-dir/",
 		"", false, false, nil)
 }
@@ -212,12 +212,12 @@ func TestInstallRenameErr(t *testing.T) {
 	inst.fs.(*test.FakeFileSystem).RenameError = fsErr
 
 	defaultURL := "http://the.default.url"
-	defaultResults := map[api.Script]*downloadResult{
+	defaultResults := map[string]*downloadResult{
 		api.Assemble: {defaultURL, nil},
 		api.Run:      {defaultURL, nil},
 	}
 
-	testInstall(t, inst, []api.Script{api.Assemble, api.Run},
+	testInstall(t, inst, []string{api.Assemble, api.Run},
 		nil, nil, defaultResults, "/working-dir/",
 		defaultURL, false, false, fsErr)
 }
@@ -227,23 +227,23 @@ func TestInstallChmodErr(t *testing.T) {
 	workingDir := "/working-dir/"
 	fsErr := fmt.Errorf("Chmod Error")
 	inst.fs.(*test.FakeFileSystem).ChmodError = map[string]error{
-		filepath.Join(workingDir, api.UploadScripts, string(api.Assemble)): fsErr,
-		filepath.Join(workingDir, api.UploadScripts, string(api.Run)):      fsErr,
+		filepath.Join(workingDir, api.UploadScripts, api.Assemble): fsErr,
+		filepath.Join(workingDir, api.UploadScripts, api.Run):      fsErr,
 	}
 
 	defaultURL := "http://the.default.url"
-	defaultResults := map[api.Script]*downloadResult{
+	defaultResults := map[string]*downloadResult{
 		api.Assemble: {defaultURL, nil},
 		api.Run:      {defaultURL, nil},
 	}
 
-	testInstall(t, inst, []api.Script{api.Assemble, api.Run},
+	testInstall(t, inst, []string{api.Assemble, api.Run},
 		nil, nil, defaultResults, workingDir,
 		defaultURL, false, false, fsErr)
 }
 
-func testInstall(t *testing.T, inst *installer, scripts []api.Script, userResults, sourceResults,
-	defaultResults map[api.Script]*downloadResult, workingDir, expectedURL string,
+func testInstall(t *testing.T, inst *installer, scripts []string, userResults, sourceResults,
+	defaultResults map[string]*downloadResult, workingDir, expectedURL string,
 	expectedDownloaded, expectedInstalled bool, expectedError error) {
 	result := inst.install(scripts, userResults, sourceResults, defaultResults, workingDir)
 
@@ -268,23 +268,23 @@ func testInstall(t *testing.T, inst *installer, scripts []api.Script, userResult
 
 func TestInstallCombined(t *testing.T) {
 	scriptsURL := "http://the.scripts.url"
-	userResults := map[api.Script]*downloadResult{
+	userResults := map[string]*downloadResult{
 		api.Assemble: {scriptsURL, nil},
 	}
 
-	sourceResults := map[api.Script]*downloadResult{
+	sourceResults := map[string]*downloadResult{
 		api.Run: {api.SourceScripts, nil},
 	}
 
 	defaultURL := "image:///path/in/image"
-	defaultResults := map[api.Script]*downloadResult{
+	defaultResults := map[string]*downloadResult{
 		api.Assemble:      {defaultURL, errors.NewScriptsInsideImageError(defaultURL)},
 		api.Run:           {defaultURL, errors.NewScriptsInsideImageError(defaultURL)},
 		api.SaveArtifacts: {defaultURL, errors.NewScriptsInsideImageError(defaultURL)},
 	}
 
 	inst := getFakeInstaller()
-	result := inst.install([]api.Script{api.Assemble, api.Run, api.SaveArtifacts}, userResults, sourceResults, defaultResults, "/working-dir/")
+	result := inst.install([]string{api.Assemble, api.Run, api.SaveArtifacts}, userResults, sourceResults, defaultResults, "/working-dir/")
 
 	if len(result) != 3 {
 		t.Errorf("Unexpected result length, expected 3, got %d", len(result))

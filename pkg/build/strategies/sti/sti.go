@@ -47,10 +47,10 @@ type STI struct {
 	tar              tar.Tar
 	docker           docker.Docker
 	callbackInvoker  util.CallbackInvoker
-	requiredScripts  []api.Script
-	optionalScripts  []api.Script
-	externalScripts  map[api.Script]bool
-	installedScripts map[api.Script]bool
+	requiredScripts  []string
+	optionalScripts  []string
+	externalScripts  map[string]bool
+	installedScripts map[string]bool
 
 	// Interfaces
 	preparer  build.Preparer
@@ -80,10 +80,10 @@ func New(req *api.Request) (*STI, error) {
 		fs:               util.NewFileSystem(),
 		tar:              tar.New(),
 		callbackInvoker:  util.NewCallbackInvoker(),
-		requiredScripts:  []api.Script{api.Assemble, api.Run},
-		optionalScripts:  []api.Script{api.SaveArtifacts},
-		externalScripts:  map[api.Script]bool{},
-		installedScripts: map[api.Script]bool{},
+		requiredScripts:  []string{api.Assemble, api.Run},
+		optionalScripts:  []string{api.SaveArtifacts},
+		externalScripts:  map[string]bool{},
+		installedScripts: map[string]bool{},
 	}
 
 	// The sources are downloaded using the GIT downloader.
@@ -189,7 +189,7 @@ func (b *STI) Prepare(request *api.Request) error {
 }
 
 // SetScripts allows to override default required and optional scripts
-func (b *STI) SetScripts(required, optional []api.Script) {
+func (b *STI) SetScripts(required, optional []string) {
 	b.requiredScripts = required
 	b.optionalScripts = optional
 }
@@ -210,7 +210,7 @@ func (b *STI) PostExecute(containerID string, location string) error {
 
 	cmd := []string{}
 	opts := docker.CommitContainerOptions{
-		Command:     append(cmd, filepath.Join(location, string(api.Run))),
+		Command:     append(cmd, filepath.Join(location, api.Run)),
 		Env:         b.generateConfigEnv(),
 		ContainerID: containerID,
 		Repository:  b.request.Tag,
@@ -292,7 +292,7 @@ func (b *STI) Save(request *api.Request) (err error) {
 }
 
 // Execute runs the specified STI script in the builder image.
-func (b *STI) Execute(command api.Script, request *api.Request) error {
+func (b *STI) Execute(command string, request *api.Request) error {
 	glog.V(2).Infof("Using image name %s", request.BaseImage)
 
 	uploadDir := filepath.Join(request.WorkingDir, "upload")
