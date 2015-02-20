@@ -8,19 +8,19 @@ import (
 
 // Common STI errors
 const (
-	ErrInspectImage int = 1 + iota
-	ErrPullImage
-	ErrSaveArtifacts
-	ErrAssemble
-	ErrWorkDir
-	ErrBuild
-	ErrTarTimeout
-	ErrDownload
-	ErrScriptsInsideImage
-	ErrInstall
-	ErrInstallRequired
-	ErrURLHandler
-	ErrSTIContainer
+	InspectImageError int = 1 + iota
+	PullImageError
+	SaveArtifactsError
+	AssembleError
+	WorkdirError
+	BuildError
+	TarTimeoutError
+	DownloadError
+	ScriptsInsideImageError
+	InstallError
+	InstallErrorRequired
+	URLHandlerError
+	STIContainerError
 )
 
 // Error represents an error thrown during STI execution
@@ -57,7 +57,7 @@ func NewInspectImageError(name string, err error) error {
 	return Error{
 		Message:    fmt.Sprintf("unable to get metadata for %s", name),
 		Details:    err,
-		ErrorCode:  ErrInspectImage,
+		ErrorCode:  InspectImageError,
 		Suggestion: "check image name",
 	}
 }
@@ -68,7 +68,7 @@ func NewPullImageError(name string, err error) error {
 	return Error{
 		Message:    fmt.Sprintf("unable to get %s", name),
 		Details:    err,
-		ErrorCode:  ErrPullImage,
+		ErrorCode:  PullImageError,
 		Suggestion: "check image name, or if using local image add --forcePull=false flag",
 	}
 }
@@ -79,7 +79,7 @@ func NewSaveArtifactsError(name, output string, err error) error {
 	return Error{
 		Message:    fmt.Sprintf("saving artifacts for %s failed:\n%s", name, output),
 		Details:    err,
-		ErrorCode:  ErrSaveArtifacts,
+		ErrorCode:  SaveArtifactsError,
 		Suggestion: "check the save-artifacts script for errors",
 	}
 }
@@ -90,7 +90,7 @@ func NewAssembleError(name, output string, err error) error {
 	return Error{
 		Message:    fmt.Sprintf("assemble for %s failed:\n%s", name, output),
 		Details:    err,
-		ErrorCode:  ErrAssemble,
+		ErrorCode:  AssembleError,
 		Suggestion: "check the assemble script output for errors",
 	}
 }
@@ -101,7 +101,7 @@ func NewWorkDirError(dir string, err error) error {
 	return Error{
 		Message:    fmt.Sprintf("creating temporary directory %s failed", dir),
 		Details:    err,
-		ErrorCode:  ErrWorkDir,
+		ErrorCode:  WorkdirError,
 		Suggestion: "check if you have access to your system's temporary directory",
 	}
 }
@@ -112,7 +112,7 @@ func NewBuildError(name string, err error) error {
 	return Error{
 		Message:    fmt.Sprintf("building %s failed", name),
 		Details:    err,
-		ErrorCode:  ErrBuild,
+		ErrorCode:  BuildError,
 		Suggestion: "check the build output for errors",
 	}
 }
@@ -123,7 +123,7 @@ func NewTarTimeoutError() error {
 	return Error{
 		Message:    fmt.Sprintf("timeout waiting for tar stream"),
 		Details:    nil,
-		ErrorCode:  ErrTarTimeout,
+		ErrorCode:  TarTimeoutError,
 		Suggestion: "check the sti-helper script if it accepts tar stream for assemble and sends for save-artifacts",
 	}
 }
@@ -134,7 +134,7 @@ func NewDownloadError(url string, code int) error {
 	return Error{
 		Message:    fmt.Sprintf("failed to retrieve %s, response code %d", url, code),
 		Details:    nil,
-		ErrorCode:  ErrDownload,
+		ErrorCode:  DownloadError,
 		Suggestion: "check the availability of the address",
 	}
 }
@@ -145,7 +145,7 @@ func NewScriptsInsideImageError(url string) error {
 	return Error{
 		Message:    fmt.Sprintf("scripts inside the image: %s", url),
 		Details:    nil,
-		ErrorCode:  ErrScriptsInsideImage,
+		ErrorCode:  ScriptsInsideImageError,
 		Suggestion: "",
 	}
 }
@@ -156,7 +156,7 @@ func NewInstallError(script api.Script) error {
 	return Error{
 		Message:    fmt.Sprintf("failed to install %v", script),
 		Details:    nil,
-		ErrorCode:  ErrInstall,
+		ErrorCode:  InstallError,
 		Suggestion: "provide URL with STI scripts with -s flag or check the image if it contains STI_SCRIPTS_URL variable set",
 	}
 }
@@ -167,7 +167,7 @@ func NewInstallRequiredError(scripts []api.Script) error {
 	return Error{
 		Message:    fmt.Sprintf("failed to install %v", scripts),
 		Details:    nil,
-		ErrorCode:  ErrInstallRequired,
+		ErrorCode:  InstallErrorRequired,
 		Suggestion: "provide URL with STI scripts with -s flag or check the image if it contains STI_SCRIPTS_URL variable set",
 	}
 }
@@ -178,7 +178,7 @@ func NewURLHandlerError(url string) error {
 	return Error{
 		Message:    fmt.Sprintf("no URL handler for %s", url),
 		Details:    nil,
-		ErrorCode:  ErrURLHandler,
+		ErrorCode:  URLHandlerError,
 		Suggestion: "check the URL",
 	}
 }
@@ -189,7 +189,7 @@ func NewContainerError(name string, code int, output string) error {
 	return ContainerError{
 		Message:    fmt.Sprintf("non-zero (%d) exit code from %s", code, name),
 		Output:     output,
-		ErrorCode:  ErrSTIContainer,
+		ErrorCode:  STIContainerError,
 		Suggestion: "check the container logs for more information on the failure",
 		ExitCode:   code,
 	}

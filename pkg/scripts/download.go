@@ -51,7 +51,7 @@ func (d *downloader) Download(url *url.URL, targetFile string) error {
 
 	reader, err := schemeReader.Read(url)
 	if err != nil {
-		if e, ok := err.(errors.Error); ok && e.ErrorCode == errors.ErrScriptsInsideImage {
+		if e, ok := err.(errors.Error); ok && e.ErrorCode == errors.ScriptsInsideImageError {
 			glog.V(2).Infof("Using image internal scripts from: %s", url.String())
 		}
 		return err

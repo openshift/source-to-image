@@ -142,7 +142,7 @@ func (i *installer) install(scripts []api.Script, userResults, sourceResults, de
 			// and continue searching other locations
 			if downloadResult.err != nil {
 				// one exception is when error contains information about scripts being inside the image
-				if e, ok := downloadResult.err.(errors.Error); ok && e.ErrorCode == errors.ErrScriptsInsideImage {
+				if e, ok := downloadResult.err.(errors.Error); ok && e.ErrorCode == errors.ScriptsInsideImageError {
 					// in which case update result object and break further searching
 					result.Error = nil
 					result.Downloaded = false

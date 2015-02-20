@@ -126,7 +126,7 @@ func TestNoDownload(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error with information about scripts inside the image!")
 	}
-	if e, ok := err.(errors.Error); !ok || e.ErrorCode != errors.ErrScriptsInsideImage {
+	if e, ok := err.(errors.Error); !ok || e.ErrorCode != errors.ScriptsInsideImageError {
 		t.Errorf("Unexpected error %v", err)
 	}
 }
