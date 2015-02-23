@@ -12,7 +12,7 @@ install:
   - ./hack/build-go.sh
 
 script:
-  - KUBE_RACE="-race" KUBE_COVER="-cover -covermode=atomic" ./hack/test-go.sh "" -p=4
+  - STI_RACE="-race" STI_COVER="-cover -covermode=atomic" ./hack/test-go.sh "" -p=4
 
 notifications:
   irc: "chat.freenode.net#openshift-dev"
