@@ -64,7 +64,7 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 | Name                       | Description                                             |
 |:-------------------------- |:--------------------------------------------------------|
 | `--callbackURL`            | URL to be invoked after successful build (see [Callback URL](#callback-url)) |
-| `--clean`                  | Always perform clean build, even if build is eligible for incremental one (default: `true`) |
+| `--incremental`            | Try performing an incremental build |
 | `-e (--env)`               | Environment variables passed to the builder eg. `NAME=VALUE,NAME2=VALUE2,...` |
 | `--forcePull`              | Always pull the builder image, even if it is present locally |
 | `-l (--location)`          | Location where the scripts and sources will be placed prior doing build (see [STI Scripts](#sti-scripts))|

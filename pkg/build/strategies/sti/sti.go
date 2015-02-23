@@ -51,6 +51,7 @@ type STI struct {
 	optionalScripts  []string
 	externalScripts  map[string]bool
 	installedScripts map[string]bool
+	incremental      bool
 
 	// Interfaces
 	preparer  build.Preparer
@@ -112,14 +113,14 @@ func (b *STI) Build(request *api.Request) (*api.Result, error) {
 		return nil, err
 	}
 
-	if b.request.Incremental = b.artifacts.Exists(request); b.request.Incremental {
+	if b.incremental = b.artifacts.Exists(request); b.incremental {
 		glog.V(1).Infof("Existing image for tag %s detected for incremental build", request.Tag)
 	} else {
 		glog.V(1).Infof("Clean build will be performed")
 	}
 
 	glog.V(2).Infof("Performing source build from %s", request.Source)
-	if request.Incremental {
+	if b.incremental {
 		if err := b.artifacts.Save(request); err != nil {
 			glog.Warningf("Error saving previous build artifacts: %v", err)
 			glog.Warning("Clean build will be performed!")
@@ -202,7 +203,7 @@ func (b *STI) PostExecute(containerID string, location string) error {
 		previousImageID string
 	)
 
-	if b.request.Incremental && b.request.RemovePreviousImage {
+	if b.incremental && b.request.RemovePreviousImage {
 		if previousImageID, err = b.docker.GetImageID(b.request.Tag); err != nil {
 			glog.Errorf("Error retrieving previous image's metadata: %v", err)
 		}
@@ -225,7 +226,7 @@ func (b *STI) PostExecute(containerID string, location string) error {
 	b.result.ImageID = imageID
 	glog.V(1).Infof("Tagged %s as %s", imageID, b.request.Tag)
 
-	if b.request.Incremental && b.request.RemovePreviousImage && previousImageID != "" {
+	if b.incremental && b.request.RemovePreviousImage && previousImageID != "" {
 		glog.V(1).Infof("Removing previously-tagged image %s", previousImageID)
 		if err = b.docker.RemoveImage(previousImageID); err != nil {
 			glog.Errorf("Unable to remove previous image: %v", err)
@@ -244,7 +245,7 @@ func (b *STI) PostExecute(containerID string, location string) error {
 // It checks if the previous image exists in the system and if so, then it
 // verifies that the save-artifacts script is present.
 func (b *STI) Exists(request *api.Request) bool {
-	if request.Clean {
+	if !request.Incremental {
 		return false
 	}
 

@@ -175,7 +175,7 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 		BaseImage:    imageName,
 		Source:       TestSource,
 		Tag:          tag,
-		Clean:        true,
+		Incremental:  false,
 		CallbackURL:  callbackURL,
 		ScriptsURL:   scriptsURL}
 
@@ -230,7 +230,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 		BaseImage:           imageName,
 		Source:              TestSource,
 		Tag:                 tag,
-		Clean:               true,
+		Incremental:         false,
 		RemovePreviousImage: removePreviousImage,
 	}
 
@@ -252,7 +252,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 		BaseImage:           imageName,
 		Source:              TestSource,
 		Tag:                 tag,
-		Clean:               false,
+		Incremental:         true,
 		RemovePreviousImage: removePreviousImage,
 	}
 
