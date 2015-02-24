@@ -209,10 +209,17 @@ func (b *STI) PostExecute(containerID string, location string) error {
 		}
 	}
 
+	env, err := scripts.GetEnvironment(b.request)
+	if err != nil {
+		glog.V(1).Infof("No .sti/environment provided (%v)", err)
+	}
+
+	buildEnv := append(scripts.ConvertEnvironment(env), b.generateConfigEnv()...)
+
 	cmd := []string{}
 	opts := docker.CommitContainerOptions{
 		Command:     append(cmd, filepath.Join(location, api.Run)),
-		Env:         b.generateConfigEnv(),
+		Env:         buildEnv,
 		ContainerID: containerID,
 		Repository:  b.request.Tag,
 	}
@@ -296,6 +303,13 @@ func (b *STI) Save(request *api.Request) (err error) {
 func (b *STI) Execute(command string, request *api.Request) error {
 	glog.V(2).Infof("Using image name %s", request.BaseImage)
 
+	env, err := scripts.GetEnvironment(request)
+	if err != nil {
+		glog.V(1).Infof("No .sti/environment provided (%v)", err)
+	}
+
+	buildEnv := append(scripts.ConvertEnvironment(env), b.generateConfigEnv()...)
+
 	uploadDir := filepath.Join(request.WorkingDir, "upload")
 	tarFileName, err := b.tar.CreateTarFile(request.WorkingDir, uploadDir)
 	if err != nil {
@@ -329,7 +343,7 @@ func (b *STI) Execute(command string, request *api.Request) error {
 		ScriptsURL:      request.ScriptsURL,
 		Location:        request.Location,
 		Command:         command,
-		Env:             b.generateConfigEnv(),
+		Env:             buildEnv,
 		PostExec:        b.postExecutor,
 	}
 	if !request.LayeredBuild {
