@@ -40,6 +40,18 @@ image:
 Additionally for the best user experience and optimized sti operation we suggest image
 to have `/bin/sh` and tar command inside.
 
+Users can also set extra environment variables in the application source code,
+which are passed to the build and the `assemble` script consumes them. All
+environment variables are also present in the output application image. These
+variables are defined in `.sti/environment` file inside the application sources.
+The format of this file is a simple key-value, for example:
+
+```
+FOO=bar
+```
+
+In this case, the value of `FOO` environment variable will be set to `bar`.
+
 For detailed description of the requirements and the scripts along with examples see
 [builder_image.md](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md)
 
@@ -51,6 +63,7 @@ For detailed description of the requirements and the scripts along with examples
 1. `sti` creates a container based on the build image and passes it a tar file that contains:
     1. The application source in `src`
     1. The build artifacts in `artifacts` (if applicable - see [incremental builds](#incremental-builds))
+1. `sti` sets the environment variables from `.sti/environment` (optional)
 1. `sti` starts the container and runs its `assemble` script
 1. `sti` waits for the container to finish
 1. `sti` commits the container, setting the CMD for the output image to be the `run` script and tagging the image with the name provided.
