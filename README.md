@@ -115,7 +115,7 @@ You can start using `sti` right away (see [releases](https://github.com/openshif
 with the following test sources and publicly available images:
 
 ```
-$ sti build git://github.com/pmorie/simple-ruby openshift/ruby-20-centos test-ruby-app
+$ sti build git://github.com/pmorie/simple-ruby openshift/ruby-20-centos7 test-ruby-app
 $ docker run --rm -i -p :9292 -t test-ruby-app
 ```
 

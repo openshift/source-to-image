@@ -124,11 +124,11 @@ sources and artifacts.
 
 #### Example Usage
 
-Build a ruby application from a GIT source, using the official `ruby-20-centos` builder
+Build a ruby application from a GIT source, using the official `ruby-20-centos7` builder
 image, the resulting image will be named `ruby-app`:
 
 ```
-$ sti build git://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos ruby-app
+$ sti build git://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos7 ruby-app
 ```
 
 Build a nodejs application from a local directory, using a local image, the resulting
@@ -147,10 +147,10 @@ $ sti build --scripts=file://stiscripts git://github.com/bparees/openshift-jee-s
 ```
 
 Build a ruby application from a GIT source, specifying `ref`, using the official
-`ruby-20-centos` builder image, the resulting image will be named `ruby-app`:
+`ruby-20-centos7` builder image, the resulting image will be named `ruby-app`:
 
 ```
-$ sti build --ref=my-branch git://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos ruby-app
+$ sti build --ref=my-branch git://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos7 ruby-app
 ```
 
 If the ref is invalid or not present in the source repository, the build will fail.
@@ -159,7 +159,7 @@ Build a ruby application from a GIT source, overriding the scripts URL from a lo
 and forcing the scripts and sources to be placed in `/opt` directory:
 
 ```
-$ sti build --scripts=file://stiscripts --location=/opt git://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos ruby-app
+$ sti build --scripts=file://stiscripts --location=/opt git://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos7 ruby-app
 ```
 
 
@@ -181,9 +181,9 @@ the only parameter.
 
 #### Example Usage
 
-Print the official `ruby-20-centos` builder image usage:
+Print the official `ruby-20-centos7` builder image usage:
 ```
-$ sti usage openshift/ruby-20-centos
+$ sti usage openshift/ruby-20-centos7
 ```
 
 
