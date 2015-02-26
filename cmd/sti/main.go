@@ -46,7 +46,7 @@ func dockerSocket() string {
 }
 
 func validRequest(r *api.Request) bool {
-	return !(len(r.Source) == 0 || len(r.BaseImage) == 0 || len(r.Tag) == 0)
+	return !(len(r.Source) == 0 || len(r.BaseImage) == 0)
 }
 
 func newCmdVersion() *cobra.Command {
@@ -64,9 +64,9 @@ func newCmdBuild(req *api.Request) *cobra.Command {
 	useConfig := false
 
 	buildCmd := &cobra.Command{
-		Use:   "build <source> <image> <tag>",
+		Use:   "build <source> <image> [<tag>]",
 		Short: "Build a new image",
-		Long:  "Build a new Docker image named <tag> from a source repository and base image.",
+		Long:  "Build a new Docker image named <tag> (if provided) from a source repository and base image.",
 		Run: func(cmd *cobra.Command, args []string) {
 			// Attempt to restore the build command from the configuration file
 			if useConfig {
@@ -74,10 +74,12 @@ func newCmdBuild(req *api.Request) *cobra.Command {
 			}
 
 			// If user specifies the arguments, then we override the stored ones
-			if len(args) >= 3 {
+			if len(args) >= 2 {
 				req.Source = args[0]
 				req.BaseImage = args[1]
-				req.Tag = args[2]
+				if len(args) >= 3 {
+					req.Tag = args[2]
+				}
 			}
 
 			if !validRequest(req) {

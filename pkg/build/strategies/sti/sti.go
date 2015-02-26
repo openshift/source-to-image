@@ -216,22 +216,27 @@ func (b *STI) PostExecute(containerID string, location string) error {
 
 	buildEnv := append(scripts.ConvertEnvironment(env), b.generateConfigEnv()...)
 
-	cmd := []string{}
 	opts := docker.CommitContainerOptions{
-		Command:     append(cmd, filepath.Join(location, api.Run)),
+		Command:     append([]string{}, filepath.Join(location, api.Run)),
 		Env:         buildEnv,
 		ContainerID: containerID,
 		Repository:  b.request.Tag,
 	}
+
 	imageID, err := b.docker.CommitContainer(opts)
 	if err != nil {
 		return errors.NewBuildError(b.request.Tag, err)
 	}
-	b.result.Success = true
-	glog.Infof("Successfully built %s", b.request.Tag)
 
+	b.result.Success = true
 	b.result.ImageID = imageID
-	glog.V(1).Infof("Tagged %s as %s", imageID, b.request.Tag)
+
+	if len(b.request.Tag) > 0 {
+		glog.Infof("Successfully built %s", b.request.Tag)
+		glog.V(1).Infof("Tagged %s as %s", imageID, b.request.Tag)
+	} else {
+		glog.Infof("Successfully built %s", imageID)
+	}
 
 	if b.incremental && b.request.RemovePreviousImage && previousImageID != "" {
 		glog.V(1).Infof("Removing previously-tagged image %s", previousImageID)

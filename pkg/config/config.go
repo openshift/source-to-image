@@ -18,7 +18,7 @@ const DefaultConfigPath = ".stifile"
 type Config struct {
 	Source    string            `json:"source" yaml:"source"`
 	BaseImage string            `json:"baseImage" yaml:"baseImage"`
-	Tag       string            `json:"tag" yaml:"tag"`
+	Tag       string            `json:"tag,omitempty" yaml:"tag,omitempty"`
 	Flags     map[string]string `json:"flags,omitempty" yaml:"flags,omitempty"`
 }
 
@@ -49,7 +49,7 @@ func Save(req *api.Request, cmd *cobra.Command) {
 func Restore(req *api.Request, cmd *cobra.Command) {
 	data, err := ioutil.ReadFile(DefaultConfigPath)
 	if err != nil {
-		glog.V(1).Infof("Unable to restore %s: %v", err)
+		glog.V(1).Infof("Unable to restore %s: %v", DefaultConfigPath, err)
 		return
 	}
 	c := Config{}
