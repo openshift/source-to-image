@@ -52,7 +52,7 @@ order:
 
 1. `source` - is the URL of a GIT repository or a local path to the sources
 1. `builder image` - docker image capable of building the final image
-1. `tag` - name of the final docker image
+1. `tag` - name of the final docker image (if provided)
 
 If the build image is compatible with incremental builds, `sti build` will look for
 an image tagged with the same name. If an image is present with that tag, and a
