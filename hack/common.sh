@@ -18,15 +18,11 @@ STI_ROOT=$(
 STI_OUTPUT_SUBPATH="${STI_OUTPUT_SUBPATH:-_output/local}"
 STI_OUTPUT="${STI_ROOT}/${STI_OUTPUT_SUBPATH}"
 STI_OUTPUT_BINPATH="${STI_OUTPUT}/bin"
+STI_LOCAL_BINPATH="${STI_ROOT}/_output/local/go/bin"
+STI_LOCAL_RELEASEPATH="${STI_ROOT}/_output/local/releases"
 
 readonly STI_GO_PACKAGE=github.com/openshift/source-to-image
 readonly STI_GOPATH="${STI_OUTPUT}/go"
-
-readonly STI_COMPILE_PLATFORMS=(
-  linux/amd64
-)
-readonly STI_COMPILE_TARGETS=(
-)
 
 readonly STI_CROSS_COMPILE_PLATFORMS=(
   linux/amd64
@@ -36,10 +32,9 @@ readonly STI_CROSS_COMPILE_PLATFORMS=(
 readonly STI_CROSS_COMPILE_TARGETS=(
   cmd/sti
 )
-# readonly STI_CROSS_COMPILE_BINARIES=("${STI_CROSS_COMPILE_TARGETS[@]##*/}")
+readonly STI_CROSS_COMPILE_BINARIES=("${STI_CROSS_COMPILE_TARGETS[@]##*/}")
 
 readonly STI_ALL_TARGETS=(
-  "${STI_COMPILE_TARGETS[@]-}"
   "${STI_CROSS_COMPILE_TARGETS[@]}"
 )
 # readonly STI_ALL_BINARIES=("${STI_ALL_TARGETS[@]##*/}")
@@ -196,8 +191,8 @@ EOF
 # This will take binaries from $GOPATH/bin and copy them to the appropriate
 # place in ${STI_OUTPUT_BINDIR}
 #
-# If STI_RELEASE_ARCHIVES is set to a directory, it will have tar archives of
-# each CROSS_COMPILE_PLATFORM created
+# If STI_RELEASE_ARCHIVE is set to a directory, it will have tar archives of
+# each STI_RELEASE_PLATFORMS created
 #
 # Ideally this wouldn't be necessary and we could just set GOBIN to
 # STI_OUTPUT_BINDIR but that won't work in the face of cross compilation.  'go
@@ -211,14 +206,12 @@ sti::build::place_bins() {
 
     echo "++ Placing binaries"
 
-    if [[ "${STI_RELEASE_ARCHIVES-}" != "" ]]; then
+    if [[ "${STI_RELEASE_ARCHIVE-}" != "" ]]; then
       sti::build::get_version_vars
-      rm -rf "${STI_RELEASE_ARCHIVES}"
-      mkdir -p "${STI_RELEASE_ARCHIVES}"
+      mkdir -p "${STI_LOCAL_RELEASEPATH}"
     fi
 
-    local platform
-    for platform in "${STI_CROSS_COMPILE_PLATFORMS[@]}"; do
+    for platform in "${STI_RELEASE_PLATFORMS[@]-(host_platform)}"; do
       # The substitution on platform_src below will replace all slashes with
       # underscores.  It'll transform darwin/amd64 -> darwin_amd64.
       local platform_src="/${platform//\//_}"
@@ -226,22 +219,73 @@ sti::build::place_bins() {
         platform_src=""
       fi
 
+      # Skip this directory if the platform has no binaries.
       local full_binpath_src="${STI_GOPATH}/bin${platform_src}"
-      if [[ -d "${full_binpath_src}" ]]; then
-        mkdir -p "${STI_OUTPUT_BINPATH}/${platform}"
-        find "${full_binpath_src}" -maxdepth 1 -type f -exec \
-          rsync -pt {} "${STI_OUTPUT_BINPATH}/${platform}" \;
-
-        if [[ "${STI_RELEASE_ARCHIVES-}" != "" ]]; then
-          local platform_segment="${platform//\//-}"
-          local archive_name="source-to-image-${STI_GIT_VERSION}-${STI_GIT_COMMIT}-${platform_segment}.tar.gz"
-          echo "++ Creating ${archive_name}"
-          tar -czf "${STI_RELEASE_ARCHIVES}/${archive_name}" -C "${STI_OUTPUT_BINPATH}/${platform}" .
-        fi
+      if [[ ! -d "${full_binpath_src}" ]]; then
+        continue
       fi
+
+      mkdir -p "${STI_OUTPUT_BINPATH}/${platform}"
+
+      # Create an array of binaries to release. Append .exe variants if the platform is windows.
+      local -a binaries=()
+      local binary
+      for binary in "${STI_RELEASE_BINARIES[@]}"; do
+        binaries+=("${binary}")
+        if [[ $platform == "windows/amd64" ]]; then
+          binaries+=("${binary}.exe")
+        fi
+      done
+
+      # Copy only the specified release binaries to the shared STI_OUTPUT_BINPATH.
+      local -a includes=()
+      for binary in "${binaries[@]}"; do
+        includes+=("--include=${binary}")
+      done
+      find "${full_binpath_src}" -maxdepth 1 -type f -exec \
+        rsync "${includes[@]}" --exclude="*" -pt {} "${STI_OUTPUT_BINPATH}/${platform}" \;
+
+      # If no release archive was requested, we're done.
+      if [[ "${STI_RELEASE_ARCHIVE-}" == "" ]]; then
+        continue
+      fi
+
+      # Create a temporary bin directory containing only the binaries marked for release.
+      local release_binpath=$(mktemp -d sti.release.${STI_RELEASE_ARCHIVE}.XXX)
+      find "${full_binpath_src}" -maxdepth 1 -type f -exec \
+        rsync "${includes[@]}" --exclude="*" -pt {} "${release_binpath}" \;
+
+      # Create the release archive.
+      local platform_segment="${platform//\//-}"
+      local archive_name="${STI_RELEASE_ARCHIVE}-${STI_GIT_VERSION}-${STI_GIT_COMMIT}-${platform_segment}.tar.gz"
+
+      echo "++ Creating ${archive_name}"
+      tar -czf "${STI_LOCAL_RELEASEPATH}/${archive_name}" -C "${release_binpath}" .
+      rm -rf "${release_binpath}"
     done
   )
 }
+
+# sti::build::detect_local_release_tars verifies there is only one primary and one
+# image binaries release tar in STI_LOCAL_RELEASEPATH for the given platform specified by
+# argument 1, exiting if more than one of either is found.
+#
+# If the tars are discovered, their full paths are exported to the following env vars:
+#
+#   STI_PRIMARY_RELEASE_TAR
+sti::build::detect_local_release_tars() {
+  local platform="$1"
+
+  local primary=$(find ${STI_LOCAL_RELEASEPATH} -maxdepth 1 -type f -name source-to-image-*-${platform}-*)
+  if [[ $(echo "${primary}" | wc -l) -ne 1 ]]; then
+    echo "There should be exactly one ${platform} primary tar in $STI_LOCAL_RELEASEPATH"
+    exit 2
+  fi
+
+  export STI_PRIMARY_RELEASE_TAR="${primary}"
+  export STI_RELEASE_COMMIT="$(cat ${STI_LOCAL_RELEASEPATH}/.commit)"
+}
+
 
 # sti::build::get_version_vars loads the standard version variables as
 # ENV vars
