@@ -13,34 +13,35 @@ source "${STI_ROOT}/hack/common.sh"
 # Go to the top of the tree.
 cd "${STI_ROOT}"
 
+# Build the images
+echo "++ Building openshift/sti-release"
+docker build -q --tag openshift/sti-release "${STI_ROOT}/images/release"
+
 context="${STI_ROOT}/_output/buildenv-context"
 
-# clean existing output
+# Clean existing output.
 rm -rf "${STI_ROOT}/_output/local/releases"
 rm -rf "${STI_ROOT}/_output/local/go/bin"
 rm -rf "${context}"
 mkdir -p "${context}"
 mkdir -p "${STI_ROOT}/_output/local"
 
-# generate version definitions
+# Generate version definitions.
 sti::build::get_version_vars
 sti::build::save_version_vars "${context}/sti-version-defs"
 
-# create the input archive
+# Create the input archive.
 git archive --format=tar -o "${context}/archive.tar" HEAD
 tar -rf "${context}/archive.tar" -C "${context}" sti-version-defs
 gzip -f "${context}/archive.tar"
 
-# build in the clean environment
+# Perform the build and release in Docker.
 cat "${context}/archive.tar.gz" | docker run -i --cidfile="${context}/cid" openshift/sti-release
 docker cp $(cat ${context}/cid):/go/src/github.com/openshift/source-to-image/_output/local/releases "${STI_ROOT}/_output/local"
+echo "${STI_GIT_COMMIT}" > "${STI_ROOT}/_output/local/releases/.commit"
 
-# copy the linux release back to the _output/go/bin dir
-releases=$(find _output/local/releases/ -print | grep 'source-to-image-.*-linux-' --color=never)
-if [[ $(echo $releases | wc -l) -ne 1 ]]; then
-  echo "There should be exactly one Linux release tar in _output/local/releases"
-  exit 1
-fi
-bindir="_output/local/go/bin"
-mkdir -p "${bindir}"
-tar mxzf "${releases}" -C "${bindir}"
+# Copy the linux release archives release back to the local _output/local/go/bin directory.
+sti::build::detect_local_release_tars "linux"
+
+mkdir -p "${STI_LOCAL_BINPATH}"
+tar mxzf "${STI_PRIMARY_RELEASE_TAR}" -C "${STI_LOCAL_BINPATH}"
