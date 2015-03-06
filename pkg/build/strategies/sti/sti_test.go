@@ -511,7 +511,7 @@ func TestFetchSource(t *testing.T) {
 			}
 		}
 		if ft.copyExpected {
-			if fh.CopySource != "a-repo-source" {
+			if fh.CopySource != "a-repo-source/." {
 				t.Errorf("Copy was not called with the expected source.")
 			}
 			if fh.CopyDest != expectedTargetDir {
