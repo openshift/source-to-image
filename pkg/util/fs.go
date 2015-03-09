@@ -76,12 +76,13 @@ func (h *fs) Exists(file string) bool {
 
 // Copy copies a set of files from sourcePath to targetPath
 func (h *fs) Copy(sourcePath string, targetPath string) error {
-	info, err := os.Stat(sourcePath)
-	if err != nil {
+	if _, err := os.Stat(sourcePath); err != nil {
 		return err
 	}
 
-	if !info.IsDir() {
+	info, err := os.Stat(targetPath)
+
+	if err != nil || (info != nil && !info.IsDir()) {
 		err = os.Mkdir(targetPath, 0700)
 		if err != nil {
 			return err
