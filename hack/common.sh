@@ -312,7 +312,7 @@ sti::build::sti_version_vars() {
     fi
 
     # Use git describe to find the version based on annotated tags.
-    if [[ -n ${STI_GIT_VERSION-} ]] || STI_GIT_VERSION=$("${git[@]}" describe --abbrev=14 "${STI_GIT_COMMIT}^{commit}" 2>/dev/null); then
+    if [[ -n ${STI_GIT_VERSION-} ]] || STI_GIT_VERSION=$("${git[@]}" describe "${STI_GIT_COMMIT}^{commit}" 2>/dev/null); then
       if [[ "${STI_GIT_TREE_STATE}" == "dirty" ]]; then
         # git describe --dirty only considers changes to existing files, but
         # that is problematic since new untracked .go files affect the build,
@@ -364,7 +364,10 @@ sti::build::ldflags() {
     sti::build::get_version_vars
 
     declare -a ldflags=()
-    ldflags+=(-X "${STI_GO_PACKAGE}/pkg/sti/version.commitFromGit" "${STI_GIT_COMMIT}")
+    ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.majorFromGit" "${STI_GIT_MAJOR}")
+    ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.minorFromGit" "${STI_GIT_MINOR}")
+    ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.versionFromGit" "${STI_GIT_VERSION}")
+    ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.commitFromGit" "${STI_GIT_COMMIT}")
 
     # The -ldflags parameter takes a single string, so join the output.
     echo "${ldflags[*]-}"
