@@ -108,7 +108,7 @@ func New(req *api.Request) (*STI, error) {
 func (b *STI) Build(request *api.Request) (*api.Result, error) {
 	defer b.garbage.Cleanup(request)
 
-	glog.Infof("Building %s", request.Tag)
+	glog.V(1).Infof("Building %s", request.Tag)
 	if err := b.preparer.Prepare(request); err != nil {
 		return nil, err
 	}
@@ -232,10 +232,10 @@ func (b *STI) PostExecute(containerID string, location string) error {
 	b.result.ImageID = imageID
 
 	if len(b.request.Tag) > 0 {
-		glog.Infof("Successfully built %s", b.request.Tag)
+		glog.V(1).Infof("Successfully built %s", b.request.Tag)
 		glog.V(1).Infof("Tagged %s as %s", imageID, b.request.Tag)
 	} else {
-		glog.Infof("Successfully built %s", imageID)
+		glog.V(1).Infof("Successfully built %s", imageID)
 	}
 
 	if b.incremental && b.request.RemovePreviousImage && previousImageID != "" {
@@ -367,7 +367,7 @@ func (b *STI) Execute(command string, request *api.Request) error {
 				}
 				break
 			}
-			if glog.V(2) || command == api.Usage {
+			if glog.V(2) || request.AssembleOutput == true || command == api.Usage {
 				glog.Info(text)
 			}
 		}

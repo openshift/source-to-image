@@ -108,6 +108,7 @@ func newCmdBuild(req *api.Request) *cobra.Command {
 		},
 	}
 
+	buildCmd.Flags().BoolVar(&(req.AssembleOutput), "assembleOutput", true, "Print the output from assemble script to console")
 	buildCmd.Flags().BoolVar(&(req.Incremental), "incremental", false, "Perform an incremental build")
 	buildCmd.Flags().BoolVar(&(req.RemovePreviousImage), "rm", false, "Remove the previous image during incremental builds")
 	buildCmd.Flags().StringP("env", "e", "", "Specify an environment var NAME=VALUE,NAME2=VALUE2,...")
@@ -198,7 +199,8 @@ func checkErr(err error) {
 			"providing us with a log from your build using --loglevel=3")
 		os.Exit(e.ErrorCode)
 	} else {
-		glog.Fatalf("An error occurred: %v", err)
+		glog.V(1).Infof("An error occurred: %v", err)
+		os.Exit(1)
 	}
 }
 

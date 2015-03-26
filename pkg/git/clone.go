@@ -25,7 +25,7 @@ func (c *Clone) Download(request *api.Request) error {
 		}
 		glog.V(2).Infof("Cloning into %s", targetSourceDir)
 		if err := c.Clone(request.Source, targetSourceDir); err != nil {
-			glog.Errorf("Git clone failed: %+v", err)
+			glog.V(1).Infof("Git clone failed: %+v", err)
 			return err
 		}
 
