@@ -367,7 +367,7 @@ func (b *STI) Execute(command string, request *api.Request) error {
 				}
 				break
 			}
-			if glog.V(2) || request.AssembleOutput == true || command == api.Usage {
+			if glog.V(2) || request.Quiet != true || command == api.Usage {
 				glog.Info(text)
 			}
 		}
