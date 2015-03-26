@@ -54,6 +54,10 @@ type Request struct {
 	// (see ONBUILD strategy). The default value is "upload/scripts".
 	InstallDestination string
 
+	// Print the output from the assemble script to console if set to true
+	// (default).
+	AssembleOutput bool
+
 	// Specify a relative directory inside the application repository that should
 	// be used as a root directory for the application.
 	ContextDir string
