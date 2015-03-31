@@ -385,9 +385,7 @@ func (b *STI) Execute(command string, request *api.Request) error {
 				}
 				break
 			}
-			if glog.V(1) {
-				glog.Error(text)
-			}
+			glog.Error(text)
 			if len(errOutput) < maxErrorOutput {
 				errOutput += text + "\n"
 			}
