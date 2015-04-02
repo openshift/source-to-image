@@ -24,7 +24,7 @@ at common flags that can be used with all of the subcommands.
 #### Log levels
 
 There are four log levels:
-* `Level 0` - produces almost no input, just information about success or encountered errors
+* `Level 0` - produces output from containers running `assemble` script and all encountered errors
 * `Level 1` - produces basic information about the executed process
 * `Level 2` - produces very detailed information about the executed process
 * `Level 3` - produces very detailed information about the executed process, alongside with listing tar contents
@@ -70,9 +70,10 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 | `-l (--location)`          | Location where the scripts and sources will be placed prior doing build (see [STI Scripts](#sti-scripts))|
 | `-r (--ref)`               | A branch/tag from which the build should happen (applies only to GIT source) |
 | `--rm`                     | Remove previous image during incremental build |
-| `--saveTempDir`            | Save the working directory used for fetching scripts and sources|
+| `--saveTempDir`            | Save the working directory used for fetching scripts and sources |
 | `--contextDir`             | Allow to specify directory name with your application |
-| `-s (--scripts)`           | URL of STI scripts (see [STI Scripts](#sti-scripts))|
+| `-s (--scripts)`           | URL of STI scripts (see [STI Scripts](#sti-scripts)) |
+| `-q (--quiet)`             | Operate quietly, suppressing all non-error output |
 
 #### Context directory
 

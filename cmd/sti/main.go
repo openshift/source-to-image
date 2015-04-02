@@ -108,7 +108,7 @@ func newCmdBuild(req *api.Request) *cobra.Command {
 		},
 	}
 
-	buildCmd.Flags().BoolVar(&(req.Quiet), "quiet", false, "Operate quietly. Suppress all non-error output.")
+	buildCmd.Flags().BoolVarP(&(req.Quiet), "quiet", "q", false, "Operate quietly. Suppress all non-error output.")
 	buildCmd.Flags().BoolVar(&(req.Incremental), "incremental", false, "Perform an incremental build")
 	buildCmd.Flags().BoolVar(&(req.RemovePreviousImage), "rm", false, "Remove the previous image during incremental builds")
 	buildCmd.Flags().StringP("env", "e", "", "Specify an environment var NAME=VALUE,NAME2=VALUE2,...")
