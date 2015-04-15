@@ -89,8 +89,7 @@ an entrypoint in that case.
 * Whether a builder image is compatible with incremental building
 * Whether a previous image exists, with the same name as the output name for this build
 
-If a `save-artifacts` script exists, a prior image already exists, and the `--clean` option is not used,
-the workflow is as follows:
+If a `save-artifacts` script exists, a prior image already exists, and the `--incremental=true` option is used, the workflow is as follows:
 
 1. `sti` creates a new docker container from the prior build image
 1. `sti` runs `save-artifacts` in this container - this script is responsible for streaming out
