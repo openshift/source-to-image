@@ -28,7 +28,7 @@ type Layered struct {
 }
 
 func New(request *api.Request, scripts build.ScriptsHandler) (*Layered, error) {
-	d, err := docker.New(request.DockerSocket)
+	d, err := docker.New(request.DockerConfig)
 	if err != nil {
 		return nil, err
 	}

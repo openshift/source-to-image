@@ -56,16 +56,34 @@ var (
 	FakeScriptsFileURL string
 )
 
-func dockerSocket() string {
-	if dh := os.Getenv("DOCKER_HOST"); dh != "" {
-		return dh
+func dockerConfig() *api.DockerConfig {
+	cfg := &api.DockerConfig{}
+	if cfg.Endpoint = os.Getenv("DOCKER_HOST"); cfg.Endpoint == "" {
+		cfg.Endpoint = DefaultDockerSocket
 	}
-	return DefaultDockerSocket
+	if os.Getenv("DOCKER_TLS_VERIFY") == "1" {
+		certPath := os.Getenv("DOCKER_CERT_PATH")
+		cfg.CertFile = filepath.Join(certPath, "cert.pem")
+		cfg.KeyFile = filepath.Join(certPath, "key.pem")
+		cfg.CAFile = filepath.Join(certPath, "ca.pem")
+	}
+	return cfg
+}
+
+func dockerClient(config *api.DockerConfig) (*docker.Client, error) {
+	if config.CertFile != "" && config.KeyFile != "" && config.CAFile != "" {
+		return docker.NewTLSClient(
+			config.Endpoint,
+			config.CertFile,
+			config.KeyFile,
+			config.CAFile)
+	}
+	return docker.NewClient(config.Endpoint)
 }
 
 // setup sets up integration tests
 func (i *integrationTest) setup() {
-	i.dockerClient, _ = docker.NewClient(dockerSocket())
+	i.dockerClient, _ = dockerClient(dockerConfig())
 	if !i.setupComplete {
 		// get the full path to this .go file so we can construct the file url
 		// using this file's dirname
@@ -171,7 +189,7 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 	}
 
 	req := &api.Request{
-		DockerSocket: dockerSocket(),
+		DockerConfig: dockerConfig(),
 		BaseImage:    imageName,
 		Source:       TestSource,
 		Tag:          tag,
@@ -226,7 +244,7 @@ func TestIncrementalBuildScriptsNoSaveArtifacts(t *testing.T) {
 func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, removePreviousImage bool, expectClean bool) {
 	t := i.t
 	req := &api.Request{
-		DockerSocket:        dockerSocket(),
+		DockerConfig:        dockerConfig(),
 		BaseImage:           imageName,
 		Source:              TestSource,
 		Tag:                 tag,
@@ -248,7 +266,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 
 	previousImageID := resp.ImageID
 	req = &api.Request{
-		DockerSocket:        dockerSocket(),
+		DockerConfig:        dockerConfig(),
 		BaseImage:           imageName,
 		Source:              TestSource,
 		Tag:                 tag,

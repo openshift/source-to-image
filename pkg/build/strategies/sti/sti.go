@@ -67,7 +67,7 @@ type STI struct {
 // be used for the case that the base Docker image does not have 'tar' or 'bash'
 // installed.
 func New(req *api.Request) (*STI, error) {
-	docker, err := docker.New(req.DockerSocket)
+	docker, err := docker.New(req.DockerConfig)
 	if err != nil {
 		return nil, err
 	}
