@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/golang/glog"
@@ -38,11 +39,18 @@ func parseEnvs(cmd *cobra.Command, name string) (map[string]string, error) {
 	return envs, nil
 }
 
-func dockerSocket() string {
-	if host := os.Getenv("DOCKER_HOST"); host != "" {
-		return host
+func defaultDockerConfig() *api.DockerConfig {
+	cfg := &api.DockerConfig{}
+	if cfg.Endpoint = os.Getenv("DOCKER_HOST"); cfg.Endpoint == "" {
+		cfg.Endpoint = "unix:///var/run/docker.sock"
 	}
-	return "unix:///var/run/docker.sock"
+	if os.Getenv("DOCKER_TLS_VERIFY") == "1" {
+		certPath := os.Getenv("DOCKER_CERT_PATH")
+		cfg.CertFile = filepath.Join(certPath, "cert.pem")
+		cfg.KeyFile = filepath.Join(certPath, "key.pem")
+		cfg.CAFile = filepath.Join(certPath, "ca.pem")
+	}
+	return cfg
 }
 
 func validRequest(r *api.Request) bool {
@@ -215,7 +223,11 @@ func main() {
 			cmd.Help()
 		},
 	}
-	stiCmd.PersistentFlags().StringVarP(&(req.DockerSocket), "url", "U", dockerSocket(), "Set the url of the docker socket to use")
+	req.DockerConfig = defaultDockerConfig()
+	stiCmd.PersistentFlags().StringVarP(&(req.DockerConfig.Endpoint), "url", "U", req.DockerConfig.Endpoint, "Set the url of the docker socket to use")
+	stiCmd.PersistentFlags().StringVar(&(req.DockerConfig.CertFile), "cert", req.DockerConfig.CertFile, "Set the path of the docker TLS certificate file")
+	stiCmd.PersistentFlags().StringVar(&(req.DockerConfig.KeyFile), "key", req.DockerConfig.KeyFile, "Set the path of the docker TLS key file")
+	stiCmd.PersistentFlags().StringVar(&(req.DockerConfig.CAFile), "ca", req.DockerConfig.CAFile, "Set the path of the docker TLS ca file")
 
 	stiCmd.AddCommand(newCmdVersion())
 	stiCmd.AddCommand(newCmdBuild(req))
