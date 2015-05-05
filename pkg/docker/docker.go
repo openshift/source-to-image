@@ -58,7 +58,7 @@ type stiDocker struct {
 }
 
 type PostExecutor interface {
-	PostExecute(containerID string, location string) error
+	PostExecute(containerID, location string) error
 }
 
 type PullResult struct {
@@ -367,7 +367,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 	}
 	if opts.PostExec != nil {
 		glog.V(2).Infof("Invoking postExecution function")
-		if err = opts.PostExec.PostExecute(container.ID, commandBaseDir); err != nil {
+		if err = opts.PostExec.PostExecute(container.ID, tarDestination); err != nil {
 			return err
 		}
 	}

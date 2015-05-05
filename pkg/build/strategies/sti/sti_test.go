@@ -292,7 +292,7 @@ func TestPostExecute(t *testing.T) {
 			t.Errorf("(%d) Unexpected error from postExecute: %v", i, err)
 		}
 		// Ensure CommitContainer was called with the right parameters
-		if !reflect.DeepEqual(dh.CommitContainerOpts.Command, []string{"cmd1/" + api.Run}) {
+		if !reflect.DeepEqual(dh.CommitContainerOpts.Command, []string{"cmd1/scripts/" + api.Run}) {
 			t.Errorf("(%d) Unexpected commit container command: %#v", i, dh.CommitContainerOpts.Command)
 		}
 		if dh.CommitContainerOpts.Repository != tc.tag {
