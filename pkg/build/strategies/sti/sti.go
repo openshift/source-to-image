@@ -221,10 +221,10 @@ func (b *STI) PostExecute(containerID, location string) error {
 
 	buildEnv := append(scripts.ConvertEnvironment(env), b.generateConfigEnv()...)
 
-	runCmd := filepath.Join(b.scriptsURL[api.Run], api.Run)
+	runCmd := b.scriptsURL[api.Run]
 	if strings.HasPrefix(runCmd, "image://") {
 		// scripts from inside of the image, we need to strip the image part
-		runCmd = strings.TrimPrefix("image://", runCmd)
+		runCmd = filepath.Join(strings.TrimPrefix(runCmd, "image://"), api.Run)
 	} else {
 		// external scripts, in which case we're taking the directory to which they
 		// were extracted and append scripts dir and name
