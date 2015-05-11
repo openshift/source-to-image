@@ -16,6 +16,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/build/strategies/sti"
 	"github.com/openshift/source-to-image/pkg/config"
 	"github.com/openshift/source-to-image/pkg/create"
+	"github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/version"
 )
@@ -100,6 +101,12 @@ func newCmdBuild(req *api.Request) *cobra.Command {
 				config.Save(req, cmd)
 			}
 
+			// Attempt to read the .dockercfg and extract the authentication for
+			// docker pull
+			if r, err := os.Open(req.DockerCfgPath); err == nil {
+				req.PullAuthentication = docker.GetImageRegistryAuth(r, req.BaseImage)
+			}
+
 			envs, err := parseEnvs(cmd, "env")
 			checkErr(err)
 			req.Environment = envs
@@ -128,6 +135,7 @@ func newCmdBuild(req *api.Request) *cobra.Command {
 	buildCmd.Flags().BoolVar(&(req.PreserveWorkingDir), "saveTempDir", false, "Save the temporary directory used by STI instead of deleting it")
 	buildCmd.Flags().BoolVar(&(useConfig), "use-config", false, "Store command line options to .stifile")
 	buildCmd.Flags().StringVarP(&(req.ContextDir), "contextDir", "", "", "Specify the sub-directory inside the repository with the application sources")
+	buildCmd.Flags().StringVarP(&(req.DockerCfgPath), "dockerCfgPath", "", filepath.Join(os.Getenv("HOME"), ".dockercfg"), "Specify the path to the Docker configuration file")
 
 	return buildCmd
 }
