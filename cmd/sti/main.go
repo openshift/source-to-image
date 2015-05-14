@@ -111,6 +111,9 @@ func newCmdBuild(req *api.Request) *cobra.Command {
 			checkErr(err)
 			req.Environment = envs
 
+			if glog.V(2) {
+				fmt.Printf("\n%s\n", req.PrintObj())
+			}
 			builder, err := strategies.GetStrategy(req)
 			checkErr(err)
 			result, err := builder.Build(req)
