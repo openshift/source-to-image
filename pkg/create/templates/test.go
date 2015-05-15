@@ -21,7 +21,7 @@ cid_file=$(mktemp -u --suffix=.cid)
 
 # Since we built the candidate image locally, we don't want STI attempt to pull
 # it from Docker hub
-sti_args="--forcePull=false -s ${scripts_url}"
+sti_args="--force-pull=false -s ${scripts_url}"
 
 # TODO: This should be part of the image metadata
 test_port=8000

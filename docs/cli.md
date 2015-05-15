@@ -63,22 +63,23 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 
 | Name                       | Description                                             |
 |:-------------------------- |:--------------------------------------------------------|
-| `--callbackURL`            | URL to be invoked after successful build (see [Callback URL](#callback-url)) |
+| `--callback-url`           | URL to be invoked after successful build (see [Callback URL](#callback-url)) |
+| `--dockercfg-path`         | Specify the path to the Docker configuration file |
 | `--incremental`            | Try performing an incremental build |
 | `-e (--env)`               | Environment variables passed to the builder eg. `NAME=VALUE,NAME2=VALUE2,...` |
-| `--forcePull`              | Always pull the builder image, even if it is present locally |
+| `--force-pull`             | Always pull the builder image, even if it is present locally |
 | `-l (--location)`          | Location where the scripts and sources will be placed prior doing build (see [STI Scripts](#sti-scripts))|
 | `-r (--ref)`               | A branch/tag from which the build should happen (applies only to GIT source) |
 | `--rm`                     | Remove previous image during incremental build |
-| `--saveTempDir`            | Save the working directory used for fetching scripts and sources |
-| `--contextDir`             | Allow to specify directory name with your application |
+| `--save-temp-dir`          | Save the working directory used for fetching scripts and sources |
+| `--context-dir`            | Allow to specify directory name with your application |
 | `-s (--scripts)`           | URL of STI scripts (see [STI Scripts](#sti-scripts)) |
 | `-q (--quiet)`             | Operate quietly, suppressing all non-error output |
 
 #### Context directory
 
 In case your application reside in directory other than your repository root
-folder, you can specify that directory using the `--contextDir` parameter. In
+folder, you can specify that directory using the `--context-dir` parameter. In
 that case, the specified directory will be used as your application root folder.
 
 #### Callback URL
@@ -136,7 +137,7 @@ Build a nodejs application from a local directory, using a local image, the resu
 image will be named `nodejs-app`:
 
 ```
-$ sti build --forcePull=false ~/nodejs-app local-nodejs-builder nodejs-app
+$ sti build --force-pull=false ~/nodejs-app local-nodejs-builder nodejs-app
 ```
 
 Build a java application from a GIT source, using the official `wildfly-8-centos`
@@ -175,9 +176,9 @@ the only parameter.
 | Name                       | Description                                             |
 |:-------------------------- |:--------------------------------------------------------|
 | `-e (--env)`               | Environment variables passed to the builder eg. `NAME=VALUE,NAME2=VALUE2,...`) |
-| `--forcePull`              | Always pull the builder image, even if it is present locally |
+| `--force-pull`              | Always pull the builder image, even if it is present locally |
 | `-l (--location)`          | Location where the scripts and sources will be placed prior invoking usage (see [STI Scripts](#sti-scripts))|
-| `--saveTempDir`            | Save the working directory used for fetching scripts and sources |
+| `--save-temp-dir`            | Save the working directory used for fetching scripts and sources |
 | `-s (--scripts)`           | URL of STI scripts (see [Scripts URL](#scripts-url))|
 
 #### Example Usage

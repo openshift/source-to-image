@@ -128,14 +128,14 @@ func newCmdBuild(req *api.Request) *cobra.Command {
 	buildCmd.Flags().BoolVar(&(req.RemovePreviousImage), "rm", false, "Remove the previous image during incremental builds")
 	buildCmd.Flags().StringP("env", "e", "", "Specify an environment var NAME=VALUE,NAME2=VALUE2,...")
 	buildCmd.Flags().StringVarP(&(req.Ref), "ref", "r", "", "Specify a ref to check-out")
-	buildCmd.Flags().StringVar(&(req.CallbackURL), "callbackURL", "", "Specify a URL to invoke via HTTP POST upon build completion")
+	buildCmd.Flags().StringVar(&(req.CallbackURL), "callback-url", "", "Specify a URL to invoke via HTTP POST upon build completion")
 	buildCmd.Flags().StringVarP(&(req.ScriptsURL), "scripts", "s", "", "Specify a URL for the assemble and run scripts")
 	buildCmd.Flags().StringVarP(&(req.Location), "location", "l", "", "Specify a destination location for untar operation")
-	buildCmd.Flags().BoolVar(&(req.ForcePull), "forcePull", true, "Always pull the builder image even if it is present locally")
-	buildCmd.Flags().BoolVar(&(req.PreserveWorkingDir), "saveTempDir", false, "Save the temporary directory used by STI instead of deleting it")
+	buildCmd.Flags().BoolVar(&(req.ForcePull), "force-pull", true, "Always pull the builder image even if it is present locally")
+	buildCmd.Flags().BoolVar(&(req.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by STI instead of deleting it")
 	buildCmd.Flags().BoolVar(&(useConfig), "use-config", false, "Store command line options to .stifile")
-	buildCmd.Flags().StringVarP(&(req.ContextDir), "contextDir", "", "", "Specify the sub-directory inside the repository with the application sources")
-	buildCmd.Flags().StringVarP(&(req.DockerCfgPath), "dockerCfgPath", "", filepath.Join(os.Getenv("HOME"), ".dockercfg"), "Specify the path to the Docker configuration file")
+	buildCmd.Flags().StringVarP(&(req.ContextDir), "context-dir", "", "", "Specify the sub-directory inside the repository with the application sources")
+	buildCmd.Flags().StringVarP(&(req.DockerCfgPath), "dockercfg-path", "", filepath.Join(os.Getenv("HOME"), ".dockercfg"), "Specify the path to the Docker configuration file")
 
 	return buildCmd
 }
@@ -182,8 +182,8 @@ func newCmdUsage(req *api.Request) *cobra.Command {
 	}
 	usageCmd.Flags().StringP("env", "e", "", "Specify an environment var NAME=VALUE,NAME2=VALUE2,...")
 	usageCmd.Flags().StringVarP(&(req.ScriptsURL), "scripts", "s", "", "Specify a URL for the assemble and run scripts")
-	usageCmd.Flags().BoolVar(&(req.ForcePull), "forcePull", true, "Always pull the builder image even if it is present locally")
-	usageCmd.Flags().BoolVar(&(req.PreserveWorkingDir), "saveTempDir", false, "Save the temporary directory used by STI instead of deleting it")
+	usageCmd.Flags().BoolVar(&(req.ForcePull), "force-pull", true, "Always pull the builder image even if it is present locally")
+	usageCmd.Flags().BoolVar(&(req.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by STI instead of deleting it")
 	usageCmd.Flags().StringVarP(&(req.Location), "location", "l", "", "Specify a destination location for untar operation")
 	return usageCmd
 }
