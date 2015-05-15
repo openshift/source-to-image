@@ -277,8 +277,10 @@ func (b *STI) Exists(request *api.Request) bool {
 
 	// can only do incremental build if runtime image exists, so always pull image
 	previousImageExists, _ := b.docker.IsImageInLocalRegistry(request.Tag)
-	if image, _ := b.docker.PullImage(request.Tag); image != nil {
-		previousImageExists = true
+	if request.ForcePull {
+		if image, _ := b.docker.PullImage(request.Tag); image != nil {
+			previousImageExists = true
+		}
 	}
 
 	return previousImageExists && b.installedScripts[api.SaveArtifacts]
