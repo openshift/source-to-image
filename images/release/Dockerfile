@@ -15,7 +15,7 @@ RUN yum install -y hg golang golang-pkg-darwin golang-pkg-windows && \
 ENV GOPATH /go
 
 # Get the code coverage tool and godep
-RUN go get code.google.com/p/go.tools/cmd/cover github.com/tools/godep
+RUN go get golang.org/x/tools/cmd/cover github.com/tools/godep
 
 # Mark this as a sti-build container
 RUN touch /sti-build-image
