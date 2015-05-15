@@ -120,6 +120,16 @@ $ export PATH=$PATH:${GOPATH}/src/github.com/openshift/source-to-image/_output/l
 $ hack/build-go.sh
 ```
 
+# Security
+
+Since the `sti` command use the Docker client library, the `sti` command has to
+run in the same security context as the `docker` command. For some systems, it
+is enough to add yourself into the 'docker' group to be able to work with Docker
+as 'non-root'. In the latest versions of Fedora/RHEL, it is recommended to use
+`sudo` command as this way is more auditable and secure.
+
+If you are using `sudo docker` command already, they you will have to also use
+`sudo sti` to give STI permissions to work with Docker directly.
 
 # Getting Started
 
