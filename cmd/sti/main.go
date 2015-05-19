@@ -3,9 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"syscall"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -77,6 +81,22 @@ func newCmdBuild(req *api.Request) *cobra.Command {
 		Short: "Build a new image",
 		Long:  "Build a new Docker image named <tag> (if provided) from a source repository and base image.",
 		Run: func(cmd *cobra.Command, args []string) {
+			go func() {
+				for {
+					sigs := make(chan os.Signal, 1)
+					signal.Notify(sigs, syscall.SIGQUIT)
+					buf := make([]byte, 1<<20)
+					for {
+						<-sigs
+						runtime.Stack(buf, true)
+						if file, err := ioutil.TempFile(os.TempDir(), "sti_dump"); err == nil {
+							defer file.Close()
+							file.Write(buf)
+						}
+						glog.Infof("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf)
+					}
+				}
+			}()
 			// Attempt to restore the build command from the configuration file
 			if useConfig {
 				config.Restore(req, cmd)
