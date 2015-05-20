@@ -321,8 +321,10 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 	wg := sync.WaitGroup{}
 	go func() {
 		wg.Add(1)
-		d.client.AttachToContainer(attachOpts)
-		wg.Done()
+		defer wg.Done()
+		if err := d.client.AttachToContainer(attachOpts); err != nil {
+			glog.Errorf("Unable to attach container with %v", attachOpts)
+		}
 	}()
 	attached <- <-attached
 
@@ -345,8 +347,10 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 		}
 		go func() {
 			wg.Add(1)
-			d.client.AttachToContainer(attachOpts2)
-			wg.Done()
+			defer wg.Done()
+			if err := d.client.AttachToContainer(attachOpts2); err != nil {
+				glog.Errorf("Unable to attach container with %v", attachOpts2)
+			}
 		}()
 		attached2 <- <-attached2
 	}
