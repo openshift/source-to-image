@@ -40,6 +40,10 @@ type Request struct {
 	// Environment is a map of environment variables to be passed to the image.
 	Environment map[string]string
 
+	// EnvironmentFile provides the path to a file with list of environment
+	// variables.
+	EnvironmentFile string
+
 	// CallbackURL is a URL which is called upon successful build to inform about that fact.
 	CallbackURL string
 
