@@ -24,6 +24,9 @@ func (r *Request) PrintObj() string {
 			fmt.Fprintf(out, "Install Destination:\t%s\n", r.InstallDestination)
 		}
 		printEnv(out, r.Environment)
+		if len(r.EnvironmentFile) > 0 {
+			fmt.Fprintf(out, "Environment File:\t%s\n", r.EnvironmentFile)
+		}
 		fmt.Fprintf(out, "Incremental Build:\t%s\n", printBool(r.Incremental))
 		fmt.Fprintf(out, "Remove Old Build:\t%s\n", printBool(r.RemovePreviousImage))
 		fmt.Fprintf(out, "Force Pull:\t%s\n", printBool(r.ForcePull))

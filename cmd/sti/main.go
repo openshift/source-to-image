@@ -22,6 +22,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/create"
 	"github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/errors"
+	"github.com/openshift/source-to-image/pkg/util"
 	"github.com/openshift/source-to-image/pkg/version"
 )
 
@@ -127,9 +128,22 @@ func newCmdBuild(req *api.Request) *cobra.Command {
 				req.PullAuthentication = docker.GetImageRegistryAuth(r, req.BaseImage)
 			}
 
+			req.Environment = map[string]string{}
+
+			if len(req.EnvironmentFile) > 0 {
+				result, err := util.ReadEnvironmentFile(req.EnvironmentFile)
+				if err != nil {
+					glog.Warningf("Unable to read %s: %v", req.EnvironmentFile, err)
+				} else {
+					req.Environment = result
+				}
+			}
+
 			envs, err := parseEnvs(cmd, "env")
 			checkErr(err)
-			req.Environment = envs
+			for k, v := range envs {
+				req.Environment[k] = v
+			}
 
 			if glog.V(2) {
 				fmt.Printf("\n%s\n", req.PrintObj())
@@ -159,6 +173,7 @@ func newCmdBuild(req *api.Request) *cobra.Command {
 	buildCmd.Flags().BoolVar(&(useConfig), "use-config", false, "Store command line options to .stifile")
 	buildCmd.Flags().StringVarP(&(req.ContextDir), "context-dir", "", "", "Specify the sub-directory inside the repository with the application sources")
 	buildCmd.Flags().StringVarP(&(req.DockerCfgPath), "dockercfg-path", "", filepath.Join(os.Getenv("HOME"), ".dockercfg"), "Specify the path to the Docker configuration file")
+	buildCmd.Flags().StringVarP(&(req.EnvironmentFile), "environment-file", "E", "", "Specify the path to the file with environment")
 
 	return buildCmd
 }
