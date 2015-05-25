@@ -15,8 +15,13 @@ import (
 )
 
 const (
-	ScriptsURL = "STI_SCRIPTS_URL"
-	Location   = "STI_LOCATION"
+	ScriptsURLEnvironment = "STI_SCRIPTS_URL"
+	LocationEnvironment   = "STI_LOCATION"
+
+	ScriptsURLLabel = "io.openshift.sti.scripts-url"
+	LocationLabel   = "io.openshift.sti.location"
+
+	DefaultLocation = "/tmp"
 )
 
 // Docker is the interface between STI and the Docker client
@@ -195,8 +200,20 @@ func (d *stiDocker) RemoveContainer(id string) error {
 	return d.client.RemoveContainer(opts)
 }
 
+// getLabel gets label's value from the image metadata
+func getLabel(image *docker.Image, name string) string {
+	if value, ok := image.Config.Labels[name]; ok {
+		return value
+	}
+	if value, ok := image.ContainerConfig.Labels[name]; ok {
+		return value
+	}
+
+	return ""
+}
+
 // getVariable gets environment variable's value from the image metadata
-func (d *stiDocker) getVariable(image *docker.Image, name string) string {
+func getVariable(image *docker.Image, name string) string {
 	envName := name + "="
 	env := append(image.ContainerConfig.Env, image.Config.Env...)
 	for _, v := range env {
@@ -208,21 +225,48 @@ func (d *stiDocker) getVariable(image *docker.Image, name string) string {
 	return ""
 }
 
-// GetScriptsURL finds a STI_SCRIPTS_URL in the given image's metadata
+// GetScriptsURL finds a scripts-url label in the given image's metadata
 func (d *stiDocker) GetScriptsURL(image string) (string, error) {
 	imageMetadata, err := d.CheckAndPull(image)
 	if err != nil {
 		return "", err
 	}
 
-	scriptsURL := d.getVariable(imageMetadata, ScriptsURL)
+	return getScriptsURL(imageMetadata), nil
+}
+
+// getScriptsURL finds a scripts url label in the image metadata
+func getScriptsURL(image *docker.Image) string {
+	scriptsURL := getLabel(image, ScriptsURLLabel)
 	if len(scriptsURL) == 0 {
-		glog.Warningf("Image does not contain a value for the STI_SCRIPTS_URL environment variable")
+		scriptsURL = getVariable(image, ScriptsURLEnvironment)
+		if len(scriptsURL) != 0 {
+			glog.Warningf("Image %s uses deprecated environment variable %s, please migrate it to %s label instead!",
+				image.ID, ScriptsURLEnvironment, ScriptsURLLabel)
+		}
+	}
+	if len(scriptsURL) == 0 {
+		glog.Warningf("Image does not contain a value for the %s label", ScriptsURLLabel)
 	} else {
-		glog.V(2).Infof("Image contains STI_SCRIPTS_URL set to '%s'", scriptsURL)
+		glog.V(2).Infof("Image contains %s set to '%s'", ScriptsURLLabel, scriptsURL)
 	}
 
-	return scriptsURL, nil
+	return scriptsURL
+}
+
+// getLocation finds a location label in the image metadata
+func getLocation(image *docker.Image) string {
+	if val := getLabel(image, LocationLabel); len(val) != 0 {
+		return val
+	}
+	if val := getVariable(image, LocationEnvironment); len(val) != 0 {
+		glog.Warningf("Image %s uses deprecated environment variable %s, please migrate it to %s label instead!",
+			image.ID, LocationEnvironment, LocationLabel)
+		return val
+	}
+
+	// default directory if none is specified
+	return DefaultLocation
 }
 
 // RunContainer creates and starts a container using the image specified in the options with the ability
@@ -245,12 +289,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 	// untar operation destination directory
 	tarDestination := opts.Location
 	if len(tarDestination) == 0 {
-		if val := d.getVariable(imageMetadata, Location); len(val) != 0 {
-			tarDestination = val
-		} else {
-			// default directory if none is specified
-			tarDestination = "/tmp"
-		}
+		tarDestination = getLocation(imageMetadata)
 	}
 	if opts.ExternalScripts {
 		// for external scripts we must always append 'scripts' because this is
@@ -261,7 +300,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 		// for internal scripts we can have separate path for scripts and untar operation destination
 		scriptsURL := opts.ScriptsURL
 		if len(scriptsURL) == 0 {
-			scriptsURL = d.getVariable(imageMetadata, ScriptsURL)
+			scriptsURL = getScriptsURL(imageMetadata)
 		}
 		commandBaseDir = strings.TrimPrefix(scriptsURL, "image://")
 		glog.V(2).Infof("Base directory for STI scripts is '%s'. Untarring destination is '%s'.",

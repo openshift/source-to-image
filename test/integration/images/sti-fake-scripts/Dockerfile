@@ -15,4 +15,4 @@ WORKDIR /
 ADD scripts/.sti/bin/ /tmp/scripts/
 
 # Scripts are already in the image and this is their location
-ENV STI_SCRIPTS_URL image:///tmp/scripts/
+LABEL io.openshift.sti.scripts-url=image:///tmp/scripts/

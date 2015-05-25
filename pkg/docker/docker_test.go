@@ -201,32 +201,34 @@ func TestGetScriptsURL(t *testing.T) {
 		"not present": {
 			image: docker.Image{
 				ContainerConfig: docker.Config{
-					Env: []string{"Env1=value1"},
+					Env:    []string{"Env1=value1"},
+					Labels: map[string]string{},
 				},
 				Config: &docker.Config{
-					Env: []string{"Env2=value2"},
+					Env:    []string{"Env2=value2"},
+					Labels: map[string]string{},
 				},
 			},
 			result: "",
 		},
 
-		"in containerConfig": {
+		"env in containerConfig": {
 			image: docker.Image{
 				ContainerConfig: docker.Config{
-					Env: []string{"Env1=value1", ScriptsURL + "=test_url_value"},
+					Env: []string{"Env1=value1", ScriptsURLEnvironment + "=test_url_value"},
 				},
 				Config: &docker.Config{},
 			},
 			result: "test_url_value",
 		},
 
-		"in image config": {
+		"env in image config": {
 			image: docker.Image{
 				ContainerConfig: docker.Config{},
 				Config: &docker.Config{
 					Env: []string{
 						"Env1=value1",
-						ScriptsURL + "=test_url_value_2",
+						ScriptsURLEnvironment + "=test_url_value_2",
 						"Env2=value2",
 					},
 				},
@@ -234,14 +236,24 @@ func TestGetScriptsURL(t *testing.T) {
 			result: "test_url_value_2",
 		},
 
-		"contains =": {
+		"label in containerConfig": {
 			image: docker.Image{
 				ContainerConfig: docker.Config{
-					Env: []string{ScriptsURL + "=http://my.test.url/test?param=one"},
+					Labels: map[string]string{ScriptsURLLabel: "test_url_value"},
 				},
 				Config: &docker.Config{},
 			},
-			result: "http://my.test.url/test?param=one",
+			result: "test_url_value",
+		},
+
+		"label in image config": {
+			image: docker.Image{
+				ContainerConfig: docker.Config{},
+				Config: &docker.Config{
+					Labels: map[string]string{ScriptsURLLabel: "test_url_value_2"},
+				},
+			},
+			result: "test_url_value_2",
 		},
 
 		"inspect error": {
@@ -312,10 +324,10 @@ func TestRunContainer(t *testing.T) {
 			paramScriptsURL: "http://my.test.url/test?param=one",
 			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /opt/test -xf - && /opt/test/scripts/%s", api.Assemble)},
 		},
-		"scriptsInsideImage": {
+		"scriptsInsideImageEnvironment": {
 			image: docker.Image{
 				ContainerConfig: docker.Config{
-					Env: []string{ScriptsURL + "=image:///opt/bin/"},
+					Env: []string{ScriptsURLEnvironment + "=image:///opt/bin/"},
 				},
 				Config: &docker.Config{},
 			},
@@ -323,10 +335,21 @@ func TestRunContainer(t *testing.T) {
 			externalScripts: false,
 			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /tmp -xf - && /opt/bin/%s", api.Assemble)},
 		},
-		"scriptsInsideImageWithParamLocation": {
+		"scriptsInsideImageLabel": {
 			image: docker.Image{
 				ContainerConfig: docker.Config{
-					Env: []string{ScriptsURL + "=image:///opt/bin"},
+					Labels: map[string]string{ScriptsURLLabel: "image:///opt/bin/"},
+				},
+				Config: &docker.Config{},
+			},
+			cmd:             api.Assemble,
+			externalScripts: false,
+			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /tmp -xf - && /opt/bin/%s", api.Assemble)},
+		},
+		"scriptsInsideImageEnvironmentWithParamLocation": {
+			image: docker.Image{
+				ContainerConfig: docker.Config{
+					Env: []string{ScriptsURLEnvironment + "=image:///opt/bin"},
 				},
 				Config: &docker.Config{},
 			},
@@ -335,10 +358,33 @@ func TestRunContainer(t *testing.T) {
 			paramLocation:   "/opt/sti",
 			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /opt/sti -xf - && /opt/bin/%s", api.Assemble)},
 		},
-		"paramLocationFromImageVar": {
+		"scriptsInsideImageLabelWithParamLocation": {
 			image: docker.Image{
 				ContainerConfig: docker.Config{
-					Env: []string{Location + "=/opt", ScriptsURL + "=http://my.test.url/test?param=one"},
+					Labels: map[string]string{ScriptsURLLabel: "image:///opt/bin"},
+				},
+				Config: &docker.Config{},
+			},
+			cmd:             api.Assemble,
+			externalScripts: false,
+			paramLocation:   "/opt/sti",
+			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /opt/sti -xf - && /opt/bin/%s", api.Assemble)},
+		},
+		"paramLocationFromImageEnvironment": {
+			image: docker.Image{
+				ContainerConfig: docker.Config{
+					Env: []string{LocationEnvironment + "=/opt", ScriptsURLEnvironment + "=http://my.test.url/test?param=one"},
+				},
+				Config: &docker.Config{},
+			},
+			cmd:             api.Assemble,
+			externalScripts: true,
+			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /opt -xf - && /opt/scripts/%s", api.Assemble)},
+		},
+		"paramLocationFromImageLabel": {
+			image: docker.Image{
+				ContainerConfig: docker.Config{
+					Labels: map[string]string{LocationLabel: "/opt", ScriptsURLLabel: "http://my.test.url/test?param=one"},
 				},
 				Config: &docker.Config{},
 			},
