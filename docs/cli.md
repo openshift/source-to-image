@@ -105,9 +105,9 @@ All of these locations are checked on each build in the following order:
 
 1. A script found at the `--scripts` URL
 1. A script found in the application source `.sti/bin` directory
-1. A script found at the default image URL (`STI_SCRIPTS_URL` environment variable)
+1. A script found at the default image URL (`io.openshift.sti.scripts-url` label)
 
-Both `STI_SCRIPTS_URL` environment variable specified in the image and `--scripts` flag
+Both `io.openshift.sti.scripts-url` label specified in the image and `--scripts` flag
 can take one of the following form:
 
 * `image://path_to_scripts_dir` - absolute path inside the image to a directory where the STI scripts are located
@@ -115,13 +115,13 @@ can take one of the following form:
 * `http(s)://path_to_scripts_dir` - URL to a directory where the STI scripts are located
 
 Additionally we allow specifying the location of both scripts and sources inside the image
-prior executing the `assemble` script with `--location` flag or `STI_LOCATION` environment
-variable set inside the image. The expected value of this flag is absolute and existing path
+prior executing the `assemble` script with `--location` flag or `io.openshift.sti.location`
+label set inside the image. The expected value of this flag is absolute and existing path
 inside the image, if none is specified the default value of `/tmp` is being used.
 In case of both of these specified the `--location` flag takes precedence over the environment variable.
 
 **NOTE**: In case where the scripts are already placed inside the image (using `--scripts`
-or `STI_SCRIPTS_URL` with value `image:///path/in/image`) then this value applies only to
+or `io.openshift.sti.scripts-url` with value `image:///path/in/image`) then this value applies only to
 sources and artifacts.
 
 #### Example Usage
