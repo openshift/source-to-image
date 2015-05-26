@@ -75,7 +75,7 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
-			"Rev": "463bdc838f2b35e9307e91d480878bda5fff7232"
-		}
+			"Rev": "8730624c6c03fa1c5b8ae471cb5e4d735784d32a"
+		},
 	]
 }
