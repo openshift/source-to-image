@@ -22,6 +22,7 @@ const (
 	LocationLabel   = "io.openshift.sti.location"
 
 	DefaultLocation = "/tmp"
+	DefaultTag      = "latest"
 )
 
 // Docker is the interface between STI and the Docker client
@@ -128,6 +129,7 @@ func New(config *api.DockerConfig, auth docker.AuthConfiguration) (Docker, error
 
 // IsImageInLocalRegistry determines whether the supplied image is in the local registry.
 func (d *stiDocker) IsImageInLocalRegistry(name string) (bool, error) {
+	name = getImageName(name)
 	image, err := d.client.InspectImage(name)
 
 	if image != nil {
@@ -141,6 +143,7 @@ func (d *stiDocker) IsImageInLocalRegistry(name string) (bool, error) {
 // GetImageUser finds and retrieves the user associated with
 // an image if one has been specified
 func (d *stiDocker) GetImageUser(name string) (string, error) {
+	name = getImageName(name)
 	image, err := d.client.InspectImage(name)
 	if err != nil {
 		return "", errors.NewInspectImageError(name, err)
@@ -155,6 +158,7 @@ func (d *stiDocker) GetImageUser(name string) (string, error) {
 // IsImageOnBuild provides information about whether the Docker image has
 // OnBuild instruction recorded in the Image Config.
 func (d *stiDocker) IsImageOnBuild(name string) bool {
+	name = getImageName(name)
 	image, err := d.client.InspectImage(name)
 	if err != nil {
 		return false
@@ -165,6 +169,7 @@ func (d *stiDocker) IsImageOnBuild(name string) bool {
 // CheckAndPull pulls an image into the local registry if not present
 // and returns the image metadata
 func (d *stiDocker) CheckAndPull(name string) (image *docker.Image, err error) {
+	name = getImageName(name)
 	if image, err = d.client.InspectImage(name); err != nil && err != docker.ErrNoSuchImage {
 		return nil, errors.NewInspectImageError(name, err)
 	}
@@ -178,6 +183,7 @@ func (d *stiDocker) CheckAndPull(name string) (image *docker.Image, err error) {
 
 // PullImage pulls an image into the local registry
 func (d *stiDocker) PullImage(name string) (image *docker.Image, err error) {
+	name = getImageName(name)
 	glog.V(1).Infof("Pulling image %s", name)
 	// TODO: Add authentication support
 	if err = d.client.PullImage(docker.PullImageOptions{Repository: name}, d.pullAuth); err != nil {
@@ -198,6 +204,16 @@ func (d *stiDocker) RemoveContainer(id string) error {
 		Force:         true,
 	}
 	return d.client.RemoveContainer(opts)
+}
+
+// getImageName checks the image name and adds DefaultTag if none is specified
+func getImageName(name string) string {
+	_, tag := docker.ParseRepositoryTag(name)
+	if len(tag) == 0 {
+		return strings.Join([]string{name, DefaultTag}, ":")
+	}
+
+	return name
 }
 
 // getLabel gets label's value from the image metadata
@@ -273,14 +289,15 @@ func getLocation(image *docker.Image) string {
 // to stream input or output
 func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 	// get info about the specified image
+	image := getImageName(opts.Image)
 	var imageMetadata *docker.Image
 	if opts.PullImage {
-		imageMetadata, err = d.CheckAndPull(opts.Image)
+		imageMetadata, err = d.CheckAndPull(image)
 	} else {
-		imageMetadata, err = d.client.InspectImage(opts.Image)
+		imageMetadata, err = d.client.InspectImage(image)
 	}
 	if err != nil {
-		glog.Errorf("Unable to get image metadata for %s: %v", opts.Image, err)
+		glog.Errorf("Unable to get image metadata for %s: %v", image, err)
 		return err
 	}
 
@@ -315,7 +332,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 			tarDestination, filepath.Join(commandBaseDir, string(opts.Command)))}
 	}
 	config := docker.Config{
-		Image: opts.Image,
+		Image: image,
 		Cmd:   cmd,
 	}
 
@@ -426,6 +443,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 
 // GetImageID retrieves the ID of the image identified by name
 func (d *stiDocker) GetImageID(name string) (string, error) {
+	name = getImageName(name)
 	image, err := d.client.InspectImage(name)
 	if err != nil {
 		return "", err
