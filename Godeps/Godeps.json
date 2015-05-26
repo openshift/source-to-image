@@ -71,11 +71,15 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/cobra",
-			"Rev": "e1e66f7b4e667751cf530ddb6e72b79d6eeb0235"
+			"Rev": "bba56042cf767e329430e7c7f68c3f9f640b4b8b"
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
 			"Rev": "8730624c6c03fa1c5b8ae471cb5e4d735784d32a"
+		},
+		{
+			"ImportPath": "github.com/inconshreveable/mousetrap",
+			"Rev": "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75"
 		},
 	]
 }
