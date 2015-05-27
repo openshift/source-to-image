@@ -24,7 +24,7 @@ const (
 	DefaultDockerSocket = "unix:///var/run/docker.sock"
 	TestSource          = "git://github.com/pmorie/simple-html"
 
-	FakeBaseImage                   = "sti_test/sti-fake"
+	FakeBuilderImage                = "sti_test/sti-fake"
 	FakeUserImage                   = "sti_test/sti-fake-user"
 	FakeImageScripts                = "sti_test/sti-fake-scripts"
 	FakeImageScriptsNoSaveArtifacts = "sti_test/sti-fake-scripts-no-save-artifacts"
@@ -130,7 +130,7 @@ func waitForHTTPReady() error {
 
 // Test a clean build.  The simplest case.
 func TestCleanBuild(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBaseImage, "")
+	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBuilderImage, "")
 }
 
 func TestCleanBuildUser(t *testing.T) {
@@ -138,11 +138,11 @@ func TestCleanBuildUser(t *testing.T) {
 }
 
 func TestCleanBuildFileScriptsURL(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBaseImage, FakeScriptsFileURL)
+	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBuilderImage, FakeScriptsFileURL)
 }
 
 func TestCleanBuildHttpScriptsURL(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBaseImage, FakeScriptsHttpURL)
+	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBuilderImage, FakeScriptsHttpURL)
 }
 
 func TestCleanBuildScripts(t *testing.T) {
@@ -153,9 +153,9 @@ func TestLayeredBuildNoTar(t *testing.T) {
 	integration(t).exerciseCleanBuild(TagCleanLayeredBuildNoTar, false, FakeImageNoTar, FakeScriptsFileURL)
 }
 
-// Test that a build request with a callbackURL will invoke HTTP endpoint
+// Test that a build config with a callbackURL will invoke HTTP endpoint
 func TestCleanBuildCallbackInvoked(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuild, true, FakeBaseImage, "")
+	integration(t).exerciseCleanBuild(TagCleanBuild, true, FakeBuilderImage, "")
 }
 
 func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, imageName string, scriptsURL string) {
@@ -188,20 +188,20 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 		callbackURL = ts.URL
 	}
 
-	req := &api.Request{
+	config := &api.Config{
 		DockerConfig: dockerConfig(),
-		BaseImage:    imageName,
+		BuilderImage: imageName,
 		Source:       TestSource,
 		Tag:          tag,
 		Incremental:  false,
 		CallbackURL:  callbackURL,
 		ScriptsURL:   scriptsURL}
 
-	b, err := strategies.GetStrategy(req)
+	b, err := strategies.GetStrategy(config)
 	if err != nil {
 		t.Fatalf("Cannot create a new builder.")
 	}
-	resp, err := b.Build(req)
+	resp, err := b.Build(config)
 	if err != nil {
 		t.Fatalf("An error occurred during the build: %v", err)
 	} else if !resp.Success {
@@ -222,15 +222,15 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 
 // Test an incremental build.
 func TestIncrementalBuildAndRemovePreviousImage(t *testing.T) {
-	integration(t).exerciseIncrementalBuild(TagIncrementalBuild, FakeBaseImage, true, false)
+	integration(t).exerciseIncrementalBuild(TagIncrementalBuild, FakeBuilderImage, true, false)
 }
 
 func TestIncrementalBuildAndKeepPreviousImage(t *testing.T) {
-	integration(t).exerciseIncrementalBuild(TagIncrementalBuild, FakeBaseImage, false, false)
+	integration(t).exerciseIncrementalBuild(TagIncrementalBuild, FakeBuilderImage, false, false)
 }
 
 func TestIncrementalBuildUser(t *testing.T) {
-	integration(t).exerciseIncrementalBuild(TagIncrementalBuildUser, FakeBaseImage, true, false)
+	integration(t).exerciseIncrementalBuild(TagIncrementalBuildUser, FakeBuilderImage, true, false)
 }
 
 func TestIncrementalBuildScripts(t *testing.T) {
@@ -243,20 +243,20 @@ func TestIncrementalBuildScriptsNoSaveArtifacts(t *testing.T) {
 
 func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, removePreviousImage bool, expectClean bool) {
 	t := i.t
-	req := &api.Request{
+	config := &api.Config{
 		DockerConfig:        dockerConfig(),
-		BaseImage:           imageName,
+		BuilderImage:        imageName,
 		Source:              TestSource,
 		Tag:                 tag,
 		Incremental:         false,
 		RemovePreviousImage: removePreviousImage,
 	}
 
-	builder, err := strategies.GetStrategy(req)
+	builder, err := strategies.GetStrategy(config)
 	if err != nil {
 		t.Fatalf("Unable to create builder: %v", err)
 	}
-	resp, err := builder.Build(req)
+	resp, err := builder.Build(config)
 	if err != nil {
 		t.Fatalf("Unexpected error occurred during build: %v", err)
 	}
@@ -265,20 +265,20 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 	}
 
 	previousImageID := resp.ImageID
-	req = &api.Request{
+	config = &api.Config{
 		DockerConfig:        dockerConfig(),
-		BaseImage:           imageName,
+		BuilderImage:        imageName,
 		Source:              TestSource,
 		Tag:                 tag,
 		Incremental:         true,
 		RemovePreviousImage: removePreviousImage,
 	}
 
-	builder, err = strategies.GetStrategy(req)
+	builder, err = strategies.GetStrategy(config)
 	if err != nil {
 		t.Fatalf("Unable to create incremental builder: %v", err)
 	}
-	resp, err = builder.Build(req)
+	resp, err = builder.Build(config)
 	if err != nil {
 		t.Fatalf("Unexpected error occurred during incremental build: %v", err)
 	}

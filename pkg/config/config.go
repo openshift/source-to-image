@@ -16,19 +16,19 @@ const DefaultConfigPath = ".stifile"
 
 // Config represents a basic serialization for the STI build options
 type Config struct {
-	Source    string            `json:"source" yaml:"source"`
-	BaseImage string            `json:"baseImage" yaml:"baseImage"`
-	Tag       string            `json:"tag,omitempty" yaml:"tag,omitempty"`
-	Flags     map[string]string `json:"flags,omitempty" yaml:"flags,omitempty"`
+	Source       string            `json:"source" yaml:"source"`
+	BuilderImage string            `json:"builderImage" yaml:"builderImage"`
+	Tag          string            `json:"tag,omitempty" yaml:"tag,omitempty"`
+	Flags        map[string]string `json:"flags,omitempty" yaml:"flags,omitempty"`
 }
 
 // Save persists the STI command line arguments into disk
-func Save(req *api.Request, cmd *cobra.Command) {
+func Save(config *api.Config, cmd *cobra.Command) {
 	c := Config{
-		BaseImage: req.BaseImage,
-		Source:    req.Source,
-		Tag:       req.Tag,
-		Flags:     make(map[string]string),
+		BuilderImage: config.BuilderImage,
+		Source:       config.Source,
+		Tag:          config.Tag,
+		Flags:        make(map[string]string),
 	}
 	// Store only flags that have changed
 	cmd.Flags().Visit(func(f *pflag.Flag) {
@@ -46,7 +46,7 @@ func Save(req *api.Request, cmd *cobra.Command) {
 }
 
 // Restore loads the arguments from disk and prefills the Request
-func Restore(req *api.Request, cmd *cobra.Command) {
+func Restore(config *api.Config, cmd *cobra.Command) {
 	data, err := ioutil.ReadFile(DefaultConfigPath)
 	if err != nil {
 		glog.V(1).Infof("Unable to restore %s: %v", DefaultConfigPath, err)
@@ -57,9 +57,9 @@ func Restore(req *api.Request, cmd *cobra.Command) {
 		glog.V(1).Infof("Unable to parse %s: %v", DefaultConfigPath, err)
 		return
 	}
-	req.BaseImage = c.BaseImage
-	req.Source = c.Source
-	req.Tag = c.Tag
+	config.BuilderImage = c.BuilderImage
+	config.Source = c.Source
+	config.Tag = c.Tag
 	for name, value := range c.Flags {
 		// Do not change flags that user sets. Allow overriding of stored flags.
 		if cmd.Flag(name).Changed {
