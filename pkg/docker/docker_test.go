@@ -23,29 +23,29 @@ func getDocker(client Client) *stiDocker {
 
 func TestIsImageInLocalRegistry(t *testing.T) {
 	type testDef struct {
-		docker         test.FakeDockerClient
-		expectedResult bool
-		expectedError  error
+		imageName         string
+		docker            test.FakeDockerClient
+		expectedImageName string
+		expectedResult    bool
+		expectedError     error
 	}
 	otherError := fmt.Errorf("Other")
 	tests := map[string]testDef{
-		"ImageFound":    {test.FakeDockerClient{Image: &docker.Image{}}, true, nil},
-		"ImageNotFound": {test.FakeDockerClient{InspectImageErr: []error{docker.ErrNoSuchImage}}, false, nil},
-		"ErrorOccurred": {test.FakeDockerClient{InspectImageErr: []error{otherError}}, false, otherError},
+		"ImageFound":    {"a_test_image", test.FakeDockerClient{Image: &docker.Image{}}, "a_test_image:latest", true, nil},
+		"ImageNotFound": {"a_test_image:sometag", test.FakeDockerClient{InspectImageErr: []error{docker.ErrNoSuchImage}}, "a_test_image:sometag", false, nil},
+		"ErrorOccurred": {"a_test_image", test.FakeDockerClient{InspectImageErr: []error{otherError}}, "a_test_image:latest", false, otherError},
 	}
-
-	imageName := "a_test_image"
 
 	for test, def := range tests {
 		dh := getDocker(&def.docker)
-		result, err := dh.IsImageInLocalRegistry(imageName)
+		result, err := dh.IsImageInLocalRegistry(def.imageName)
 		if result != def.expectedResult {
 			t.Errorf("Test - %s: Expected result: %v. Got: %v", test, def.expectedResult, result)
 		}
 		if err != def.expectedError {
 			t.Errorf("Test - %s: Expected error: %v. Got: %v", test, def.expectedError, err)
 		}
-		if def.docker.InspectImageName[0] != imageName {
+		if def.docker.InspectImageName[0] != def.expectedImageName {
 			t.Errorf("Docker inspect called with unexpected image name: %s\n",
 				def.docker.InspectImageName)
 		}
@@ -54,14 +54,15 @@ func TestIsImageInLocalRegistry(t *testing.T) {
 
 func TestCheckAndPull(t *testing.T) {
 	type testDef struct {
+		imageName           string
 		docker              test.FakeDockerClient
 		expectedImage       *docker.Image
 		expectedError       int
 		expectedPullOptions docker.PullImageOptions
 	}
 	image := &docker.Image{}
-	imageName := "test_image"
 	imageExistsTest := testDef{
+		imageName: "test_image",
 		docker: test.FakeDockerClient{
 			InspectImageErr:    []error{nil},
 			InspectImageResult: []*docker.Image{image},
@@ -69,14 +70,16 @@ func TestCheckAndPull(t *testing.T) {
 		expectedImage: image,
 	}
 	imagePulledTest := testDef{
+		imageName: "test_image",
 		docker: test.FakeDockerClient{
 			InspectImageErr:    []error{docker.ErrNoSuchImage, nil},
 			InspectImageResult: []*docker.Image{nil, image},
 		},
 		expectedImage:       image,
-		expectedPullOptions: docker.PullImageOptions{Repository: imageName},
+		expectedPullOptions: docker.PullImageOptions{Repository: "test_image:" + DefaultTag},
 	}
 	inspectErrorTest := testDef{
+		imageName: "test_image",
 		docker: test.FakeDockerClient{
 			InspectImageErr:    []error{docker.ErrConnectionRefused},
 			InspectImageResult: []*docker.Image{nil},
@@ -85,6 +88,7 @@ func TestCheckAndPull(t *testing.T) {
 		expectedError: errors.InspectImageError,
 	}
 	pullErrorTest := testDef{
+		imageName: "test_image",
 		docker: test.FakeDockerClient{
 			PullImageErr:       docker.ErrConnectionRefused,
 			InspectImageErr:    []error{nil},
@@ -92,16 +96,17 @@ func TestCheckAndPull(t *testing.T) {
 		},
 		expectedImage:       nil,
 		expectedError:       errors.PullImageError,
-		expectedPullOptions: docker.PullImageOptions{Repository: imageName},
+		expectedPullOptions: docker.PullImageOptions{Repository: "test_image:" + DefaultTag},
 	}
 	errorAfterPullTest := testDef{
+		imageName: "test_image:testtag",
 		docker: test.FakeDockerClient{
 			InspectImageErr:    []error{docker.ErrNoSuchImage, docker.ErrNoSuchImage},
 			InspectImageResult: []*docker.Image{nil, image},
 		},
 		expectedImage:       nil,
 		expectedError:       errors.InspectImageError,
-		expectedPullOptions: docker.PullImageOptions{Repository: imageName},
+		expectedPullOptions: docker.PullImageOptions{Repository: "test_image:testtag"},
 	}
 	tests := map[string]testDef{
 		"ImageExists":    imageExistsTest,
@@ -113,7 +118,7 @@ func TestCheckAndPull(t *testing.T) {
 
 	for test, def := range tests {
 		dh := getDocker(&def.docker)
-		resultImage, resultErr := dh.CheckAndPull(imageName)
+		resultImage, resultErr := dh.CheckAndPull(def.imageName)
 		if resultImage != def.expectedImage {
 			t.Errorf("%s: Unexpected image result -- %v", test, resultImage)
 		}
@@ -438,7 +443,7 @@ func TestRunContainer(t *testing.T) {
 		}
 		// Validate the CreateContainer parameters
 		createConfig := fakeDocker.CreateContainerOpts.Config
-		if createConfig.Image != "test/image" {
+		if createConfig.Image != "test/image:latest" {
 			t.Errorf("%s: Unexpected create config image: %s", desc, createConfig.Image)
 		}
 		if !reflect.DeepEqual(createConfig.Cmd, tst.cmdExpected) {
@@ -510,5 +515,26 @@ func TestRemoveImage(t *testing.T) {
 	}
 	if fakeDocker.RemoveImageName != "test-image-id" {
 		t.Errorf("Unexpected image removed: %s", fakeDocker.RemoveImageName)
+	}
+}
+
+func TestGetImageName(t *testing.T) {
+	type runtest struct {
+		name     string
+		expected string
+	}
+	tests := []runtest{
+		{"test/image", "test/image:latest"},
+		{"test/image:latest", "test/image:latest"},
+		{"test/image:tag", "test/image:tag"},
+		{"repository/test/image", "repository/test/image:latest"},
+		{"repository/test/image:latest", "repository/test/image:latest"},
+		{"repository/test/image:tag", "repository/test/image:tag"},
+	}
+
+	for _, tc := range tests {
+		if e, a := tc.expected, getImageName(tc.name); e != a {
+			t.Errorf("Expected image name %s, but got %s!", e, a)
+		}
 	}
 }

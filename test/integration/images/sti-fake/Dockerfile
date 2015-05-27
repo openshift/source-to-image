@@ -3,11 +3,7 @@
 #
 FROM busybox
 
-RUN mkdir -p /sti-fake/src && \
-# FIXME: The 'default' user has conflicting UID (1000). This should be fixed in
-#        how source-to-image handles UID's during isolation.
-#
-    deluser default
+RUN mkdir -p /sti-fake/src
 
 WORKDIR /
 
