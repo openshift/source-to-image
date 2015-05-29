@@ -16,6 +16,8 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/openshift/source-to-image/pkg/api"
+	"github.com/openshift/source-to-image/pkg/api/describe"
+	"github.com/openshift/source-to-image/pkg/api/validation"
 	"github.com/openshift/source-to-image/pkg/build/strategies"
 	"github.com/openshift/source-to-image/pkg/build/strategies/sti"
 	"github.com/openshift/source-to-image/pkg/config"
@@ -59,10 +61,6 @@ func defaultDockerConfig() *api.DockerConfig {
 	return cfg
 }
 
-func validRequest(r *api.Request) bool {
-	return !(len(r.Source) == 0 || len(r.BaseImage) == 0)
-}
-
 func newCmdVersion() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
@@ -74,7 +72,7 @@ func newCmdVersion() *cobra.Command {
 	}
 }
 
-func newCmdBuild(req *api.Request) *cobra.Command {
+func newCmdBuild(cfg *api.Config) *cobra.Command {
 	useConfig := false
 
 	buildCmd := &cobra.Command{
@@ -100,57 +98,57 @@ func newCmdBuild(req *api.Request) *cobra.Command {
 			}()
 			// Attempt to restore the build command from the configuration file
 			if useConfig {
-				config.Restore(req, cmd)
+				config.Restore(cfg, cmd)
 			}
 
 			// If user specifies the arguments, then we override the stored ones
 			if len(args) >= 2 {
-				req.Source = args[0]
-				req.BaseImage = args[1]
+				cfg.Source = args[0]
+				cfg.BuilderImage = args[1]
 				if len(args) >= 3 {
-					req.Tag = args[2]
+					cfg.Tag = args[2]
 				}
 			}
 
-			if !validRequest(req) {
+			if len(validation.ValidateConfig(cfg)) != 0 {
 				cmd.Help()
 				os.Exit(1)
 			}
 
-			// Persists the current command line options and request into .stifile
+			// Persists the current command line options and config into .stifile
 			if useConfig {
-				config.Save(req, cmd)
+				config.Save(cfg, cmd)
 			}
 
 			// Attempt to read the .dockercfg and extract the authentication for
 			// docker pull
-			if r, err := os.Open(req.DockerCfgPath); err == nil {
-				req.PullAuthentication = docker.GetImageRegistryAuth(r, req.BaseImage)
+			if r, err := os.Open(cfg.DockerCfgPath); err == nil {
+				cfg.PullAuthentication = docker.GetImageRegistryAuth(r, cfg.BuilderImage)
 			}
 
-			req.Environment = map[string]string{}
+			cfg.Environment = map[string]string{}
 
-			if len(req.EnvironmentFile) > 0 {
-				result, err := util.ReadEnvironmentFile(req.EnvironmentFile)
+			if len(cfg.EnvironmentFile) > 0 {
+				result, err := util.ReadEnvironmentFile(cfg.EnvironmentFile)
 				if err != nil {
-					glog.Warningf("Unable to read %s: %v", req.EnvironmentFile, err)
+					glog.Warningf("Unable to read %s: %v", cfg.EnvironmentFile, err)
 				} else {
-					req.Environment = result
+					cfg.Environment = result
 				}
 			}
 
 			envs, err := parseEnvs(cmd, "env")
 			checkErr(err)
 			for k, v := range envs {
-				req.Environment[k] = v
+				cfg.Environment[k] = v
 			}
 
 			if glog.V(2) {
-				fmt.Printf("\n%s\n", req.PrintObj())
+				fmt.Printf("\n%s\n", describe.DescribeConfig(cfg))
 			}
-			builder, err := strategies.GetStrategy(req)
+			builder, err := strategies.GetStrategy(cfg)
 			checkErr(err)
-			result, err := builder.Build(req)
+			result, err := builder.Build(cfg)
 			checkErr(err)
 
 			for _, message := range result.Messages {
@@ -160,20 +158,20 @@ func newCmdBuild(req *api.Request) *cobra.Command {
 		},
 	}
 
-	buildCmd.Flags().BoolVarP(&(req.Quiet), "quiet", "q", false, "Operate quietly. Suppress all non-error output.")
-	buildCmd.Flags().BoolVar(&(req.Incremental), "incremental", false, "Perform an incremental build")
-	buildCmd.Flags().BoolVar(&(req.RemovePreviousImage), "rm", false, "Remove the previous image during incremental builds")
+	buildCmd.Flags().BoolVarP(&(cfg.Quiet), "quiet", "q", false, "Operate quietly. Suppress all non-error output.")
+	buildCmd.Flags().BoolVar(&(cfg.Incremental), "incremental", false, "Perform an incremental build")
+	buildCmd.Flags().BoolVar(&(cfg.RemovePreviousImage), "rm", false, "Remove the previous image during incremental builds")
 	buildCmd.Flags().StringP("env", "e", "", "Specify an environment var NAME=VALUE,NAME2=VALUE2,...")
-	buildCmd.Flags().StringVarP(&(req.Ref), "ref", "r", "", "Specify a ref to check-out")
-	buildCmd.Flags().StringVar(&(req.CallbackURL), "callback-url", "", "Specify a URL to invoke via HTTP POST upon build completion")
-	buildCmd.Flags().StringVarP(&(req.ScriptsURL), "scripts", "s", "", "Specify a URL for the assemble and run scripts")
-	buildCmd.Flags().StringVarP(&(req.Location), "location", "l", "", "Specify a destination location for untar operation")
-	buildCmd.Flags().BoolVar(&(req.ForcePull), "force-pull", true, "Always pull the builder image even if it is present locally")
-	buildCmd.Flags().BoolVar(&(req.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by STI instead of deleting it")
+	buildCmd.Flags().StringVarP(&(cfg.Ref), "ref", "r", "", "Specify a ref to check-out")
+	buildCmd.Flags().StringVar(&(cfg.CallbackURL), "callback-url", "", "Specify a URL to invoke via HTTP POST upon build completion")
+	buildCmd.Flags().StringVarP(&(cfg.ScriptsURL), "scripts", "s", "", "Specify a URL for the assemble and run scripts")
+	buildCmd.Flags().StringVarP(&(cfg.Location), "location", "l", "", "Specify a destination location for untar operation")
+	buildCmd.Flags().BoolVar(&(cfg.ForcePull), "force-pull", true, "Always pull the builder image even if it is present locally")
+	buildCmd.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by STI instead of deleting it")
 	buildCmd.Flags().BoolVar(&(useConfig), "use-config", false, "Store command line options to .stifile")
-	buildCmd.Flags().StringVarP(&(req.ContextDir), "context-dir", "", "", "Specify the sub-directory inside the repository with the application sources")
-	buildCmd.Flags().StringVarP(&(req.DockerCfgPath), "dockercfg-path", "", filepath.Join(os.Getenv("HOME"), ".dockercfg"), "Specify the path to the Docker configuration file")
-	buildCmd.Flags().StringVarP(&(req.EnvironmentFile), "environment-file", "E", "", "Specify the path to the file with environment")
+	buildCmd.Flags().StringVarP(&(cfg.ContextDir), "context-dir", "", "", "Specify the sub-directory inside the repository with the application sources")
+	buildCmd.Flags().StringVarP(&(cfg.DockerCfgPath), "dockercfg-path", "", filepath.Join(os.Getenv("HOME"), ".dockercfg"), "Specify the path to the Docker configuration file")
+	buildCmd.Flags().StringVarP(&(cfg.EnvironmentFile), "environment-file", "E", "", "Specify the path to the file with environment")
 
 	return buildCmd
 }
@@ -196,7 +194,7 @@ func newCmdCreate() *cobra.Command {
 	}
 }
 
-func newCmdUsage(req *api.Request) *cobra.Command {
+func newCmdUsage(cfg *api.Config) *cobra.Command {
 	usageCmd := &cobra.Command{
 		Use:   "usage <image>",
 		Short: "Print usage of the assemble script associated with the image",
@@ -207,22 +205,22 @@ func newCmdUsage(req *api.Request) *cobra.Command {
 				os.Exit(1)
 			}
 
-			req.BaseImage = args[0]
+			cfg.BuilderImage = args[0]
 			envs, err := parseEnvs(cmd, "env")
 			checkErr(err)
-			req.Environment = envs
+			cfg.Environment = envs
 
-			uh, err := sti.NewUsage(req)
+			uh, err := sti.NewUsage(cfg)
 			checkErr(err)
 			err = uh.Show()
 			checkErr(err)
 		},
 	}
 	usageCmd.Flags().StringP("env", "e", "", "Specify an environment var NAME=VALUE,NAME2=VALUE2,...")
-	usageCmd.Flags().StringVarP(&(req.ScriptsURL), "scripts", "s", "", "Specify a URL for the assemble and run scripts")
-	usageCmd.Flags().BoolVar(&(req.ForcePull), "force-pull", true, "Always pull the builder image even if it is present locally")
-	usageCmd.Flags().BoolVar(&(req.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by STI instead of deleting it")
-	usageCmd.Flags().StringVarP(&(req.Location), "location", "l", "", "Specify a destination location for untar operation")
+	usageCmd.Flags().StringVarP(&(cfg.ScriptsURL), "scripts", "s", "", "Specify a URL for the assemble and run scripts")
+	usageCmd.Flags().BoolVar(&(cfg.ForcePull), "force-pull", true, "Always pull the builder image even if it is present locally")
+	usageCmd.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by STI instead of deleting it")
+	usageCmd.Flags().StringVarP(&(cfg.Location), "location", "l", "", "Specify a destination location for untar operation")
 	return usageCmd
 }
 
@@ -259,7 +257,7 @@ func checkErr(err error) {
 }
 
 func main() {
-	req := &api.Request{}
+	cfg := &api.Config{}
 	stiCmd := &cobra.Command{
 		Use: "sti",
 		Long: "Source-to-image (STI) is a tool for building repeatable docker images.\n\n" +
@@ -269,15 +267,15 @@ func main() {
 			cmd.Help()
 		},
 	}
-	req.DockerConfig = defaultDockerConfig()
-	stiCmd.PersistentFlags().StringVarP(&(req.DockerConfig.Endpoint), "url", "U", req.DockerConfig.Endpoint, "Set the url of the docker socket to use")
-	stiCmd.PersistentFlags().StringVar(&(req.DockerConfig.CertFile), "cert", req.DockerConfig.CertFile, "Set the path of the docker TLS certificate file")
-	stiCmd.PersistentFlags().StringVar(&(req.DockerConfig.KeyFile), "key", req.DockerConfig.KeyFile, "Set the path of the docker TLS key file")
-	stiCmd.PersistentFlags().StringVar(&(req.DockerConfig.CAFile), "ca", req.DockerConfig.CAFile, "Set the path of the docker TLS ca file")
+	cfg.DockerConfig = defaultDockerConfig()
+	stiCmd.PersistentFlags().StringVarP(&(cfg.DockerConfig.Endpoint), "url", "U", cfg.DockerConfig.Endpoint, "Set the url of the docker socket to use")
+	stiCmd.PersistentFlags().StringVar(&(cfg.DockerConfig.CertFile), "cert", cfg.DockerConfig.CertFile, "Set the path of the docker TLS certificate file")
+	stiCmd.PersistentFlags().StringVar(&(cfg.DockerConfig.KeyFile), "key", cfg.DockerConfig.KeyFile, "Set the path of the docker TLS key file")
+	stiCmd.PersistentFlags().StringVar(&(cfg.DockerConfig.CAFile), "ca", cfg.DockerConfig.CAFile, "Set the path of the docker TLS ca file")
 
 	stiCmd.AddCommand(newCmdVersion())
-	stiCmd.AddCommand(newCmdBuild(req))
-	stiCmd.AddCommand(newCmdUsage(req))
+	stiCmd.AddCommand(newCmdBuild(cfg))
+	stiCmd.AddCommand(newCmdUsage(cfg))
 	stiCmd.AddCommand(newCmdCreate())
 	setupGlog(stiCmd.PersistentFlags())
 

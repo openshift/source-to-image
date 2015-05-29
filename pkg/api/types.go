@@ -2,11 +2,11 @@ package api
 
 import docker "github.com/fsouza/go-dockerclient"
 
-// Request contains essential fields for any request.
-type Request struct {
+// Config contains essential fields for performing build.
+type Config struct {
 
-	// BaseImage describes which image is used for building the result images.
-	BaseImage string
+	// BuilderImage describes which image is used for building the result images.
+	BuilderImage string
 
 	// DockerConfig describes how to access host docker daemon.
 	DockerConfig *DockerConfig
@@ -59,13 +59,8 @@ type Request struct {
 	// WorkingDir describes temporary directory used for downloading sources, scripts and tar operations.
 	WorkingDir string
 
-	// LayeredBuild describes if this is build which layered scripts and sources on top of BaseImage.
+	// LayeredBuild describes if this is build which layered scripts and sources on top of BuilderImage.
 	LayeredBuild bool
-
-	// InstallDestination allows to override the default destination of the STI
-	// scripts. It allows to place the scripts into application root directory
-	// (see ONBUILD strategy). The default value is "upload/scripts".
-	InstallDestination string
 
 	// Operate quietly. Progress and assemble script output are not reported, only fatal errors.
 	// (default: false).

@@ -1,4 +1,4 @@
-// Main STI command. Parses command line arguments, creates request,
-// and launches the proper request handler.
+// Main STI command. Parses command line arguments, builds config object,
+// and launches the proper handler.
 
 package main
