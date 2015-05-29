@@ -88,6 +88,8 @@ type RunContainerOptions struct {
 	Stderr          io.Writer
 	OnStart         func() error
 	PostExec        PostExecutor
+	DNS             []string
+	DNSSearch       []string
 }
 
 // CommitContainerOptions are options passed in to the CommitContainer method
@@ -346,9 +348,16 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 	if opts.Stdout != nil {
 		config.AttachStdout = true
 	}
+	var hostConfig *docker.HostConfig
+	if opts.DNS != nil || opts.DNSSearch != nil {
+		hostConfig = &docker.HostConfig{
+			DNS:       opts.DNS,
+			DNSSearch: opts.DNSSearch,
+		}
+	}
 
-	glog.V(2).Infof("Creating container using config: %+v", config)
-	container, err := d.client.CreateContainer(docker.CreateContainerOptions{Name: "", Config: &config})
+	glog.V(2).Infof("Creating container using config: %+v and host config: %+v", config, hostConfig)
+	container, err := d.client.CreateContainer(docker.CreateContainerOptions{Name: "", Config: &config, HostConfig: hostConfig})
 	if err != nil {
 		return err
 	}
