@@ -312,6 +312,8 @@ func (b *STI) Save(config *api.Config) (err error) {
 		Stdout:          outWriter,
 		Stderr:          errWriter,
 		OnStart:         extractFunc,
+		DNS:             config.DNS,
+		DNSSearch:       config.DNSSearch,
 	}
 
 	go streamContainerError(errReader, nil, config)
@@ -369,6 +371,8 @@ func (b *STI) Execute(command string, config *api.Config) error {
 		Command:         command,
 		Env:             buildEnv,
 		PostExec:        b.postExecutor,
+		DNS:             config.DNS,
+		DNSSearch:       config.DNSSearch,
 	}
 	if !config.LayeredBuild {
 		opts.Stdin = tarFile
