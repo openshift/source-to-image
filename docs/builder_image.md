@@ -15,7 +15,7 @@ final docker image, the three are: sources, scripts and builder image. During th
 build process sti must place sources and scripts inside that builder image. To do
 so sti creates a tar file containing the two and then streams that file into the
 builder image. Before executing `assemble` script, sti untars that file and places
-its contents into the location specified with `--location` flag or `io.openshift.sti.location`
+its contents into the location specified with `--location` flag or `io.s2i.location`
 label from the builder image (default location is `/tmp`). For this
 to happen your image must supply tar archiving utility (command `tar` available in `$PATH`)
 and command line interpreter (command `/bin/sh`). Doing so will allow your image to

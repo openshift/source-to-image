@@ -18,8 +18,8 @@ const (
 	ScriptsURLEnvironment = "STI_SCRIPTS_URL"
 	LocationEnvironment   = "STI_LOCATION"
 
-	ScriptsURLLabel = "io.openshift.sti.scripts-url"
-	LocationLabel   = "io.openshift.sti.location"
+	ScriptsURLLabel = "io.s2i.scripts-url"
+	LocationLabel   = "io.s2i.location"
 
 	DefaultLocation = "/tmp"
 	DefaultTag      = "latest"
@@ -257,8 +257,8 @@ func getScriptsURL(image *docker.Image) string {
 	if len(scriptsURL) == 0 {
 		scriptsURL = getVariable(image, ScriptsURLEnvironment)
 		if len(scriptsURL) != 0 {
-			glog.Warningf("Image %s uses deprecated environment variable %s, please migrate it to %s label instead!",
-				image.ID, ScriptsURLEnvironment, ScriptsURLLabel)
+			glog.Warningf("BuilderImage uses deprecated environment variable %s, please migrate it to %s label instead!",
+				ScriptsURLEnvironment, ScriptsURLLabel)
 		}
 	}
 	if len(scriptsURL) == 0 {
@@ -276,8 +276,8 @@ func getLocation(image *docker.Image) string {
 		return val
 	}
 	if val := getVariable(image, LocationEnvironment); len(val) != 0 {
-		glog.Warningf("Image %s uses deprecated environment variable %s, please migrate it to %s label instead!",
-			image.ID, LocationEnvironment, LocationLabel)
+		glog.Warningf("BuilderImage uses deprecated environment variable %s, please migrate it to %s label instead!",
+			LocationEnvironment, LocationLabel)
 		return val
 	}
 
