@@ -69,12 +69,6 @@ type Config struct {
 	// Specify a relative directory inside the application repository that should
 	// be used as a root directory for the application.
 	ContextDir string
-
-	// DNS servers to use when running build container
-	DNS []string
-
-	// DNS search suffixes to use when running build container
-	DNSSearch []string
 }
 
 // DockerConfig contains the configuration for a Docker connection
