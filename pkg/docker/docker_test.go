@@ -426,7 +426,6 @@ func TestRunContainer(t *testing.T) {
 			AttachToContainerSleep: 200 * time.Millisecond,
 		}
 		dh := getDocker(fakeDocker)
-		dnsServers := []string{"dnsserver1", "dnsserver2"}
 		err := dh.RunContainer(RunContainerOptions{
 			Image:           "test/image",
 			PullImage:       true,
@@ -438,7 +437,6 @@ func TestRunContainer(t *testing.T) {
 			Stdin:           os.Stdin,
 			Stdout:          os.Stdout,
 			Stderr:          os.Stdout,
-			DNS:             dnsServers,
 		})
 		if err != nil {
 			t.Errorf("%s: Unexpected error: %v", desc, err)
@@ -457,13 +455,6 @@ func TestRunContainer(t *testing.T) {
 		if !createConfig.OpenStdin || !createConfig.StdinOnce {
 			t.Errorf("%s: Unexpected stdin flags for createConfig: OpenStdin - %v"+
 				" StdinOnce - %v", desc, createConfig.OpenStdin, createConfig.StdinOnce)
-		}
-		hostConfig := fakeDocker.CreateContainerOpts.HostConfig
-		if hostConfig == nil {
-			t.Errorf("%s: Expected a valid hostConfig in createContainerOpts")
-		}
-		if hostConfig != nil && !reflect.DeepEqual(hostConfig.DNS, dnsServers) {
-			t.Errorf("%s: Unexpected hostConfig DNS value: %#v", hostConfig.DNS)
 		}
 
 		// Verify that remove container was called
