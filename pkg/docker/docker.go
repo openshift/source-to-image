@@ -18,11 +18,11 @@ const (
 	ScriptsURLEnvironment = "STI_SCRIPTS_URL"
 	LocationEnvironment   = "STI_LOCATION"
 
-	ScriptsURLLabel = "io.s2i.scripts-url"
-	LocationLabel   = "io.s2i.location"
+	ScriptsURLLabel  = "io.s2i.scripts-url"
+	DestinationLabel = "io.s2i.destination"
 
-	DefaultLocation = "/tmp"
-	DefaultTag      = "latest"
+	DefaultDestination = "/tmp"
+	DefaultTag         = "latest"
 )
 
 // Docker is the interface between STI and the Docker client
@@ -65,7 +65,7 @@ type stiDocker struct {
 }
 
 type PostExecutor interface {
-	PostExecute(containerID, location string) error
+	PostExecute(containerID, destination string) error
 }
 
 type PullResult struct {
@@ -80,7 +80,7 @@ type RunContainerOptions struct {
 	PullAuth        docker.AuthConfiguration
 	ExternalScripts bool
 	ScriptsURL      string
-	Location        string
+	Destination     string
 	Command         string
 	Env             []string
 	Stdin           io.Reader
@@ -270,19 +270,19 @@ func getScriptsURL(image *docker.Image) string {
 	return scriptsURL
 }
 
-// getLocation finds a location label in the image metadata
-func getLocation(image *docker.Image) string {
-	if val := getLabel(image, LocationLabel); len(val) != 0 {
+// getDestination finds a destination label in the image metadata
+func getDestination(image *docker.Image) string {
+	if val := getLabel(image, DestinationLabel); len(val) != 0 {
 		return val
 	}
 	if val := getVariable(image, LocationEnvironment); len(val) != 0 {
 		glog.Warningf("BuilderImage uses deprecated environment variable %s, please migrate it to %s label instead!",
-			LocationEnvironment, LocationLabel)
+			LocationEnvironment, DestinationLabel)
 		return val
 	}
 
 	// default directory if none is specified
-	return DefaultLocation
+	return DefaultDestination
 }
 
 // RunContainer creates and starts a container using the image specified in the options with the ability
@@ -304,9 +304,9 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 	// base directory for all STI commands
 	var commandBaseDir string
 	// untar operation destination directory
-	tarDestination := opts.Location
+	tarDestination := opts.Destination
 	if len(tarDestination) == 0 {
-		tarDestination = getLocation(imageMetadata)
+		tarDestination = getDestination(imageMetadata)
 	}
 	if opts.ExternalScripts {
 		// for external scripts we must always append 'scripts' because this is

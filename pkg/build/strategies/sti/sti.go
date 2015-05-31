@@ -22,8 +22,6 @@ import (
 const (
 	// maxErrorOutput is the maximum length of the error output saved for processing
 	maxErrorOutput = 1024
-	// defaultLocation is the default location of the scripts and sources in image
-	defaultLocation = "/tmp"
 )
 
 var (
@@ -307,7 +305,7 @@ func (b *STI) Save(config *api.Config) (err error) {
 		Image:           image,
 		ExternalScripts: b.externalScripts[api.SaveArtifacts],
 		ScriptsURL:      config.ScriptsURL,
-		Location:        config.Location,
+		Destination:     config.Destination,
 		Command:         api.SaveArtifacts,
 		Stdout:          outWriter,
 		Stderr:          errWriter,
@@ -365,7 +363,7 @@ func (b *STI) Execute(command string, config *api.Config) error {
 		PullImage:       config.ForcePull,
 		ExternalScripts: externalScripts,
 		ScriptsURL:      config.ScriptsURL,
-		Location:        config.Location,
+		Destination:     config.Destination,
 		Command:         command,
 		Env:             buildEnv,
 		PostExec:        b.postExecutor,

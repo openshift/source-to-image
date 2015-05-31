@@ -64,11 +64,11 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 | Name                       | Description                                             |
 |:-------------------------- |:--------------------------------------------------------|
 | `--callback-url`           | URL to be invoked after successful build (see [Callback URL](#callback-url)) |
+| `-d (--destination)`       | Location where the scripts and sources will be placed prior doing build (see [STI Scripts](#sti-scripts))|
 | `--dockercfg-path`         | Specify the path to the Docker configuration file |
 | `--incremental`            | Try performing an incremental build |
 | `-e (--env)`               | Environment variables passed to the builder eg. `NAME=VALUE,NAME2=VALUE2,...` |
 | `--force-pull`             | Always pull the builder image, even if it is present locally |
-| `-l (--location)`          | Location where the scripts and sources will be placed prior doing build (see [STI Scripts](#sti-scripts))|
 | `-r (--ref)`               | A branch/tag from which the build should happen (applies only to GIT source) |
 | `--rm`                     | Remove previous image during incremental build |
 | `--save-temp-dir`          | Save the working directory used for fetching scripts and sources |
@@ -115,10 +115,10 @@ can take one of the following form:
 * `http(s)://path_to_scripts_dir` - URL to a directory where the STI scripts are located
 
 Additionally we allow specifying the location of both scripts and sources inside the image
-prior executing the `assemble` script with `--location` flag or `io.s2i.location`
+prior executing the `assemble` script with `--destination` flag or `io.s2i.destination`
 label set inside the image. The expected value of this flag is absolute and existing path
 inside the image, if none is specified the default value of `/tmp` is being used.
-In case of both of these specified the `--location` flag takes precedence over the environment variable.
+In case of both of these specified the `--destination` flag takes precedence over the environment variable.
 
 **NOTE**: In case where the scripts are already placed inside the image (using `--scripts-url`
 or `io.s2i.scripts-url` with value `image:///path/in/image`) then this value applies only to
@@ -161,7 +161,7 @@ Build a ruby application from a GIT source, overriding the scripts URL from a lo
 and forcing the scripts and sources to be placed in `/opt` directory:
 
 ```
-$ sti build --scripts-url=file://stiscripts --location=/opt git://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos7 ruby-app
+$ sti build --scripts-url=file://stiscripts --destination=/opt git://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos7 ruby-app
 ```
 
 
@@ -175,9 +175,9 @@ the only parameter.
 
 | Name                       | Description                                             |
 |:-------------------------- |:--------------------------------------------------------|
+| `-d (--destination)`       | Location where the scripts and sources will be placed prior invoking usage (see [STI Scripts](#sti-scripts))|
 | `-e (--env)`               | Environment variables passed to the builder eg. `NAME=VALUE,NAME2=VALUE2,...`) |
 | `--force-pull`             | Always pull the builder image, even if it is present locally |
-| `-l (--location)`          | Location where the scripts and sources will be placed prior invoking usage (see [STI Scripts](#sti-scripts))|
 | `--save-temp-dir`          | Save the working directory used for fetching scripts and sources |
 | `-s (--scripts-url)`       | URL of STI scripts (see [Scripts URL](#scripts-url))|
 

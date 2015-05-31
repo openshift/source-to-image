@@ -15,8 +15,8 @@ final docker image, the three are: sources, scripts and builder image. During th
 build process sti must place sources and scripts inside that builder image. To do
 so sti creates a tar file containing the two and then streams that file into the
 builder image. Before executing `assemble` script, sti untars that file and places
-its contents into the location specified with `--location` flag or `io.s2i.location`
-label from the builder image (default location is `/tmp`). For this
+its contents into the destination specified with `--destination` flag or `io.s2i.destination`
+label from the builder image (default destination is `/tmp`). For this
 to happen your image must supply tar archiving utility (command `tar` available in `$PATH`)
 and command line interpreter (command `/bin/sh`). Doing so will allow your image to
 use the fastest possible build path, because in all other cases when either
@@ -55,7 +55,7 @@ and place them into appropriate directories inside the image. The workflow for `
 
 1. Restore build artifacts (in case you want to support incremental builds, make sure
    to define [save-artifacts](#save-artifacts)) as well.
-1. Place the application source in desired location.
+1. Place the application source in desired destination.
 1. Build application artifacts.
 1. Install the artifacts into locations appropriate for running.
 

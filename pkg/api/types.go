@@ -50,8 +50,8 @@ type Config struct {
 	// ScriptsURL is a URL describing the localization of STI scripts used during build process.
 	ScriptsURL string
 
-	// Location specifies a location where the untar operation will place its artifacts.
-	Location string
+	// Destination specifies a location where the untar operation will place its artifacts.
+	Destination string
 
 	// ForcePull describes if the builder should pull the images from registry prior to building.
 	ForcePull bool

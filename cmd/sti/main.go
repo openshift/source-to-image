@@ -75,6 +75,7 @@ func newCmdVersion() *cobra.Command {
 func newCmdBuild(cfg *api.Config) *cobra.Command {
 	useConfig := false
 	oldScriptsFlag := ""
+	oldDestination := ""
 
 	buildCmd := &cobra.Command{
 		Use:   "build <source> <image> [<tag>]",
@@ -148,6 +149,10 @@ func newCmdBuild(cfg *api.Config) *cobra.Command {
 				glog.Warning("Flag --scripts is deprecated, use --scripts-url instead")
 				cfg.ScriptsURL = oldScriptsFlag
 			}
+			if len(oldDestination) != 0 {
+				glog.Warning("Flag --location is deprecated, use --destination instead")
+				cfg.Destination = oldDestination
+			}
 
 			if glog.V(2) {
 				fmt.Printf("\n%s\n", describe.DescribeConfig(cfg))
@@ -172,7 +177,8 @@ func newCmdBuild(cfg *api.Config) *cobra.Command {
 	buildCmd.Flags().StringVar(&(cfg.CallbackURL), "callback-url", "", "Specify a URL to invoke via HTTP POST upon build completion")
 	buildCmd.Flags().StringVarP(&(cfg.ScriptsURL), "scripts-url", "s", "", "Specify a URL for the assemble and run scripts")
 	buildCmd.Flags().StringVar(&(oldScriptsFlag), "scripts", "", "Specify a URL for the assemble and run scripts")
-	buildCmd.Flags().StringVarP(&(cfg.Location), "location", "l", "", "Specify a destination location for untar operation")
+	buildCmd.Flags().StringVarP(&(oldDestination), "location", "l", "", "Specify a destination location for untar operation")
+	buildCmd.Flags().StringVarP(&(cfg.Destination), "destination", "d", "", "Specify a destination location for untar operation")
 	buildCmd.Flags().BoolVar(&(cfg.ForcePull), "force-pull", true, "Always pull the builder image even if it is present locally")
 	buildCmd.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by STI instead of deleting it")
 	buildCmd.Flags().BoolVar(&(useConfig), "use-config", false, "Store command line options to .stifile")
@@ -203,6 +209,7 @@ func newCmdCreate() *cobra.Command {
 
 func newCmdUsage(cfg *api.Config) *cobra.Command {
 	oldScriptsFlag := ""
+	oldDestination := ""
 
 	usageCmd := &cobra.Command{
 		Use:   "usage <image>",
@@ -235,7 +242,8 @@ func newCmdUsage(cfg *api.Config) *cobra.Command {
 	usageCmd.Flags().StringVar(&(oldScriptsFlag), "scripts", "", "Specify a URL for the assemble and run scripts")
 	usageCmd.Flags().BoolVar(&(cfg.ForcePull), "force-pull", true, "Always pull the builder image even if it is present locally")
 	usageCmd.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by STI instead of deleting it")
-	usageCmd.Flags().StringVarP(&(cfg.Location), "location", "l", "", "Specify a destination location for untar operation")
+	usageCmd.Flags().StringVarP(&(oldDestination), "location", "l", "", "Specify a destination location for untar operation")
+	usageCmd.Flags().StringVarP(&(cfg.Destination), "destination", "d", "", "Specify a destination location for untar operation")
 	return usageCmd
 }
 

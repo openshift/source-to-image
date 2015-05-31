@@ -31,9 +31,9 @@ func DescribeConfig(config *api.Config) string {
 		fmt.Fprintf(out, "Remove Old Build:\t%s\n", printBool(config.RemovePreviousImage))
 		fmt.Fprintf(out, "Force Pull:\t%s\n", printBool(config.ForcePull))
 		fmt.Fprintf(out, "Quiet:\t%s\n", printBool(config.Quiet))
-		// fmt.Fprintf(out, "Layered Build:\t%s\n", printBool(config.LayeredBuild))
-		if len(config.Location) > 0 {
-			fmt.Fprintf(out, "Artifacts Location:\t%s\n", config.Location)
+		fmt.Fprintf(out, "Layered Build:\t%s\n", printBool(config.LayeredBuild))
+		if len(config.Destination) > 0 {
+			fmt.Fprintf(out, "Artifacts Destination:\t%s\n", config.Destination)
 		}
 		if len(config.CallbackURL) > 0 {
 			fmt.Fprintf(out, "Callback URL:\t%s\n", config.CallbackURL)
