@@ -155,7 +155,7 @@ func NewInstallError(script string) error {
 		Message:    fmt.Sprintf("failed to install %v", script),
 		Details:    nil,
 		ErrorCode:  InstallError,
-		Suggestion: "provide URL with Source-To-Image scripts with -s flag or check the image if it contains io.openshift.sti.scripts-url label set",
+		Suggestion: "provide URL with Source-To-Image scripts with -s flag or check the image if it contains io.s2i.scripts-url label set",
 	}
 }
 
@@ -166,7 +166,7 @@ func NewInstallRequiredError(scripts []string) error {
 		Message:    fmt.Sprintf("failed to install %v", scripts),
 		Details:    nil,
 		ErrorCode:  InstallErrorRequired,
-		Suggestion: "provide URL with Source-To-Image scripts with -s flag or check the image if it contains io.openshift.sti.scripts-url label set",
+		Suggestion: "provide URL with Source-To-Image scripts with -s flag or check the image if it contains io.s2i.scripts-url label set",
 	}
 }
 

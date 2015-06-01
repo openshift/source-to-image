@@ -290,12 +290,12 @@ func TestGetScriptsURL(t *testing.T) {
 
 func TestRunContainer(t *testing.T) {
 	type runtest struct {
-		image           docker.Image
-		cmd             string
-		externalScripts bool
-		paramScriptsURL string
-		paramLocation   string
-		cmdExpected     []string
+		image            docker.Image
+		cmd              string
+		externalScripts  bool
+		paramScriptsURL  string
+		paramDestination string
+		cmdExpected      []string
 	}
 
 	tests := map[string]runtest{
@@ -308,26 +308,26 @@ func TestRunContainer(t *testing.T) {
 			externalScripts: true,
 			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /tmp -xf - && /tmp/scripts/%s", api.Assemble)},
 		},
-		"paramLocation": {
+		"paramDestination": {
 			image: docker.Image{
 				ContainerConfig: docker.Config{},
 				Config:          &docker.Config{},
 			},
-			cmd:             api.Assemble,
-			externalScripts: true,
-			paramLocation:   "/opt/test",
-			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /opt/test -xf - && /opt/test/scripts/%s", api.Assemble)},
+			cmd:              api.Assemble,
+			externalScripts:  true,
+			paramDestination: "/opt/test",
+			cmdExpected:      []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /opt/test -xf - && /opt/test/scripts/%s", api.Assemble)},
 		},
-		"paramLocation&paramScripts": {
+		"paramDestination&paramScripts": {
 			image: docker.Image{
 				ContainerConfig: docker.Config{},
 				Config:          &docker.Config{},
 			},
-			cmd:             api.Assemble,
-			externalScripts: true,
-			paramLocation:   "/opt/test",
-			paramScriptsURL: "http://my.test.url/test?param=one",
-			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /opt/test -xf - && /opt/test/scripts/%s", api.Assemble)},
+			cmd:              api.Assemble,
+			externalScripts:  true,
+			paramDestination: "/opt/test",
+			paramScriptsURL:  "http://my.test.url/test?param=one",
+			cmdExpected:      []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /opt/test -xf - && /opt/test/scripts/%s", api.Assemble)},
 		},
 		"scriptsInsideImageEnvironment": {
 			image: docker.Image{
@@ -351,31 +351,31 @@ func TestRunContainer(t *testing.T) {
 			externalScripts: false,
 			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /tmp -xf - && /opt/bin/%s", api.Assemble)},
 		},
-		"scriptsInsideImageEnvironmentWithParamLocation": {
+		"scriptsInsideImageEnvironmentWithParamDestination": {
 			image: docker.Image{
 				ContainerConfig: docker.Config{
 					Env: []string{ScriptsURLEnvironment + "=image:///opt/bin"},
 				},
 				Config: &docker.Config{},
 			},
-			cmd:             api.Assemble,
-			externalScripts: false,
-			paramLocation:   "/opt/sti",
-			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /opt/sti -xf - && /opt/bin/%s", api.Assemble)},
+			cmd:              api.Assemble,
+			externalScripts:  false,
+			paramDestination: "/opt/sti",
+			cmdExpected:      []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /opt/sti -xf - && /opt/bin/%s", api.Assemble)},
 		},
-		"scriptsInsideImageLabelWithParamLocation": {
+		"scriptsInsideImageLabelWithParamDestination": {
 			image: docker.Image{
 				ContainerConfig: docker.Config{
 					Labels: map[string]string{ScriptsURLLabel: "image:///opt/bin"},
 				},
 				Config: &docker.Config{},
 			},
-			cmd:             api.Assemble,
-			externalScripts: false,
-			paramLocation:   "/opt/sti",
-			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /opt/sti -xf - && /opt/bin/%s", api.Assemble)},
+			cmd:              api.Assemble,
+			externalScripts:  false,
+			paramDestination: "/opt/sti",
+			cmdExpected:      []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /opt/sti -xf - && /opt/bin/%s", api.Assemble)},
 		},
-		"paramLocationFromImageEnvironment": {
+		"paramDestinationFromImageEnvironment": {
 			image: docker.Image{
 				ContainerConfig: docker.Config{
 					Env: []string{LocationEnvironment + "=/opt", ScriptsURLEnvironment + "=http://my.test.url/test?param=one"},
@@ -386,10 +386,10 @@ func TestRunContainer(t *testing.T) {
 			externalScripts: true,
 			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /opt -xf - && /opt/scripts/%s", api.Assemble)},
 		},
-		"paramLocationFromImageLabel": {
+		"paramDestinationFromImageLabel": {
 			image: docker.Image{
 				ContainerConfig: docker.Config{
-					Labels: map[string]string{LocationLabel: "/opt", ScriptsURLLabel: "http://my.test.url/test?param=one"},
+					Labels: map[string]string{DestinationLabel: "/opt", ScriptsURLLabel: "http://my.test.url/test?param=one"},
 				},
 				Config: &docker.Config{},
 			},
@@ -431,7 +431,7 @@ func TestRunContainer(t *testing.T) {
 			PullImage:       true,
 			ExternalScripts: tst.externalScripts,
 			ScriptsURL:      tst.paramScriptsURL,
-			Location:        tst.paramLocation,
+			Destination:     tst.paramDestination,
 			Command:         tst.cmd,
 			Env:             []string{"Key1=Value1", "Key2=Value2"},
 			Stdin:           os.Stdin,

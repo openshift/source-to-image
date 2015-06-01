@@ -17,7 +17,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/util"
 )
 
-const defaultLocation = "/tmp"
+const defaultDestination = "/tmp"
 
 type Layered struct {
 	config  *api.Config
@@ -41,12 +41,12 @@ func New(config *api.Config, scripts build.ScriptsHandler) (*Layered, error) {
 	}, nil
 }
 
-func getLocation(config *api.Config) string {
-	location := config.Location
-	if len(location) == 0 {
-		location = defaultLocation
+func getDestination(config *api.Config) string {
+	destination := config.Destination
+	if len(destination) == 0 {
+		destination = defaultDestination
 	}
-	return location
+	return destination
 }
 
 func (b *Layered) CreateDockerfile(config *api.Config) error {
@@ -58,8 +58,8 @@ func (b *Layered) CreateDockerfile(config *api.Config) error {
 	}
 
 	locations := []string{
-		filepath.Join(getLocation(config), "scripts"),
-		filepath.Join(getLocation(config), "src"),
+		filepath.Join(getDestination(config), "scripts"),
+		filepath.Join(getDestination(config), "src"),
 	}
 
 	buffer.WriteString(fmt.Sprintf("FROM %s\n", b.config.BuilderImage))
@@ -140,7 +140,7 @@ func (b *Layered) Build(config *api.Config) (*api.Result, error) {
 	// new image name
 	b.config.BuilderImage = newBuilderImage
 	// the scripts are inside the image
-	b.config.ScriptsURL = "image://" + filepath.Join(getLocation(config), "scripts")
+	b.config.ScriptsURL = "image://" + filepath.Join(getDestination(config), "scripts")
 
 	glog.V(2).Infof("Building %s using sti-enabled image", b.config.Tag)
 	if err := b.scripts.Execute(api.Assemble, b.config); err != nil {

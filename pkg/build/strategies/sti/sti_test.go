@@ -32,7 +32,7 @@ type FakeSTI struct {
 	ExpectedError          bool
 	LayeredBuildCalled     bool
 	LayeredBuildError      error
-	PostExecuteLocation    string
+	PostExecuteDestination string
 	PostExecuteContainerID string
 	PostExecuteError       error
 }
@@ -114,9 +114,9 @@ func (f *FakeSTI) wasExpectedError(text string) bool {
 	return f.ExpectedError
 }
 
-func (f *FakeSTI) PostExecute(id, location string) error {
+func (f *FakeSTI) PostExecute(id, destination string) error {
 	f.PostExecuteContainerID = id
-	f.PostExecuteLocation = location
+	f.PostExecuteDestination = destination
 	return f.PostExecuteError
 }
 
@@ -681,8 +681,8 @@ func TestExecuteOK(t *testing.T) {
 		t.Errorf("PostExecutor not called with expected ID: %s",
 			pe.PostExecuteContainerID)
 	}
-	if !reflect.DeepEqual(pe.PostExecuteLocation, "test-command") {
-		t.Errorf("PostExecutor not called with expected command: %s", pe.PostExecuteLocation)
+	if !reflect.DeepEqual(pe.PostExecuteDestination, "test-command") {
+		t.Errorf("PostExecutor not called with expected command: %s", pe.PostExecuteDestination)
 	}
 }
 

@@ -41,8 +41,8 @@ func TestBuildOK(t *testing.T) {
 	if l.config.ScriptsURL != "image:///tmp/scripts" {
 		t.Error("Expected ScriptsURL image:///tmp/scripts, but got %s", l.config.ScriptsURL)
 	}
-	if len(l.config.Location) != 0 {
-		t.Errorf("Unexpected Location %s", l.config.Location)
+	if len(l.config.Destination) != 0 {
+		t.Errorf("Unexpected Destination %s", l.config.Destination)
 	}
 }
 
