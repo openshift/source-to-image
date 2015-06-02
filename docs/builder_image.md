@@ -45,8 +45,25 @@ sources are already there.
     * [usage](#usage)
     * [test/run](#test/run)
 
-All of the scripts can be written in any programming language, as long as it is
-executable inside the builder image.
+All of the scripts can be written in any programming language, as long as the scripts
+are executable inside the builder image. STI supports multiple options providing
+`assemble`/`run`/`save-artifacts` scripts. All of these locations are checked on
+each build in the following order:
+
+1. A script found at the `--scripts-url` URL
+1. A script found in the application source `.sti/bin` directory
+1. A script found at the default image URL (`io.s2i.scripts-url` label)
+
+Both `io.s2i.scripts-url` label specified in the image and `--scripts-url` flag
+can take one of the following form:
+
+* `image://path_to_scripts_dir` - absolute path inside the image to a directory where the STI scripts are located
+* `file://path_to_scripts_dir` - relative or absolute path to a directory on the host where the STI scripts are located
+* `http(s)://path_to_scripts_dir` - URL to a directory where the STI scripts are located
+
+**NOTE**: In case where the scripts are already placed inside the image (using `--scripts-url`
+or `io.s2i.scripts-url` with value `image:///path/in/image`) then setting `--destination`
+or `io.s2i.destination` label applies only to sources and artifacts.
 
 ## assemble
 

@@ -64,7 +64,7 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 | Name                       | Description                                             |
 |:-------------------------- |:--------------------------------------------------------|
 | `--callback-url`           | URL to be invoked after successful build (see [Callback URL](#callback-url)) |
-| `-d (--destination)`       | Location where the scripts and sources will be placed prior doing build (see [STI Scripts](#sti-scripts))|
+| `-d (--destination)`       | Location where the scripts and sources will be placed prior doing build (see [STI Scripts](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#sti-scripts))|
 | `--dockercfg-path`         | Specify the path to the Docker configuration file |
 | `--incremental`            | Try performing an incremental build |
 | `-e (--env)`               | Environment variables passed to the builder eg. `NAME=VALUE,NAME2=VALUE2,...` |
@@ -73,7 +73,7 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 | `--rm`                     | Remove previous image during incremental build |
 | `--save-temp-dir`          | Save the working directory used for fetching scripts and sources |
 | `--context-dir`            | Allow to specify directory name with your application |
-| `-s (--scripts-url)`       | URL of STI scripts (see [STI Scripts](#sti-scripts)) |
+| `-s (--scripts-url)`       | URL of STI scripts (see [STI Scripts](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#sti-scripts)) |
 | `-q (--quiet)`             | Operate quietly, suppressing all non-error output |
 
 #### Context directory
@@ -97,32 +97,6 @@ Example data posted will be of the form:
     "success": true
 }
 ```
-
-#### STI Scripts
-
-STI supports multiple options providing `assemble`/`run`/`save-artifacts` scripts.
-All of these locations are checked on each build in the following order:
-
-1. A script found at the `--scripts-url` URL
-1. A script found in the application source `.sti/bin` directory
-1. A script found at the default image URL (`io.s2i.scripts-url` label)
-
-Both `io.s2i.scripts-url` label specified in the image and `--scripts-url` flag
-can take one of the following form:
-
-* `image://path_to_scripts_dir` - absolute path inside the image to a directory where the STI scripts are located
-* `file://path_to_scripts_dir` - relative or absolute path to a directory on the host where the STI scripts are located
-* `http(s)://path_to_scripts_dir` - URL to a directory where the STI scripts are located
-
-Additionally we allow specifying the location of both scripts and sources inside the image
-prior executing the `assemble` script with `--destination` flag or `io.s2i.destination`
-label set inside the image. The expected value of this flag is absolute and existing path
-inside the image, if none is specified the default value of `/tmp` is being used.
-In case of both of these specified the `--destination` flag takes precedence over the environment variable.
-
-**NOTE**: In case where the scripts are already placed inside the image (using `--scripts-url`
-or `io.s2i.scripts-url` with value `image:///path/in/image`) then this value applies only to
-sources and artifacts.
 
 #### Example Usage
 
@@ -175,11 +149,11 @@ the only parameter.
 
 | Name                       | Description                                             |
 |:-------------------------- |:--------------------------------------------------------|
-| `-d (--destination)`       | Location where the scripts and sources will be placed prior invoking usage (see [STI Scripts](#sti-scripts))|
+| `-d (--destination)`       | Location where the scripts and sources will be placed prior invoking usage (see [STI Scripts](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#sti-scripts))|
 | `-e (--env)`               | Environment variables passed to the builder eg. `NAME=VALUE,NAME2=VALUE2,...`) |
 | `--force-pull`             | Always pull the builder image, even if it is present locally |
 | `--save-temp-dir`          | Save the working directory used for fetching scripts and sources |
-| `-s (--scripts-url)`       | URL of STI scripts (see [Scripts URL](#scripts-url))|
+| `-s (--scripts-url)`       | URL of STI scripts (see [Scripts URL](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#sti-scripts))|
 
 #### Example Usage
 
