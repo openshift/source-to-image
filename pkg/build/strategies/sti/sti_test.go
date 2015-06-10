@@ -236,13 +236,12 @@ func testBuildHandler() *STI {
 		docker:          &test.FakeDocker{},
 		installer:       &test.FakeInstaller{},
 		git:             &test.FakeGit{},
-		fs:              &test.FakeFileSystem{},
+		fs:              &test.FakeFileSystem{ExistsResult: map[string]bool{"a-repo-source/.": true}},
 		tar:             &test.FakeTar{},
 		config:          &api.Config{},
 		result:          &api.Result{},
 		callbackInvoker: &test.FakeCallbackInvoker{},
 	}
-
 	s.source = &git.Clone{s.git, s.fs}
 	return s
 }
@@ -467,6 +466,7 @@ func TestFetchSource(t *testing.T) {
 	}
 
 	tests := []fetchTest{
+		// 0
 		{
 			validCloneSpec:   false,
 			refSpecified:     false,
@@ -474,6 +474,7 @@ func TestFetchSource(t *testing.T) {
 			checkoutExpected: false,
 			copyExpected:     true,
 		},
+		// 1
 		{
 			validCloneSpec:   true,
 			refSpecified:     false,
@@ -481,6 +482,7 @@ func TestFetchSource(t *testing.T) {
 			checkoutExpected: false,
 			copyExpected:     false,
 		},
+		// 2
 		{
 			validCloneSpec:   true,
 			refSpecified:     true,
@@ -490,7 +492,7 @@ func TestFetchSource(t *testing.T) {
 		},
 	}
 
-	for _, ft := range tests {
+	for testNum, ft := range tests {
 		bh := testBuildHandler()
 		gh := bh.git.(*test.FakeGit)
 		fh := bh.fs.(*test.FakeFileSystem)
@@ -505,26 +507,26 @@ func TestFetchSource(t *testing.T) {
 		bh.source.Download(bh.config)
 		if ft.cloneExpected {
 			if gh.CloneSource != "a-repo-source" {
-				t.Errorf("Clone was not called with the expected source.")
+				t.Errorf("Clone was not called with the expected source. Got %s, expected %s [%d]", gh.CloneSource, "a-source-repo-source", testNum)
 			}
 			if gh.CloneTarget != expectedTargetDir {
-				t.Errorf("Unexpected target dirrectory for clone operation.")
+				t.Errorf("Unexpected target dirrectory for clone operation. Got %s, expected %s [%d]", gh.CloneTarget, expectedTargetDir, testNum)
 			}
 		}
 		if ft.checkoutExpected {
 			if gh.CheckoutRef != "a-branch" {
-				t.Errorf("Checkout was not called with the expected branch.")
+				t.Errorf("Checkout was not called with the expected branch. Got %s, expected %s [%d]", gh.CheckoutRef, "a-branch", testNum)
 			}
 			if gh.CheckoutRepo != expectedTargetDir {
-				t.Errorf("Unexpected target repository for checkout operation.")
+				t.Errorf("Unexpected target repository for checkout operation. Got %s, expected %s [%d]", gh.CheckoutRepo, expectedTargetDir, testNum)
 			}
 		}
 		if ft.copyExpected {
 			if fh.CopySource != "a-repo-source/." {
-				t.Errorf("Copy was not called with the expected source.")
+				t.Errorf("Copy was not called with the expected source. Got %s, expected %s [%d]", fh.CopySource, "a-repo-source/.", testNum)
 			}
 			if fh.CopyDest != expectedTargetDir {
-				t.Errorf("Unexpected target director for copy operation.")
+				t.Errorf("Unexpected target director for copy operation. Got %s, expected %s [%d]", fh.CopyDest, expectedTargetDir, testNum)
 			}
 		}
 	}
