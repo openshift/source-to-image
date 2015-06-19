@@ -96,6 +96,7 @@ type CommitContainerOptions struct {
 	Repository  string
 	Command     []string
 	Env         []string
+	Labels      map[string]string
 }
 
 // BuildImageOptions are options passed in to the BuildImage method
@@ -462,8 +463,9 @@ func (d *stiDocker) CommitContainer(opts CommitContainerOptions) (string, error)
 	}
 	if opts.Command != nil {
 		config := docker.Config{
-			Cmd: opts.Command,
-			Env: opts.Env,
+			Cmd:    opts.Command,
+			Env:    opts.Env,
+			Labels: opts.Labels,
 		}
 		dockerOpts.Run = &config
 		glog.V(2).Infof("Committing container with config: %+v", config)

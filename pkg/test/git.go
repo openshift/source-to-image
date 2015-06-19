@@ -1,5 +1,7 @@
 package test
 
+import "github.com/openshift/source-to-image/pkg/api"
+
 // FakeGit provides a fake GIT
 type FakeGit struct {
 	ValidCloneSpecSource string
@@ -32,4 +34,12 @@ func (f *FakeGit) Checkout(repo, ref string) error {
 	f.CheckoutRepo = repo
 	f.CheckoutRef = ref
 	return f.CheckoutError
+}
+
+func (f *FakeGit) GetInfo(repo string) *api.SourceInfo {
+	return &api.SourceInfo{
+		Ref:      "master",
+		CommitID: "1bf4f04",
+		Location: "file:///foo",
+	}
 }
