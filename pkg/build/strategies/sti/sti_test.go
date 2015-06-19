@@ -463,8 +463,11 @@ func TestFetchSource(t *testing.T) {
 		cloneExpected    bool
 		checkoutExpected bool
 		copyExpected     bool
+		source_path      string
+		expectedError    *error
 	}
 
+	err := stierr.NewSourcePathError("error")
 	tests := []fetchTest{
 		// 0
 		{
@@ -472,9 +475,19 @@ func TestFetchSource(t *testing.T) {
 			refSpecified:     false,
 			cloneExpected:    false,
 			checkoutExpected: false,
-			copyExpected:     true,
+			copyExpected:     false,
+			source_path:      "invalid/path",
+			expectedError:    &err,
 		},
 		// 1
+		{
+			validCloneSpec:   false,
+			refSpecified:     false,
+			cloneExpected:    false,
+			checkoutExpected: false,
+			copyExpected:     true,
+		},
+		// 2
 		{
 			validCloneSpec:   true,
 			refSpecified:     false,
@@ -482,7 +495,7 @@ func TestFetchSource(t *testing.T) {
 			checkoutExpected: false,
 			copyExpected:     false,
 		},
-		// 2
+		// 3
 		{
 			validCloneSpec:   true,
 			refSpecified:     true,
@@ -502,15 +515,32 @@ func TestFetchSource(t *testing.T) {
 		if ft.refSpecified {
 			bh.config.Ref = "a-branch"
 		}
-		bh.config.Source = "a-repo-source"
+		if len(ft.source_path) == 0 {
+			bh.config.Source = "a-repo-source"
+		} else {
+			bh.config.Source = ft.source_path
+		}
+
 		expectedTargetDir := "/working-dir/upload/src"
-		bh.source.Download(bh.config)
+		e := bh.source.Download(bh.config)
+		if ft.expectedError == nil && e != nil {
+			t.Errorf("Unexpected error %v [%d]", e, testNum)
+		}
+		if ft.expectedError != nil {
+			if e == nil {
+				t.Errorf("Did not get expected error [%d]", testNum)
+				continue
+			}
+			if (*ft.expectedError).(stierr.Error).ErrorCode != e.(stierr.Error).ErrorCode {
+				t.Errorf("Expected error code %s, got %s [%d]", (*ft.expectedError).(stierr.Error).ErrorCode, e.(stierr.Error).ErrorCode, testNum)
+			}
+		}
 		if ft.cloneExpected {
 			if gh.CloneSource != "a-repo-source" {
 				t.Errorf("Clone was not called with the expected source. Got %s, expected %s [%d]", gh.CloneSource, "a-source-repo-source", testNum)
 			}
 			if gh.CloneTarget != expectedTargetDir {
-				t.Errorf("Unexpected target dirrectory for clone operation. Got %s, expected %s [%d]", gh.CloneTarget, expectedTargetDir, testNum)
+				t.Errorf("Unexpected target directory for clone operation. Got %s, expected %s [%d]", gh.CloneTarget, expectedTargetDir, testNum)
 			}
 		}
 		if ft.checkoutExpected {
