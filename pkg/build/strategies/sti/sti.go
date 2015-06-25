@@ -52,6 +52,7 @@ type STI struct {
 	installedScripts map[string]bool
 	scriptsURL       map[string]string
 	incremental      bool
+	sourceInfo       *api.SourceInfo
 
 	// Interfaces
 	preparer  build.Preparer
@@ -165,7 +166,7 @@ func (b *STI) Prepare(config *api.Config) error {
 
 	// fetch sources, for theirs .sti/bin might contain sti scripts
 	if len(config.Source) > 0 {
-		if err = b.source.Download(config); err != nil {
+		if b.sourceInfo, err = b.source.Download(config); err != nil {
 			return err
 		}
 	}
@@ -232,6 +233,7 @@ func (b *STI) PostExecute(containerID, location string) error {
 		Env:         buildEnv,
 		ContainerID: containerID,
 		Repository:  b.config.Tag,
+		Labels:      util.GenerateOutputImageLabels(b.sourceInfo, b.config),
 	}
 
 	imageID, err := b.docker.CommitContainer(opts)

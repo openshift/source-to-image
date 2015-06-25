@@ -110,7 +110,7 @@ func (i *installer) download(scriptsURL string, scripts []string, dstDir string)
 			result[script].err = err
 			continue
 		}
-		result[script].err = i.downloader.Download(url, filepath.Join(dstDir, script))
+		_, result[script].err = i.downloader.Download(url, filepath.Join(dstDir, script))
 	}
 
 	return result
