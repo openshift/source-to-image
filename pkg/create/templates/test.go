@@ -3,10 +3,10 @@ package templates
 const TestRunScript = `
 #!/bin/bash
 #
-# The 'run' performs a simple test that verifies that STI image.
-# The main focus here is to excersise the STI scripts.
+# The 'run' performs a simple test that verifies the STI image.
+# The main focus here is to exercise the STI scripts.
 #
-# For more informations see the documentation:
+# For more information see the documentation:
 #	https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md
 #
 # IMAGE_NAME specifies a name of the candidate image used for testing.
@@ -19,7 +19,7 @@ image_dir=$(readlink -zf ${test_dir}/..)
 scripts_url="file://${image_dir}/.sti/bin"
 cid_file=$(mktemp -u --suffix=.cid)
 
-# Since we built the candidate image locally, we don't want STI attempt to pull
+# Since we built the candidate image locally, we don't want STI to attempt to pull
 # it from Docker hub
 sti_args="--force-pull=false -s ${scripts_url}"
 
@@ -47,7 +47,7 @@ prepare() {
     echo "ERROR: The image ${IMAGE_NAME} must exist before this script is executed."
     exit 1
   fi
-  # TODO: STI build require the application is a valid 'GIT' repository, we
+  # TODO: The STI build requires that the application is a valid git repository. We
   # should remove this restriction in the future when a file:// is used.
   pushd ${test_dir}/test-app >/dev/null
   git init
@@ -89,7 +89,7 @@ wait_for_cid() {
   local result=1
   while [ $attempt -le $max_attempts ]; do
     [ -f $cid_file ] && break
-    echo "Waiting for container start..."
+    echo "Waiting for container to start..."
     attempt=$(( $attempt + 1 ))
     sleep $sleep_time
   done
@@ -135,7 +135,7 @@ check_result $?
 # Verify that the HTTP connection can be established to test application container
 run_test_application &
 
-# Wait for the container to write it's CID file
+# Wait for the container to write its CID file
 wait_for_cid
 
 test_connection

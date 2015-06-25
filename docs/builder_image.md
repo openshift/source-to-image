@@ -1,8 +1,9 @@
 # sti builder image requirements
 
-The main advantage of using sti for building reproducible docker image ease of use
-for developer. To meet that criteria you, as a builder image author, should be aware
-of the two basic requirements for the best possible sti performance, these are:
+The main advantage of using sti for building reproducible docker images is ease
+of use for the developer. To meet that criteria you, as a builder image author,
+should be aware of the two basic requirements for the best possible sti
+performance. These are:
 
 * [required image contents](#required-image-contents)
 * [sti scripts](#sti-scripts)
@@ -10,32 +11,30 @@ of the two basic requirements for the best possible sti performance, these are:
 
 # Required image contents
 
-The build process consists of three fundamental elements which are combined into
-final docker image, the three are: sources, scripts and builder image. During the
+The build process consists of three fundamental elements which are combined into the
+final docker image. These are: source code, sti scripts, and the builder image. Duringthe
 build process sti must place sources and scripts inside that builder image. To do
 so sti creates a tar file containing the two and then streams that file into the
-builder image. Before executing `assemble` script, sti untars that file and places
-its contents into the destination specified with `--destination` flag or `io.s2i.destination`
-label from the builder image (default destination is `/tmp`). For this
-to happen your image must supply tar archiving utility (command `tar` available in `$PATH`)
-and command line interpreter (command `/bin/sh`). Doing so will allow your image to
-use the fastest possible build path, because in all other cases when either
-`tar` or `/bin/sh` is not available, sti build will be forced to perform an additional
-docker build to put both sources and scripts inside the image and only then run the
-usual sti build procedure (sti will do this automatically if tar and /bin/sh are not found).
-See the following diagram for how build workflow looks like:
+builder image. Before executing the `assemble` script, sti untars that file and places
+its contents into the destination specified with `--destination` flag or the value of 
+the `io.s2i.destination` label set in the builder image (the default destination is `/tmp`).
+If your image does not have either `tar` or `/bin/sh` the sti build will perform an additional
+docker build to place the source code and scripts into an appropriate image and then run
+the normal sti build.
+
+The following diagram illustrates the build workflow:
 
 ![sti workflow](./sti-flow.png "sti workflow")
 
-\* Run build's responsibility is to untar the sources, scripts and artifacts (if such
-exist) and invoke `assemble` script. If this is second run (after catching `tar`/`/bin/sh`
-error) it's responsible only for invoking `assemble` script, since both scripts and
-sources are already there.
+\* Run build's responsibility is to untar the sources, scripts and (opionally) artifacts
+and invoke the `assemble` script. If this is the second run after any previous runs with
+`tar`/`/bin/sh` errors, it will only run the `assemble` script, since both the source and
+scripts are already present.
 
 
 # sti scripts
 
-`sti` expects you, as the builder image author, to supply the following scripts:
+`sti` expects you (the builder image author) to supply the following scripts:
 
 * required:
     * [assemble](#assemble)
@@ -46,40 +45,41 @@ sources are already there.
     * [test/run](#test/run)
 
 All of the scripts can be written in any programming language, as long as the scripts
-are executable inside the builder image. STI supports multiple options providing
-`assemble`/`run`/`save-artifacts` scripts. All of these locations are checked on
-each build in the following order:
+are executable inside the builder image. The build searches the following locations for
+these scripts in the following order:
 
-1. A script found at the `--scripts-url` URL
-1. A script found in the application source `.sti/bin` directory
-1. A script found at the default image URL (`io.s2i.scripts-url` label)
+1. The supplied `--scripts-url` URL (if supplied as an argument)
+1. The application source's `.sti/bin` directory (if it exists)
+1. The default image URL (ie the value of the image's `io.s2i.scripts-url` label)
 
-Both `io.s2i.scripts-url` label specified in the image and `--scripts-url` flag
-can take one of the following form:
+Both the `io.s2i.scripts-url` label specified in the image and the `--scripts-url` flag
+can be supplied in any of the following ways to indicate where the STI scripts are located:
 
-* `image://path_to_scripts_dir` - absolute path inside the image to a directory where the STI scripts are located
-* `file://path_to_scripts_dir` - relative or absolute path to a directory on the host where the STI scripts are located
-* `http(s)://path_to_scripts_dir` - URL to a directory where the STI scripts are located
+* `image://path_to_scripts_dir` - absolute path inside the image
+* `file://path_to_scripts_dir` - relative or absolute path on the host machine
+* `http(s)://path_to_scripts_dir` - URL to a directory
 
-**NOTE**: In case where the scripts are already placed inside the image (using `--scripts-url`
-or `io.s2i.scripts-url` with value `image:///path/in/image`) then setting `--destination`
-or `io.s2i.destination` label applies only to sources and artifacts.
+**NOTE**: In the case where the scripts are already placed inside the image (ie when
+using the `--scripts-url` flag or the `io.s2i.scripts-url` label with the format
+`image:///path/in/image`), then the `--destination` flag or the `io.s2i.destination`
+label applies only to sources and artifacts.
 
 ## assemble
 
 The `assemble` script is responsible for building the application artifacts from source,
-and place them into appropriate directories inside the image. The workflow for `assemble` is:
+and placing them into the appropriate directories inside the image. The workflow for the
+`assemble` script is:
 
-1. Restore build artifacts (in case you want to support incremental builds, make sure
-   to define [save-artifacts](#save-artifacts)) as well.
-1. Place the application source in desired destination.
-1. Build application artifacts.
+1. Restore build artifacts (in case you want to support incremental builds (if using this,
+   make sure you define [save-artifacts](#save-artifacts)) as well.
+1. Place the application source code in the appropriate location.
+1. Build any application artifacts.
 1. Install the artifacts into locations appropriate for running.
 
 #### Example `assemble` script:
 
 **NOTE**: All the examples are written in [Bash](http://www.gnu.org/software/bash/)
-and it is assumed all the tar contents is unpacked into `/tmp/sti` directory.
+and it is assumed that the tar is unpacked into the `/tmp/sti` directory.
 
 ```
 #!/bin/bash
@@ -116,9 +116,9 @@ The `run` script is responsible for executing your application.
 
 ## save-artifacts
 
-The `save-artifacts` script is responsible for gathering all the dependencies which
-existence can speed up the following build processes (eg. for Ruby - gems installed by Bundler,
-for Java - `.m2` contents, etc.) into a tar file and stream it to the standard output.
+The `save-artifacts` script is responsible for gathering all the dependencies whose
+existence can speed up the build processes (eg for Ruby-gems installed by Bundler,
+maven caches for Java builds) into a tar file and streaming it to standard output.
 
 #### Example `save-artifacts` script:
 
@@ -136,8 +136,8 @@ popd
 
 ## usage
 
-The `usage` script is for you, as the builder image author, to inform the user
-how to properly use your image.
+The `usage` script is for you (as the builder image author) to inform the user
+how to use your image.
 
 #### Example `usage` script:
 
@@ -153,17 +153,17 @@ EOF
 
 ## test/run
 
-The `test/run` script is for you, as the builder image author, to create a simple
-process to checks if the image is working correctly. The proposed flow of that process
-should be following:
+The `test/run` script is for you (as the builder image author) to create a simple
+process to check whether the image is working correctly. The workflow of that process
+should be the following:
 
 1. Build the image.
-1. Run the image to verify `usage` script.
-1. Run `sti build` to verify `assemble` script.
-1. (optional) Run `sti build` once more to verify `save-artifacts` script and
+1. Run the image to verify the `usage` script.
+1. Run the `sti build` to verify `assemble` script.
+1. (Optional) Run the `sti build` once more to verify `save-artifacts` script and
    `assemble`'s restore artifacts functionality.
 1. Run the image to verify the test application is working.
 
-**NOTE** The suggested place to put your test application which should be built by your
+**NOTE** The suggested place to put your test application built by your
 `test/run` script is `test/test-app` in your image repository, see
 [sti create](https://github.com/openshift/source-to-image/blob/master/docs/cli.md#sti-create).
