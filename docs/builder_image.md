@@ -1,7 +1,7 @@
 # sti builder image requirements
 
-The main advantage of using sti for building reproducible docker image ease of use
-for developer. To meet that criteria you, as a builder image author, should be aware
+The main advantage of using sti for building reproducible docker images is ease of use
+for developers. To meet that criteria you, as a builder image author, should be aware
 of the two basic requirements for the best possible sti performance, these are:
 
 * [required image contents](#required-image-contents)
@@ -11,26 +11,25 @@ of the two basic requirements for the best possible sti performance, these are:
 # Required image contents
 
 The build process consists of three fundamental elements which are combined into
-final docker image, the three are: sources, scripts and builder image. During the
+final docker image.  These three are: sources, scripts and builder image. During the
 build process sti must place sources and scripts inside that builder image. To do
 so sti creates a tar file containing the two and then streams that file into the
-builder image. Before executing `assemble` script, sti untars that file and places
-its contents into the destination specified with `--destination` flag or `io.s2i.destination`
+builder image. Before executing the `assemble` script, sti untars that file and places
+its contents into the destination specified with either the `--destination` flag or `io.s2i.destination`
 label from the builder image (default destination is `/tmp`). For this
-to happen your image must supply tar archiving utility (command `tar` available in `$PATH`)
-and command line interpreter (command `/bin/sh`). Doing so will allow your image to
+to happen your image must supply the tar archiving utility (command `tar` available in `$PATH`)
+and a command line interpreter (command `/bin/sh`). Doing so will allow your image to
 use the fastest possible build path, because in all other cases when either
-`tar` or `/bin/sh` is not available, sti build will be forced to perform an additional
+`tar` or `/bin/sh` are not available, sti build will be forced to perform an additional
 docker build to put both sources and scripts inside the image and only then run the
-usual sti build procedure (sti will do this automatically if tar and /bin/sh are not found).
+usual sti build procedure (sti will do this automatically if tar or /bin/sh are not found).
 See the following diagram for how build workflow looks like:
 
 ![sti workflow](./sti-flow.png "sti workflow")
 
 \* Run build's responsibility is to untar the sources, scripts and artifacts (if such
-exist) and invoke `assemble` script. If this is second run (after catching `tar`/`/bin/sh`
-error) it's responsible only for invoking `assemble` script, since both scripts and
-sources are already there.
+exist) and invoke the `assemble` script. If this is the second run (due to catching any `tar`/`/bin/sh` related
+errors) it's responsibility is only to invoke the `assemble` script, since both scripts and sources are already there.
 
 
 # sti scripts
@@ -54,32 +53,32 @@ each build in the following order:
 1. A script found in the application source `.sti/bin` directory
 1. A script found at the default image URL (`io.s2i.scripts-url` label)
 
-Both `io.s2i.scripts-url` label specified in the image and `--scripts-url` flag
-can take one of the following form:
+Both the `io.s2i.scripts-url` label specified in the image and `--scripts-url` flag
+can take one of the following forms:
 
 * `image://path_to_scripts_dir` - absolute path inside the image to a directory where the STI scripts are located
 * `file://path_to_scripts_dir` - relative or absolute path to a directory on the host where the STI scripts are located
 * `http(s)://path_to_scripts_dir` - URL to a directory where the STI scripts are located
 
-**NOTE**: In case where the scripts are already placed inside the image (using `--scripts-url`
+**NOTE**: In the case where the scripts are already placed inside the image (using `--scripts-url`
 or `io.s2i.scripts-url` with value `image:///path/in/image`) then setting `--destination`
 or `io.s2i.destination` label applies only to sources and artifacts.
 
 ## assemble
 
-The `assemble` script is responsible for building the application artifacts from source,
-and place them into appropriate directories inside the image. The workflow for `assemble` is:
+The `assemble` script is responsible for building the application artifacts from source
+and placing them into appropriate directories inside the image. The workflow for `assemble` is:
 
 1. Restore build artifacts (in case you want to support incremental builds, make sure
    to define [save-artifacts](#save-artifacts)) as well.
-1. Place the application source in desired destination.
+1. Place the application source in the desired destination.
 1. Build application artifacts.
 1. Install the artifacts into locations appropriate for running.
 
 #### Example `assemble` script:
 
 **NOTE**: All the examples are written in [Bash](http://www.gnu.org/software/bash/)
-and it is assumed all the tar contents is unpacked into `/tmp/sti` directory.
+and it is assumed all the tar contents unpack into the `/tmp/sti` directory.
 
 ```
 #!/bin/bash
@@ -116,9 +115,7 @@ The `run` script is responsible for executing your application.
 
 ## save-artifacts
 
-The `save-artifacts` script is responsible for gathering all the dependencies which
-existence can speed up the following build processes (eg. for Ruby - gems installed by Bundler,
-for Java - `.m2` contents, etc.) into a tar file and stream it to the standard output.
+The `save-artifacts` script is responsible for gathering all the dependencies into a tar file and streaming it to the standard output.  The existance of this can speed up the following build processes (eg. for Ruby - gems installed by Bundler, for Java - `.m2` contents, etc.).
 
 #### Example `save-artifacts` script:
 
