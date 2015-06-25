@@ -23,8 +23,8 @@ cid_file=$(mktemp -u --suffix=.cid)
 # it from Docker hub
 sti_args="--force-pull=false -s ${scripts_url}"
 
-# TODO: This should be part of the image metadata
-test_port=8000
+# Port the image exposes service to be tested
+test_port=8080
 
 image_exists() {
   docker inspect $1 &>/dev/null
@@ -35,7 +35,7 @@ container_exists() {
 }
 
 container_ip() {
-  docker inspect --format="\{\{ .NetworkSettings.IPAddress \}\}" $(cat $cid_file)
+  docker inspect --format="{{"{{"}} .NetworkSettings.IPAddress {{"}}"}}" $(cat $cid_file)
 }
 
 run_sti_build() {
@@ -47,13 +47,6 @@ prepare() {
     echo "ERROR: The image ${IMAGE_NAME} must exist before this script is executed."
     exit 1
   fi
-  # TODO: STI build require the application is a valid 'GIT' repository, we
-  # should remove this restriction in the future when a file:// is used.
-  pushd ${test_dir}/test-app >/dev/null
-  git init
-  git config user.email "build@localhost" && git config user.name "builder"
-  git add -A && git commit -m "Sample commit"
-  popd >/dev/null
   run_sti_build
 }
 
@@ -70,7 +63,6 @@ cleanup() {
   if image_exists ${IMAGE_NAME}-testapp; then
     docker rmi ${IMAGE_NAME}-testapp
   fi
-  rm -rf ${test_dir}/test-app/.git
 }
 
 check_result() {
