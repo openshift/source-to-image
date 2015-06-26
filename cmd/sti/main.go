@@ -18,6 +18,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/api/describe"
 	"github.com/openshift/source-to-image/pkg/api/validation"
+	"github.com/openshift/source-to-image/pkg/build"
 	"github.com/openshift/source-to-image/pkg/build/strategies"
 	"github.com/openshift/source-to-image/pkg/build/strategies/sti"
 	"github.com/openshift/source-to-image/pkg/config"
@@ -191,6 +192,63 @@ func newCmdBuild(cfg *api.Config) *cobra.Command {
 	return buildCmd
 }
 
+func newCmdRebuild(cfg *api.Config) *cobra.Command {
+	buildCmd := &cobra.Command{
+		Use:   "rebuild <image> [<new-tag>]",
+		Short: "Rebuild an existing image",
+		Long:  "Rebuild an existing application image that was build by S2I previously.",
+		Run: func(cmd *cobra.Command, args []string) {
+			// If user specifies the arguments, then we override the stored ones
+			if len(args) >= 0 {
+				cfg.Tag = args[0]
+			} else {
+				cmd.Help()
+				os.Exit(1)
+			}
+
+			if r, err := os.Open(cfg.DockerCfgPath); err == nil {
+				cfg.PullAuthentication = docker.GetImageRegistryAuth(r, cfg.Tag)
+			}
+
+			err := build.GenerateConfigFromLabels(cfg.Tag, cfg)
+			checkErr(err)
+
+			if len(args) >= 1 {
+				cfg.Tag = args[1]
+			}
+
+			// Attempt to read the .dockercfg and extract the authentication for
+			// docker pull
+			if r, err := os.Open(cfg.DockerCfgPath); err == nil {
+				cfg.PullAuthentication = docker.GetImageRegistryAuth(r, cfg.BuilderImage)
+			}
+
+			if glog.V(2) {
+				fmt.Printf("\n%s\n", describe.DescribeConfig(cfg))
+			}
+
+			builder, err := strategies.GetStrategy(cfg)
+			checkErr(err)
+			result, err := builder.Build(cfg)
+			checkErr(err)
+
+			for _, message := range result.Messages {
+				glog.V(1).Infof(message)
+			}
+
+		},
+	}
+
+	buildCmd.Flags().BoolVarP(&(cfg.Quiet), "quiet", "q", false, "Operate quietly. Suppress all non-error output.")
+	buildCmd.Flags().BoolVar(&(cfg.Incremental), "incremental", true, "Perform an incremental build")
+	buildCmd.Flags().BoolVar(&(cfg.RemovePreviousImage), "rm", false, "Remove the previous image during incremental builds")
+	buildCmd.Flags().StringVar(&(cfg.CallbackURL), "callback-url", "", "Specify a URL to invoke via HTTP POST upon build completion")
+	buildCmd.Flags().BoolVar(&(cfg.ForcePull), "force-pull", true, "Always pull the builder image even if it is present locally")
+	buildCmd.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by STI instead of deleting it")
+	buildCmd.Flags().StringVarP(&(cfg.DockerCfgPath), "dockercfg-path", "", filepath.Join(os.Getenv("HOME"), ".dockercfg"), "Specify the path to the Docker configuration file")
+	return buildCmd
+}
+
 func newCmdCreate() *cobra.Command {
 	return &cobra.Command{
 		Use:   "create <imageName> <destination>",
@@ -300,6 +358,7 @@ func main() {
 
 	stiCmd.AddCommand(newCmdVersion())
 	stiCmd.AddCommand(newCmdBuild(cfg))
+	stiCmd.AddCommand(newCmdRebuild(cfg))
 	stiCmd.AddCommand(newCmdUsage(cfg))
 	stiCmd.AddCommand(newCmdCreate())
 	setupGlog(stiCmd.PersistentFlags())
