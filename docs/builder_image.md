@@ -16,7 +16,7 @@ final docker image. These are: source code, sti scripts, and the builder image. 
 build process sti must place sources and scripts inside that builder image. To do
 so sti creates a tar file containing the two and then streams that file into the
 builder image. Before executing the `assemble` script, sti untars that file and places
-its contents into the destination specified with the `--destination` flag or the value of 
+its contents into the destination specified with either the `--destination` flag or the value of 
 the `io.s2i.destination` label set in the builder image (the default destination is `/tmp`).
 If your image does not have either `tar` or `/bin/sh` the sti build will perform an additional
 docker build to place the source code and scripts into an appropriate image and then run
@@ -53,13 +53,12 @@ these scripts in the following order:
 1. A script found at the default image URL (`io.openshift.s2i.scripts-url` label)
 
 Both the `io.openshift.s2i.scripts-url` label specified in the image and `--scripts-url` flag
-can take one of the following forms:
+can be supplied in any of the following forms to indicate where the scripts are located:
 
 * `image://path_to_scripts_dir` - absolute path inside the image
 * `file://path_to_scripts_dir` - relative or absolute path on the host machine
 * `http(s)://path_to_scripts_dir` - URL to a directory
 
-<<<<<<< HEAD
 **NOTE**: In the case where the scripts are already placed inside the image (ie when
 using `--scripts-url` flag or the `io.openshift.s2i.scripts-url` with the format
 `image:///path/in/image`), then the `--destination` flag or the `io.openshift.s2i.destination` 
@@ -80,7 +79,7 @@ and placing them into the appropriate directories inside the image. The workflow
 #### Example `assemble` script:
 
 **NOTE**: All the examples are written in [Bash](http://www.gnu.org/software/bash/)
-and it is assumed all the tar contents unpack into the `/tmp/sti` directory.
+and it is assumed that the tar contents unpack into the `/tmp/sti` directory.
 
 ```
 #!/bin/bash
@@ -117,7 +116,7 @@ The `run` script is responsible for executing your application.
 
 ## save-artifacts
 
-The `save-artifacts` script is responsible for gathering all the dependencies into a tar file and streaming it to the standard output (eg. for Ruby - gems installed by Bundler, for Java - `.m2` contents, etc.).  The existance of this can speed up the following build processes.
+The `save-artifacts` script is responsible for gathering all the dependencies into a tar file and streaming it to the standard output (eg. for Ruby - gems installed by Bundler, for Java - `.m2` contents, etc.).  The existence of this can speed up the following build processes.
 
 #### Example `save-artifacts` script:
 

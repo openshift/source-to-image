@@ -47,16 +47,6 @@ prepare() {
     echo "ERROR: The image ${IMAGE_NAME} must exist before this script is executed."
     exit 1
   fi
-<<<<<<< HEAD
-=======
-  # TODO: The STI build requires that the application is a valid git repository. We
-  # should remove this restriction in the future when a file:// is used.
-  pushd ${test_dir}/test-app >/dev/null
-  git init
-  git config user.email "build@localhost" && git config user.name "builder"
-  git add -A && git commit -m "Sample commit"
-  popd >/dev/null
->>>>>>> e86b0ad... Some rewrites and clarifications
   run_sti_build
 }
 
