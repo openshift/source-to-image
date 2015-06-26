@@ -51,9 +51,9 @@ each build in the following order:
 
 1. A script found at the `--scripts-url` URL
 1. A script found in the application source `.sti/bin` directory
-1. A script found at the default image URL (`io.s2i.scripts-url` label)
+1. A script found at the default image URL (`io.openshift.s2i.scripts-url` label)
 
-Both the `io.s2i.scripts-url` label specified in the image and `--scripts-url` flag
+Both the `io.openshift.s2i.scripts-url` label specified in the image and `--scripts-url` flag
 can take one of the following forms:
 
 * `image://path_to_scripts_dir` - absolute path inside the image to a directory where the STI scripts are located
@@ -61,8 +61,8 @@ can take one of the following forms:
 * `http(s)://path_to_scripts_dir` - URL to a directory where the STI scripts are located
 
 **NOTE**: In the case where the scripts are already placed inside the image (using `--scripts-url`
-or `io.s2i.scripts-url` with value `image:///path/in/image`) then setting `--destination`
-or `io.s2i.destination` label applies only to sources and artifacts.
+or `io.openshift.s2i.scripts-url` with value `image:///path/in/image`) then setting `--destination`
+or `io.openshift.s2i.destination` label applies only to sources and artifacts.
 
 ## assemble
 
