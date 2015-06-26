@@ -18,23 +18,25 @@ at common flags that can be used with all of the subcommands.
 | Name                       | Description                                             |
 |:-------------------------- |:--------------------------------------------------------|
 | `-h (--help)`              | Display help for the specified command |
-| `--loglevel`               | Set log level of log output (0-3) (see [Log levels](#log-levels))|
-| `-U (--url)`               | URL of docker socket to use (default: `unix:///var/run/docker.sock`) |
+| `--loglevel`               | Set the level of log output (0-5) (see [Log levels](#log-levels))|
+| `-U (--url)`               | URL of the Docker socket to use (default: `unix:///var/run/docker.sock`) |
 
 #### Log levels
 
 There are four log levels:
-* `Level 0` - produces output from containers running `assemble` script and all encountered errors
-* `Level 1` - produces basic information about the executed process
-* `Level 2` - produces very detailed information about the executed process
-* `Level 3` - produces very detailed information about the executed process, alongside with listing tar contents
+* Level `0` - produces output from containers running `assemble` script and all encountered errors
+* Level `1` - produces basic information about the executed process
+* Level `2` - produces very detailed information about the executed process
+* Level `3` - produces very detailed information about the executed process, along with listing tar contents
+* Level `4` - currently produces same information as level `3` 
+* Level `5` - produces very detailed information about the executed process, lists tar contents, Docker Registry credentials, and copied source files
 
 **NOTE**: All of the commands and flags are case sensitive!
 
 # sti create
 
 The `sti create` command is responsible for bootstrapping a new STI enabled
-image repository. This command will generate example `.sti` directory and
+image repository. This command will generate a skeleton `.sti` directory and
 populate it with sample STI scripts you can start hacking on.
 
 Usage:
@@ -45,52 +47,57 @@ $ sti create <image name> <destination directory>
 
 # sti build
 
-The `sti build` command is responsible for building the docker image by combining
-provided builder image and sources. The resulting image will be named according
-to tag parameter. Build command requires three input parameters in the following
-order:
+The `sti build` command is responsible for building the Docker image by combining
+the specified builder image and sources. The resulting image will be named according
+to the tag parameter. 
 
-1. `source` - is the URL of a GIT repository or a local path to the sources
-1. `builder image` - docker image capable of building the final image
-1. `tag` - name of the final docker image (if provided)
+Usage:
+```
+$ sti build <source location> <builder image> [<tag>] [flags]
+```
+The build command parameters are defined as follows:
+
+1. `source location` - the URL of a GIT repository or a local path to the source code
+1. `builder image` - the Docker image to be used in building the final image
+1. `tag` - the name of the final Docker image (if provided)
 
 If the build image is compatible with incremental builds, `sti build` will look for
-an image tagged with the same name. If an image is present with that tag, and a
-`save-artifacts` script is present, `sti build` will save the build artifacts from
+an image tagged with the same name. If an image is present with that tag and a
+`save-artifacts` script is present in the scripts directory, `sti build` will save the build artifacts from
 that image and add them to the tar streamed to the container into `/artifacts`.
 
 #### Build flags
 
 | Name                       | Description                                             |
 |:-------------------------- |:--------------------------------------------------------|
-| `--callback-url`           | URL to be invoked after successful build (see [Callback URL](#callback-url)) |
-| `-d (--destination)`       | Location where the scripts and sources will be placed prior doing build (see [STI Scripts](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#sti-scripts))|
-| `--dockercfg-path`         | Specify the path to the Docker configuration file |
-| `--incremental`            | Try performing an incremental build |
-| `-e (--env)`               | Environment variables passed to the builder eg. `NAME=VALUE,NAME2=VALUE2,...` |
-| `--force-pull`             | Always pull the builder image, even if it is present locally |
-| `-r (--ref)`               | A branch/tag from which the build should happen (applies only to GIT source) |
-| `--rm`                     | Remove previous image during incremental build |
+| `--callback-url`           | URL to be invoked after a successful build (see [Callback URL](#callback-url)) |
+| `-d (--destination)`       | Location where the scripts and sources will be placed prior doing build (see [STI Scripts](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#sti-scripts)) |
+| `--dockercfg-path`         | The path to the Docker configuration file |
+| `--incremental`            | Try to perform an incremental build |
+| `-e (--env)`               | Environment variables to be passed to the builder eg. `NAME=VALUE,NAME2=VALUE2,...` |
+| `--force-pull`             | Always pull the builder image, even if it is present locally (defaults to true) |
+| `-r (--ref)`               | A branch/tag that the build should use instead of MASTER (applies only to GIT source) |
+| `--rm`                     | Remove the previous image during incremental builds |
 | `--save-temp-dir`          | Save the working directory used for fetching scripts and sources |
-| `--context-dir`            | Allow to specify directory name with your application |
+| `--context-dir`            | Specify the directory containing your application (if not located within the root path) |
 | `-s (--scripts-url)`       | URL of STI scripts (see [STI Scripts](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#sti-scripts)) |
 | `-q (--quiet)`             | Operate quietly, suppressing all non-error output |
 
 #### Context directory
 
-In case your application reside in directory other than your repository root
-folder, you can specify that directory using the `--context-dir` parameter. In
-that case, the specified directory will be used as your application root folder.
+In the case where your application resides in a directory other than your repository root
+folder, you can specify that directory using the `--context-dir` parameter. The 
+specified directory will be used as your application root folder.
 
 #### Callback URL
 
-Upon completion (or failure) of a build, `sti` can HTTP POST to a URL with information
+Upon completion (or failure) of a build, `sti` can execute a HTTP POST to a URL with information
 about the build:
 
 * `success` - flag indicating the result of the build process (`true` or `false`)
 * `payload` - list of messages from the build process
 
-Example data posted will be of the form:
+Example: data posted will be in the form:
 ```
 {
     "payload": "A string containing all build messages",
@@ -100,39 +107,39 @@ Example data posted will be of the form:
 
 #### Example Usage
 
-Build a ruby application from a GIT source, using the official `ruby-20-centos7` builder
+Build a Ruby application from a GIT source, using the official `ruby-20-centos7` builder
 image, the resulting image will be named `ruby-app`:
 
 ```
 $ sti build git://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos7 ruby-app
 ```
 
-Build a nodejs application from a local directory, using a local image, the resulting
+Build a Node.js application from a local directory, using a local image, the resulting
 image will be named `nodejs-app`:
 
 ```
 $ sti build --force-pull=false ~/nodejs-app local-nodejs-builder nodejs-app
 ```
 
-Build a java application from a GIT source, using the official `wildfly-8-centos`
-builder image but overriding the scripts URL from local directory, the resulting
+Build a Java application from a GIT source, using the official `wildfly-8-centos`
+builder image but overriding the scripts URL from local directory.  The resulting
 image will be named `java-app`:
 
 ```
 $ sti build --scripts-url=file://stiscripts git://github.com/bparees/openshift-jee-sample openshift/wildfly-8-centos java-app
 ```
 
-Build a ruby application from a GIT source, specifying `ref`, using the official
-`ruby-20-centos7` builder image, the resulting image will be named `ruby-app`:
+Build a Ruby application from a GIT source, specifying `ref`, and using the official
+`ruby-20-centos7` builder image.  The resulting image will be named `ruby-app`:
 
 ```
 $ sti build --ref=my-branch git://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos7 ruby-app
 ```
 
-If the ref is invalid or not present in the source repository, the build will fail.
+***NOTE:*** If the ref is invalid or not present in the source repository then the build will fail.
 
-Build a ruby application from a GIT source, overriding the scripts URL from a local directory,
-and forcing the scripts and sources to be placed in `/opt` directory:
+Build a Ruby application from a GIT source, overriding the scripts URL from a local directory,
+and specifying the scripts and sources be placed in `/opt` directory:
 
 ```
 $ sti build --scripts-url=file://stiscripts --destination=/opt git://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos7 ruby-app
@@ -141,9 +148,14 @@ $ sti build --scripts-url=file://stiscripts --destination=/opt git://github.com/
 
 # sti usage
 
-The `sti usage` command starts a container and runs a `usage` script which prints
+The `sti usage` command starts a container and runs the `usage` script which prints
 information about the builder image. This command expects `builder image` name as
 the only parameter.
+
+Usage:
+```
+$ sti usage <builder image> [flags]
+```
 
 #### Usage flags
 
@@ -165,10 +177,22 @@ $ sti usage openshift/ruby-20-centos7
 
 # sti version
 
-The `sti version` command prints information about the STI version.
+The `sti version` command prints the version of STI currently installed.
 
 
 # sti help
 
 The `sti help` command prints help either for the `sti` itself or for the specified
 subcommand.
+
+### Example Usage
+
+Print the help page for the build command:
+```
+$ sti help build
+```
+
+***Note:*** You can also accomplish this with:
+```
+$ sti build --help
+```
