@@ -4,9 +4,9 @@
 [![Travis](https://travis-ci.org/openshift/source-to-image.svg?branch=master)](https://travis-ci.org/openshift/source-to-image)
 
 
-Source-to-image (`sti`) is a tool for building reproducible docker images. `sti` produces
-ready-to-run images by injecting source code into a docker image and *assembling*
-a new docker image which incorporates the builder image and built source, and is ready to use
+Source-to-image (`sti`) is a tool for building reproducible Docker images. `sti` produces
+ready-to-run images by injecting source code into a Docker image and *assembling*
+a new Docker image which incorporates the builder image and built source.  The result is then ready to use
 with `docker run`. `sti` supports incremental builds which re-use previously downloaded
 dependencies, previously built artifacts, etc.
 
@@ -19,17 +19,17 @@ Want to just get started now? Check out the [instructions](#getting-started).
 
 1. Simplify the process of application source + builder image -> usable image for most use cases (the
    80%)
-1. Define and implement a workflow for incremental build that eventually uses only docker
+1. Define and implement a workflow for incremental builds that eventually uses only Docker
    primitives
 1. Develop tooling that can assist in verifying that two different builder images result in the same
-   "docker run" outcome for the same input
-1. Use native docker primitives to accomplish this - map out useful improvements to docker that
+   `docker run` outcome for the same input
+1. Use native Docker primitives to accomplish this - map out useful improvements to Docker that
    benefit all image builders
 
 
 # Anatomy of a builder image
 
-Creating builder images is easy. `sti` expects you to supply the following scripts to use with an
+Creating builder images is easy. `sti` looks for you to supply the following scripts to use with an
 image:
 
 1. `assemble` - builds and/or deploys the source
@@ -37,13 +37,13 @@ image:
 1. `save-artifacts` (optional) - captures the artifacts from a previous build into the next incremental build
 1. `usage` (optional) - displays builder image usage information
 
-Additionally for the best user experience and optimized sti operation we suggest image
-to have `/bin/sh` and tar command inside.
+Additionally for the best user experience and optimized `sti` operation we suggest images
+to have `/bin/sh` and `tar` commands available.
 
-Users can also set extra environment variables in the application source code,
-which are passed to the build and the `assemble` script consumes them. All
+Users can also set extra environment variables in the application source code. 
+They are passed to the build, and the `assemble` script consumes them. All
 environment variables are also present in the output application image. These
-variables are defined in `.sti/environment` file inside the application sources.
+variables are defined in the `.sti/environment` file inside the application sources.
 The format of this file is a simple key-value, for example:
 
 ```
@@ -52,13 +52,13 @@ FOO=bar
 
 In this case, the value of `FOO` environment variable will be set to `bar`.
 
-For detailed description of the requirements and the scripts along with examples see
-[builder_image.md](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md)
+See [here](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md) for a detailed description of the requirements and scripts along with examples of builder images.
+
 
 
 # Build workflow
 
-`sti build` workflow is:
+The `sti build` workflow is:
 
 1. `sti` creates a container based on the build image and passes it a tar file that contains:
     1. The application source in `src`
@@ -71,15 +71,15 @@ For detailed description of the requirements and the scripts along with examples
 # Using ONBUILD images
 
 In case you want to use one of the official Docker language stack images for
-your build you don't have do anything extra. The STI is capable to recognize the
-Docker image with ONBUILD instructions and choose the OnBuild strategy. This
+your build you don't have do anything extra. STI is capable of recognizing the
+Docker image with ONBUILD instructions and choosing the OnBuild strategy. This
 strategy will trigger all ONBUILD instructions and execute the assemble script
 (if it exists) as the last instruction.
 
 Since the ONBUILD images usually don't provide any entrypoint, in order to use
-this build strategy you have to provide it. You can either include the 'run',
+this build strategy you will have to provide one. You can either include the 'run',
 'start' or 'execute' script in your application source root folder or you can
-specify a valid STI scripts URL and the 'run' script will be fetched and set as
+specify a valid STI script URL and the 'run' script will be fetched and set as
 an entrypoint in that case.
 
 ## Incremental builds
@@ -91,7 +91,7 @@ an entrypoint in that case.
 
 If a `save-artifacts` script exists, a prior image already exists, and the `--incremental=true` option is used, the workflow is as follows:
 
-1. `sti` creates a new docker container from the prior build image
+1. `sti` creates a new Docker container from the prior build image
 1. `sti` runs `save-artifacts` in this container - this script is responsible for streaming out
    a tar of the artifacts to stdout
 1. `sti` builds the new output image:
@@ -111,7 +111,7 @@ If a `save-artifacts` script exists, a prior image already exists, and the `--in
 
 # Installation
 
-Assuming go and docker are installed and configured, execute the following commands:
+Assuming Go and Docker are installed and configured, execute the following commands:
 
 ```
 $ go get github.com/openshift/source-to-image
@@ -122,14 +122,14 @@ $ hack/build-go.sh
 
 # Security
 
-Since the `sti` command use the Docker client library, the `sti` command has to
-run in the same security context as the `docker` command. For some systems, it
-is enough to add yourself into the 'docker' group to be able to work with Docker
-as 'non-root'. In the latest versions of Fedora/RHEL, it is recommended to use
-`sudo` command as this way is more auditable and secure.
+Since the `sti` command uses the Docker client library, it has to run in the same 
+security context as the `docker` command. For some systems, it is enough to add 
+yourself into the 'docker' group to be able to work with Docker as 'non-root'. 
+In the latest versions of Fedora/RHEL, it is recommended to use the `sudo` command 
+as this way is more auditable and secure.
 
-If you are using `sudo docker` command already, they you will have to also use
-`sudo sti` to give STI permissions to work with Docker directly.
+If you are using the `sudo docker` command already, then you will have to also use
+`sudo sti` to give STI permission to work with Docker directly.
 
 # Getting Started
 
@@ -146,5 +146,5 @@ $ sti build git://github.com/bparees/openshift-jee-sample openshift/wildfly-8-ce
 $ docker run --rm -i -p :8080 -t test-jee-app
 ```
 
-Interested in more advanced `sti` usage? See [cli.md](https://github.com/openshift/source-to-image/blob/master/docs/cli.md)
-for detailed CLI description with examples.
+Interested in more advanced `sti` usage? See [here](https://github.com/openshift/source-to-image/blob/master/docs/cli.md)
+for detailed descriptions of the different CLI commands with examples.
