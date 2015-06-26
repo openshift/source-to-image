@@ -254,7 +254,7 @@ func setupGlog(flags *pflag.FlagSet) {
 	if fflag := from.Lookup("v"); fflag != nil {
 		level := fflag.Value.(*glog.Level)
 		levelPtr := (*int32)(level)
-		flags.Int32Var(levelPtr, "loglevel", 0, "Set the level of log output (0-3)")
+		flags.Int32Var(levelPtr, "loglevel", 0, "Set the level of log output (0-5)")
 	}
 	// FIXME currently glog has only option to redirect output to stderr
 	// the preferred for STI would be to redirect to stdout
