@@ -12,4 +12,4 @@ WORKDIR /
 #
 # Port 23456 must match the port used in the http server in STI's
 # integration_test.go
-LABEL io.s2i.scripts-url=http://127.0.0.1:23456/.sti/bin
+LABEL io.openshift.s2i.scripts-url=http://127.0.0.1:23456/.sti/bin

@@ -56,7 +56,7 @@ func (i *installer) InstallRequired(scripts []string, dstDir string) (results []
 		}
 	}
 	if len(failedScripts) > 0 {
-		err = errors.NewInstallRequiredError(failedScripts)
+		err = errors.NewInstallRequiredError(failedScripts, docker.ScriptsURLLabel)
 	}
 
 	return
