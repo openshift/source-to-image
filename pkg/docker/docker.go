@@ -18,8 +18,13 @@ const (
 	ScriptsURLEnvironment = "STI_SCRIPTS_URL"
 	LocationEnvironment   = "STI_LOCATION"
 
-	ScriptsURLLabel  = "io.s2i.scripts-url"
-	DestinationLabel = "io.s2i.destination"
+	// ScriptsURLLabel is the name of the Docker image LABEL that tells S2I where
+	// to look for the S2I scripts. This label is also copied into the ouput
+	// image.
+	// The previous name of this label was 'io.s2i.scripts-url'. This is now
+	// deprecated.
+	ScriptsURLLabel  = api.DefaultNamespace + "scripts-url"
+	DestinationLabel = api.DefaultNamespace + "destination"
 
 	DefaultDestination = "/tmp"
 	DefaultTag         = "latest"
@@ -255,6 +260,14 @@ func (d *stiDocker) GetScriptsURL(image string) (string, error) {
 // getScriptsURL finds a scripts url label in the image metadata
 func getScriptsURL(image *docker.Image) string {
 	scriptsURL := getLabel(image, ScriptsURLLabel)
+
+	// For backward compatibility, support the old label schema
+	if len(scriptsURL) == 0 {
+		scriptsURL = getLabel(image, "io.s2i.scripts-url")
+		if len(scriptsURL) > 0 {
+			glog.Warningf("The 'io.s2i.scripts-url' label is deprecated. Use %q instead.", ScriptsURLLabel)
+		}
+	}
 	if len(scriptsURL) == 0 {
 		scriptsURL = getVariable(image, ScriptsURLEnvironment)
 		if len(scriptsURL) != 0 {
