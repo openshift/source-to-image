@@ -23,25 +23,25 @@ func New(name, dst string) *Bootstrap {
 // templates for STI scripts
 func (b *Bootstrap) AddSTIScripts() {
 	os.MkdirAll(b.DestinationDir+"/"+".sti/bin", 0700)
-	b.process(templates.AssembleScript, ".sti/bin/assemble")
-	b.process(templates.RunScript, ".sti/bin/run")
-	b.process(templates.UsageScript, ".sti/bin/usage")
-	b.process(templates.SaveArtifactsScript, ".sti/bin/save-artifacts")
+	b.process(templates.AssembleScript, ".sti/bin/assemble", 0755)
+	b.process(templates.RunScript, ".sti/bin/run", 0755)
+	b.process(templates.UsageScript, ".sti/bin/usage", 0755)
+	b.process(templates.SaveArtifactsScript, ".sti/bin/save-artifacts", 0755)
 }
 
 // AddDockerfile creates an example Dockerfile
 func (b *Bootstrap) AddDockerfile() {
-	b.process(templates.Dockerfile, "Dockerfile")
+	b.process(templates.Dockerfile, "Dockerfile", 0600)
 }
 
 // AddTests creates an example test for the STI image and the Makefile
 func (b *Bootstrap) AddTests() {
 	os.MkdirAll(b.DestinationDir+"/"+"test/test-app", 0700)
-	b.process(templates.TestRunScript, "test/run")
-	b.process(templates.Makefile, "Makefile")
+	b.process(templates.TestRunScript, "test/run", 0700)
+	b.process(templates.Makefile, "Makefile", 0600)
 }
 
-func (b *Bootstrap) process(t string, dst string) {
+func (b *Bootstrap) process(t string, dst string, perm os.FileMode) {
 	tpl := template.Must(template.New("").Parse(t))
 	if _, err := os.Stat(b.DestinationDir + "/" + dst); err == nil {
 		glog.Errorf("File already exists: %s, skipping", dst)
@@ -50,6 +50,10 @@ func (b *Bootstrap) process(t string, dst string) {
 	f, err := os.Create(b.DestinationDir + "/" + dst)
 	if err != nil {
 		glog.Errorf("Unable to create %s file, skipping: %v", dst, err)
+		return
+	}
+	if err := f.Chmod(perm); err != nil {
+		glog.Errorf("Unable to chmod %s file to %v, skipping: %v", dst, perm, err)
 		return
 	}
 	defer f.Close()
