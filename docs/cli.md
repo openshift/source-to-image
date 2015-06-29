@@ -145,6 +145,23 @@ and specifying the scripts and sources be placed in `/opt` directory:
 $ sti build --scripts-url=file://stiscripts --destination=/opt git://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos7 ruby-app
 ```
 
+# sti rebuild
+
+The `sti rebuild` command is used to rebuild an image already built using S2I,
+or the image that contains the required S2I labels.
+The rebuild will read the S2I labels and automatically set the builder image,
+source repository and other configuration options used to build the previous
+image according to the stored labels values.
+
+Optionally, you can set the new image name as a second argument to the rebuild
+command.
+
+Usage:
+
+```
+$ sti rebuild <image name> [<new-tag-name>]
+```
+
 
 # sti usage
 
