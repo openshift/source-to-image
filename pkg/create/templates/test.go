@@ -3,8 +3,8 @@ package templates
 const TestRunScript = `
 #!/bin/bash
 #
-# The 'run' performs a simple test that verifies the STI image.
-# The main focus here is to exercise the STI scripts.
+# The 'run' performs a simple test that verifies the S2I image.
+# The main focus here is to exercise the S2I scripts.
 #
 # For more information see the documentation:
 #	https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md
@@ -19,7 +19,7 @@ image_dir=$(readlink -zf ${test_dir}/..)
 scripts_url="file://${image_dir}/.sti/bin"
 cid_file=$(mktemp -u --suffix=.cid)
 
-# Since we built the candidate image locally, we don't want STI to attempt to pull
+# Since we built the candidate image locally, we don't want S2I to attempt to pull
 # it from Docker hub
 sti_args="--force-pull=false -s ${scripts_url}"
 
@@ -68,7 +68,7 @@ cleanup() {
 check_result() {
   local result="$1"
   if [[ "$result" != "0" ]]; then
-    echo "STI image '${IMAGE_NAME}' test FAILED (exit code: ${result})"
+    echo "S2I image '${IMAGE_NAME}' test FAILED (exit code: ${result})"
     cleanup
     exit $result
   fi

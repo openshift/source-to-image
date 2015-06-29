@@ -11,8 +11,8 @@ FROM openshift/base-centos7
 # ENV BUILDER_VERSION 1.0
 
 # TODO: Set labels used in OpenShift to describe the builder image
-#LABEL k8s.io/description="Platform for building xyz" \
-#      k8s.io/display-name="builder x.y.z" \
+#LABEL io.k8s.description="Platform for building xyz" \
+#      io.k8s.display-name="builder x.y.z" \
 #      io.openshift.expose-services="8080:http" \
 #      io.openshift.tags="builder,x.y.z,etc."
 
@@ -25,8 +25,11 @@ USER 1001
 # TODO (optional): Copy the builder files into /opt/openshift
 # COPY ./<builder_folder>/ /opt/openshift/
 
-# TODO: Copy the STI scripts to /usr/local/sti, since openshift/base-centos7 image sets io.s2i.scripts-url label that way, or update that label
+# TODO: Copy the S2I scripts to /usr/local/sti, since openshift/base-centos7 image sets io.s2i.scripts-url label that way, or update that label
 # COPY ./.sti/bin/ /usr/local/sti
+
+# TODO: Drop the root user and make the content of /opt/openshift owned by user 1001
+# RUN chown -R 1001:1001 /opt/openshift
 
 # TODO: Set the default port for applications built using this image
 # EXPOSE 8080
