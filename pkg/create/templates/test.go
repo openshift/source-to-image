@@ -47,6 +47,12 @@ prepare() {
     echo "ERROR: The image ${IMAGE_NAME} must exist before this script is executed."
     exit 1
   fi
+  # sti build requires the application is a valid 'GIT' repository
+  pushd ${test_dir}/test-app >/dev/null
+  git init
+  git config user.email "build@localhost" && git config user.name "builder"
+  git add -A && git commit -m "Sample commit"
+  popd >/dev/null
   run_sti_build
 }
 
