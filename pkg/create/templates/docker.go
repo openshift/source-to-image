@@ -19,9 +19,6 @@ FROM openshift/base-centos7
 # TODO: Install required packages here:
 # RUN yum install -y ... && yum clean all -y
 
-# This default user is created in the openshift/base-centos7 image
-USER 1001
-
 # TODO (optional): Copy the builder files into /opt/openshift
 # COPY ./<builder_folder>/ /opt/openshift/
 
@@ -30,6 +27,9 @@ USER 1001
 
 # TODO: Drop the root user and make the content of /opt/openshift owned by user 1001
 # RUN chown -R 1001:1001 /opt/openshift
+
+# This default user is created in the openshift/base-centos7 image
+USER 1001
 
 # TODO: Set the default port for applications built using this image
 # EXPOSE 8080
