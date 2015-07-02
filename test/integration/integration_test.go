@@ -29,6 +29,7 @@ const (
 	FakeImageScripts                = "sti_test/sti-fake-scripts"
 	FakeImageScriptsNoSaveArtifacts = "sti_test/sti-fake-scripts-no-save-artifacts"
 	FakeImageNoTar                  = "sti_test/sti-fake-no-tar"
+	FakeImageOnBuild                = "sti_test/sti-fake-onbuild"
 
 	TagCleanBuild                             = "test/sti-fake-app"
 	TagCleanBuildUser                         = "test/sti-fake-app-user"
@@ -38,6 +39,11 @@ const (
 	TagIncrementalBuildScripts                = "test/sti-incremental-app-scripts"
 	TagIncrementalBuildScriptsNoSaveArtifacts = "test/sti-incremental-app-scripts-no-save-artifacts"
 	TagCleanLayeredBuildNoTar                 = "test/sti-fake-no-tar"
+	TagCleanBuildOnBuild                      = "test/sti-fake-app-onbuild"
+	TagIncrementalBuildOnBuild                = "test/sti-incremental-app-onbuild"
+	TagCleanBuildOnBuildNoName                = "test/sti-fake-app-onbuild-noname"
+	TagCleanBuildNoName                       = "test/sti-fake-app-noname"
+	TagCleanLayeredBuildNoTarNoName           = "test/sti-fake-no-tar-noname"
 
 	// Need to serve the scripts from local host so any potential changes to the
 	// scripts are made available for integration testing.
@@ -130,35 +136,51 @@ func waitForHTTPReady() error {
 
 // Test a clean build.  The simplest case.
 func TestCleanBuild(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBuilderImage, "")
+	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBuilderImage, "", true, true)
 }
 
 func TestCleanBuildUser(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuildUser, false, FakeUserImage, "")
+	integration(t).exerciseCleanBuild(TagCleanBuildUser, false, FakeUserImage, "", true, true)
 }
 
 func TestCleanBuildFileScriptsURL(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBuilderImage, FakeScriptsFileURL)
+	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBuilderImage, FakeScriptsFileURL, true, true)
 }
 
 func TestCleanBuildHttpScriptsURL(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBuilderImage, FakeScriptsHttpURL)
+	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBuilderImage, FakeScriptsHttpURL, true, true)
 }
 
 func TestCleanBuildScripts(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuildScripts, false, FakeImageScripts, "")
+	integration(t).exerciseCleanBuild(TagCleanBuildScripts, false, FakeImageScripts, "", true, true)
 }
 
 func TestLayeredBuildNoTar(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanLayeredBuildNoTar, false, FakeImageNoTar, FakeScriptsFileURL)
+	integration(t).exerciseCleanBuild(TagCleanLayeredBuildNoTar, false, FakeImageNoTar, FakeScriptsFileURL, false, true)
 }
 
 // Test that a build config with a callbackURL will invoke HTTP endpoint
 func TestCleanBuildCallbackInvoked(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuild, true, FakeBuilderImage, "")
+	integration(t).exerciseCleanBuild(TagCleanBuild, true, FakeBuilderImage, "", true, true)
 }
 
-func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, imageName string, scriptsURL string) {
+func TestCleanBuildOnBuild(t *testing.T) {
+	integration(t).exerciseCleanBuild(TagCleanBuildOnBuild, false, FakeImageOnBuild, "", true, true)
+}
+
+func TestCleanBuildOnBuildNoName(t *testing.T) {
+	integration(t).exerciseCleanBuild(TagCleanBuildOnBuildNoName, false, FakeImageOnBuild, "", false, false)
+}
+
+func TestCleanBuildNoName(t *testing.T) {
+	integration(t).exerciseCleanBuild(TagCleanBuildNoName, false, FakeBuilderImage, "", true, false)
+}
+
+func TestLayeredBuildNoTarNoName(t *testing.T) {
+	integration(t).exerciseCleanBuild(TagCleanLayeredBuildNoTarNoName, false, FakeImageNoTar, FakeScriptsFileURL, false, false)
+}
+
+func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, imageName string, scriptsURL string, expectImageName bool, setTag bool) {
 	t := i.t
 	callbackURL := ""
 	callbackInvoked := false
@@ -188,11 +210,18 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 		callbackURL = ts.URL
 	}
 
+	var buildTag string
+	if setTag {
+		buildTag = tag
+	} else {
+		buildTag = ""
+	}
+
 	config := &api.Config{
 		DockerConfig: dockerConfig(),
 		BuilderImage: imageName,
 		Source:       TestSource,
-		Tag:          tag,
+		Tag:          buildTag,
 		Incremental:  false,
 		CallbackURL:  callbackURL,
 		ScriptsURL:   scriptsURL}
@@ -208,40 +237,56 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 		t.Fatalf("The build failed.")
 	}
 	if callbackInvoked != verifyCallback {
-		t.Fatalf("Sti build did not invoke callback")
+		t.Fatalf("S2I build did not invoke callback")
 	}
 	if callbackHasValidJSON != verifyCallback {
-		t.Fatalf("Sti build did not invoke callback with valid json message")
+		t.Fatalf("S2I build did not invoke callback with valid json message")
 	}
 
-	i.checkForImage(tag)
-	containerID := i.createContainer(tag)
-	defer i.removeContainer(containerID)
-	i.checkBasicBuildState(containerID, resp.WorkingDir)
+	// We restrict this check to only when we are passing tag through the build config
+	// since we will not end up with an available tag by that name from build
+	if setTag {
+		i.checkForImage(tag)
+		containerID := i.createContainer(tag)
+		defer i.removeContainer(containerID)
+		i.checkBasicBuildState(containerID, resp.WorkingDir)
+	}
+
+	// Check if we receive back an ImageID when we are expecting to
+	if expectImageName && len(resp.ImageID) == 0 {
+		t.Fatalf("S2I build did not receive an ImageID in response")
+	}
+	if !expectImageName && len(resp.ImageID) > 0 {
+		t.Fatalf("S2I build received an ImageID in response")
+	}
 }
 
 // Test an incremental build.
 func TestIncrementalBuildAndRemovePreviousImage(t *testing.T) {
-	integration(t).exerciseIncrementalBuild(TagIncrementalBuild, FakeBuilderImage, true, false)
+	integration(t).exerciseIncrementalBuild(TagIncrementalBuild, FakeBuilderImage, true, false, false)
 }
 
 func TestIncrementalBuildAndKeepPreviousImage(t *testing.T) {
-	integration(t).exerciseIncrementalBuild(TagIncrementalBuild, FakeBuilderImage, false, false)
+	integration(t).exerciseIncrementalBuild(TagIncrementalBuild, FakeBuilderImage, false, false, false)
 }
 
 func TestIncrementalBuildUser(t *testing.T) {
-	integration(t).exerciseIncrementalBuild(TagIncrementalBuildUser, FakeBuilderImage, true, false)
+	integration(t).exerciseIncrementalBuild(TagIncrementalBuildUser, FakeBuilderImage, true, false, false)
 }
 
 func TestIncrementalBuildScripts(t *testing.T) {
-	integration(t).exerciseIncrementalBuild(TagIncrementalBuildScripts, FakeImageScripts, true, false)
+	integration(t).exerciseIncrementalBuild(TagIncrementalBuildScripts, FakeImageScripts, true, false, false)
 }
 
 func TestIncrementalBuildScriptsNoSaveArtifacts(t *testing.T) {
-	integration(t).exerciseIncrementalBuild(TagIncrementalBuildScriptsNoSaveArtifacts, FakeImageScriptsNoSaveArtifacts, true, true)
+	integration(t).exerciseIncrementalBuild(TagIncrementalBuildScriptsNoSaveArtifacts, FakeImageScriptsNoSaveArtifacts, true, true, false)
 }
 
-func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, removePreviousImage bool, expectClean bool) {
+func TestIncrementalBuildOnBuild(t *testing.T) {
+	integration(t).exerciseIncrementalBuild(TagIncrementalBuildOnBuild, FakeImageOnBuild, false, true, true)
+}
+
+func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, removePreviousImage bool, expectClean bool, checkOnBuild bool) {
 	t := i.t
 	config := &api.Config{
 		DockerConfig:        dockerConfig(),
@@ -261,7 +306,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 		t.Fatalf("Unexpected error occurred during build: %v", err)
 	}
 	if !resp.Success {
-		t.Fatalf("STI Build failed.")
+		t.Fatalf("S2I Build failed.")
 	}
 
 	previousImageID := resp.ImageID
@@ -283,7 +328,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 		t.Fatalf("Unexpected error occurred during incremental build: %v", err)
 	}
 	if !resp.Success {
-		t.Fatalf("STI incremental build failed.")
+		t.Fatalf("S2I incremental build failed.")
 	}
 
 	i.checkForImage(tag)
@@ -300,6 +345,10 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 		if err != nil {
 			t.Errorf("Coudln't find previous image %s", previousImageID)
 		}
+	}
+
+	if checkOnBuild {
+		i.fileExists(containerID, "/sti-fake/src/onbuild")
 	}
 }
 
