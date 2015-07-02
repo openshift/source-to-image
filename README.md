@@ -72,7 +72,7 @@ The `sti build` workflow is:
 
 In case you want to use one of the official Docker language stack images for
 your build you don't have do anything extra. STI is capable of recognizing the
-Docker image with ONBUILD instructions and choosing the OnBuild strategy. This
+Docker image with [ONBUILD](https://docs.docker.com/reference/builder/#onbuild) instructions and choosing the OnBuild strategy. This
 strategy will trigger all ONBUILD instructions and execute the assemble script
 (if it exists) as the last instruction.
 
