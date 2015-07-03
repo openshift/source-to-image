@@ -20,7 +20,7 @@ func GenerateConfigFromLabels(image string, config *api.Config) error {
 	if config.ForcePull {
 		source, err = d.PullImage(config.BuilderImage)
 	} else {
-		source, err = d.CheckAndPull(config.Tag)
+		source, err = d.CheckAndPullImage(config.Tag)
 	}
 
 	if err != nil {

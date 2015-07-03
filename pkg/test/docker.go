@@ -105,6 +105,11 @@ func (f *FakeDocker) RemoveImage(name string) error {
 	return f.RemoveImageError
 }
 
+// CheckImage checks image in local registry
+func (f *FakeDocker) CheckImage(name string) (*dockerclient.Image, error) {
+	return nil, nil
+}
+
 // PullImage pulls a fake docker image
 func (f *FakeDocker) PullImage(imageName string) (*dockerclient.Image, error) {
 	if f.PullResult {
@@ -114,8 +119,8 @@ func (f *FakeDocker) PullImage(imageName string) (*dockerclient.Image, error) {
 	return nil, f.PullError
 }
 
-// CheckAndPull pulls a fake docker image
-func (f *FakeDocker) CheckAndPull(name string) (*dockerclient.Image, error) {
+// CheckAndPullImage pulls a fake docker image
+func (f *FakeDocker) CheckAndPullImage(name string) (*dockerclient.Image, error) {
 	return nil, nil
 }
 
