@@ -15,19 +15,30 @@ import (
 )
 
 const (
+	// Deprecated environment variable name, specifying where to look for the S2I scripts.
+	// It is now being replaced with ScriptsURLLabel.
 	ScriptsURLEnvironment = "STI_SCRIPTS_URL"
-	LocationEnvironment   = "STI_LOCATION"
+	// Deprecated environment variable name, specifying where to place artifacts in
+	// builder image. It is now being replaced with DestinationLabel.
+	LocationEnvironment = "STI_LOCATION"
 
 	// ScriptsURLLabel is the name of the Docker image LABEL that tells S2I where
 	// to look for the S2I scripts. This label is also copied into the ouput
 	// image.
 	// The previous name of this label was 'io.s2i.scripts-url'. This is now
 	// deprecated.
-	ScriptsURLLabel  = api.DefaultNamespace + "scripts-url"
+	ScriptsURLLabel = api.DefaultNamespace + "scripts-url"
+	// DestinationLabel is the name of the Docker image LABEL that tells S2I where
+	// to place the artifacts (scripts, sources) in the builder image.
+	// The previous name of this label was 'io.s2i.destination'. This is now
+	// deprecated
 	DestinationLabel = api.DefaultNamespace + "destination"
 
+	// DefaultDestination is the destination where the artifacts will be placed
+	// if DestinationLabel was not specified.
 	DefaultDestination = "/tmp"
-	DefaultTag         = "latest"
+	// DefaultTag is the image tag, being applied if none is specified.
+	DefaultTag = "latest"
 )
 
 // Docker is the interface between STI and the Docker client
@@ -300,6 +311,11 @@ func getScriptsURL(image *docker.Image) string {
 // getDestination finds a destination label in the image metadata
 func getDestination(image *docker.Image) string {
 	if val := getLabel(image, DestinationLabel); len(val) != 0 {
+		return val
+	}
+	// For backward compatibility, support the old label schema
+	if val := getLabel(image, "io.s2i.destination"); len(val) != 0 {
+		glog.Warningf("The 'io.s2i.destination' label is deprecated. Use %q instead.", DestinationLabel)
 		return val
 	}
 	if val := getVariable(image, LocationEnvironment); len(val) != 0 {

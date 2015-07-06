@@ -16,8 +16,8 @@ final docker image. These are: source code, sti scripts, and the builder image. 
 build process sti must place sources and scripts inside that builder image. To do
 so sti creates a tar file containing the two and then streams that file into the
 builder image. Before executing the `assemble` script, sti untars that file and places
-its contents into the destination specified with either the `--destination` flag or the value of 
-the `io.s2i.destination` label set in the builder image (the default destination is `/tmp`).
+its contents into the destination specified with either the `--destination` flag or the value of
+the `io.openshift.s2i.destination` label set in the builder image (the default destination is `/tmp`).
 If your image does not have either `tar` or `/bin/sh` the sti build will perform an additional
 docker build to place the source code and scripts into an appropriate image and then run
 the normal sti build.
@@ -61,7 +61,7 @@ can be supplied in any of the following forms to indicate where the scripts are 
 
 **NOTE**: In the case where the scripts are already placed inside the image (ie when
 using `--scripts-url` flag or the `io.openshift.s2i.scripts-url` with the format
-`image:///path/in/image`), then the `--destination` flag or the `io.openshift.s2i.destination` 
+`image:///path/in/image`), then the `--destination` flag or the `io.openshift.s2i.destination`
 label applies only to sources and artifacts.
 
 ## assemble
