@@ -5,6 +5,8 @@ package integration
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -15,7 +17,7 @@ import (
 	"time"
 
 	"github.com/fsouza/go-dockerclient"
-
+	"github.com/golang/glog"
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/build/strategies"
 )
@@ -81,6 +83,15 @@ func dockerClient(config *api.DockerConfig) (*docker.Client, error) {
 	return docker.NewClient(config.Endpoint)
 }
 
+func getLogLevel() (level int) {
+	for level = 5; level >= 0; level-- {
+		if glog.V(glog.Level(level)) == true {
+			break
+		}
+	}
+	return
+}
+
 // setup sets up integration tests
 func (i *integrationTest) setup() {
 	i.dockerClient, _ = dockerClient(dockerConfig())
@@ -101,6 +112,25 @@ func (i *integrationTest) setup() {
 			i.t.Fatalf("Unexpected error: %v", err)
 		}
 		i.setupComplete = true
+	}
+
+	from := flag.CommandLine
+	if vflag := from.Lookup("v"); vflag != nil {
+		fmt.Fprintf(os.Stdout, "integration_test.go: found -v flag from starter bash script with initial glog level %d\n", getLogLevel())
+
+		// the thing here is that we are looking for the bash -v passed into test-integration.sh (with no value),
+		// but for glog (https://github.com/golang/glog/blob/master/glog.go), one specifies
+		// the logging level with -v=# (i.e. -v=0 or -v=3 or -v=5).
+		// so, for the changes stemming from issue 133, we 'reuse' the bash -v, and set the highest glog level.
+		// (if you look at STI's main.go, and setupGlog, it essentially maps glog's -v to --loglevel for use by the sti command)
+		//NOTE - passing --loglevel or -v=5 into test-integration.sh does not work
+		if getLogLevel() != 5 {
+			vflag.Value.Set("5")
+			fmt.Fprintf(os.Stdout, "integration_test.go: glog level now %d\n", getLogLevel())
+			// FIXME currently glog has only option to redirect output to stderr
+			// the preferred for STI would be to redirect to stdout
+			flag.CommandLine.Set("logtostderr", "true")
+		}
 	}
 }
 
