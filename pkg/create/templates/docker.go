@@ -22,7 +22,7 @@ FROM openshift/base-centos7
 # TODO (optional): Copy the builder files into /opt/openshift
 # COPY ./<builder_folder>/ /opt/openshift/
 
-# TODO: Copy the S2I scripts to /usr/local/sti, since openshift/base-centos7 image sets io.s2i.scripts-url label that way, or update that label
+# TODO: Copy the S2I scripts to /usr/local/sti, since openshift/base-centos7 image sets io.openshift.s2i.scripts-url label that way, or update that label
 # COPY ./.sti/bin/ /usr/local/sti
 
 # TODO: Drop the root user and make the content of /opt/openshift owned by user 1001
