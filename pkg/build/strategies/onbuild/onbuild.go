@@ -68,8 +68,34 @@ func (b *OnBuild) SourceTar(config *api.Config) (io.ReadCloser, error) {
 	return b.fs.Open(tarFileName)
 }
 
+func (b *OnBuild) checkNoRoot(config *api.Config) error {
+	if !config.NoRoot {
+		return nil
+	}
+	user, err := b.docker.GetImageUser(config.BuilderImage)
+	if err != nil {
+		return err
+	}
+	if util.IsPotentialRootUser(user) {
+		return fmt.Errorf("image %q must specify a user that is numeric and not equal to 0", config.BuilderImage)
+	}
+	cmds, err := b.docker.GetOnBuild(config.BuilderImage)
+	if err != nil {
+		return err
+	}
+	if util.IncludesRootUserDirective(cmds) {
+		return fmt.Errorf("image %q includes at least one ONBUILD instruction that sets the user to a non-numeric user or to user 0", config.BuilderImage)
+	}
+	return nil
+
+}
+
 // Build executes the ONBUILD kind of build
 func (b *OnBuild) Build(config *api.Config) (*api.Result, error) {
+	if err := b.checkNoRoot(config); err != nil {
+		return nil, err
+	}
+
 	glog.V(2).Info("Preparing the source code for build")
 	// Change the installation directory for this config to store scripts inside
 	// the application root directory.
