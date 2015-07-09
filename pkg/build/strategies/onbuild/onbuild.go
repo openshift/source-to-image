@@ -106,9 +106,12 @@ func (b *OnBuild) Build(config *api.Config) (*api.Result, error) {
 	glog.V(2).Info("Cleaning up temporary containers")
 	b.garbage.Cleanup(config)
 
-	imageID, err := b.docker.GetImageID(opts.Name)
-	if err != nil {
-		return nil, err
+	var imageID string
+
+	if len(opts.Name) > 0 {
+		if imageID, err = b.docker.GetImageID(opts.Name); err != nil {
+			return nil, err
+		}
 	}
 
 	return &api.Result{
