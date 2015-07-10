@@ -2,7 +2,6 @@ package sti
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"path/filepath"
 	"regexp"
@@ -162,7 +161,7 @@ func (b *STI) checkNoRoot(config *api.Config) error {
 		return err
 	}
 	if util.IsPotentialRootUser(user) {
-		return fmt.Errorf("image %q must specify a user that is numeric and not equal to 0", config.BuilderImage)
+		return errors.NewBuilderRootNotAllowedError(config.BuilderImage, false)
 	}
 	return nil
 }
