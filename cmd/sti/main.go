@@ -188,6 +188,7 @@ func newCmdBuild(cfg *api.Config) *cobra.Command {
 	buildCmd.Flags().StringVarP(&(cfg.EnvironmentFile), "environment-file", "E", "", "Specify the path to the file with environment")
 	buildCmd.Flags().StringVarP(&(cfg.DisplayName), "application-name", "n", "", "Specify the display name for the application (default: output image name)")
 	buildCmd.Flags().StringVarP(&(cfg.Description), "description", "", "", "Specify the description of the application")
+	buildCmd.Flags().BoolVar(&(cfg.NoRoot), "no-root", false, "Do not allow using a builder image that will run as root")
 
 	return buildCmd
 }

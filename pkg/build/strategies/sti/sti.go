@@ -2,6 +2,7 @@ package sti
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"path/filepath"
 	"regexp"
@@ -110,6 +111,10 @@ func New(req *api.Config) (*STI, error) {
 func (b *STI) Build(config *api.Config) (*api.Result, error) {
 	defer b.garbage.Cleanup(config)
 
+	if err := b.checkNoRoot(config); err != nil {
+		return nil, err
+	}
+
 	glog.V(1).Infof("Building %s", config.Tag)
 	if err := b.preparer.Prepare(config); err != nil {
 		return nil, err
@@ -146,6 +151,20 @@ func (b *STI) Build(config *api.Config) (*api.Result, error) {
 	}
 
 	return b.result, nil
+}
+
+func (b *STI) checkNoRoot(config *api.Config) error {
+	if !config.NoRoot {
+		return nil
+	}
+	user, err := b.docker.GetImageUser(config.BuilderImage)
+	if err != nil {
+		return err
+	}
+	if util.IsPotentialRootUser(user) {
+		return fmt.Errorf("image %q must specify a user that is numeric and not equal to 0", config.BuilderImage)
+	}
+	return nil
 }
 
 // Prepare prepares the source code and tar for build
