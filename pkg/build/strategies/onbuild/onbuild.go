@@ -12,6 +12,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/build"
 	"github.com/openshift/source-to-image/pkg/build/strategies/sti"
 	"github.com/openshift/source-to-image/pkg/docker"
+	"github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/git"
 	"github.com/openshift/source-to-image/pkg/scripts"
 	"github.com/openshift/source-to-image/pkg/tar"
@@ -77,14 +78,14 @@ func (b *OnBuild) checkNoRoot(config *api.Config) error {
 		return err
 	}
 	if util.IsPotentialRootUser(user) {
-		return fmt.Errorf("image %q must specify a user that is numeric and not equal to 0", config.BuilderImage)
+		return errors.NewBuilderRootNotAllowedError(config.BuilderImage, false)
 	}
 	cmds, err := b.docker.GetOnBuild(config.BuilderImage)
 	if err != nil {
 		return err
 	}
 	if util.IncludesRootUserDirective(cmds) {
-		return fmt.Errorf("image %q includes at least one ONBUILD instruction that sets the user to a non-numeric user or to user 0", config.BuilderImage)
+		return errors.NewBuilderRootNotAllowedError(config.BuilderImage, true)
 	}
 	return nil
 
