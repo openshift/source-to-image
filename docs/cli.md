@@ -8,6 +8,7 @@ following sections of this document:
 
 * [create](#sti-create)
 * [build](#sti-build)
+* [rebuild](#sti-rebuild)
 * [usage](#sti-usage)
 * [version](#sti-version)
 * [help](#sti-help)
