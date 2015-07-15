@@ -27,3 +27,4 @@ buildimage sti_test/sti-fake-user test/integration/images/sti-fake-user
 buildimage sti_test/sti-fake-scripts test/integration/images/sti-fake-scripts
 buildimage sti_test/sti-fake-scripts-no-save-artifacts test/integration/images/sti-fake-scripts-no-save-artifacts
 buildimage sti_test/sti-fake-no-tar test/integration/images/sti-fake-no-tar
+buildimage sti_test/sti-fake-onbuild test/integration/images/sti-fake-onbuild
