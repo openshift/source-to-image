@@ -20,6 +20,12 @@ type Config struct {
 	// BuilderImage describes which image is used for building the result images.
 	BuilderImage string
 
+	// BuilderImageVersion provides optional version information about the builder image.
+	BuilderImageVersion string
+
+	// BuilderBaseImageVersion provides optional version information about the builder base image.
+	BuilderBaseImageVersion string
+
 	// DockerConfig describes how to access host docker daemon.
 	DockerConfig *DockerConfig
 

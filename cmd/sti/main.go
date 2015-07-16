@@ -214,7 +214,7 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 			err := build.GenerateConfigFromLabels(cfg.Tag, cfg)
 			checkErr(err)
 
-			if len(args) >= 1 {
+			if len(args) >= 2 {
 				cfg.Tag = args[1]
 			}
 
