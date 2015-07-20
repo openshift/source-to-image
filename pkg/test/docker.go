@@ -23,9 +23,6 @@ type FakeDocker struct {
 	RunContainerErrorBeforeStart bool
 	RunContainerContainerID      string
 	RunContainerCmd              []string
-	GetOnBuildResult             []string
-	GetOnBuildError              error
-	GetOnBuildImage              string
 	GetImageIDImage              string
 	GetImageIDResult             string
 	GetImageIDError              error
@@ -51,15 +48,8 @@ func (f *FakeDocker) IsImageInLocalRegistry(imageName string) (bool, error) {
 	return f.LocalRegistryResult, f.LocalRegistryError
 }
 
-// IsImageOnBuild returns true if the image has onbuild instructions
 func (f *FakeDocker) IsImageOnBuild(imageName string) bool {
 	return false
-}
-
-// GetOnBuild returns the list of onbuild instructions for the image
-func (f *FakeDocker) GetOnBuild(imageName string) ([]string, error) {
-	f.GetOnBuildImage = imageName
-	return f.GetOnBuildResult, f.GetOnBuildError
 }
 
 // RemoveContainer removes a fake Docker container
