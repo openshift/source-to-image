@@ -40,6 +40,40 @@ image:
 Additionally for the best user experience and optimized `sti` operation we suggest images
 to have `/bin/sh` and `tar` commands available.
 
+Filtering the contents of the source tree is possible if the user supplies a
+`.s2iignore` file in the root directory of the source repository, where `.s2iignore` contains regular
+expressions that capture the set of files and directories you want filtered from the image s2i produces.
+
+Specifically:
+
+1. Specify one rule per line, with each line terminating in `\n`.
+1. Filepaths are appended to the absolute path of the  root of the source tree (either the local directory supplied, or the target destination of the clone of the remote source repository s2i creates).
+1. Wildcards and globbing (file name expansion) leverage Go's `filepath.Match` and `filepath.Glob` functions.
+1. Search is not recursive.  Subdirectory paths must be specified (though wildcards and regular expressions can be used in the subdirectory specifications).
+1. If the first character is the `#` character, the line is treated as a comment.
+1. If the first character is the `!`, the rule is an exception rule, and can undo candidates selected for filtering by prior rules (but only prior rules).
+
+Here are some examples to help illustrate:
+
+With specifying subdirectories, the `*/temp*` rule prevents the filtering of any files starting with `temp` that are in any subdirectory that is immediately (or one level) below the root directory.
+And the `*/*/temp*` rule prevents the filtering of any files starting with `temp` that are in any subdirectory that is two levels below the root directory.
+
+Next, to illustrate exception rules, first consider the following example snippet of a `.s2iignore` file:
+
+
+	*.md
+	!README.md
+
+
+With this exception rule example, README.md will not be filtered, and remain in the image s2i produces.  However, with this snippet:
+
+
+	!README.md
+	*.md
+
+
+README.md, if filtered by any prior rules, but then put back in by `!README.md`, would be filtered, and not part of the resulting image s2i produces.  Since `*.md` follows `!README.md`, `*.md` takes precedence.
+
 Users can also set extra environment variables in the application source code. 
 They are passed to the build, and the `assemble` script consumes them. All
 environment variables are also present in the output application image. These
@@ -61,7 +95,7 @@ See [here](https://github.com/openshift/source-to-image/blob/master/docs/builder
 The `sti build` workflow is:
 
 1. `sti` creates a container based on the build image and passes it a tar file that contains:
-    1. The application source in `src`
+    1. The application source in `src`, excluding any files selected by `.s2iignore`
     1. The build artifacts in `artifacts` (if applicable - see [incremental builds](#incremental-builds))
 1. `sti` sets the environment variables from `.sti/environment` (optional)
 1. `sti` starts the container and runs its `assemble` script

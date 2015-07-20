@@ -17,12 +17,13 @@ type Clone struct {
 // Download downloads the application source code from the GIT repository
 // and checkout the Ref specified in the config.
 func (c *Clone) Download(config *api.Config) (*api.SourceInfo, error) {
-	targetSourceDir := filepath.Join(config.WorkingDir, "upload", "src")
+	targetSourceDir := filepath.Join(config.WorkingDir, api.Source)
+	config.WorkingSourceDir = targetSourceDir
 	var info *api.SourceInfo
 
 	if c.ValidCloneSpec(config.Source) {
 		if len(config.ContextDir) > 0 {
-			targetSourceDir = filepath.Join(config.WorkingDir, "upload", "tmp")
+			targetSourceDir = filepath.Join(config.WorkingDir, api.ContextTmp)
 		}
 		glog.V(2).Infof("Cloning into %s", targetSourceDir)
 		if err := c.Clone(config.Source, targetSourceDir); err != nil {
@@ -38,7 +39,7 @@ func (c *Clone) Download(config *api.Config) (*api.SourceInfo, error) {
 		}
 
 		if len(config.ContextDir) > 0 {
-			originalTargetDir := filepath.Join(config.WorkingDir, "upload", "src")
+			originalTargetDir := filepath.Join(config.WorkingDir, api.Source)
 			c.RemoveDirectory(originalTargetDir)
 			// we want to copy entire dir contents, thus we need to use dir/. construct
 			path := filepath.Join(targetSourceDir, config.ContextDir) + string(filepath.Separator) + "."

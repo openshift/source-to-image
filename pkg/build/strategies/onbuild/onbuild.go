@@ -10,6 +10,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/build"
+	"github.com/openshift/source-to-image/pkg/ignore"
 	"github.com/openshift/source-to-image/pkg/build/strategies/sti"
 	"github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/git"
@@ -32,6 +33,7 @@ type OnBuild struct {
 type onBuildSourceHandler struct {
 	build.Downloader
 	build.Preparer
+	build.Ignorer
 }
 
 // New returns a new instance of OnBuild builder
@@ -53,6 +55,7 @@ func New(config *api.Config) (*OnBuild, error) {
 	b.source = onBuildSourceHandler{
 		&git.Clone{b.git, b.fs},
 		s,
+		&ignore.DockerIgnorer{},
 	}
 	b.garbage = &build.DefaultCleaner{b.fs, b.docker}
 	return b, nil
