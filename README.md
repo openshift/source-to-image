@@ -148,3 +148,5 @@ $ docker run --rm -i -p :8080 -t test-jee-app
 
 Interested in more advanced `sti` usage? See [here](https://github.com/openshift/source-to-image/blob/master/docs/cli.md)
 for detailed descriptions of the different CLI commands with examples.
+
+Running into some issues and need some advice debugging?  Peruse [here](https://github.com/openshift/source-to-image/blob/master/docs/debugging-s2i.md) for some tips.

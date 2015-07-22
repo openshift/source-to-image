@@ -76,6 +76,7 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 | `--dockercfg-path`         | The path to the Docker configuration file |
 | `--incremental`            | Try to perform an incremental build |
 | `-e (--env)`               | Environment variables to be passed to the builder eg. `NAME=VALUE,NAME2=VALUE2,...` |
+| `-E (--environment-file)`               | Specify the path to the file with environment |
 | `--force-pull`             | Always pull the builder image, even if it is present locally (defaults to true) |
 | `-r (--ref)`               | A branch/tag that the build should use instead of MASTER (applies only to GIT source) |
 | `--rm`                     | Remove the previous image during incremental builds |
