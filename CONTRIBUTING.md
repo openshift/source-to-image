@@ -3,12 +3,12 @@ Hacking on source-to-image
 
 ## Local development
 
-STI comes with a `Makefile` which defines following targets:
+S2I comes with a `Makefile` which defines following targets:
 
-* `build` - is the default target responsible for building STI binary, under the covers
+* `build` - is the default target responsible for building S2I binary, under the covers
 it calls `hack/build-go.sh`. The resulting binary will be placed in `_output/local/go/bin/`.
 * `all` - is synonym for `build`.
-* `test` - is responsible for testing STI, under the covers it calls `hack/test-go.sh`.
+* `test` - is responsible for testing S2I, under the covers it calls `hack/test-go.sh`.
 Additionally you can pass `WHAT` or `TEST` variable specifying directory names to test,
 eg. `make test WHAT=pkg/build`
 * `check` - is synonym for `test`.
@@ -17,7 +17,7 @@ eg. `make test WHAT=pkg/build`
 
 ## Test Suites
 
-STI uses two levels of testing - unit tests and integration tests, both of them are run on each
+S2I uses two levels of testing - unit tests and integration tests, both of them are run on each
 pull request, so make sure to run those before submitting one.
 
 
@@ -70,7 +70,7 @@ To create a coverage report for all packages:
 
 ### Integration tests
 
-The second category are integration tests which verify the whole STI flow. The integration tests
+The second category are integration tests which verify the whole S2I flow. The integration tests
 require a couple of images for testing, these can be built with `hack/build-test-images.sh`, if
 integration tests don't find them it'll print appropriate information regarding running this command.
 
@@ -81,10 +81,10 @@ Run the integration tests with:
 
 ## Installing Godep
 
-STI uses [Godep](https://github.com/tools/godep) for dependency management.
+S2I uses [Godep](https://github.com/tools/godep) for dependency management.
 Godep allows versions of dependent packages to be locked at a specific commit by *vendoring* them
 (checking a copy of them into `Godeps/_workspace/`).  This means that everything you need for
-STI is checked into this repository.  To install `godep` locally run:
+S2I is checked into this repository.  To install `godep` locally run:
 
     $ go get github.com/tools/godep
 
@@ -93,7 +93,7 @@ If you are not updating packages you should not need godep installed.
 
 ## Building a Release
 
-To build a STI release you run the `hack/build-release.sh` script on a system with Docker,
+To build a S2I release you run the `hack/build-release.sh` script on a system with Docker,
 which will create a build environment image and then execute a cross platform Go build within it. The build
 output will be copied to `_output/releases` as a set of tars containing each version.
 

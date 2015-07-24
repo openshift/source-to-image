@@ -45,3 +45,5 @@ sti::build::detect_local_release_tars "linux"
 
 mkdir -p "${STI_LOCAL_BINPATH}"
 tar mxzf "${STI_PRIMARY_RELEASE_TAR}" -C "${STI_LOCAL_BINPATH}"
+
+sti::build::make_binary_symlinks

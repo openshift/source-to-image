@@ -1,30 +1,30 @@
-# sti builder image requirements
+# s2i builder image requirements
 
-The main advantage of using sti for building reproducible docker images is ease
+The main advantage of using s2i for building reproducible docker images is ease
 of use for developers. To meet that criteria you, as a builder image author,
 should be aware of the two basic requirements for the best possible sti
 performance. These are:
 
 * [required image contents](#required-image-contents)
-* [sti scripts](#sti-scripts)
+* [s2i scripts](#s2i-scripts)
 
 
 # Required image contents
 
 The build process consists of three fundamental elements which are combined into the
-final docker image. These are: source code, sti scripts, and the builder image. During the
-build process sti must place sources and scripts inside that builder image. To do
-so sti creates a tar file containing the two and then streams that file into the
-builder image. Before executing the `assemble` script, sti untars that file and places
+final docker image. These are: source code, s2i scripts, and the builder image. During the
+build process s2i must place sources and scripts inside that builder image. To do
+so s2i creates a tar file containing the two and then streams that file into the
+builder image. Before executing the `assemble` script, s2i untars that file and places
 its contents into the destination specified with either the `--destination` flag or the value of
 the `io.openshift.s2i.destination` label set in the builder image (the default destination is `/tmp`).
-If your image does not have either `tar` or `/bin/sh` the sti build will perform an additional
+If your image does not have either `tar` or `/bin/sh` the s2i build will perform an additional
 docker build to place the source code and scripts into an appropriate image and then run
-the normal sti build.
+the normal s2i build.
 
 The following diagram illustrates the build workflow:
 
-![sti workflow](./sti-flow.png "sti workflow")
+![s2i workflow](./sti-flow.png "s2i workflow")
 
 \* Run build's responsibility is to untar the sources, scripts and (optionally) artifacts
 and invoke the `assemble` script. If this is the second run after any previous runs with
@@ -32,9 +32,9 @@ and invoke the `assemble` script. If this is the second run after any previous r
 scripts are already present.
 
 
-# sti scripts
+# s2i scripts
 
-`sti` expects you (the builder image author) to supply the following scripts:
+`s2i` expects you (the builder image author) to supply the following scripts:
 
 * required:
     * [assemble](#assemble)
@@ -144,7 +144,7 @@ how to use your image.
 
 # inform the user how to use the image
 cat <<EOF
-This is a STI sample builder image, to use it, install
+This is a S2I sample builder image, to use it, install
 https://github.com/openshift/source-to-image
 EOF
 ```
@@ -157,11 +157,11 @@ should be the following:
 
 1. Build the image.
 1. Run the image to verify the `usage` script.
-1. Run the `sti build` to verify `assemble` script.
-1. (Optional) Run the `sti build` once more to verify `save-artifacts` script and
+1. Run the `s2i build` to verify `assemble` script.
+1. (Optional) Run the `s2i build` once more to verify `save-artifacts` script and
    `assemble`'s restore artifacts functionality.
 1. Run the image to verify the test application is working.
 
 **NOTE** The suggested place to put your test application built by your
 `test/run` script is `test/test-app` in your image repository, see
-[sti create](https://github.com/openshift/source-to-image/blob/master/docs/cli.md#sti-create).
+[s2i create](https://github.com/openshift/source-to-image/blob/master/docs/cli.md#s2i-create).

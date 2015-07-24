@@ -24,12 +24,12 @@ fi
 
 test_dir="$($READLINK_EXEC -zf $(dirname "${BASH_SOURCE[0]}"))"
 image_dir=$($READLINK_EXEC -zf ${test_dir}/..)
-scripts_url="file://${image_dir}/.sti/bin"
+scripts_url="file://${image_dir}/.s2i/bin"
 cid_file=$($MKTEMP_EXEC -u --suffix=.cid)
 
 # Since we built the candidate image locally, we don't want S2I to attempt to pull
 # it from Docker hub
-sti_args="--force-pull=false -s ${scripts_url} --loglevel=2"
+s2i_args="--force-pull=false -s ${scripts_url} --loglevel=2"
 
 # Port the image exposes service to be tested
 test_port=8080
@@ -46,8 +46,8 @@ container_ip() {
   docker inspect --format="{{"{{"}} .NetworkSettings.IPAddress {{"}}"}}" $(cat $cid_file)
 }
 
-run_sti_build() {
-  sti build --incremental=true ${sti_args} file://${test_dir}/test-app ${IMAGE_NAME} ${IMAGE_NAME}-testapp
+run_s2i_build() {
+  s2i build --incremental=true ${s2i_args} file://${test_dir}/test-app ${IMAGE_NAME} ${IMAGE_NAME}-testapp
 }
 
 prepare() {
@@ -55,13 +55,13 @@ prepare() {
     echo "ERROR: The image ${IMAGE_NAME} must exist before this script is executed."
     exit 1
   fi
-  # sti build requires the application is a valid 'GIT' repository
+  # s2i build requires the application is a valid 'GIT' repository
   pushd ${test_dir}/test-app >/dev/null
   git init
   git config user.email "build@localhost" && git config user.name "builder"
   git add -A && git commit -m "Sample commit"
   popd >/dev/null
-  run_sti_build
+  run_s2i_build
 }
 
 run_test_application() {
@@ -102,8 +102,8 @@ wait_for_cid() {
 }
 
 test_usage() {
-  echo "Testing 'sti usage'..."
-  sti usage ${sti_args} ${IMAGE_NAME} &>/dev/null
+  echo "Testing 's2i usage'..."
+  s2i usage ${s2i_args} ${IMAGE_NAME} &>/dev/null
 }
 
 test_connection() {
@@ -136,7 +136,7 @@ test_connection() {
 # Build the application image twice to ensure the 'save-artifacts' and
 # 'restore-artifacts' scripts are working properly
 prepare
-run_sti_build
+run_s2i_build
 check_result $?
 
 # Verify the 'usage' script is working properly

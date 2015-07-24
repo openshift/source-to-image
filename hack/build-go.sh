@@ -11,4 +11,4 @@ source "${STI_ROOT}/hack/common.sh"
 
 sti::build::build_binaries "$@"
 sti::build::place_bins
-
+sti::build::make_binary_symlinks

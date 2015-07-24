@@ -30,14 +30,20 @@ readonly STI_CROSS_COMPILE_PLATFORMS=(
   windows/amd64
 )
 readonly STI_CROSS_COMPILE_TARGETS=(
-  cmd/sti
+  cmd/s2i
 )
 readonly STI_CROSS_COMPILE_BINARIES=("${STI_CROSS_COMPILE_TARGETS[@]##*/}")
 
 readonly STI_ALL_TARGETS=(
   "${STI_CROSS_COMPILE_TARGETS[@]}"
 )
-# readonly STI_ALL_BINARIES=("${STI_ALL_TARGETS[@]##*/}")
+
+readonly STI_BINARY_SYMLINKS=(
+  sti
+)
+readonly STI_BINARY_COPY=(
+  sti
+)
 
 # sti::build::binaries_from_targets take a list of build targets and return the
 # full go package to be built
@@ -255,6 +261,18 @@ sti::build::place_bins() {
       find "${full_binpath_src}" -maxdepth 1 -type f -exec \
         rsync "${includes[@]}" --exclude="*" -pt {} "${release_binpath}" \;
 
+      # Create binary copies where specified.
+      local suffix=""
+      if [[ $platform == "windows/amd64" ]]; then
+        suffix=".exe"
+      fi
+      for linkname in "${STI_BINARY_COPY[@]}"; do
+        local src="${release_binpath}/s2i${suffix}"
+        if [[ -f "${src}" ]]; then
+          cp "${release_binpath}/s2i${suffix}" "${release_binpath}/${linkname}${suffix}"
+        fi
+      done
+
       # Create the release archive.
       local platform_segment="${platform//\//-}"
       local archive_name="${STI_RELEASE_ARCHIVE}-${STI_GIT_VERSION}-${STI_GIT_COMMIT}-${platform_segment}.tar.gz"
@@ -264,6 +282,23 @@ sti::build::place_bins() {
       rm -rf "${release_binpath}"
     done
   )
+}
+
+# sti::build::make_binary_symlinks makes symlinks for the sti
+# binary in _output/local/go/bin
+sti::build::make_binary_symlinks() {
+  local host_platform
+  host_platform=$(sti::build::host_platform)
+
+  if [[ -f "${STI_LOCAL_BINPATH}/s2i" ]]; then
+    for linkname in "${STI_BINARY_SYMLINKS[@]}"; do
+      if [[ $host_platform == "windows/amd64" ]]; then
+        cp "${STI_LOCAL_BINPATH}/s2i.exe" "${STI_LOCAL_BINPATH}/${linkname}.exe"
+      else
+        ln -sf "${STI_LOCAL_BINPATH}/s2i" "${STI_LOCAL_BINPATH}/${linkname}"
+      fi
+    done
+  fi
 }
 
 # sti::build::detect_local_release_tars verifies there is only one primary and one
