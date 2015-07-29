@@ -1,7 +1,6 @@
 package templates
 
-const AssembleScript = `
-#!/bin/bash -e
+const AssembleScript = `#!/bin/bash -e
 #
 # S2I assemble script for the '{{.ImageName}}' image.
 # The 'assemble' script builds your application source ready to run.
@@ -30,8 +29,7 @@ echo "---> Building application from source"
 # TODO: Add build steps for your application, eg npm install, bundle install
 `
 
-const RunScript = `
-#!/bin/bash -e
+const RunScript = `#!/bin/bash -e
 #
 # S2I run script for the '{{.ImageName}}' image.
 # The run script executes the server that runs your application.
@@ -43,8 +41,7 @@ const RunScript = `
 exec <start your server here>
 `
 
-const UsageScript = `
-#!/bin/bash -e
+const UsageScript = `#!/bin/bash -e
 cat <<EOF
 This is the {{.ImageName}} S2I image:
 To use it, install S2I: https://github.com/openshift/source-to-image
@@ -58,8 +55,7 @@ docker run <application image>
 EOF
 `
 
-const SaveArtifactsScript = `
-#!/bin/sh -e
+const SaveArtifactsScript = `#!/bin/sh -e
 #
 # S2I save-artifacts script for the '{{.ImageName}}' image.
 # The save-artifacts script streams a tar archive to standard output.
