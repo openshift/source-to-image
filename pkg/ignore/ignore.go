@@ -11,24 +11,20 @@ import (
 	"github.com/openshift/source-to-image/pkg/api"
 )
 
-type DockerIgnorer struct {}
+type DockerIgnorer struct{}
 
 func (b *DockerIgnorer) Ignore(config *api.Config) error {
-	// so, to duplicate the .dockerignore capabilities (https://docs.docker.com/reference/builder/#dockerignore-file)
-	// we have a flow that follows:
 	/*
-
+		 so, to duplicate the .dockerignore capabilities (https://docs.docker.com/reference/builder/#dockerignore-file)
+		 we have a flow that follows:
 		0) First note, .dockerignore rules are NOT recursive (unlike .gitignore) .. you have to list subdir explicitly
 		1) Read in the exclusion patterns
 		2) Skip over comments (noted by #)
 		3) note overrides (via exclamation sign i.e. !) and reinstate files (don't remove) as needed
 		4) leverage Glob matching to build list, as .dockerignore is documented as following filepath.Match / filepath.Glob
 		5) del files
-
-                 1 to 4 is in getListOfFilesToIgnore
-
+		 1 to 4 is in getListOfFilesToIgnore
 	*/
-
 	filesToDel, lerr := getListOfFilesToIgnore(config)
 	if lerr != nil {
 		return lerr
@@ -38,7 +34,7 @@ func (b *DockerIgnorer) Ignore(config *api.Config) error {
 		return nil
 	}
 
-	// delete compiled list of files 
+	// delete compiled list of files
 	for _, fileToDel := range filesToDel {
 		glog.V(5).Infof("attempting to remove file %s \n", fileToDel)
 		rerr := os.RemoveAll(fileToDel)
@@ -72,9 +68,9 @@ func getListOfFilesToIgnore(config *api.Config) (map[string]string, error) {
 		if strings.HasPrefix(filespec, "#") {
 			continue
 		}
-		
+
 		glog.V(4).Infof(".s2iignore lists a file spec of %s \n", filespec)
-		
+
 		if strings.HasPrefix(filespec, "!") {
 			//remove any existing files to del that the override covers
 			// and patterns later on that undo this take precedence
@@ -85,7 +81,7 @@ func getListOfFilesToIgnore(config *api.Config) (map[string]string, error) {
 
 			// iterate through and determine ones to leave in
 			dontDel := make([]string, 0)
-			for candidate, _ := range filesToDel {
+			for candidate := range filesToDel {
 				compare := filepath.Join(config.WorkingSourceDir, filespec)
 				glog.V(5).Infof("For %s  and %s see if it matches the spec  %s which means that we leave in\n", filespec, candidate, compare)
 				leaveIn, _ := filepath.Match(compare, candidate)

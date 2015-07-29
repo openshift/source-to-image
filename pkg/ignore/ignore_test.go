@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang/glog"
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/util"
-	"github.com/golang/glog"
 	"os"
 )
 
@@ -19,7 +19,6 @@ func getLogLevel() (level int) {
 	}
 	return
 }
-
 
 func baseTest(t *testing.T, patterns []string, filesToDel []string, filesToKeep []string) {
 
@@ -38,16 +37,15 @@ func baseTest(t *testing.T, patterns []string, filesToDel []string, filesToKeep 
 		}
 	}()
 
-	
 	c := &api.Config{WorkingDir: workingDir}
-	
+
 	// create source repo dir for .s2iignore that matches where ignore.go looks
-	dpath := filepath.Join(c.WorkingDir,"upload","src")
-	derr := os.MkdirAll(dpath,0777)	
+	dpath := filepath.Join(c.WorkingDir, "upload", "src")
+	derr := os.MkdirAll(dpath, 0777)
 	if derr != nil {
 		t.Errorf("Problem creating source repo dir %s with  %v \n", dpath, derr)
 	}
-	
+
 	c.WorkingSourceDir = dpath
 	t.Logf("working source dir %s \n", dpath)
 
@@ -56,20 +54,20 @@ func baseTest(t *testing.T, patterns []string, filesToDel []string, filesToKeep 
 	ifile, ierr := os.Create(ipath)
 	defer ifile.Close()
 	if ierr != nil {
-		t.Errorf("Problem creating .s2iignore at %s with  %v \n",ipath, ierr)
+		t.Errorf("Problem creating .s2iignore at %s with  %v \n", ipath, ierr)
 	}
-	
+
 	// write patterns to remove into s2ignore, but save ! exclusions
 	filesToIgnore := make(map[string]string)
-	for _,pattern := range patterns {
-		t.Logf("storing pattern %s \n",pattern)
+	for _, pattern := range patterns {
+		t.Logf("storing pattern %s \n", pattern)
 		_, serr := ifile.WriteString(pattern)
-		
+
 		if serr != nil {
 			t.Errorf("Problem setting .s2iignore %v \n", serr)
 		}
 		if strings.HasPrefix(pattern, "!") {
-			pattern = strings.Replace(pattern, "!","",1)
+			pattern = strings.Replace(pattern, "!", "", 1)
 			t.Logf("Noting ignore pattern  %s \n", pattern)
 			filesToIgnore[pattern] = pattern
 		}
@@ -83,19 +81,18 @@ func baseTest(t *testing.T, patterns []string, filesToDel []string, filesToKeep 
 		filesToCreate = append(filesToCreate, fileToDel)
 	}
 	filesToKeepCheck := make(map[string]string)
-	for _,fileToKeep :=range filesToKeep {
+	for _, fileToKeep := range filesToKeep {
 		filesToKeepCheck[fileToKeep] = fileToKeep
 		filesToCreate = append(filesToCreate, fileToKeep)
 	}
 
-	
 	// create files for test
-        for _, fileToCreate := range filesToCreate {
+	for _, fileToCreate := range filesToCreate {
 		fbpath := filepath.Join(dpath, fileToCreate)
 
 		// ensure any subdirs off working dir exist
 		dirpath := filepath.Dir(fbpath)
-		derr := os.MkdirAll(dirpath,0777)
+		derr := os.MkdirAll(dirpath, 0777)
 		if derr != nil && !os.IsExist(derr) {
 			t.Errorf("Problem creating subdirs %s with %v \n", dirpath, derr)
 		}
@@ -105,15 +102,14 @@ func baseTest(t *testing.T, patterns []string, filesToDel []string, filesToKeep 
 		if fberr != nil {
 			t.Errorf("Problem creating test file %v \n", fberr)
 		}
-        }
-
+	}
 
 	// run ignorer algorithm
-	ignorer := &DockerIgnorer{}	
+	ignorer := &DockerIgnorer{}
 	ignorer.Ignore(c)
 
 	// check if filesToDel, minus ignores, are gone, and filesToKeep are still there
-	for _,fileToCheck := range filesToCreate {
+	for _, fileToCheck := range filesToCreate {
 		fbpath := filepath.Join(dpath, fileToCheck)
 		t.Logf("Evaluating file %s from dir %s and file to check %s \n", fbpath, dpath, fileToCheck)
 
@@ -153,10 +149,10 @@ func baseTest(t *testing.T, patterns []string, filesToDel []string, filesToKeep 
 				t.Errorf("file which was cited to be deleted by caller to runTest exists %s \n", fileToCheck)
 				continue
 			}
-			
-			// if here, something unexpected 
+
+			// if here, something unexpected
 			t.Errorf("file not in ignore / keep / del list  !?!?!?!?  %s \n", fileToCheck)
-			
+
 		} else {
 			if dok {
 				t.Logf("file which should have been deleted is in fact gone %s \n", fileToCheck)
@@ -175,9 +171,9 @@ func baseTest(t *testing.T, patterns []string, filesToDel []string, filesToKeep 
 
 			// if here, then something unexpected happened
 			t.Errorf("file not in ignore / keep / del list  !?!?!?!?  %s \n", fileToCheck)
-			
+
 		}
-		
+
 	}
 
 }

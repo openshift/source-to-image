@@ -76,9 +76,8 @@ func (h *stiGit) Clone(source, target string) error {
 	// --quiet does not surpress that anyway reduced the frequency of the hang, but it still occurred.
 	// the pipeToLog method has been left for now for historical purposes, but if this implemenetation
 	// of git clone holds, we'll want to delete that at some point.
-	
-	opts := util.CommandOpts{
-	}
+
+	opts := util.CommandOpts{}
 
 	return h.runner.RunWithOptions(opts, "git", "clone", "--quiet", "--recursive", source, target)
 }
