@@ -14,14 +14,22 @@ const TestRunScript = `
 #
 IMAGE_NAME=${IMAGE_NAME-{{.ImageName}}-candidate}
 
-test_dir="$(readlink -zf $(dirname "${BASH_SOURCE[0]}"))"
-image_dir=$(readlink -zf ${test_dir}/..)
+# Determining system utility executables (darwin compatibility check)
+READLINK_EXEC="readlink"
+MKTEMP_EXEC="mktemp"
+if (echo "$OSTYPE" | egrep -qs 'darwin'); then
+  ! type -a "greadlink" &>"/dev/null" || READLINK_EXEC="greadlink"
+  ! type -a "gmktemp" &>"/dev/null" || MKTEMP_EXEC="gmktemp"
+fi
+
+test_dir="$($READLINK_EXEC -zf $(dirname "${BASH_SOURCE[0]}"))"
+image_dir=$($READLINK_EXEC -zf ${test_dir}/..)
 scripts_url="file://${image_dir}/.sti/bin"
-cid_file=$(mktemp -u --suffix=.cid)
+cid_file=$($MKTEMP_EXEC -u --suffix=.cid)
 
 # Since we built the candidate image locally, we don't want S2I to attempt to pull
 # it from Docker hub
-sti_args="--force-pull=false -s ${scripts_url}"
+sti_args="--force-pull=false -s ${scripts_url} --loglevel=2"
 
 # Port the image exposes service to be tested
 test_port=8080
@@ -39,7 +47,7 @@ container_ip() {
 }
 
 run_sti_build() {
-  sti build ${sti_args} file://${test_dir}/test-app ${IMAGE_NAME} ${IMAGE_NAME}-testapp
+  sti build --incremental=true ${sti_args} file://${test_dir}/test-app ${IMAGE_NAME} ${IMAGE_NAME}-testapp
 }
 
 prepare() {
@@ -106,6 +114,11 @@ test_connection() {
   local result=1
   while [ $attempt -le $max_attempts ]; do
     echo "Sending GET request to http://$(container_ip):${test_port}/"
+    if (echo "$OSTYPE" | egrep -qs 'darwin'); then
+      echo "Warning for OSX users: if you can't access the container's IP ${container_ip} directly (because you use boot2docker for example)"
+      echo "you should run the curl command in a container, for example using:"
+      echo "docker run --rm -it sequenceiq/alpine-curl curl -s -w %{http_code} -o /dev/null http://$(container_ip):${test_port}/"
+    fi
     response_code=$(curl -s -w %{http_code} -o /dev/null http://$(container_ip):${test_port}/)
     status=$?
     if [ $status -eq 0 ]; then
