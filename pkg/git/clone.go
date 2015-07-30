@@ -67,6 +67,8 @@ func (c *Clone) Download(config *api.Config) (*api.SourceInfo, error) {
 	// When building from a local directory (not using GIT clone spec scheme) we
 	// skip gathering informations about the source as there is no guarantee that
 	// the folder is a GIT repository or it requires context-dir to be set.
-	glog.Warning("You are using <source> location that is not valid GIT repository. The source code information will not be stored into the output image. Use this image only for local testing and development.")
+	if !config.Quiet {
+		glog.Warning("You are using <source> location that is not valid GIT repository. The source code information will not be stored into the output image. Use this image only for local testing and development.")
+	}
 	return nil, nil
 }
