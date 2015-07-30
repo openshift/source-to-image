@@ -35,7 +35,7 @@ type stiGit struct {
 
 var gitSshURLExp = regexp.MustCompile(`\A([\w\d\-_\.+]+@[\w\d\-_\.+]+:[\w\d\-_\.+%/]+\.git)$`)
 
-var allowedSchemes = []string{"git", "http", "https", "file"}
+var allowedSchemes = []string{"git", "http", "https", "file", "ssh"}
 
 func stringInSlice(s string, slice []string) bool {
 	for _, element := range slice {
