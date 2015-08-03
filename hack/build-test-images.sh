@@ -28,3 +28,6 @@ buildimage sti_test/sti-fake-scripts test/integration/images/sti-fake-scripts
 buildimage sti_test/sti-fake-scripts-no-save-artifacts test/integration/images/sti-fake-scripts-no-save-artifacts
 buildimage sti_test/sti-fake-no-tar test/integration/images/sti-fake-no-tar
 buildimage sti_test/sti-fake-onbuild test/integration/images/sti-fake-onbuild
+buildimage sti_test/sti-fake-numericuser test/integration/images/sti-fake-numericuser
+buildimage sti_test/sti-fake-onbuild-rootuser test/integration/images/sti-fake-onbuild-rootuser
+buildimage sti_test/sti-fake-onbuild-numericuser test/integration/images/sti-fake-onbuild-numericuser
