@@ -62,6 +62,9 @@ type Config struct {
 	// variables.
 	EnvironmentFile string
 
+	// LabelNamespace provides the namespace under which the labels will be generated.
+	LabelNamespace string
+
 	// CallbackURL is a URL which is called upon successful build to inform about that fact.
 	CallbackURL string
 
