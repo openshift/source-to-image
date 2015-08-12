@@ -188,6 +188,7 @@ func newCmdBuild(cfg *api.Config) *cobra.Command {
 	buildCmd.Flags().StringVarP(&(cfg.EnvironmentFile), "environment-file", "E", "", "Specify the path to the file with environment")
 	buildCmd.Flags().StringVarP(&(cfg.DisplayName), "application-name", "n", "", "Specify the display name for the application (default: output image name)")
 	buildCmd.Flags().StringVarP(&(cfg.Description), "description", "", "", "Specify the description of the application")
+	buildCmd.Flags().VarP(&(cfg.AllowedUIDs), "allowed-uids", "u", "Specify a range of allowed user ids for the builder image. If the builder specifies a non-numeric user or a uid that falls outside the range, the build fails.")
 
 	return buildCmd
 }

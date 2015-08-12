@@ -32,20 +32,27 @@ const (
 	FakeImageScriptsNoSaveArtifacts = "sti_test/sti-fake-scripts-no-save-artifacts"
 	FakeImageNoTar                  = "sti_test/sti-fake-no-tar"
 	FakeImageOnBuild                = "sti_test/sti-fake-onbuild"
+	FakeNumericUserImage            = "sti_test/sti-fake-numericuser"
+	FakeImageOnBuildRootUser        = "sti_test/sti-fake-onbuild-rootuser"
+	FakeImageOnBuildNumericUser     = "sti_test/sti-fake-onbuild-numericuser"
 
-	TagCleanBuild                             = "test/sti-fake-app"
-	TagCleanBuildUser                         = "test/sti-fake-app-user"
-	TagIncrementalBuild                       = "test/sti-incremental-app"
-	TagIncrementalBuildUser                   = "test/sti-incremental-app-user"
-	TagCleanBuildScripts                      = "test/sti-fake-app-scripts"
-	TagIncrementalBuildScripts                = "test/sti-incremental-app-scripts"
-	TagIncrementalBuildScriptsNoSaveArtifacts = "test/sti-incremental-app-scripts-no-save-artifacts"
-	TagCleanLayeredBuildNoTar                 = "test/sti-fake-no-tar"
-	TagCleanBuildOnBuild                      = "test/sti-fake-app-onbuild"
-	TagIncrementalBuildOnBuild                = "test/sti-incremental-app-onbuild"
-	TagCleanBuildOnBuildNoName                = "test/sti-fake-app-onbuild-noname"
-	TagCleanBuildNoName                       = "test/sti-fake-app-noname"
-	TagCleanLayeredBuildNoTarNoName           = "test/sti-fake-no-tar-noname"
+	TagCleanBuild                              = "test/sti-fake-app"
+	TagCleanBuildUser                          = "test/sti-fake-app-user"
+	TagIncrementalBuild                        = "test/sti-incremental-app"
+	TagIncrementalBuildUser                    = "test/sti-incremental-app-user"
+	TagCleanBuildScripts                       = "test/sti-fake-app-scripts"
+	TagIncrementalBuildScripts                 = "test/sti-incremental-app-scripts"
+	TagIncrementalBuildScriptsNoSaveArtifacts  = "test/sti-incremental-app-scripts-no-save-artifacts"
+	TagCleanLayeredBuildNoTar                  = "test/sti-fake-no-tar"
+	TagCleanBuildOnBuild                       = "test/sti-fake-app-onbuild"
+	TagIncrementalBuildOnBuild                 = "test/sti-incremental-app-onbuild"
+	TagCleanBuildOnBuildNoName                 = "test/sti-fake-app-onbuild-noname"
+	TagCleanBuildNoName                        = "test/sti-fake-app-noname"
+	TagCleanLayeredBuildNoTarNoName            = "test/sti-fake-no-tar-noname"
+	TagCleanBuildAllowedUIDsNamedUser          = "test/sti-fake-alloweduids-nameduser"
+	TagCleanBuildAllowedUIDsNumericUser        = "test/sti-fake-alloweduids-numericuser"
+	TagCleanBuildAllowedUIDsOnBuildRoot        = "test/sti-fake-alloweduids-onbuildroot"
+	TagCleanBuildAllowedUIDsOnBuildNumericUser = "test/sti-fake-alloweduids-onbuildnumeric"
 
 	// Need to serve the scripts from local host so any potential changes to the
 	// scripts are made available for integration testing.
@@ -152,7 +159,9 @@ func waitForHTTPReady() error {
 	retryCount := 50
 	for {
 		if resp, err := http.Get("http://127.0.0.1:23456/"); err != nil {
-			resp.Body.Close()
+			if resp != nil && resp.Body != nil {
+				resp.Body.Close()
+			}
 			if retryCount--; retryCount > 0 {
 				time.Sleep(20 * time.Millisecond)
 			} else {
@@ -208,6 +217,42 @@ func TestCleanBuildNoName(t *testing.T) {
 
 func TestLayeredBuildNoTarNoName(t *testing.T) {
 	integration(t).exerciseCleanBuild(TagCleanLayeredBuildNoTarNoName, false, FakeImageNoTar, FakeScriptsFileURL, false, false)
+}
+
+func TestAllowedUIDsNamedUser(t *testing.T) {
+	integration(t).exerciseCleanAllowedUIDsBuild(TagCleanBuildAllowedUIDsNamedUser, FakeUserImage, true)
+}
+
+func TestAllowedUIDsNumericUser(t *testing.T) {
+	integration(t).exerciseCleanAllowedUIDsBuild(TagCleanBuildAllowedUIDsNumericUser, FakeNumericUserImage, false)
+}
+
+func TestAllowedUIDsOnBuildRootUser(t *testing.T) {
+	integration(t).exerciseCleanAllowedUIDsBuild(TagCleanBuildAllowedUIDsNamedUser, FakeImageOnBuildRootUser, true)
+}
+
+func TestAllowedUIDsOnBuildNumericUser(t *testing.T) {
+	integration(t).exerciseCleanAllowedUIDsBuild(TagCleanBuildAllowedUIDsNumericUser, FakeImageOnBuildNumericUser, false)
+}
+
+func (i *integrationTest) exerciseCleanAllowedUIDsBuild(tag, imageName string, expectError bool) {
+	t := i.t
+	config := &api.Config{
+		DockerConfig: dockerConfig(),
+		BuilderImage: imageName,
+		Source:       TestSource,
+		Tag:          tag,
+		Incremental:  false,
+		ScriptsURL:   "",
+	}
+	config.AllowedUIDs.Set("1-")
+	_, err := strategies.GetStrategy(config)
+	if err != nil && !expectError {
+		t.Fatalf("Cannot create a new builder: %v", err)
+	}
+	if err == nil && expectError {
+		t.Fatalf("Did not get an error and was expecting one.")
+	}
 }
 
 func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, imageName string, scriptsURL string, expectImageName bool, setTag bool) {
