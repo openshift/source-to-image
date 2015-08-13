@@ -104,6 +104,10 @@ type Config struct {
 	// If a range is specified and the builder image uses a non-numeric user or a user
 	// that is outside the specified range, then the build fails.
 	AllowedUIDs user.RangeList
+
+	// RunImage will trigger a "docker run ..." invocation of the produced image so the user
+	// can see if it operates as he would expect
+	RunImage bool
 }
 
 // DockerConfig contains the configuration for a Docker connection

@@ -78,6 +78,7 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 | `-e (--env)`               | Environment variables to be passed to the builder eg. `NAME=VALUE,NAME2=VALUE2,...` |
 | `-E (--environment-file)`               | Specify the path to the file with environment |
 | `--force-pull`             | Always pull the builder image, even if it is present locally (defaults to true) |
+| `--run`             | Launch the resulting image after a successful build. All output from the image is being printed to help determine image's validity. In case of a long running image you will have to Ctrl-C to exit both sti and the running container.  (defaults to false) |
 | `-r (--ref)`               | A branch/tag that the build should use instead of MASTER (applies only to GIT source) |
 | `--rm`                     | Remove the previous image during incremental builds |
 | `--save-temp-dir`          | Save the working directory used for fetching scripts and sources |

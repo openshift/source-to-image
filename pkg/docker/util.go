@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"bufio"
 	client "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 )
@@ -18,7 +19,11 @@ type DockerImageReference struct {
 	ID        string
 }
 
-const defaultRegistry = "https://index.docker.io/v1/"
+const (
+	// maxErrorOutput is the maximum length of the error output saved for processing
+	maxErrorOutput  = 1024
+	defaultRegistry = "https://index.docker.io/v1/"
+)
 
 func GetImageRegistryAuth(dockerCfg io.Reader, imageName string) client.AuthConfiguration {
 	spec, err := ParseDockerImageReference(imageName)
@@ -36,6 +41,27 @@ func GetImageRegistryAuth(dockerCfg io.Reader, imageName string) client.AuthConf
 		}
 	}
 	return client.AuthConfiguration{}
+}
+
+// Takes data from the Reader and redirects to the log functin (typically we pass in
+// glog.Error for stderr and glog.Info for stdout
+func StreamContainerIO(errStream io.Reader, errOutput *string, log func(...interface{})) {
+	scanner := bufio.NewReader(errStream)
+	for {
+		text, err := scanner.ReadString('\n')
+		if err != nil {
+			// we're ignoring ErrClosedPipe, as this is information
+			// the docker container ended streaming logs
+			if err != io.ErrClosedPipe && err != io.EOF {
+				glog.Errorf("Error reading docker stderr, %v", err)
+			}
+			break
+		}
+		log(text)
+		if errOutput != nil && len(*errOutput) < maxErrorOutput {
+			*errOutput += text + "\n"
+		}
+	}
 }
 
 // ParseDockerImageReference parses a Docker pull spec string into a

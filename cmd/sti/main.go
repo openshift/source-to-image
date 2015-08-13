@@ -25,6 +25,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/create"
 	"github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/errors"
+	"github.com/openshift/source-to-image/pkg/run"
 	"github.com/openshift/source-to-image/pkg/util"
 	"github.com/openshift/source-to-image/pkg/version"
 )
@@ -167,10 +168,19 @@ func newCmdBuild(cfg *api.Config) *cobra.Command {
 				glog.V(1).Infof(message)
 			}
 
+			if cfg.RunImage {
+				runner, rerr := run.New(cfg)
+				if rerr == nil {
+					rerr = runner.Run(cfg)
+				}
+				checkErr(rerr)
+			}
+
 		},
 	}
 
 	buildCmd.Flags().BoolVarP(&(cfg.Quiet), "quiet", "q", false, "Operate quietly. Suppress all non-error output.")
+	buildCmd.Flags().BoolVar(&(cfg.RunImage), "run", false, "Run resulting image as part of invocation of this command.  You may have to Ctrl-C to exit the sti command invocation and the container launched because this options was specified.")
 	buildCmd.Flags().BoolVar(&(cfg.Incremental), "incremental", false, "Perform an incremental build")
 	buildCmd.Flags().BoolVar(&(cfg.RemovePreviousImage), "rm", false, "Remove the previous image during incremental builds")
 	buildCmd.Flags().StringP("env", "e", "", "Specify an environment var NAME=VALUE,NAME2=VALUE2,...")

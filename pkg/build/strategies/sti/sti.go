@@ -20,11 +20,6 @@ import (
 	"github.com/openshift/source-to-image/pkg/util"
 )
 
-const (
-	// maxErrorOutput is the maximum length of the error output saved for processing
-	maxErrorOutput = 1024
-)
-
 var (
 	// List of directories that needs to be present inside working dir
 	workingDirs = []string{
@@ -325,7 +320,7 @@ func (b *STI) Save(config *api.Config) (err error) {
 		OnStart:         extractFunc,
 	}
 
-	go streamContainerError(errReader, nil, config)
+	go docker.StreamContainerIO(errReader, nil, glog.Error)
 	err = b.docker.RunContainer(opts)
 
 	if e, ok := err.(errors.ContainerError); ok {
@@ -403,32 +398,13 @@ func (b *STI) Execute(command string, config *api.Config) error {
 		}
 	}(outReader)
 
-	go streamContainerError(errReader, &errOutput, config)
+	go docker.StreamContainerIO(errReader, &errOutput, glog.Error)
 
 	err = b.docker.RunContainer(opts)
 	if e, ok := err.(errors.ContainerError); ok {
 		return errors.NewContainerError(config.BuilderImage, e.ErrorCode, errOutput)
 	}
 	return err
-}
-
-func streamContainerError(errStream io.Reader, errOutput *string, config *api.Config) {
-	scanner := bufio.NewReader(errStream)
-	for {
-		text, err := scanner.ReadString('\n')
-		if err != nil {
-			// we're ignoring ErrClosedPipe, as this is information
-			// the docker container ended streaming logs
-			if err != io.ErrClosedPipe && err != io.EOF {
-				glog.Errorf("Error reading docker stderr, %v", err)
-			}
-			break
-		}
-		glog.Error(text)
-		if errOutput != nil && len(*errOutput) < maxErrorOutput {
-			*errOutput += text + "\n"
-		}
-	}
 }
 
 func (b *STI) generateConfigEnv() (configEnv []string) {
