@@ -281,7 +281,7 @@ func (b *STI) Exists(config *api.Config) bool {
 
 	// can only do incremental build if runtime image exists, so always pull image
 	previousImageExists, _ := b.docker.IsImageInLocalRegistry(config.Tag)
-	if config.ForcePull {
+	if !previousImageExists || config.ForcePull {
 		if image, _ := b.docker.PullImage(config.Tag); image != nil {
 			previousImageExists = true
 		}
