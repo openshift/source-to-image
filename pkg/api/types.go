@@ -41,6 +41,10 @@ type Config struct {
 	// Docker images from private repositories
 	PullAuthentication docker.AuthConfiguration
 
+	// IncrementalAuthentication holds the authentication information for pulling the
+	// previous image from private repositories
+	IncrementalAuthentication docker.AuthConfiguration
+
 	// PreserveWorkingDir describes if working directory should be left after processing.
 	PreserveWorkingDir bool
 

@@ -100,6 +100,8 @@ func newCmdBuild(cfg *api.Config) *cobra.Command {
 					}
 				}
 			}()
+
+			glog.Infof("incremental is %s", cfg.Incremental)
 			// Attempt to restore the build command from the configuration file
 			if useConfig {
 				config.Restore(cfg, cmd)
@@ -127,7 +129,11 @@ func newCmdBuild(cfg *api.Config) *cobra.Command {
 			// Attempt to read the .dockercfg and extract the authentication for
 			// docker pull
 			if r, err := os.Open(cfg.DockerCfgPath); err == nil {
-				cfg.PullAuthentication = docker.GetImageRegistryAuth(r, cfg.BuilderImage)
+				auths := docker.LoadImageRegistryAuth(r)
+				cfg.PullAuthentication = docker.GetImageRegistryAuth(auths, cfg.BuilderImage)
+				if cfg.Incremental {
+					cfg.IncrementalAuthentication = docker.GetImageRegistryAuth(auths, cfg.Tag)
+				}
 			}
 
 			cfg.Environment = map[string]string{}
@@ -194,7 +200,7 @@ func newCmdBuild(cfg *api.Config) *cobra.Command {
 	buildCmd.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by STI instead of deleting it")
 	buildCmd.Flags().BoolVar(&(useConfig), "use-config", false, "Store command line options to .stifile")
 	buildCmd.Flags().StringVarP(&(cfg.ContextDir), "context-dir", "", "", "Specify the sub-directory inside the repository with the application sources")
-	buildCmd.Flags().StringVarP(&(cfg.DockerCfgPath), "dockercfg-path", "", filepath.Join(os.Getenv("HOME"), ".dockercfg"), "Specify the path to the Docker configuration file")
+	buildCmd.Flags().StringVarP(&(cfg.DockerCfgPath), "dockercfg-path", "", filepath.Join(os.Getenv("HOME"), ".docker/config.json"), "Specify the path to the Docker configuration file")
 	buildCmd.Flags().StringVarP(&(cfg.EnvironmentFile), "environment-file", "E", "", "Specify the path to the file with environment")
 	buildCmd.Flags().StringVarP(&(cfg.DisplayName), "application-name", "n", "", "Specify the display name for the application (default: output image name)")
 	buildCmd.Flags().StringVarP(&(cfg.Description), "description", "", "", "Specify the description of the application")
@@ -218,7 +224,7 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 			}
 
 			if r, err := os.Open(cfg.DockerCfgPath); err == nil {
-				cfg.PullAuthentication = docker.GetImageRegistryAuth(r, cfg.Tag)
+				cfg.PullAuthentication = docker.LoadAndGetImageRegistryAuth(r, cfg.Tag)
 			}
 
 			err := build.GenerateConfigFromLabels(cfg.Tag, cfg)
@@ -231,7 +237,7 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 			// Attempt to read the .dockercfg and extract the authentication for
 			// docker pull
 			if r, err := os.Open(cfg.DockerCfgPath); err == nil {
-				cfg.PullAuthentication = docker.GetImageRegistryAuth(r, cfg.BuilderImage)
+				cfg.PullAuthentication = docker.LoadAndGetImageRegistryAuth(r, cfg.BuilderImage)
 			}
 
 			if glog.V(2) {
@@ -251,12 +257,12 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 	}
 
 	buildCmd.Flags().BoolVarP(&(cfg.Quiet), "quiet", "q", false, "Operate quietly. Suppress all non-error output.")
-	buildCmd.Flags().BoolVar(&(cfg.Incremental), "incremental", true, "Perform an incremental build")
+	buildCmd.Flags().BoolVar(&(cfg.Incremental), "incremental", false, "Perform an incremental build")
 	buildCmd.Flags().BoolVar(&(cfg.RemovePreviousImage), "rm", false, "Remove the previous image during incremental builds")
 	buildCmd.Flags().StringVar(&(cfg.CallbackURL), "callback-url", "", "Specify a URL to invoke via HTTP POST upon build completion")
 	buildCmd.Flags().BoolVar(&(cfg.ForcePull), "force-pull", true, "Always pull the builder image even if it is present locally")
 	buildCmd.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by STI instead of deleting it")
-	buildCmd.Flags().StringVarP(&(cfg.DockerCfgPath), "dockercfg-path", "", filepath.Join(os.Getenv("HOME"), ".dockercfg"), "Specify the path to the Docker configuration file")
+	buildCmd.Flags().StringVarP(&(cfg.DockerCfgPath), "dockercfg-path", "", filepath.Join(os.Getenv("HOME"), ".docker/config.json"), "Specify the path to the Docker configuration file")
 	return buildCmd
 }
 
