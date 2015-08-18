@@ -101,7 +101,6 @@ func newCmdBuild(cfg *api.Config) *cobra.Command {
 				}
 			}()
 
-			glog.Infof("incremental is %s", cfg.Incremental)
 			// Attempt to restore the build command from the configuration file
 			if useConfig {
 				config.Restore(cfg, cmd)
