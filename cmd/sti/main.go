@@ -215,7 +215,7 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 		Long:  "Rebuild an existing application image that was build by S2I previously.",
 		Run: func(cmd *cobra.Command, args []string) {
 			// If user specifies the arguments, then we override the stored ones
-			if len(args) >= 0 {
+			if len(args) >= 1 {
 				cfg.Tag = args[0]
 			} else {
 				cmd.Help()
