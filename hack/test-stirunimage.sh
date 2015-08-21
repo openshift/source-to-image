@@ -42,7 +42,7 @@ sti build git://github.com/bparees/openshift-jee-sample openshift/wildfly-8-cent
 export STI_PID=$!
 TIME_SEC=1000
 TIME_MIN=$((60 * $TIME_SEC))
-max_wait=2*TIME_MIN
+max_wait=5*TIME_MIN
 echo "waiting up to ${max_wait}"
 expire=$(($(time_now) + $max_wait))
 
