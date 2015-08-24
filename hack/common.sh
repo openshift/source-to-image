@@ -399,11 +399,19 @@ sti::build::ldflags() {
     sti::build::get_version_vars
 
     declare -a ldflags=()
-    ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.majorFromGit" "${STI_GIT_MAJOR}")
-    ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.minorFromGit" "${STI_GIT_MINOR}")
-    ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.versionFromGit" "${STI_GIT_VERSION}")
-    ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.commitFromGit" "${STI_GIT_COMMIT}")
+    GO_VERSION=($(go version))
 
+    if [[ "${GO_VERSION[2]}" =~ ^go1.4.*$ ]]; then
+      ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.majorFromGit" "${STI_GIT_MAJOR}")
+      ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.minorFromGit" "${STI_GIT_MINOR}")
+      ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.versionFromGit" "${STI_GIT_VERSION}")
+      ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.commitFromGit" "${STI_GIT_COMMIT}")
+    else
+      ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.majorFromGit=${STI_GIT_MAJOR}")
+      ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.minorFromGit=${STI_GIT_MINOR}")
+      ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.versionFromGit=${STI_GIT_VERSION}")
+      ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.commitFromGit=${STI_GIT_COMMIT}")
+    fi
     # The -ldflags parameter takes a single string, so join the output.
     echo "${ldflags[*]-}"
   )
