@@ -12,7 +12,7 @@ const AssembleScript = `#!/bin/bash -e
 if [ "$1" = "-h" ]; then
 	# If the '{{.ImageName}}' assemble script is executed with '-h' flag,
 	# print the usage.
-	exec /usr/local/sti/usage
+	exec /usr/local/s2i/usage
 fi
 
 # Restore artifacts from the previous build (if they exist).
@@ -48,7 +48,7 @@ To use it, install S2I: https://github.com/openshift/source-to-image
 
 Sample invocation:
 
-sti build git://<source code> {{.ImageName}} <application image>
+s2i build git://<source code> {{.ImageName}} <application image>
 
 You can then run the resulting image via:
 docker run <application image>

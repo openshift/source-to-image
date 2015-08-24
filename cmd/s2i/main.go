@@ -69,7 +69,7 @@ func newCmdVersion() *cobra.Command {
 		Short: "Display version",
 		Long:  "Display version",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("sti %v\n", version.Get())
+			fmt.Printf("s2i %v\n", version.Get())
 		},
 	}
 }
@@ -196,7 +196,7 @@ func newCmdBuild(cfg *api.Config) *cobra.Command {
 	buildCmd.Flags().StringVarP(&(oldDestination), "location", "l", "", "Specify a destination location for untar operation")
 	buildCmd.Flags().StringVarP(&(cfg.Destination), "destination", "d", "", "Specify a destination location for untar operation")
 	buildCmd.Flags().BoolVar(&(cfg.ForcePull), "force-pull", true, "Always pull the builder image even if it is present locally")
-	buildCmd.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by STI instead of deleting it")
+	buildCmd.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by S2I instead of deleting it")
 	buildCmd.Flags().BoolVar(&(useConfig), "use-config", false, "Store command line options to .stifile")
 	buildCmd.Flags().StringVarP(&(cfg.ContextDir), "context-dir", "", "", "Specify the sub-directory inside the repository with the application sources")
 	buildCmd.Flags().StringVarP(&(cfg.DockerCfgPath), "dockercfg-path", "", filepath.Join(os.Getenv("HOME"), ".docker/config.json"), "Specify the path to the Docker configuration file")
@@ -260,7 +260,7 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 	buildCmd.Flags().BoolVar(&(cfg.RemovePreviousImage), "rm", false, "Remove the previous image during incremental builds")
 	buildCmd.Flags().StringVar(&(cfg.CallbackURL), "callback-url", "", "Specify a URL to invoke via HTTP POST upon build completion")
 	buildCmd.Flags().BoolVar(&(cfg.ForcePull), "force-pull", true, "Always pull the builder image even if it is present locally")
-	buildCmd.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by STI instead of deleting it")
+	buildCmd.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by S2I instead of deleting it")
 	buildCmd.Flags().StringVarP(&(cfg.DockerCfgPath), "dockercfg-path", "", filepath.Join(os.Getenv("HOME"), ".docker/config.json"), "Specify the path to the Docker configuration file")
 	return buildCmd
 }
@@ -268,8 +268,8 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 func newCmdCreate() *cobra.Command {
 	return &cobra.Command{
 		Use:   "create <imageName> <destination>",
-		Short: "Bootstrap a new STI image repository",
-		Long:  "Bootstrap a new STI image with given imageName inside the destination directory",
+		Short: "Bootstrap a new S2I image repository",
+		Long:  "Bootstrap a new S2I image with given imageName inside the destination directory",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 2 {
 				cmd.Help()
@@ -317,7 +317,7 @@ func newCmdUsage(cfg *api.Config) *cobra.Command {
 	usageCmd.Flags().StringVarP(&(cfg.ScriptsURL), "scripts-url", "s", "", "Specify a URL for the assemble and run scripts")
 	usageCmd.Flags().StringVar(&(oldScriptsFlag), "scripts", "", "Specify a URL for the assemble and run scripts")
 	usageCmd.Flags().BoolVar(&(cfg.ForcePull), "force-pull", true, "Always pull the builder image even if it is present locally")
-	usageCmd.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by STI instead of deleting it")
+	usageCmd.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by S2I instead of deleting it")
 	usageCmd.Flags().StringVarP(&(oldDestination), "location", "l", "", "Specify a destination location for untar operation")
 	usageCmd.Flags().StringVarP(&(cfg.Destination), "destination", "d", "", "Specify a destination location for untar operation")
 	return usageCmd
@@ -358,8 +358,8 @@ func checkErr(err error) {
 func main() {
 	cfg := &api.Config{}
 	stiCmd := &cobra.Command{
-		Use: "sti",
-		Long: "Source-to-image (STI) is a tool for building repeatable docker images.\n\n" +
+		Use: "s2i",
+		Long: "Source-to-image (S2I) is a tool for building repeatable docker images.\n\n" +
 			"A command line interface that injects and assembles source code into a docker image.\n" +
 			"Complete documentation is available at http://github.com/openshift/source-to-image",
 		Run: func(cmd *cobra.Command, args []string) {
@@ -378,6 +378,16 @@ func main() {
 	stiCmd.AddCommand(newCmdUsage(cfg))
 	stiCmd.AddCommand(newCmdCreate())
 	setupGlog(stiCmd.PersistentFlags())
+
+	basename := filepath.Base(os.Args[0])
+	// Make case-insensitive and strip executable suffix if present
+	if runtime.GOOS == "windows" {
+		basename = strings.ToLower(basename)
+		basename = strings.TrimSuffix(basename, ".exe")
+	}
+	if basename == "sti" {
+		glog.Warning("sti binary is deprecated, use s2i instead")
+	}
 
 	err := stiCmd.Execute()
 	if err != nil {
