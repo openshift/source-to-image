@@ -50,7 +50,6 @@ set +e
 while [[ $(time_now) -lt $expire ]]; do
     grep  "as a result of the --run=true option" "${STI_ROOT}/hack/sti-run.log"
     if [ $? -eq 0 ]; then
-      set -e
       echo "[INFO] Success running command sti --run=true"
       
       # use sigint so that sti post processing will remove docker container
@@ -59,7 +58,7 @@ while [[ $(time_now) -lt $expire ]]; do
       sleep 5
       docker ps -a | grep test-jee-app
 
-      if [ $? -eq 1]; then
+      if [ $? -eq 1 ]; then
 	  echo "[INFO] Success terminating associated docker container"
 	  exit 0
       else
