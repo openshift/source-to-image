@@ -24,6 +24,26 @@ all build:
 	hack/build-go.sh
 .PHONY: all build
 
+
+# Verify code is properly organized.
+#
+# Example:
+#   make verify
+verify: build
+	hack/verify-gofmt.sh
+	hack/verify-golint.sh || true
+	hack/verify-govet.sh || true
+.PHONY: verify
+
+
+# Install travis dependencies
+#
+# Example:
+#   make install-travis
+install-travis:
+	hack/install-tools.sh
+.PHONY: install-travis
+
 # Build and run tests.
 #
 # Args:
@@ -36,8 +56,8 @@ all build:
 #   make check
 #   make test
 #   make check WHAT=pkg/build GOFLAGS=-v
-check test:
-	hack/test-go.sh $(WHAT) $(TESTS)
+check test: verify
+	STI_COVER="-cover -covermode=atomic" STI_RACE="-race" hack/test-go.sh $(WHAT) $(TESTS)
 .PHONY: check test
 
 # Remove all build artifacts.

@@ -46,7 +46,7 @@ if [ -z ${STI_RACE+x} ]; then
   STI_RACE=""
 fi
 
-STI_TIMEOUT=${STI_TIMEOUT:--timeout 30s}
+STI_TIMEOUT=${STI_TIMEOUT:--timeout 60s}
 
 if [ "${1-}" != "" ]; then
   test_packages="$STI_GO_PACKAGE/$1"
