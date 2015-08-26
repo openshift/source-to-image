@@ -386,6 +386,20 @@ STI_GIT_MINOR='${STI_GIT_MINOR-}'
 EOF
 }
 
+# golang 1.5 wants `-X key=val`, but golang 1.4- REQUIRES `-X key val`
+sti::build::ldflag() {
+  local key=${1}
+  local val=${2}
+
+  GO_VERSION=($(go version))
+
+  if [[ -z $(echo "${GO_VERSION[2]}" | grep -E 'go1.5') ]]; then
+    echo "-X ${STI_GO_PACKAGE}/pkg/version.${key} ${val}"
+  else
+    echo "-X ${STI_GO_PACKAGE}/pkg/version.${key}=${val}"
+  fi
+}
+
 # sti::build::ldflags calculates the -ldflags argument for building STI
 sti::build::ldflags() {
   (
@@ -399,19 +413,11 @@ sti::build::ldflags() {
     sti::build::get_version_vars
 
     declare -a ldflags=()
-    GO_VERSION=($(go version))
+    ldflags+=($(sti::build::ldflag "majorFromGit" "${STI_GIT_MAJOR}"))
+    ldflags+=($(sti::build::ldflag "minorFromGit" "${STI_GIT_MINOR}"))
+    ldflags+=($(sti::build::ldflag "versionFromGit" "${STI_GIT_VERSION}"))
+    ldflags+=($(sti::build::ldflag "commitFromGit" "${STI_GIT_COMMIT}"))
 
-    if [[ "${GO_VERSION[2]}" =~ ^go1.4.*$ ]]; then
-      ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.majorFromGit" "${STI_GIT_MAJOR}")
-      ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.minorFromGit" "${STI_GIT_MINOR}")
-      ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.versionFromGit" "${STI_GIT_VERSION}")
-      ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.commitFromGit" "${STI_GIT_COMMIT}")
-    else
-      ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.majorFromGit=${STI_GIT_MAJOR}")
-      ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.minorFromGit=${STI_GIT_MINOR}")
-      ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.versionFromGit=${STI_GIT_VERSION}")
-      ldflags+=(-X "${STI_GO_PACKAGE}/pkg/version.commitFromGit=${STI_GIT_COMMIT}")
-    fi
     # The -ldflags parameter takes a single string, so join the output.
     echo "${ldflags[*]-}"
   )

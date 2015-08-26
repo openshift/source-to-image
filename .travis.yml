@@ -5,14 +5,12 @@ go:
   - 1.5
 
 install:
-  - go get golang.org/x/tools/cmd/cover
-  - go get -u github.com/golang/lint/golint
-  - ./hack/verify-gofmt.sh
-  - ./hack/verify-golint.sh || true
-  - ./hack/build-go.sh
+  - make install-travis
 
 script:
-  - STI_RACE="-race" STI_COVER="-cover -covermode=atomic" ./hack/test-go.sh "" -p=4
+  - make check TESTFLAGS="-p=4" TESTS="''" # empty quotes are because hack/test-go.sh requires 2 args
 
 notifications:
   irc: "chat.freenode.net#openshift-dev"
+
+sudo: false
