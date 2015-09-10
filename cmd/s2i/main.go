@@ -187,6 +187,7 @@ func newCmdBuild(cfg *api.Config) *cobra.Command {
 	buildCmd.Flags().BoolVarP(&(cfg.Quiet), "quiet", "q", false, "Operate quietly. Suppress all non-error output.")
 	buildCmd.Flags().BoolVar(&(cfg.RunImage), "run", false, "Run resulting image as part of invocation of this command.  You may have to Ctrl-C to exit the sti command invocation and the container launched because this options was specified.")
 	buildCmd.Flags().BoolVar(&(cfg.Incremental), "incremental", false, "Perform an incremental build")
+	buildCmd.Flags().BoolVar(&(cfg.DisableRecursive), "recursive", true, "Fetch all git submodules when cloning application repository")
 	buildCmd.Flags().BoolVar(&(cfg.RemovePreviousImage), "rm", false, "Remove the previous image during incremental builds")
 	buildCmd.Flags().StringP("env", "e", "", "Specify an environment var NAME=VALUE,NAME2=VALUE2,...")
 	buildCmd.Flags().StringVarP(&(cfg.Ref), "ref", "r", "", "Specify a ref to check-out")
