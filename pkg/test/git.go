@@ -1,6 +1,8 @@
 package test
 
-import "github.com/openshift/source-to-image/pkg/api"
+import (
+	"github.com/openshift/source-to-image/pkg/api"
+)
 
 // FakeGit provides a fake GIT
 type FakeGit struct {
@@ -23,7 +25,7 @@ func (f *FakeGit) ValidCloneSpec(source string) bool {
 }
 
 // Clone clones the fake source GIT repository to target directory
-func (f *FakeGit) Clone(source, target string) error {
+func (f *FakeGit) Clone(source, target string, c api.CloneConfig) error {
 	f.CloneSource = source
 	f.CloneTarget = target
 	return f.CloneError

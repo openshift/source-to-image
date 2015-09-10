@@ -17,7 +17,7 @@ import (
 // Git is an interface used by main STI code to extract/checkout git repositories
 type Git interface {
 	ValidCloneSpec(source string) bool
-	Clone(source, target string) error
+	Clone(source, target string, opts api.CloneConfig) error
 	Checkout(repo, ref string) error
 	GetInfo(string) *api.SourceInfo
 }
@@ -36,6 +36,17 @@ type stiGit struct {
 var gitSshURLExp = regexp.MustCompile(`\A([\w\d\-_\.+]+@[\w\d\-_\.+]+:[\w\d\-_\.+%/]+\.git)$`)
 
 var allowedSchemes = []string{"git", "http", "https", "file", "ssh"}
+
+func cloneConfigToArgs(opts api.CloneConfig) []string {
+	result := []string{}
+	if opts.Quiet {
+		result = append(result, "--quiet")
+	}
+	if opts.Recursive {
+		result = append(result, "--recursive")
+	}
+	return result
+}
 
 func stringInSlice(s string, slice []string) bool {
 	for _, element := range slice {
@@ -65,7 +76,7 @@ func (h *stiGit) ValidCloneSpec(source string) bool {
 }
 
 // Clone clones a git repository to a specific target directory
-func (h *stiGit) Clone(source, target string) error {
+func (h *stiGit) Clone(source, target string, c api.CloneConfig) error {
 
 	// NOTE, we don NOT pass in both stdout and stderr, because
 	// with running with --quiet, and no output heading to stdout, hangs were occurring with the coordination
@@ -77,9 +88,10 @@ func (h *stiGit) Clone(source, target string) error {
 	// the pipeToLog method has been left for now for historical purposes, but if this implemenetation
 	// of git clone holds, we'll want to delete that at some point.
 
+	cloneArgs := append([]string{"clone"}, cloneConfigToArgs(c)...)
+	cloneArgs = append(cloneArgs, []string{source, target}...)
 	opts := util.CommandOpts{}
-
-	return h.runner.RunWithOptions(opts, "git", "clone", "--quiet", "--recursive", source, target)
+	return h.runner.RunWithOptions(opts, "git", cloneArgs...)
 }
 
 // Checkout checks out a specific branch reference of a given git repository
