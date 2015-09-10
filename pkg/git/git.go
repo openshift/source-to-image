@@ -3,6 +3,7 @@ package git
 import (
 	"bufio"
 	"io"
+	"io/ioutil"
 	"net/url"
 	"os"
 	"os/exec"
@@ -90,8 +91,16 @@ func (h *stiGit) Clone(source, target string, c api.CloneConfig) error {
 
 	cloneArgs := append([]string{"clone"}, cloneConfigToArgs(c)...)
 	cloneArgs = append(cloneArgs, []string{source, target}...)
-	opts := util.CommandOpts{}
-	return h.runner.RunWithOptions(opts, "git", cloneArgs...)
+	errReader, errWriter, _ := os.Pipe()
+	opts := util.CommandOpts{Stderr: errWriter}
+	err := h.runner.RunWithOptions(opts, "git", cloneArgs...)
+	errWriter.Close()
+	if err != nil {
+		out, _ := ioutil.ReadAll(errReader)
+		glog.Errorf("Clone failed: %s", out)
+		return err
+	}
+	return nil
 }
 
 // Checkout checks out a specific branch reference of a given git repository
