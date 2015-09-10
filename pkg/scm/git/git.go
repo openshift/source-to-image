@@ -97,7 +97,10 @@ func (h *stiGit) Clone(source, target string, c api.CloneConfig) error {
 	errWriter.Close()
 	if err != nil {
 		out, _ := ioutil.ReadAll(errReader)
-		glog.Errorf("Clone failed: %s", out)
+		// If we captured errors via stderr, print them out.
+		if len(out) > 0 {
+			glog.Errorf("Clone failed: %s", out)
+		}
 		return err
 	}
 	return nil
