@@ -84,6 +84,7 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 | `--save-temp-dir`          | Save the working directory used for fetching scripts and sources |
 | `--context-dir`            | Specify the directory containing your application (if not located within the root path) |
 | `-s (--scripts-url)`       | URL of S2I scripts (see [S2I Scripts](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#s2i-scripts)) |
+| `--recursive`              | Perform recursive git clone when getting sources using git|
 | `-q (--quiet)`             | Operate quietly, suppressing all non-error output |
 
 #### Context directory
@@ -121,8 +122,13 @@ Build a Node.js application from a local directory, using a local image, the res
 image will be named `nodejs-app`:
 
 ```
-$ s2i build --force-pull=false ~/nodejs-app local-nodejs-builder nodejs-app
+$ s2i build --force-pull=false /home/user/nodejs-app local-nodejs-builder nodejs-app
 ```
+
+In case of building from the local directory, the sources will be copied into
+the builder images using plain filesystem copy and the output image will not
+have the Git specific labels. Use this method only for development or local
+testing.
 
 Build a Java application from a GIT source, using the official `wildfly-8-centos`
 builder image but overriding the scripts URL from local directory.  The resulting
