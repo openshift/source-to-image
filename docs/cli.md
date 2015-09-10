@@ -126,9 +126,9 @@ $ s2i build --force-pull=false /home/user/nodejs-app local-nodejs-builder nodejs
 ```
 
 In case of building from the local directory, the sources will be copied into
-the builder images using plain filesystem copy and the output image will not
-have the Git specific labels. Use this method only for development or local
-testing.
+the builder images using plain filesystem copy if the Git binary is not
+available. In that case the output image will not have the Git specific labels.
+Use this method only for development or local testing.
 
 Build a Java application from a GIT source, using the official `wildfly-8-centos`
 builder image but overriding the scripts URL from local directory.  The resulting
