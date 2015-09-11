@@ -1,6 +1,8 @@
 package util
 
 import (
+	"strconv"
+
 	"github.com/golang/glog"
 	"github.com/openshift/source-to-image/pkg/api"
 )
@@ -22,13 +24,13 @@ func GenerateOutputImageLabels(info *api.SourceInfo, config *api.Config) map[str
 // GenerateLabelsFromConfig generate the labels based on build s2i Config
 func GenerateLabelsFromConfig(labels map[string]string, config *api.Config, namespace string) map[string]string {
 	if len(config.Description) > 0 {
-		labels[api.KubernetesNamespace+"description"] = config.Description
+		labels[api.KubernetesNamespace+"description"] = strconv.Quote(config.Description)
 	}
 
 	if len(config.DisplayName) > 0 {
-		labels[api.KubernetesNamespace+"display-name"] = config.DisplayName
+		labels[api.KubernetesNamespace+"display-name"] = strconv.Quote(config.DisplayName)
 	} else {
-		labels[api.KubernetesNamespace+"display-name"] = config.Tag
+		labels[api.KubernetesNamespace+"display-name"] = strconv.Quote(config.Tag)
 	}
 
 	addBuildLabel(labels, "image", config.BuilderImage, namespace)
@@ -59,5 +61,5 @@ func addBuildLabel(to map[string]string, key, value, namespace string) {
 	if len(value) == 0 {
 		return
 	}
-	to[namespace+"build."+key] = value
+	to[namespace+"build."+key] = strconv.Quote(value)
 }
