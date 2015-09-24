@@ -2,6 +2,7 @@ package test
 
 import (
 	"io"
+	"regexp"
 )
 
 // FakeTar provides a fake UNIX tar interface
@@ -28,4 +29,12 @@ func (f *FakeTar) ExtractTarStream(dir string, reader io.Reader) error {
 	f.ExtractTarDir = dir
 	f.ExtractTarReader = reader
 	return f.ExtractTarError
+}
+
+func (f *FakeTar) SetExclusionPattern(*regexp.Regexp) {
+}
+
+func (f *FakeTar) CreateTarStream(dir string, includeDirInPath bool, writer io.Writer) error {
+	f.CreateTarDir = dir
+	return f.CreateTarError
 }
