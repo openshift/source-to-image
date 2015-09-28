@@ -27,5 +27,5 @@ trap cleanup EXIT SIGINT
 echo
 echo Integration test cases ...
 echo
-export STI_TIMEOUT="-timeout 240s"
+export STI_TIMEOUT="-timeout 600s"
 "${STI_ROOT}/hack/test-go.sh" test/integration -tags 'integration' "${@:1}"

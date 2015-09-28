@@ -215,6 +215,20 @@ func (b *STI) SetScripts(required, optional []string) {
 	b.optionalScripts = optional
 }
 
+func mergeLabels(newLabels, existingLabels map[string]string) map[string]string {
+	if existingLabels == nil {
+		return newLabels
+	}
+	result := map[string]string{}
+	for k, v := range existingLabels {
+		result[k] = v
+	}
+	for k, v := range newLabels {
+		result[k] = v
+	}
+	return result
+}
+
 // PostExecute allows to execute post-build actions after the Docker build
 // finishes.
 func (b *STI) PostExecute(containerID, location string) error {
@@ -245,12 +259,17 @@ func (b *STI) PostExecute(containerID, location string) error {
 		// were extracted and append scripts dir and name
 		runCmd = filepath.Join(location, "scripts", api.Run)
 	}
+	existingLabels, err := b.docker.GetLabels(b.config.BuilderImage)
+	if err != nil {
+		glog.Errorf("Unable to read existing labels from current builder image %s", b.config.BuilderImage)
+	}
+
 	opts := dockerpkg.CommitContainerOptions{
 		Command:     append([]string{}, runCmd),
 		Env:         buildEnv,
 		ContainerID: containerID,
 		Repository:  b.config.Tag,
-		Labels:      util.GenerateOutputImageLabels(b.sourceInfo, b.config),
+		Labels:      mergeLabels(util.GenerateOutputImageLabels(b.sourceInfo, b.config), existingLabels),
 	}
 
 	imageID, err := b.docker.CommitContainer(opts)

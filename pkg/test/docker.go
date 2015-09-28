@@ -43,6 +43,8 @@ type FakeDocker struct {
 	OnBuildError                 error
 	IsOnBuildResult              bool
 	IsOnBuildImage               string
+	Labels                       map[string]string
+	LabelsError                  error
 
 	mutex sync.Mutex
 }
@@ -140,4 +142,8 @@ func (f *FakeDocker) CheckAndPullImage(name string) (*dockerclient.Image, error)
 func (f *FakeDocker) BuildImage(opts docker.BuildImageOptions) error {
 	f.BuildImageOpts = opts
 	return f.BuildImageError
+}
+
+func (f *FakeDocker) GetLabels(name string) (map[string]string, error) {
+	return f.Labels, f.LabelsError
 }
