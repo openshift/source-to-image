@@ -42,7 +42,7 @@ sti build git://github.com/bparees/openshift-jee-sample openshift/wildfly-8-cent
 export STI_PID=$!
 TIME_SEC=1000
 TIME_MIN=$((60 * $TIME_SEC))
-max_wait=5*TIME_MIN
+max_wait=10*TIME_MIN
 echo "waiting up to ${max_wait}"
 expire=$(($(time_now) + $max_wait))
 
@@ -55,7 +55,7 @@ while [[ $(time_now) -lt $expire ]]; do
       # use sigint so that sti post processing will remove docker container
       kill -2 "${STI_PID}"
       export KILLDONE="killed"
-      sleep 5
+      sleep 30
       docker ps -a | grep test-jee-app
 
       if [ $? -eq 1 ]; then
