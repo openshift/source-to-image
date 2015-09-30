@@ -147,7 +147,7 @@ func (t *stiTar) writeTarHeader(tarWriter *tar.Writer, dir string, path string, 
 	if includeDirInPath {
 		prefix = filepath.Dir(prefix)
 	}
-	header.Name = path[1+len(prefix):]
+	header.Name = filepath.ToSlash(path[1+len(prefix):])
 	glog.V(3).Infof("Adding to tar: %s as %s", path, header.Name)
 	if err = tarWriter.WriteHeader(header); err != nil {
 		return err
