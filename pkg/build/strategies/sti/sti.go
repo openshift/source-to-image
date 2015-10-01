@@ -99,7 +99,11 @@ func New(req *api.Config) (*STI, error) {
 
 	// The sources are downloaded using the GIT downloader.
 	// TODO: Add more SCM in future.
-	b.source = scm.DownloaderForSource(req.Source)
+	b.source, req.Source, err = scm.DownloaderForSource(req.Source)
+	if err != nil {
+		return nil, err
+	}
+
 	b.garbage = &build.DefaultCleaner{b.fs, b.docker}
 	b.layered, err = layered.New(req, b)
 
