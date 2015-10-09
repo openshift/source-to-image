@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/openshift/source-to-image/pkg/build"
+	"github.com/openshift/source-to-image/pkg/scm/docker"
 	"github.com/openshift/source-to-image/pkg/scm/file"
 	"github.com/openshift/source-to-image/pkg/scm/git"
 	"github.com/openshift/source-to-image/pkg/util"
@@ -16,6 +17,9 @@ import (
 // DownloaderForSource determines what SCM plugin should be used for downloading
 // the sources from the repository.
 func DownloaderForSource(s string) (build.Downloader, string, error) {
+	if strings.HasPrefix(s, "docker://") {
+		return &docker.Docker{}, s, nil
+	}
 	// If the source is using file:// protocol but it is not a GIT repository,
 	// trim the prefix and treat it as a file copy.
 	if strings.HasPrefix(s, "file://") && !isLocalGitRepository(s) {
