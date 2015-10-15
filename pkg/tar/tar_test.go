@@ -139,6 +139,10 @@ func TestCreateTarStreamIncludeParentDir(t *testing.T) {
 	}
 	th := New()
 	tarFile, err := ioutil.TempFile("", "testtarout")
+	if err != nil {
+		t.Fatalf("Unable to create temporary file %v", err)
+	}
+	defer os.Remove(tarFile.Name())
 	err = th.CreateTarStream(tempDir, true, tarFile)
 	if err != nil {
 		t.Fatalf("Unable to create tar file %v", err)
@@ -179,6 +183,7 @@ func TestCreateTar(t *testing.T) {
 	}
 
 	tarFile, err := th.CreateTarFile("", tempDir)
+	defer os.Remove(tarFile)
 	if err != nil {
 		t.Fatalf("Unable to create new tar upload file: %v", err)
 	}
