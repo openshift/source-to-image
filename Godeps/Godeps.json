@@ -79,6 +79,10 @@
 			"Rev": "8cec3a854e68dba10faabbe31c089abf4a3e57a6"
 		},
 		{
+			"ImportPath": "github.com/shurcooL/sanitized_anchor_name",
+			"Rev": "244f5ac324cb97e1987ef901a0081a77bfd8e845"
+		},
+		{
 			"ImportPath": "github.com/spf13/cobra",
 			"Rev": "d732ab3a34e6e9e6b5bdac80707c2b6bad852936"
 		},
