@@ -11,6 +11,11 @@
 			"Rev": "55eb11d21d2a31a3cc93838241d04800f52e823d"
 		},
 		{
+			"ImportPath": "github.com/cpuguy83/go-md2man/md2man",
+			"Comment": "v1.0.4",
+			"Rev": "71acacd42f85e5e82f70a55327789582a5200a90"
+		},
+		{
 			"ImportPath": "github.com/docker/docker/builder/command",
 			"Comment": "v1.4.1-2754-ga313b72",
 			"Rev": "a313b729e48d0ca9d0085f407b136def162eaf4c"
