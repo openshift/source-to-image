@@ -36,7 +36,8 @@ type Tar interface {
 	CreateTarFile(base, dir string) (string, error)
 
 	// CreateTarStream creates a tar from the given directory
-	// and streams it to the given writer
+	// and streams it to the given writer.
+	// An error is returned if an error occurs during streaming.
 	CreateTarStream(dir string, includeDirInPath bool, writer io.Writer) error
 
 	// ExtractTarStream extracts files from a given tar stream.
@@ -87,6 +88,7 @@ func (t *stiTar) shouldExclude(path string) bool {
 // CreateTarStream creates a tar stream on the given writer from
 // the given directory while excluding files that match the given
 // exclusion pattern.
+// TODO: this should encapsulate the goroutine that generates the stream.
 func (t *stiTar) CreateTarStream(dir string, includeDirInPath bool, writer io.Writer) error {
 	tarWriter := tar.NewWriter(writer)
 	defer tarWriter.Close()
@@ -148,7 +150,7 @@ func (t *stiTar) writeTarHeader(tarWriter *tar.Writer, dir string, path string, 
 		prefix = filepath.Dir(prefix)
 	}
 	header.Name = filepath.ToSlash(path[1+len(prefix):])
-	glog.V(3).Infof("Adding to tar: %s as %s", path, header.Name)
+	glog.V(5).Infof("Adding to tar: %s as %s", path, header.Name)
 	if err = tarWriter.WriteHeader(header); err != nil {
 		return err
 	}
