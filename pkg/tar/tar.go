@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"time"
 
 	"github.com/golang/glog"
@@ -90,6 +91,7 @@ func (t *stiTar) shouldExclude(path string) bool {
 // exclusion pattern.
 // TODO: this should encapsulate the goroutine that generates the stream.
 func (t *stiTar) CreateTarStream(dir string, includeDirInPath bool, writer io.Writer) error {
+	dir = filepath.Clean(dir) // remove relative paths and extraneous slashes
 	tarWriter := tar.NewWriter(writer)
 	defer tarWriter.Close()
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
@@ -256,5 +258,8 @@ func extractFile(dir string, header *tar.Header, tarReader io.Reader) error {
 	if written != header.Size {
 		return fmt.Errorf("Wrote %d bytes, expected to write %d", written, header.Size)
 	}
-	return file.Chmod(header.FileInfo().Mode())
+	if runtime.GOOS != "windows" { // Skip chmod if on windows OS
+		return file.Chmod(header.FileInfo().Mode())
+	}
+	return nil
 }
