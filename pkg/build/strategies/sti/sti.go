@@ -360,6 +360,7 @@ func (b *STI) Save(config *api.Config) (err error) {
 		Stdout:          outWriter,
 		Stderr:          errWriter,
 		OnStart:         extractFunc,
+		NetworkMode:     string(config.DockerNetworkMode),
 	}
 
 	go dockerpkg.StreamContainerIO(errReader, nil, glog.Error)
@@ -405,6 +406,7 @@ func (b *STI) Execute(command string, config *api.Config) error {
 		Command:         command,
 		Env:             buildEnv,
 		PostExec:        b.postExecutor,
+		NetworkMode:     string(config.DockerNetworkMode),
 	}
 
 	if !config.LayeredBuild {
