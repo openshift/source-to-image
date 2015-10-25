@@ -219,7 +219,7 @@ func (info *FileInfo) addChanges(oldInfo *FileInfo, changes *[]Change) {
 				oldStat.Uid() != newStat.Uid() ||
 				oldStat.Gid() != newStat.Gid() ||
 				oldStat.Rdev() != newStat.Rdev() ||
-				// Don't look at size for dirs, its not a good measure of change
+				// Don't look at size for dirs, it's not a good measure of change
 				(oldStat.Mode()&syscall.S_IFDIR != syscall.S_IFDIR &&
 					(!sameFsTimeSpec(oldStat.Mtim(), newStat.Mtim()) || (oldStat.Size() != newStat.Size()))) ||
 				bytes.Compare(oldChild.capability, newChild.capability) != 0 {
