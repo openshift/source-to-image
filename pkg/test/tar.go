@@ -37,7 +37,7 @@ func (f *FakeTar) CreateTarFile(base, dir string) (string, error) {
 }
 
 // ExtractTarStream streams a content of fake tar
-func (f *FakeTar) ExtractTarStream(dir string, reader io.Reader) error {
+func (f *FakeTar) ExtractTarStreamWithLogging(dir string, reader io.Reader, logger io.Writer) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.ExtractTarDir = dir
@@ -45,12 +45,20 @@ func (f *FakeTar) ExtractTarStream(dir string, reader io.Reader) error {
 	return f.ExtractTarError
 }
 
+func (f *FakeTar) ExtractTarStream(dir string, reader io.Reader) error {
+	return f.ExtractTarStreamWithLogging(dir, reader, nil)
+}
+
 func (f *FakeTar) SetExclusionPattern(*regexp.Regexp) {
 }
 
-func (f *FakeTar) CreateTarStream(dir string, includeDirInPath bool, writer io.Writer) error {
+func (f *FakeTar) CreateTarStreamWithLogging(dir string, includeDirInPath bool, writer io.Writer, logger io.Writer) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.CreateTarDir = dir
 	return f.CreateTarError
+}
+
+func (f *FakeTar) CreateTarStream(dir string, includeDirInPath bool, writer io.Writer) error {
+	return f.CreateTarStreamWithLogging(dir, includeDirInPath, writer, nil)
 }
