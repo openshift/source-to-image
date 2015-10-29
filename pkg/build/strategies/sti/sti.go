@@ -2,7 +2,9 @@ package sti
 
 import (
 	"bufio"
+	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -445,7 +447,11 @@ func (b *STI) Execute(command string, config *api.Config) error {
 				break
 			}
 			if glog.V(2) || config.Quiet != true || command == api.Usage {
-				glog.Info(text)
+				if (config.UseLogger == true) || glog.V(3) {
+					glog.Info(text)
+					continue
+				}
+				fmt.Fprintf(os.Stdout, "%s\n", strings.TrimSpace(text))
 			}
 		}
 	}(outReader)
