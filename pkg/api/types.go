@@ -120,10 +120,6 @@ type Config struct {
 	// RunImage will trigger a "docker run ..." invocation of the produced image so the user
 	// can see if it operates as he would expect
 	RunImage bool
-
-	// UseLogger will force to use glog instead of printing the output from build
-	// container directly to standard output
-	UseLogger bool
 }
 
 // DockerConfig contains the configuration for a Docker connection
