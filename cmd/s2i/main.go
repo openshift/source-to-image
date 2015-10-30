@@ -83,6 +83,13 @@ func newCmdBuild(cfg *api.Config) *cobra.Command {
 		Use:   "build <source> <image> [<tag>]",
 		Short: "Build a new image",
 		Long:  "Build a new Docker image named <tag> (if provided) from a source repository and base image.",
+		Example: `
+# Build an application Docker image from a Git repository
+$ s2i build git://github.com/openshift/ruby-hello-world centos/ruby-22-centos7 hello-world-app
+
+# Build from a local directory
+$ s2i build . centos/ruby-22-centos7 hello-world-app
+`,
 		Run: func(cmd *cobra.Command, args []string) {
 			go func() {
 				for {
