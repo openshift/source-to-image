@@ -24,8 +24,13 @@ fi
 
 trap cleanup EXIT SIGINT
 
+export STI_TIMEOUT="-timeout 600s"
+mkdir -p /tmp/sti
+export LOG_FILE="$(mktemp -p /tmp/sti --suffix=integration.log)"
+
 echo
 echo Integration test cases ...
+echo Log file: ${LOG_FILE}
 echo
-export STI_TIMEOUT="-timeout 600s"
-"${STI_ROOT}/hack/test-go.sh" test/integration -tags 'integration' "${@:1}"
+
+"${STI_ROOT}/hack/test-go.sh" test/integration -v -tags 'integration' "${@:1}" 2> ${LOG_FILE}

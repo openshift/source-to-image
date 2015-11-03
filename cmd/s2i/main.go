@@ -122,7 +122,18 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 				}
 			}
 
-			if len(validation.ValidateConfig(cfg)) != 0 {
+			if cfg.ForcePull {
+				glog.Warning("DEPRECATED: The '--force-pull' option is deprecated. Use '--pull-policy' instead")
+			}
+
+			if len(cfg.BuilderPullPolicy) == 0 {
+				cfg.BuilderPullPolicy = api.DefaultBuilderPullPolicy
+			}
+
+			if errs := validation.ValidateConfig(cfg); len(errs) > 0 {
+				for _, e := range errs {
+					glog.Errorf("%s", e)
+				}
 				cmd.Help()
 				os.Exit(1)
 			}
@@ -160,7 +171,7 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 			}
 
 			if len(oldScriptsFlag) != 0 {
-				glog.Warning("Flag --scripts is deprecated, use --scripts-url instead")
+				glog.Warning("DEPRECATED: Flag --scripts is deprecated, use --scripts-url instead")
 				cfg.ScriptsURL = oldScriptsFlag
 			}
 			if len(oldDestination) != 0 {
@@ -200,10 +211,11 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 	buildCmd.Flags().StringVarP(&(cfg.Ref), "ref", "r", "", "Specify a ref to check-out")
 	buildCmd.Flags().StringVar(&(cfg.CallbackURL), "callback-url", "", "Specify a URL to invoke via HTTP POST upon build completion")
 	buildCmd.Flags().StringVarP(&(cfg.ScriptsURL), "scripts-url", "s", "", "Specify a URL for the assemble and run scripts")
-	buildCmd.Flags().StringVar(&(oldScriptsFlag), "scripts", "", "Specify a URL for the assemble and run scripts")
+	buildCmd.Flags().StringVar(&(oldScriptsFlag), "scripts", "", "DEPRECATED: Specify a URL for the assemble and run scripts")
 	buildCmd.Flags().StringVarP(&(oldDestination), "location", "l", "", "Specify a destination location for untar operation")
 	buildCmd.Flags().StringVarP(&(cfg.Destination), "destination", "d", "", "Specify a destination location for untar operation")
-	buildCmd.Flags().BoolVar(&(cfg.ForcePull), "force-pull", true, "Always pull the builder image even if it is present locally")
+	buildCmd.Flags().BoolVar(&(cfg.ForcePull), "force-pull", false, "DEPRECATED: Always pull the builder image even if it is present locally")
+	buildCmd.Flags().VarP(&(cfg.BuilderPullPolicy), "pull-policy", "p", "Specify when to pull the builder image (always, never or if-not-present)")
 	buildCmd.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by S2I instead of deleting it")
 	buildCmd.Flags().BoolVar(&(useConfig), "use-config", false, "Store command line options to .stifile")
 	buildCmd.Flags().StringVarP(&(cfg.ContextDir), "context-dir", "", "", "Specify the sub-directory inside the repository with the application sources")
@@ -247,6 +259,10 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 				cfg.PullAuthentication = docker.LoadAndGetImageRegistryAuth(r, cfg.BuilderImage)
 			}
 
+			if len(cfg.BuilderPullPolicy) == 0 {
+				cfg.BuilderPullPolicy = api.DefaultBuilderPullPolicy
+			}
+
 			if glog.V(2) {
 				fmt.Printf("\n%s\n", describe.DescribeConfig(cfg))
 			}
@@ -267,7 +283,8 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 	buildCmd.Flags().BoolVar(&(cfg.Incremental), "incremental", false, "Perform an incremental build")
 	buildCmd.Flags().BoolVar(&(cfg.RemovePreviousImage), "rm", false, "Remove the previous image during incremental builds")
 	buildCmd.Flags().StringVar(&(cfg.CallbackURL), "callback-url", "", "Specify a URL to invoke via HTTP POST upon build completion")
-	buildCmd.Flags().BoolVar(&(cfg.ForcePull), "force-pull", true, "Always pull the builder image even if it is present locally")
+	buildCmd.Flags().BoolVar(&(cfg.ForcePull), "force-pull", false, "DEPRECATED: Always pull the builder image even if it is present locally")
+	buildCmd.Flags().VarP(&(cfg.BuilderPullPolicy), "pull-policy", "p", "Specify when to pull the builder image (always, never or if-not-present)")
 	buildCmd.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by S2I instead of deleting it")
 	buildCmd.Flags().StringVarP(&(cfg.DockerCfgPath), "dockercfg-path", "", filepath.Join(os.Getenv("HOME"), ".docker/config.json"), "Specify the path to the Docker configuration file")
 	return buildCmd
@@ -311,8 +328,12 @@ func newCmdUsage(cfg *api.Config) *cobra.Command {
 			cfg.Environment = envs
 
 			if len(oldScriptsFlag) != 0 {
-				glog.Warning("Flag --scripts is deprecated, use --scripts-url instead")
+				glog.Warning("DEPRECATED: Flag --scripts is deprecated, use --scripts-url instead")
 				cfg.ScriptsURL = oldScriptsFlag
+			}
+
+			if len(cfg.BuilderPullPolicy) == 0 {
+				cfg.BuilderPullPolicy = api.DefaultBuilderPullPolicy
 			}
 
 			uh, err := sti.NewUsage(cfg)
@@ -323,8 +344,9 @@ func newCmdUsage(cfg *api.Config) *cobra.Command {
 	}
 	usageCmd.Flags().StringP("env", "e", "", "Specify an environment var NAME=VALUE,NAME2=VALUE2,...")
 	usageCmd.Flags().StringVarP(&(cfg.ScriptsURL), "scripts-url", "s", "", "Specify a URL for the assemble and run scripts")
-	usageCmd.Flags().StringVar(&(oldScriptsFlag), "scripts", "", "Specify a URL for the assemble and run scripts")
-	usageCmd.Flags().BoolVar(&(cfg.ForcePull), "force-pull", true, "Always pull the builder image even if it is present locally")
+	usageCmd.Flags().StringVar(&(oldScriptsFlag), "scripts", "", "DEPRECATED: Specify a URL for the assemble and run scripts")
+	usageCmd.Flags().BoolVar(&(cfg.ForcePull), "force-pull", false, "DEPRECATED: Always pull the builder image even if it is present locally")
+	usageCmd.Flags().VarP(&(cfg.BuilderPullPolicy), "pull-policy", "p", "Specify when to pull the builder image (always, never or if-not-present)")
 	usageCmd.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by S2I instead of deleting it")
 	usageCmd.Flags().StringVarP(&(oldDestination), "location", "l", "", "Specify a destination location for untar operation")
 	usageCmd.Flags().StringVarP(&(cfg.Destination), "destination", "d", "", "Specify a destination location for untar operation")

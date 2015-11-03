@@ -1,10 +1,8 @@
-package strategies
+package docker
 
 import (
 	"testing"
 
-	"github.com/openshift/source-to-image/pkg/api"
-	"github.com/openshift/source-to-image/pkg/test"
 	"github.com/openshift/source-to-image/pkg/util/user"
 )
 
@@ -83,14 +81,11 @@ func TestCheckAllowedUser(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		cfg := &api.Config{
-			AllowedUIDs: *tc.allowedUIDs,
-		}
-		docker := &test.FakeDocker{
+		docker := &FakeDocker{
 			GetImageUserResult: tc.user,
 			OnBuildResult:      tc.onbuild,
 		}
-		err := checkAllowedUser(docker, cfg, len(tc.onbuild) > 0)
+		err := CheckAllowedUser(docker, "", *tc.allowedUIDs, len(tc.onbuild) > 0)
 		if err != nil && !tc.expectErr {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 		}

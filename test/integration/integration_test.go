@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -120,7 +119,6 @@ func (i *integrationTest) setup() {
 		}
 
 		go http.ListenAndServe(":23456", http.FileServer(http.Dir(testImagesDir)))
-		i.t.Logf("Waiting for mock HTTP server to start...")
 		if err := waitForHTTPReady(); err != nil {
 			i.t.Fatalf("Unexpected error: %v", err)
 		}
@@ -129,8 +127,6 @@ func (i *integrationTest) setup() {
 
 	from := flag.CommandLine
 	if vflag := from.Lookup("v"); vflag != nil {
-		fmt.Fprintf(os.Stdout, "integration_test.go: found -v flag from starter bash script with initial glog level %d\n", getLogLevel())
-
 		// the thing here is that we are looking for the bash -v passed into test-integration.sh (with no value),
 		// but for glog (https://github.com/golang/glog/blob/master/glog.go), one specifies
 		// the logging level with -v=# (i.e. -v=0 or -v=3 or -v=5).
@@ -139,7 +135,6 @@ func (i *integrationTest) setup() {
 		//NOTE - passing --loglevel or -v=5 into test-integration.sh does not work
 		if getLogLevel() != 5 {
 			vflag.Value.Set("5")
-			fmt.Fprintf(os.Stdout, "integration_test.go: glog level now %d\n", getLogLevel())
 			// FIXME currently glog has only option to redirect output to stderr
 			// the preferred for STI would be to redirect to stdout
 			flag.CommandLine.Set("logtostderr", "true")
@@ -238,12 +233,13 @@ func TestAllowedUIDsOnBuildNumericUser(t *testing.T) {
 func (i *integrationTest) exerciseCleanAllowedUIDsBuild(tag, imageName string, expectError bool) {
 	t := i.t
 	config := &api.Config{
-		DockerConfig: dockerConfig(),
-		BuilderImage: imageName,
-		Source:       TestSource,
-		Tag:          tag,
-		Incremental:  false,
-		ScriptsURL:   "",
+		DockerConfig:      dockerConfig(),
+		BuilderImage:      imageName,
+		BuilderPullPolicy: api.DefaultBuilderPullPolicy,
+		Source:            TestSource,
+		Tag:               tag,
+		Incremental:       false,
+		ScriptsURL:        "",
 	}
 	config.AllowedUIDs.Set("1-")
 	_, err := strategies.GetStrategy(config)
@@ -293,13 +289,14 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 	}
 
 	config := &api.Config{
-		DockerConfig: dockerConfig(),
-		BuilderImage: imageName,
-		Source:       TestSource,
-		Tag:          buildTag,
-		Incremental:  false,
-		CallbackURL:  callbackURL,
-		ScriptsURL:   scriptsURL}
+		DockerConfig:      dockerConfig(),
+		BuilderImage:      imageName,
+		BuilderPullPolicy: api.DefaultBuilderPullPolicy,
+		Source:            TestSource,
+		Tag:               buildTag,
+		Incremental:       false,
+		CallbackURL:       callbackURL,
+		ScriptsURL:        scriptsURL}
 
 	b, err := strategies.GetStrategy(config)
 	if err != nil {
@@ -366,6 +363,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 	config := &api.Config{
 		DockerConfig:        dockerConfig(),
 		BuilderImage:        imageName,
+		BuilderPullPolicy:   api.DefaultBuilderPullPolicy,
 		Source:              TestSource,
 		Tag:                 tag,
 		Incremental:         false,
@@ -388,6 +386,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 	config = &api.Config{
 		DockerConfig:        dockerConfig(),
 		BuilderImage:        imageName,
+		BuilderPullPolicy:   api.DefaultBuilderPullPolicy,
 		Source:              TestSource,
 		Tag:                 tag,
 		Incremental:         true,

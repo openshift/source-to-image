@@ -323,15 +323,18 @@ func (b *STI) Exists(config *api.Config) bool {
 		return false
 	}
 
-	// can only do incremental build if runtime image exists, so always pull image
-	previousImageExists, _ := b.docker.IsImageInLocalRegistry(config.Tag)
-	if !previousImageExists || config.ForcePull {
-		if image, _ := b.incrementalDocker.PullImage(config.Tag); image != nil {
-			previousImageExists = true
-		}
+	policy := config.PreviousImagePullPolicy
+	if len(policy) == 0 {
+		policy = api.DefaultPreviousImagePullPolicy
 	}
 
-	return previousImageExists && b.installedScripts[api.SaveArtifacts]
+	result, err := dockerpkg.PullImage(config.Tag, b.incrementalDocker, policy, false)
+	if err != nil {
+		glog.V(2).Infof("Unable to pull previously build %q image: %v", config.Tag, err)
+		return false
+	}
+
+	return result.Image != nil && b.installedScripts[api.SaveArtifacts]
 }
 
 // Save extracts and restores the build artifacts from the previous build to a
@@ -358,6 +361,7 @@ func (b *STI) Save(config *api.Config) (err error) {
 		ExternalScripts: b.externalScripts[api.SaveArtifacts],
 		ScriptsURL:      config.ScriptsURL,
 		Destination:     config.Destination,
+		PullImage:       false,
 		Command:         api.SaveArtifacts,
 		Stdout:          outWriter,
 		Stderr:          errWriter,
@@ -397,11 +401,14 @@ func (b *STI) Execute(command string, config *api.Config) error {
 	if config.LayeredBuild {
 		externalScripts = false
 	}
+
 	opts := dockerpkg.RunContainerOptions{
-		Image:           config.BuilderImage,
-		Stdout:          outWriter,
-		Stderr:          errWriter,
-		PullImage:       config.ForcePull,
+		Image:  config.BuilderImage,
+		Stdout: outWriter,
+		Stderr: errWriter,
+		// The PullImage is false because the PullImage function should be called
+		// before we run the container
+		PullImage:       false,
 		ExternalScripts: externalScripts,
 		ScriptsURL:      config.ScriptsURL,
 		Destination:     config.Destination,

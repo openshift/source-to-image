@@ -16,6 +16,11 @@ func ValidateConfig(config *api.Config) []ValidationError {
 	if len(config.BuilderImage) == 0 {
 		allErrs = append(allErrs, NewFieldRequired("builderImage"))
 	}
+	switch config.BuilderPullPolicy {
+	case api.PullNever, api.PullAlways, api.PullIfNotPresent:
+	default:
+		allErrs = append(allErrs, NewFieldInvalidValue("builderPullPolicy"))
+	}
 	if config.DockerConfig == nil || len(config.DockerConfig.Endpoint) == 0 {
 		allErrs = append(allErrs, NewFieldRequired("dockerConfig.endpoint"))
 	}
