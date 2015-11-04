@@ -138,10 +138,12 @@ func (b *STI) Build(config *api.Config) (*api.Result, error) {
 		return nil, err
 	}
 
-	if b.incremental = b.artifacts.Exists(config); b.incremental {
-		glog.V(1).Infof("Existing image for tag %s detected for incremental build", config.Tag)
+	if !config.Incremental {
+		glog.V(1).Infof("Incremental build is disabled. Clean build will be performed")
+	} else if b.incremental = b.artifacts.Exists(config); b.incremental {
+		glog.V(1).Infof("Existing image for tag %s detected. Perform Incremental build with save-artifacts under the %s", config.Tag, b.scriptsURL["save-artifacts"])
 	} else {
-		glog.V(1).Infof("Clean build will be performed")
+		glog.V(1).Infof("Incremental build is enabled. But existing image for tag %s was not detected. Clean build will be performed", config.Tag)
 	}
 
 	glog.V(2).Infof("Performing source build from %s", config.Source)
@@ -316,13 +318,8 @@ func (b *STI) PostExecute(containerID, location string) error {
 }
 
 // Exists determines if the current build supports incremental workflow.
-// It checks if the previous image exists in the system and if so, then it
-// verifies that the save-artifacts script is present.
+// It checks if the previous image exists in the system.
 func (b *STI) Exists(config *api.Config) bool {
-	if !config.Incremental {
-		return false
-	}
-
 	// can only do incremental build if runtime image exists, so always pull image
 	previousImageExists, _ := b.docker.IsImageInLocalRegistry(config.Tag)
 	if !previousImageExists || config.ForcePull {
@@ -331,7 +328,7 @@ func (b *STI) Exists(config *api.Config) bool {
 		}
 	}
 
-	return previousImageExists && b.installedScripts[api.SaveArtifacts]
+	return previousImageExists
 }
 
 // Save extracts and restores the build artifacts from the previous build to a
