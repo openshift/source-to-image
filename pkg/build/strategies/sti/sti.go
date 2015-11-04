@@ -446,16 +446,13 @@ func (b *STI) Execute(command string, config *api.Config) error {
 				}
 				break
 			}
-			// Nothing is printed when the quiet option is set
-			if config.Quiet {
-				continue
+			if glog.V(2) || config.Quiet != true || command == api.Usage {
+				if (config.UseLogger == true) || glog.V(3) {
+					glog.Info(text)
+					continue
+				}
+				fmt.Fprintf(os.Stdout, "%s\n", strings.TrimSpace(text))
 			}
-			// The log level > 3 forces to use glog instead of printing to stdout
-			if glog.V(3) {
-				glog.Info(text)
-				continue
-			}
-			fmt.Fprintf(os.Stdout, "%s\n", strings.TrimSpace(text))
 		}
 	}(outReader)
 
