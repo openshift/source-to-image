@@ -208,7 +208,7 @@ func ParseFile(source string) (details *FileProtoDetails, mods *URLMods) {
 	if doesExist(source) {
 		details = &FileProtoDetails{
 			FileExists:     true,
-			UseCopy:        !isLocalGitRepository(source) || !hasGitBinary(),
+			UseCopy:        true,
 			ProtoSpecified: protoSpecified,
 			BadRef:         false,
 		}
