@@ -1,6 +1,7 @@
 package test
 
 import (
+	"net/url"
 	"github.com/openshift/source-to-image/pkg/api"
 )
 
@@ -36,6 +37,15 @@ func (f *FakeGit) Checkout(repo, ref string) error {
 	f.CheckoutRepo = repo
 	f.CheckoutRef = ref
 	return f.CheckoutError
+}
+
+func (f *FakeGit) ValidCloneSpecRemoteOnly(source string) bool {
+	f.ValidCloneSpecSource = source
+	return f.ValidCloneSpecResult
+}
+
+func (f *FakeGit) MungeNoProtocolURL(source string, url *url.URL) error {
+	return nil
 }
 
 func (f *FakeGit) GetInfo(repo string) *api.SourceInfo {

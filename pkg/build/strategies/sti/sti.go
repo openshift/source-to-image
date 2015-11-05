@@ -106,6 +106,7 @@ func New(req *api.Config, overrides build.Overrides) (*STI, error) {
 	if b.source == nil {
 		downloader, sourceURL, err := scm.DownloaderForSource(req.Source)
 		if err != nil {
+			glog.V(0).Infof("error as expected from downloader %v", err)
 			return nil, err
 		}
 		b.source = downloader
