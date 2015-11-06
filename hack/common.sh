@@ -18,8 +18,8 @@ STI_ROOT=$(
 STI_OUTPUT_SUBPATH="${STI_OUTPUT_SUBPATH:-_output/local}"
 STI_OUTPUT="${STI_ROOT}/${STI_OUTPUT_SUBPATH}"
 STI_OUTPUT_BINPATH="${STI_OUTPUT}/bin"
-STI_LOCAL_BINPATH="${STI_ROOT}/_output/local/go/bin"
-STI_LOCAL_RELEASEPATH="${STI_ROOT}/_output/local/releases"
+STI_LOCAL_BINPATH="${STI_OUTPUT}/go/bin"
+STI_LOCAL_RELEASEPATH="${STI_OUTPUT}/releases"
 
 readonly STI_GO_PACKAGE=github.com/openshift/source-to-image
 readonly STI_GOPATH="${STI_OUTPUT}/go"
@@ -28,6 +28,7 @@ readonly STI_CROSS_COMPILE_PLATFORMS=(
   linux/amd64
   darwin/amd64
   windows/amd64
+  linux/386
 )
 readonly STI_CROSS_COMPILE_TARGETS=(
   cmd/s2i
@@ -43,6 +44,10 @@ readonly STI_BINARY_SYMLINKS=(
 )
 readonly STI_BINARY_COPY=(
   sti
+)
+readonly STI_BINARY_RELEASE_WINDOWS=(
+  sti.exe
+  s2i.exe
 )
 
 # sti::build::binaries_from_targets take a list of build targets and return the
@@ -78,32 +83,7 @@ sti::build::build_binaries() {
     local version_ldflags
     version_ldflags=$(sti::build::ldflags)
 
-    # Use eval to preserve embedded quoted strings.
-    local goflags
-    eval "goflags=(${STI_GOFLAGS:-})"
-
-    local -a targets=()
-    local arg
-    for arg; do
-      if [[ "${arg}" == -* ]]; then
-        # Assume arguments starting with a dash are flags to pass to go.
-        goflags+=("${arg}")
-      else
-        targets+=("${arg}")
-      fi
-    done
-
-    if [[ ${#targets[@]} -eq 0 ]]; then
-      targets=("${STI_ALL_TARGETS[@]}")
-    fi
-
-    local -a platforms=("${STI_BUILD_PLATFORMS[@]:+${STI_BUILD_PLATFORMS[@]}}")
-    if [[ ${#platforms[@]} -eq 0 ]]; then
-      platforms=("$(sti::build::host_platform)")
-    fi
-
-    local binaries
-    binaries=($(sti::build::binaries_from_targets "${targets[@]}"))
+    sti::build::export_targets "$@"
 
     local platform
     for platform in "${platforms[@]}"; do
@@ -116,6 +96,38 @@ sti::build::build_binaries() {
     done
   )
 }
+
+# Generates the set of target packages, binaries, and platforms to build for.
+# Accepts binaries via $@, and platforms via STI_BUILD_PLATFORMS, or defaults to
+# the current platform.
+sti::build::export_targets() {
+  # Use eval to preserve embedded quoted strings.
+  local goflags
+  eval "goflags=(${STI_GOFLAGS:-})"
+
+  targets=()
+  local arg
+  for arg; do
+    if [[ "${arg}" == -* ]]; then
+      # Assume arguments starting with a dash are flags to pass to go.
+      goflags+=("${arg}")
+    else
+      targets+=("${arg}")
+    fi
+  done
+
+  if [[ ${#targets[@]} -eq 0 ]]; then
+    targets=("${STI_ALL_TARGETS[@]}")
+  fi
+
+  binaries=($(sti::build::binaries_from_targets "${targets[@]}"))
+
+  platforms=("${STI_BUILD_PLATFORMS[@]:+${STI_BUILD_PLATFORMS[@]}}")
+  if [[ ${#platforms[@]} -eq 0 ]]; then
+    platforms=("$(sti::build::host_platform)")
+  fi
+}
+
 
 # Takes the platform name ($1) and sets the appropriate golang env variables
 # for that platform.
@@ -167,13 +179,31 @@ sti::build::setup_env() {
   sti::build::create_gopath_tree
 
   if [[ -z "$(which go)" ]]; then
-    echo <<EOF
+    cat <<EOF
 
 Can't find 'go' in PATH, please fix and retry.
 See http://golang.org/doc/install for installation instructions.
 
 EOF
     exit 2
+  fi
+
+  # Travis continuous build uses a head go release that doesn't report
+  # a version number, so we skip this check on Travis.  It's unnecessary
+  # there anyway.
+  if [[ "${TRAVIS:-}" != "true" ]]; then
+    local go_version
+    go_version=($(go version))
+    if [[ "${go_version[2]}" < "go1.4" ]]; then
+      cat <<EOF
+
+Detected go version: ${go_version[*]}.
+S2I requires go version 1.4 or greater.
+Please install Go version 1.4 or later.
+
+EOF
+      exit 2
+    fi
   fi
 
   GOPATH=${STI_GOPATH}
@@ -217,7 +247,9 @@ sti::build::place_bins() {
       mkdir -p "${STI_LOCAL_RELEASEPATH}"
     fi
 
-    for platform in "${STI_RELEASE_PLATFORMS[@]-(host_platform)}"; do
+    sti::build::export_targets "$@"
+
+    for platform in "${platforms[@]}"; do
       # The substitution on platform_src below will replace all slashes with
       # underscores.  It'll transform darwin/amd64 -> darwin_amd64.
       local platform_src="/${platform//\//_}"
@@ -235,21 +267,19 @@ sti::build::place_bins() {
 
       # Create an array of binaries to release. Append .exe variants if the platform is windows.
       local -a binaries=()
-      local binary
-      for binary in "${STI_RELEASE_BINARIES[@]}"; do
-        binaries+=("${binary}")
+      for binary in "${targets[@]}"; do
+        binary=$(basename $binary)
         if [[ $platform == "windows/amd64" ]]; then
           binaries+=("${binary}.exe")
+        else
+          binaries+=("${binary}")
         fi
       done
 
-      # Copy only the specified release binaries to the shared STI_OUTPUT_BINPATH.
-      local -a includes=()
+      # Move the specified release binaries to the shared STI_OUTPUT_BINPATH.
       for binary in "${binaries[@]}"; do
-        includes+=("--include=${binary}")
+        mv "${full_binpath_src}/${binary}" "${STI_OUTPUT_BINPATH}/${platform}/"
       done
-      find "${full_binpath_src}" -maxdepth 1 -type f -exec \
-        rsync "${includes[@]}" --exclude="*" -pt {} "${STI_OUTPUT_BINPATH}/${platform}" \;
 
       # If no release archive was requested, we're done.
       if [[ "${STI_RELEASE_ARCHIVE-}" == "" ]]; then
@@ -258,8 +288,9 @@ sti::build::place_bins() {
 
       # Create a temporary bin directory containing only the binaries marked for release.
       local release_binpath=$(mktemp -d sti.release.${STI_RELEASE_ARCHIVE}.XXX)
-      find "${full_binpath_src}" -maxdepth 1 -type f -exec \
-        rsync "${includes[@]}" --exclude="*" -pt {} "${release_binpath}" \;
+      for binary in "${binaries[@]}"; do
+        cp "${STI_OUTPUT_BINPATH}/${platform}/${binary}" "${release_binpath}/"
+      done
 
       # Create binary copies where specified.
       local suffix=""
@@ -275,10 +306,17 @@ sti::build::place_bins() {
 
       # Create the release archive.
       local platform_segment="${platform//\//-}"
-      local archive_name="${STI_RELEASE_ARCHIVE}-${STI_GIT_VERSION}-${STI_GIT_COMMIT}-${platform_segment}.tar.gz"
-
-      echo "++ Creating ${archive_name}"
-      tar -czf "${STI_LOCAL_RELEASEPATH}/${archive_name}" -C "${release_binpath}" .
+      if [[ $platform == "windows/amd64" ]]; then
+        local archive_name="${STI_RELEASE_ARCHIVE}-${STI_GIT_VERSION}-${STI_GIT_COMMIT}-${platform_segment}.zip"
+        echo "++ Creating ${archive_name}"
+        for file in "${STI_BINARY_RELEASE_WINDOWS[@]}"; do
+          zip "${STI_LOCAL_RELEASEPATH}/${archive_name}" -qj "${release_binpath}/${file}"
+        done
+      else
+        local archive_name="${STI_RELEASE_ARCHIVE}-${STI_GIT_VERSION}-${STI_GIT_COMMIT}-${platform_segment}.tar.gz"
+        echo "++ Creating ${archive_name}"
+        tar -czf "${STI_LOCAL_RELEASEPATH}/${archive_name}" -C "${release_binpath}" .
+      fi
       rm -rf "${release_binpath}"
     done
   )
@@ -287,15 +325,13 @@ sti::build::place_bins() {
 # sti::build::make_binary_symlinks makes symlinks for the sti
 # binary in _output/local/go/bin
 sti::build::make_binary_symlinks() {
-  local host_platform
-  host_platform=$(sti::build::host_platform)
-
-  if [[ -f "${STI_LOCAL_BINPATH}/s2i" ]]; then
+  platform=$(sti::build::host_platform)
+  if [[ -f "${STI_OUTPUT_BINPATH}/${platform}/s2i" ]]; then
     for linkname in "${STI_BINARY_SYMLINKS[@]}"; do
-      if [[ $host_platform == "windows/amd64" ]]; then
-        cp "${STI_LOCAL_BINPATH}/s2i.exe" "${STI_LOCAL_BINPATH}/${linkname}.exe"
+      if [[ $platform == "windows/amd64" ]]; then
+        cp s2i "${STI_OUTPUT_BINPATH}/${platform}/${linkname}.exe"
       else
-        ln -sf "${STI_LOCAL_BINPATH}/s2i" "${STI_LOCAL_BINPATH}/${linkname}"
+        ln -sf s2i "${STI_OUTPUT_BINPATH}/${platform}/${linkname}"
       fi
     done
   fi
@@ -311,7 +347,15 @@ sti::build::make_binary_symlinks() {
 sti::build::detect_local_release_tars() {
   local platform="$1"
 
-  local primary=$(find ${STI_LOCAL_RELEASEPATH} -maxdepth 1 -type f -name source-to-image-*-${platform}-*)
+  if [[ ! -d "${STI_LOCAL_RELEASEPATH}" ]]; then
+    echo "There are no release artifacts in ${STI_LOCAL_RELEASEPATH}"
+    exit 2
+  fi
+  if [[ ! -f "${STI_LOCAL_RELEASEPATH}/.commit" ]]; then
+    echo "There is no release .commit identifier ${STI_LOCAL_RELEASEPATH}"
+    exit 2
+  fi
+  local primary=$(find ${STI_LOCAL_RELEASEPATH} -maxdepth 1 -type f -name source-to-image-*-${platform}*)
   if [[ $(echo "${primary}" | wc -l) -ne 1 ]]; then
     echo "There should be exactly one ${platform} primary tar in $STI_LOCAL_RELEASEPATH"
     exit 2

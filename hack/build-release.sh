@@ -7,8 +7,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+STARTTIME=$(date +%s)
 STI_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${STI_ROOT}/hack/common.sh"
+source "${STI_ROOT}/hack/util.sh"
+sti::log::install_errexit
 
 # Go to the top of the tree.
 cd "${STI_ROOT}"
@@ -20,30 +23,26 @@ docker build -q --tag openshift/sti-release "${STI_ROOT}/images/release"
 context="${STI_ROOT}/_output/buildenv-context"
 
 # Clean existing output.
-rm -rf "${STI_ROOT}/_output/local/releases"
-rm -rf "${STI_ROOT}/_output/local/go/bin"
+rm -rf "${STI_LOCAL_RELEASEPATH}"
 rm -rf "${context}"
 mkdir -p "${context}"
-mkdir -p "${STI_ROOT}/_output/local"
+mkdir -p "${STI_OUTPUT}"
 
 # Generate version definitions.
+# You can commit a specific version by specifying STI_GIT_COMMIT="" prior to build
 sti::build::get_version_vars
 sti::build::save_version_vars "${context}/sti-version-defs"
 
+echo "++ Building release ${STI_GIT_VERSION}"
+
 # Create the input archive.
-git archive --format=tar -o "${context}/archive.tar" HEAD
+git archive --format=tar -o "${context}/archive.tar" "${STI_GIT_COMMIT}"
 tar -rf "${context}/archive.tar" -C "${context}" sti-version-defs
 gzip -f "${context}/archive.tar"
 
 # Perform the build and release in Docker.
 cat "${context}/archive.tar.gz" | docker run -i --cidfile="${context}/cid" openshift/sti-release
-docker cp $(cat ${context}/cid):/go/src/github.com/openshift/source-to-image/_output/local/releases "${STI_ROOT}/_output/local"
-echo "${STI_GIT_COMMIT}" > "${STI_ROOT}/_output/local/releases/.commit"
+docker cp $(cat ${context}/cid):/go/src/github.com/openshift/source-to-image/_output/local/releases "${STI_OUTPUT}"
+echo "${STI_GIT_COMMIT}" > "${STI_LOCAL_RELEASEPATH}/.commit"
 
-# Copy the linux release archives release back to the local _output/local/go/bin directory.
-sti::build::detect_local_release_tars "linux"
-
-mkdir -p "${STI_LOCAL_BINPATH}"
-tar mxzf "${STI_PRIMARY_RELEASE_TAR}" -C "${STI_LOCAL_BINPATH}"
-
-sti::build::make_binary_symlinks
+ret=$?; ENDTIME=$(date +%s); echo "$0 took $(($ENDTIME - $STARTTIME)) seconds"; exit "$ret"

@@ -6,6 +6,7 @@
 #   check: Run tests.
 #   test: Run tests.
 #   clean: Clean up.
+#   release: Build release.
 
 OUT_DIR = _output
 OUT_PKG_DIR = Godeps/_workspace/pkg
@@ -24,7 +25,6 @@ all build:
 	hack/build-go.sh
 .PHONY: all build
 
-
 # Verify code is properly organized.
 #
 # Example:
@@ -35,7 +35,6 @@ verify: build
 	hack/verify-govet.sh || true
 .PHONY: verify
 
-
 # Install travis dependencies
 #
 # Example:
@@ -44,21 +43,22 @@ install-travis:
 	hack/install-tools.sh
 .PHONY: install-travis
 
-# Build and run tests.
+# Build and run unit tests
 #
 # Args:
 #   WHAT: Directory names to test.  All *_test.go files under these
 #     directories will be run.  If not specified, "everything" will be tested.
 #   TESTS: Same as WHAT.
 #   GOFLAGS: Extra flags to pass to 'go' when building.
+#   TESTFLAGS: Extra flags that should only be passed to hack/test-go.sh
 #
 # Example:
 #   make check
 #   make test
 #   make check WHAT=pkg/build GOFLAGS=-v
-check test: verify
-	STI_COVER="-cover -covermode=atomic" STI_RACE="-race" hack/test-go.sh $(WHAT) $(TESTS)
-.PHONY: check test
+check:
+	hack/test-go.sh $(WHAT) $(TESTS) $(TESTFLAGS)
+.PHONY: check
 
 # Remove all build artifacts.
 #
@@ -67,3 +67,12 @@ check test: verify
 clean:
 	rm -rf $(OUT_DIR) $(OUT_PKG_DIR)
 .PHONY: clean
+
+# Build the release.
+#
+# Example:
+#   make release
+release: clean
+	hack/build-release.sh
+	hack/extract-release.sh
+.PHONY: release

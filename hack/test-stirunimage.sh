@@ -35,8 +35,8 @@ fi
 
 trap cleanup EXIT SIGINT
 
-echo "Running 'sti build --run=true ...'"
-s2i build git://github.com/bparees/openshift-jee-sample openshift/wildfly-8-centos test-jee-app --run=true &> "${STI_ROOT}/hack/sti-run.log" &
+echo "Running 's2i build --run=true ...'"
+s2i build git://github.com/bparees/openshift-jee-sample openshift/wildfly-81-centos7 test-jee-app --run=true &> "${STI_ROOT}/hack/sti-run.log" &
 export STI_PID=$!
 TIME_SEC=1000
 TIME_MIN=$((60 * $TIME_SEC))
@@ -48,8 +48,8 @@ set +e
 while [[ $(time_now) -lt $expire ]]; do
     grep  "as a result of the --run=true option" "${STI_ROOT}/hack/sti-run.log"
     if [ $? -eq 0 ]; then
-      echo "[INFO] Success running command sti --run=true"
-      
+      echo "[INFO] Success running command s2i --run=true"
+
       # use sigint so that sti post processing will remove docker container
       kill -2 "${STI_PID}"
       export KILLDONE="killed"
@@ -68,7 +68,7 @@ while [[ $(time_now) -lt $expire ]]; do
     sleep 1
 done
 
-echo "[INFO] Problem with sti --run=true, dumping ${STI_ROOT}/hack/sti-run.log"
+echo "[INFO] Problem with s2i --run=true, dumping ${STI_ROOT}/hack/sti-run.log"
 cat "${STI_ROOT}/hack/sti-run.log"
 set -e
 exit 1
