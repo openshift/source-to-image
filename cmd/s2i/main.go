@@ -3,13 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -21,6 +18,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/build"
 	"github.com/openshift/source-to-image/pkg/build/strategies"
 	"github.com/openshift/source-to-image/pkg/build/strategies/sti"
+	cmdutil "github.com/openshift/source-to-image/pkg/cmd"
 	"github.com/openshift/source-to-image/pkg/config"
 	"github.com/openshift/source-to-image/pkg/create"
 	"github.com/openshift/source-to-image/pkg/docker"
@@ -29,39 +27,6 @@ import (
 	"github.com/openshift/source-to-image/pkg/util"
 	"github.com/openshift/source-to-image/pkg/version"
 )
-
-func parseEnvs(cmd *cobra.Command, name string) (map[string]string, error) {
-	env := cmd.Flags().Lookup(name)
-	if env == nil || len(env.Value.String()) == 0 {
-		return nil, nil
-	}
-
-	envs := make(map[string]string)
-	pairs := strings.Split(env.Value.String(), ",")
-	for _, pair := range pairs {
-		atoms := strings.Split(pair, "=")
-		if len(atoms) != 2 {
-			return nil, fmt.Errorf("malformed env string: %s", pair)
-		}
-		envs[atoms[0]] = atoms[1]
-	}
-
-	return envs, nil
-}
-
-func defaultDockerConfig() *api.DockerConfig {
-	cfg := &api.DockerConfig{}
-	if cfg.Endpoint = os.Getenv("DOCKER_HOST"); cfg.Endpoint == "" {
-		cfg.Endpoint = "unix:///var/run/docker.sock"
-	}
-	if os.Getenv("DOCKER_TLS_VERIFY") == "1" {
-		certPath := os.Getenv("DOCKER_CERT_PATH")
-		cfg.CertFile = filepath.Join(certPath, "cert.pem")
-		cfg.KeyFile = filepath.Join(certPath, "key.pem")
-		cfg.CAFile = filepath.Join(certPath, "ca.pem")
-	}
-	return cfg
-}
 
 func newCmdVersion() *cobra.Command {
 	return &cobra.Command{
@@ -91,22 +56,7 @@ $ s2i build git://github.com/openshift/ruby-hello-world centos/ruby-22-centos7 h
 $ s2i build . centos/ruby-22-centos7 hello-world-app
 `,
 		Run: func(cmd *cobra.Command, args []string) {
-			go func() {
-				for {
-					sigs := make(chan os.Signal, 1)
-					signal.Notify(sigs, syscall.SIGQUIT)
-					buf := make([]byte, 1<<20)
-					for {
-						<-sigs
-						runtime.Stack(buf, true)
-						if file, err := ioutil.TempFile(os.TempDir(), "sti_dump"); err == nil {
-							defer file.Close()
-							file.Write(buf)
-						}
-						glog.Infof("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf)
-					}
-				}
-			}()
+			go cmdutil.InstallDumpOnSignal()
 
 			// Attempt to restore the build command from the configuration file
 			if useConfig {
@@ -132,8 +82,9 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 
 			if errs := validation.ValidateConfig(cfg); len(errs) > 0 {
 				for _, e := range errs {
-					glog.Errorf("%s", e)
+					fmt.Fprintf(os.Stderr, "ERROR: %s\n", e)
 				}
+				fmt.Println()
 				cmd.Help()
 				os.Exit(1)
 			}
@@ -154,17 +105,16 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 			}
 
 			cfg.Environment = map[string]string{}
-
 			if len(cfg.EnvironmentFile) > 0 {
 				result, err := util.ReadEnvironmentFile(cfg.EnvironmentFile)
 				if err != nil {
-					glog.Warningf("Unable to read %s: %v", cfg.EnvironmentFile, err)
+					glog.Warningf("Unable to read environment file %q: %v", cfg.EnvironmentFile, err)
 				} else {
 					cfg.Environment = result
 				}
 			}
 
-			envs, err := parseEnvs(cmd, "env")
+			envs, err := cmdutil.ParseEnvs(cmd, "env")
 			checkErr(err)
 			for k, v := range envs {
 				cfg.Environment[k] = v
@@ -175,13 +125,14 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 				cfg.ScriptsURL = oldScriptsFlag
 			}
 			if len(oldDestination) != 0 {
-				glog.Warning("Flag --location is deprecated, use --destination instead")
+				glog.Warning("DEPRECATED: Flag --location is deprecated, use --destination instead")
 				cfg.Destination = oldDestination
 			}
 
 			if glog.V(2) {
 				fmt.Printf("\n%s\n", describe.DescribeConfig(cfg))
 			}
+
 			builder, err := strategies.GetStrategy(cfg)
 			checkErr(err)
 			result, err := builder.Build(cfg)
@@ -192,38 +143,31 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 			}
 
 			if cfg.RunImage {
-				runner, rerr := run.New(cfg)
-				if rerr == nil {
-					rerr = runner.Run(cfg)
-				}
-				checkErr(rerr)
+				runner, err := run.New(cfg)
+				checkErr(err)
+				err = runner.Run(cfg)
+				checkErr(err)
 			}
 
 		},
 	}
 
-	buildCmd.Flags().BoolVarP(&(cfg.Quiet), "quiet", "q", false, "Operate quietly. Suppress all non-error output.")
-	buildCmd.Flags().BoolVar(&(cfg.RunImage), "run", false, "Run resulting image as part of invocation of this command.  You may have to Ctrl-C to exit the sti command invocation and the container launched because this options was specified.")
-	buildCmd.Flags().BoolVar(&(cfg.Incremental), "incremental", false, "Perform an incremental build")
+	cmdutil.AddCommonFlags(buildCmd, cfg)
+
+	buildCmd.Flags().BoolVar(&(cfg.RunImage), "run", false, "Run resulting image as part of invocation of this command")
 	buildCmd.Flags().BoolVar(&(cfg.DisableRecursive), "recursive", true, "Fetch all git submodules when cloning application repository")
-	buildCmd.Flags().BoolVar(&(cfg.RemovePreviousImage), "rm", false, "Remove the previous image during incremental builds")
 	buildCmd.Flags().StringP("env", "e", "", "Specify an environment var NAME=VALUE,NAME2=VALUE2,...")
 	buildCmd.Flags().StringVarP(&(cfg.Ref), "ref", "r", "", "Specify a ref to check-out")
-	buildCmd.Flags().StringVar(&(cfg.CallbackURL), "callback-url", "", "Specify a URL to invoke via HTTP POST upon build completion")
+	buildCmd.Flags().StringVarP(&(cfg.ContextDir), "context-dir", "", "", "Specify the sub-directory inside the repository with the application sources")
 	buildCmd.Flags().StringVarP(&(cfg.ScriptsURL), "scripts-url", "s", "", "Specify a URL for the assemble and run scripts")
 	buildCmd.Flags().StringVar(&(oldScriptsFlag), "scripts", "", "DEPRECATED: Specify a URL for the assemble and run scripts")
-	buildCmd.Flags().StringVarP(&(oldDestination), "location", "l", "", "Specify a destination location for untar operation")
-	buildCmd.Flags().StringVarP(&(cfg.Destination), "destination", "d", "", "Specify a destination location for untar operation")
-	buildCmd.Flags().BoolVar(&(cfg.ForcePull), "force-pull", false, "DEPRECATED: Always pull the builder image even if it is present locally")
-	buildCmd.Flags().VarP(&(cfg.BuilderPullPolicy), "pull-policy", "p", "Specify when to pull the builder image (always, never or if-not-present)")
-	buildCmd.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by S2I instead of deleting it")
 	buildCmd.Flags().BoolVar(&(useConfig), "use-config", false, "Store command line options to .stifile")
-	buildCmd.Flags().StringVarP(&(cfg.ContextDir), "context-dir", "", "", "Specify the sub-directory inside the repository with the application sources")
-	buildCmd.Flags().StringVarP(&(cfg.DockerCfgPath), "dockercfg-path", "", filepath.Join(os.Getenv("HOME"), ".docker/config.json"), "Specify the path to the Docker configuration file")
 	buildCmd.Flags().StringVarP(&(cfg.EnvironmentFile), "environment-file", "E", "", "Specify the path to the file with environment")
 	buildCmd.Flags().StringVarP(&(cfg.DisplayName), "application-name", "n", "", "Specify the display name for the application (default: output image name)")
 	buildCmd.Flags().StringVarP(&(cfg.Description), "description", "", "", "Specify the description of the application")
-	buildCmd.Flags().VarP(&(cfg.AllowedUIDs), "allowed-uids", "u", "Specify a range of allowed user ids for the builder image. If the builder specifies a non-numeric user or a uid that falls outside the range, the build fails.")
+	buildCmd.Flags().VarP(&(cfg.AllowedUIDs), "allowed-uids", "u", "Specify a range of allowed user ids for the builder image")
+	buildCmd.Flags().StringVarP(&(oldDestination), "location", "l", "",
+		"DEPRECATED: Specify a destination location for untar operation")
 
 	return buildCmd
 }
@@ -279,14 +223,7 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 		},
 	}
 
-	buildCmd.Flags().BoolVarP(&(cfg.Quiet), "quiet", "q", false, "Operate quietly. Suppress all non-error output.")
-	buildCmd.Flags().BoolVar(&(cfg.Incremental), "incremental", false, "Perform an incremental build")
-	buildCmd.Flags().BoolVar(&(cfg.RemovePreviousImage), "rm", false, "Remove the previous image during incremental builds")
-	buildCmd.Flags().StringVar(&(cfg.CallbackURL), "callback-url", "", "Specify a URL to invoke via HTTP POST upon build completion")
-	buildCmd.Flags().BoolVar(&(cfg.ForcePull), "force-pull", false, "DEPRECATED: Always pull the builder image even if it is present locally")
-	buildCmd.Flags().VarP(&(cfg.BuilderPullPolicy), "pull-policy", "p", "Specify when to pull the builder image (always, never or if-not-present)")
-	buildCmd.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by S2I instead of deleting it")
-	buildCmd.Flags().StringVarP(&(cfg.DockerCfgPath), "dockercfg-path", "", filepath.Join(os.Getenv("HOME"), ".docker/config.json"), "Specify the path to the Docker configuration file")
+	cmdutil.AddCommonFlags(buildCmd, cfg)
 	return buildCmd
 }
 
@@ -323,7 +260,7 @@ func newCmdUsage(cfg *api.Config) *cobra.Command {
 			}
 
 			cfg.BuilderImage = args[0]
-			envs, err := parseEnvs(cmd, "env")
+			envs, err := cmdutil.ParseEnvs(cmd, "env")
 			checkErr(err)
 			cfg.Environment = envs
 
@@ -342,14 +279,9 @@ func newCmdUsage(cfg *api.Config) *cobra.Command {
 			checkErr(err)
 		},
 	}
-	usageCmd.Flags().StringP("env", "e", "", "Specify an environment var NAME=VALUE,NAME2=VALUE2,...")
-	usageCmd.Flags().StringVarP(&(cfg.ScriptsURL), "scripts-url", "s", "", "Specify a URL for the assemble and run scripts")
-	usageCmd.Flags().StringVar(&(oldScriptsFlag), "scripts", "", "DEPRECATED: Specify a URL for the assemble and run scripts")
-	usageCmd.Flags().BoolVar(&(cfg.ForcePull), "force-pull", false, "DEPRECATED: Always pull the builder image even if it is present locally")
-	usageCmd.Flags().VarP(&(cfg.BuilderPullPolicy), "pull-policy", "p", "Specify when to pull the builder image (always, never or if-not-present)")
-	usageCmd.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false, "Save the temporary directory used by S2I instead of deleting it")
-	usageCmd.Flags().StringVarP(&(oldDestination), "location", "l", "", "Specify a destination location for untar operation")
-	usageCmd.Flags().StringVarP(&(cfg.Destination), "destination", "d", "", "Specify a destination location for untar operation")
+	usageCmd.Flags().StringVarP(&(oldDestination), "location", "l", "",
+		"Specify a destination location for untar operation")
+	cmdutil.AddCommonFlags(usageCmd, cfg)
 	return usageCmd
 }
 
@@ -396,7 +328,7 @@ func main() {
 			cmd.Help()
 		},
 	}
-	cfg.DockerConfig = defaultDockerConfig()
+	cfg.DockerConfig = docker.GetDefaultDockerConfig()
 	stiCmd.PersistentFlags().StringVarP(&(cfg.DockerConfig.Endpoint), "url", "U", cfg.DockerConfig.Endpoint, "Set the url of the docker socket to use")
 	stiCmd.PersistentFlags().StringVar(&(cfg.DockerConfig.CertFile), "cert", cfg.DockerConfig.CertFile, "Set the path of the docker TLS certificate file")
 	stiCmd.PersistentFlags().StringVar(&(cfg.DockerConfig.KeyFile), "key", cfg.DockerConfig.KeyFile, "Set the path of the docker TLS key file")

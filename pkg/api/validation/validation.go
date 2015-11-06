@@ -74,5 +74,12 @@ type ValidationError struct {
 }
 
 func (v ValidationError) Error() string {
-	return fmt.Sprintf("%s: %s", v.Field, v.Type)
+	switch v.Type {
+	case ValidationErrorInvalidValue:
+		return fmt.Sprintf("Invalid value specified for %q", v.Field)
+	case ValidationErrorTypeRequired:
+		return fmt.Sprintf("Required value not specified for %q", v.Field)
+	default:
+		return fmt.Sprintf("%s: %s", v.Type, v.Field)
+	}
 }

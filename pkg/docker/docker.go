@@ -228,7 +228,7 @@ func (d *stiDocker) CheckImage(name string) (*docker.Image, error) {
 // PullImage pulls an image into the local registry
 func (d *stiDocker) PullImage(name string) (*docker.Image, error) {
 	name = getImageName(name)
-	glog.V(1).Infof("Pulling image %s", name)
+	glog.V(1).Infof("Pulling Docker image %s ...", name)
 	// TODO: Add authentication support
 	if err := d.client.PullImage(docker.PullImageOptions{Repository: name}, d.pullAuth); err != nil {
 		glog.V(3).Infof("An error was received from the PullImage call: %v", err)

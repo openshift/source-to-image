@@ -3,6 +3,8 @@ package docker
 import (
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"bufio"
@@ -239,4 +241,18 @@ func GetBuilderImage(config *api.Config) (*PullResult, error) {
 	}
 
 	return r, nil
+}
+
+func GetDefaultDockerConfig() *api.DockerConfig {
+	cfg := &api.DockerConfig{}
+	if cfg.Endpoint = os.Getenv("DOCKER_HOST"); cfg.Endpoint == "" {
+		cfg.Endpoint = "unix:///var/run/docker.sock"
+	}
+	if os.Getenv("DOCKER_TLS_VERIFY") == "1" {
+		certPath := os.Getenv("DOCKER_CERT_PATH")
+		cfg.CertFile = filepath.Join(certPath, "cert.pem")
+		cfg.KeyFile = filepath.Join(certPath, "key.pem")
+		cfg.CAFile = filepath.Join(certPath, "ca.pem")
+	}
+	return cfg
 }
