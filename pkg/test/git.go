@@ -2,6 +2,7 @@ package test
 
 import (
 	"github.com/openshift/source-to-image/pkg/api"
+	"net/url"
 )
 
 // FakeGit provides a fake GIT
@@ -22,6 +23,18 @@ type FakeGit struct {
 func (f *FakeGit) ValidCloneSpec(source string) bool {
 	f.ValidCloneSpecSource = source
 	return f.ValidCloneSpecResult
+}
+
+//ValidCloneSpecRemoteOnly returns a valid GIT clone specification
+func (f *FakeGit) ValidCloneSpecRemoteOnly(source string) bool {
+	f.ValidCloneSpecSource = source
+	return f.ValidCloneSpecResult
+}
+
+//MungeNoProtocolURL returns a valid no protocol GIT URL
+func (f *FakeGit) MungeNoProtocolURL(source string, url *url.URL) error {
+	f.ValidCloneSpecSource = source
+	return nil
 }
 
 // Clone clones the fake source GIT repository to target directory
