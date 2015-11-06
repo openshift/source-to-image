@@ -5,6 +5,7 @@ set -o nounset
 set -o pipefail
 
 STI_ROOT=$(dirname "${BASH_SOURCE}")/..
+export KILLDONE=""
 
 function time_now()
 {
@@ -17,7 +18,7 @@ function cleanup()
     rm -f  "${STI_ROOT}/hack/sti-run.log"
     # use sigint so that sti post processing will remove docker container
     if [ -z "$KILLDONE" ]; then
-	kill -2 "${STI_PID}"
+	    kill -2 "${STI_PID}"
     fi
     echo
     echo "Complete"
@@ -34,16 +35,13 @@ fi
 
 trap cleanup EXIT SIGINT
 
-echo
-echo 
-echo
-
-sti build git://github.com/bparees/openshift-jee-sample openshift/wildfly-8-centos test-jee-app --run=true &> "${STI_ROOT}/hack/sti-run.log" &
+echo "Running 'sti build --run=true ...'"
+s2i build git://github.com/bparees/openshift-jee-sample openshift/wildfly-8-centos test-jee-app --run=true &> "${STI_ROOT}/hack/sti-run.log" &
 export STI_PID=$!
 TIME_SEC=1000
 TIME_MIN=$((60 * $TIME_SEC))
 max_wait=10*TIME_MIN
-echo "waiting up to ${max_wait}"
+echo "Waiting up to ${max_wait} for the build to finish ..."
 expire=$(($(time_now) + $max_wait))
 
 set +e

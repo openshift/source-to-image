@@ -1,11 +1,9 @@
-package test
+package docker
 
 import (
 	"sync"
 
 	dockerclient "github.com/fsouza/go-dockerclient"
-
-	"github.com/openshift/source-to-image/pkg/docker"
 )
 
 // FakeDocker provides a fake docker interface
@@ -18,7 +16,7 @@ type FakeDocker struct {
 	DefaultURLImage              string
 	DefaultURLResult             string
 	DefaultURLError              error
-	RunContainerOpts             docker.RunContainerOptions
+	RunContainerOpts             RunContainerOptions
 	RunContainerError            error
 	RunContainerErrorBeforeStart bool
 	RunContainerContainerID      string
@@ -29,12 +27,12 @@ type FakeDocker struct {
 	GetImageUserImage            string
 	GetImageUserResult           string
 	GetImageUserError            error
-	CommitContainerOpts          docker.CommitContainerOptions
+	CommitContainerOpts          CommitContainerOptions
 	CommitContainerResult        string
 	CommitContainerError         error
 	RemoveImageName              string
 	RemoveImageError             error
-	BuildImageOpts               docker.BuildImageOptions
+	BuildImageOpts               BuildImageOptions
 	BuildImageError              error
 	PullResult                   bool
 	PullError                    error
@@ -80,7 +78,7 @@ func (f *FakeDocker) GetScriptsURL(image string) (string, error) {
 }
 
 // RunContainer runs a fake Docker container
-func (f *FakeDocker) RunContainer(opts docker.RunContainerOptions) error {
+func (f *FakeDocker) RunContainer(opts RunContainerOptions) error {
 	f.RunContainerOpts = opts
 	if f.RunContainerErrorBeforeStart {
 		return f.RunContainerError
@@ -109,7 +107,7 @@ func (f *FakeDocker) GetImageUser(image string) (string, error) {
 }
 
 // CommitContainer commits a fake Docker container
-func (f *FakeDocker) CommitContainer(opts docker.CommitContainerOptions) (string, error) {
+func (f *FakeDocker) CommitContainer(opts CommitContainerOptions) (string, error) {
 	f.CommitContainerOpts = opts
 	return f.CommitContainerResult, f.CommitContainerError
 }
@@ -139,7 +137,7 @@ func (f *FakeDocker) CheckAndPullImage(name string) (*dockerclient.Image, error)
 }
 
 // BuildImage builds image
-func (f *FakeDocker) BuildImage(opts docker.BuildImageOptions) error {
+func (f *FakeDocker) BuildImage(opts BuildImageOptions) error {
 	f.BuildImageOpts = opts
 	return f.BuildImageError
 }
