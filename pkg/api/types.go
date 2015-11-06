@@ -150,6 +150,9 @@ type Config struct {
 	// RunImage will trigger a "docker run ..." invocation of the produced image so the user
 	// can see if it operates as he would expect
 	RunImage bool
+
+	// Usage allows for properly shortcircuiting s2i logic when `s2i usage` is invoked
+	Usage bool
 }
 
 // DockerConfig contains the configuration for a Docker connection

@@ -3,6 +3,8 @@ package scm
 import (
 	"fmt"
 
+	"github.com/golang/glog"
+
 	"github.com/openshift/source-to-image/pkg/build"
 	"github.com/openshift/source-to-image/pkg/scm/file"
 	"github.com/openshift/source-to-image/pkg/scm/git"
@@ -12,27 +14,25 @@ import (
 // DownloaderForSource determines what SCM plugin should be used for downloading
 // the sources from the repository.
 func DownloaderForSource(s string) (build.Downloader, string, error) {
-	details, _ := git.ParseFile(s)
+	glog.V(4).Infof("DownloadForSource %s", s)
+
+	details, mods := git.ParseFile(s)
+	glog.V(4).Infof("return from ParseFile file exists %v proto specified %v use copy %v", details.FileExists, details.ProtoSpecified, details.UseCopy)
+
+	if details.FileExists && details.BadRef {
+		return nil, s, fmt.Errorf("local location referenced by %s exists but the input after the # is malformed", s)
+	}
+
+	if details.FileExists && mods != nil {
+		glog.V(4).Infof("new path from parse file %s", mods.Path)
+		s = mods.Path
+	}
 
 	if details.FileExists && details.UseCopy {
-		if !details.ProtoSpecified {
-			// since not using git, any resulting URLs need to be explicit with file:// protocol specified
-			s = "file://" + s
-		}
 		return &file.File{util.NewFileSystem()}, s, nil
 	}
 
-	if details.ProtoSpecified && !details.FileExists {
-		return nil, s, fmt.Errorf("local location: %s does not exist", s)
-	}
-
-	if !details.ProtoSpecified && details.FileExists {
-		// if local file system, without file://, when using git, should not need file://, but we'll be safe;
-		// satisfies previous constructed test case in scm_test.go as well
-		s = "file://" + s
-	}
-
-	// If the source is valid  GIT remote protocol (ssh://, git://, git@, etc..) use GIT
+	// If the source is valid  GIT protocol (file://, ssh://, git://, git@, etc..) use GIT
 	// binary to download the sources
 	g := git.New()
 	if g.ValidCloneSpec(s) {

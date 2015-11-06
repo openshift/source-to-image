@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -192,6 +193,23 @@ func ParseURL(source string) (*url.URL, error) {
 	return uri, nil
 }
 
+func useCopy(protoSpecified bool, source string) bool {
+	glog.V(4).Infof("useCopy proto spec %v local git repo %v has git bin %v", protoSpecified, isLocalGitRepository(source), hasGitBinary())
+	return !isLocalGitRepository(source) || !hasGitBinary()
+}
+
+// mimic the path munging (make paths absolute to fix file:// with non-absolute paths) done when scm.go:DownloderForSource valided git file urls
+func makePathAbsolute(source string) string {
+	glog.V(4).Infof("makePathAbsolute %s", source)
+	if !strings.HasPrefix(source, "/") {
+		if absolutePath, err := filepath.Abs(source); err == nil {
+			glog.V(4).Infof("makePathAbsolute new path %s err %v", absolutePath, err)
+			return absolutePath
+		}
+	}
+	return source
+}
+
 // ParseFile will see if the input string is a valid file location, where
 // file names have a great deal of flexibility and can even match
 // expect git clone spec syntax; it also provides details if the file://
@@ -203,18 +221,22 @@ func ParseFile(source string) (details *FileProtoDetails, mods *URLMods) {
 		protoSpecified = true
 	}
 
+	// in each valid case, like the prior logic in scm.go did, we'll make the
+	// paths absolute and prepend file:// to the path which callers should
+	// switch to
+
 	// if source, minus potential file:// prefix, exists as is, denote
 	// and return
 	if doesExist(source) {
 		details = &FileProtoDetails{
 			FileExists:     true,
-			UseCopy:        !isLocalGitRepository(source) || !hasGitBinary(),
+			UseCopy:        useCopy(protoSpecified, source),
 			ProtoSpecified: protoSpecified,
 			BadRef:         false,
 		}
 		mods = &URLMods{
 			Scheme: "file",
-			Path:   strings.TrimPrefix(source, "file://"),
+			Path:   "file://" + makePathAbsolute(strings.TrimPrefix(source, "file://")),
 		}
 		return
 	}
@@ -250,14 +272,14 @@ func ParseFile(source string) (details *FileProtoDetails, mods *URLMods) {
 
 		// return good
 		details = &FileProtoDetails{
-			UseCopy:        !isLocalGitRepository(source) || !hasGitBinary(),
+			UseCopy:        useCopy(protoSpecified, source),
 			FileExists:     true,
 			ProtoSpecified: protoSpecified,
 			BadRef:         false,
 		}
 		mods = &URLMods{
 			Scheme: "file",
-			Path:   path,
+			Path:   "file://" + makePathAbsolute(strings.TrimPrefix(source, "file://")),
 			Ref:    ref,
 		}
 		return
@@ -384,7 +406,7 @@ func (h *stiGit) Clone(source, target string, c api.CloneConfig) error {
 		out, _ := ioutil.ReadAll(errReader)
 		// If we captured errors via stderr, print them out.
 		if len(out) > 0 {
-			glog.Errorf("Clone failed: %s", out)
+			glog.Errorf("Clone failed: source %s, target %s,  with output %s", source, target, out)
 		}
 		return err
 	}

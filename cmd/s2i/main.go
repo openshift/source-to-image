@@ -263,6 +263,7 @@ func newCmdUsage(cfg *api.Config) *cobra.Command {
 				os.Exit(1)
 			}
 
+			cfg.Usage = true
 			cfg.BuilderImage = args[0]
 			envs, err := cmdutil.ParseEnvs(cmd, "env")
 			checkErr(err)
