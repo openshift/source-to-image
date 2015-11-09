@@ -5,12 +5,7 @@
 #
 FROM openshift/origin-base
 
-# components from EPEL must be installed in a separate yum install step
-RUN yum install -y git tar wget socat hostname epel-release && \
-    yum clean all
-
-RUN yum install -y hg golang golang-pkg-darwin-amd64 golang-pkg-windows-amd64 && \
-    yum clean all
+RUN yum install -y zip hg golang golang-pkg-darwin-amd64 golang-pkg-windows-amd64 golang-pkg-linux-386 && yum clean all
 
 ENV GOPATH /go
 
