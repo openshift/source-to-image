@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -267,11 +268,13 @@ func (b *STI) PostExecute(containerID, location string) error {
 	runCmd := b.scriptsURL[api.Run]
 	if strings.HasPrefix(runCmd, "image://") {
 		// scripts from inside of the image, we need to strip the image part
-		runCmd = filepath.Join(strings.TrimPrefix(runCmd, "image://"), api.Run)
+		// NOTE: We use path.Join instead of filepath.Join to avoid converting the
+		// path to UNC (Windows) format as we always run this inside container.
+		runCmd = path.Join(strings.TrimPrefix(runCmd, "image://"), api.Run)
 	} else {
 		// external scripts, in which case we're taking the directory to which they
 		// were extracted and append scripts dir and name
-		runCmd = filepath.Join(location, "scripts", api.Run)
+		runCmd = path.Join(location, "scripts", api.Run)
 	}
 	existingLabels, err := b.docker.GetLabels(b.config.BuilderImage)
 	if err != nil {

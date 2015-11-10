@@ -3,7 +3,7 @@ package docker
 import (
 	"fmt"
 	"io"
-	"path/filepath"
+	"path"
 	"strings"
 	"sync"
 
@@ -371,7 +371,9 @@ func runContainerTar(opts RunContainerOptions, config docker.Config, imageMetada
 	if opts.ExternalScripts {
 		// for external scripts we must always append 'scripts' because this is
 		// the default subdirectory inside tar for them
-		commandBaseDir = filepath.Join(tarDestination, "scripts")
+		// NOTE: We use path.Join instead of filepath.Join to avoid converting the
+		// path to UNC (Windows) format as we always run this inside container.
+		commandBaseDir = path.Join(tarDestination, "scripts")
 		glog.V(2).Infof("Both scripts and untarred source will be placed in '%s'", tarDestination)
 	} else {
 		// for internal scripts we can have separate path for scripts and untar operation destination
@@ -384,12 +386,14 @@ func runContainerTar(opts RunContainerOptions, config docker.Config, imageMetada
 			commandBaseDir, tarDestination)
 	}
 
-	cmd := []string{filepath.Join(commandBaseDir, string(opts.Command))}
+	// NOTE: We use path.Join instead of filepath.Join to avoid converting the
+	// path to UNC (Windows) format as we always run this inside container.
+	cmd := []string{path.Join(commandBaseDir, string(opts.Command))}
 	// when calling assemble script with Stdin parameter set (the tar file)
 	// we need to first untar the whole archive and only then call the assemble script
 	if opts.Stdin != nil && (opts.Command == api.Assemble || opts.Command == api.Usage) {
 		cmd = []string{"/bin/sh", "-c", fmt.Sprintf("tar -C %s -xf - && %s",
-			tarDestination, filepath.Join(commandBaseDir, string(opts.Command)))}
+			tarDestination, path.Join(commandBaseDir, string(opts.Command)))}
 	}
 	config.Cmd = cmd
 	return config, tarDestination
