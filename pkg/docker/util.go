@@ -220,6 +220,15 @@ func CheckAllowedUser(d Docker, imageName string, uids user.RangeList, isOnbuild
 	return nil
 }
 
+// IsReachable returns true if the Docker daemon is reachable from s2i
+func IsReachable(config *api.Config) bool {
+	d, err := New(config.DockerConfig, config.PullAuthentication)
+	if err != nil {
+		return false
+	}
+	return d.Ping() == nil
+}
+
 // GetBuilderImage processes the config and performs operations necessary to make
 // the Docker image specified as BuilderImage available locally.
 // It returns information about the base image, containing metadata necessary

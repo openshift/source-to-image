@@ -59,6 +59,11 @@ func (f *FakeDocker) IsImageOnBuild(imageName string) bool {
 	return f.IsOnBuildResult
 }
 
+// Ping tells id the Docker deamon is reachable
+func (f *FakeDocker) Ping() error {
+	return nil
+}
+
 // GetOnBuild returns the list of onbuild instructions for the given image
 func (f *FakeDocker) GetOnBuild(imageName string) ([]string, error) {
 	f.OnBuildImage = imageName

@@ -63,6 +63,7 @@ type Docker interface {
 	BuildImage(opts BuildImageOptions) error
 	GetImageUser(name string) (string, error)
 	GetLabels(name string) (map[string]string, error)
+	Ping() error
 }
 
 // Client contains all methods called on the go Docker
@@ -80,6 +81,7 @@ type Client interface {
 	CopyFromContainer(opts docker.CopyFromContainerOptions) error
 	BuildImage(opts docker.BuildImageOptions) error
 	InspectContainer(id string) (*docker.Container, error)
+	Ping() error
 }
 
 type stiDocker struct {
@@ -179,6 +181,11 @@ func (d *stiDocker) GetImageUser(name string) (string, error) {
 		user = image.Config.User
 	}
 	return user, nil
+}
+
+// Ping determines if the Docker daemon is reachable
+func (d *stiDocker) Ping() error {
+	return d.client.Ping()
 }
 
 // IsImageOnBuild provides information about whether the Docker image has

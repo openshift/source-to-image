@@ -133,6 +133,10 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 				fmt.Printf("\n%s\n", describe.DescribeConfig(cfg))
 			}
 
+			if !docker.IsReachable(cfg) {
+				glog.Fatalf("Unable to connect to Docker daemon. Please set the DOCKER_HOST or make sure the Docker socket %q exists", cfg.DockerConfig.Endpoint)
+			}
+
 			builder, err := strategies.GetStrategy(cfg)
 			checkErr(err)
 			result, err := builder.Build(cfg)
