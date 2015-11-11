@@ -174,6 +174,7 @@ func (d *stiDocker) GetImageUser(name string) (string, error) {
 	name = getImageName(name)
 	image, err := d.client.InspectImage(name)
 	if err != nil {
+		glog.V(4).Infof("error inspecting image %s: %v", name, err)
 		return "", errors.NewInspectImageError(name, err)
 	}
 	user := image.ContainerConfig.User
@@ -227,6 +228,7 @@ func (d *stiDocker) CheckImage(name string) (*docker.Image, error) {
 	name = getImageName(name)
 	image, err := d.client.InspectImage(name)
 	if err != nil {
+		glog.V(4).Infof("error inspecting image %s: %v", name, err)
 		return nil, errors.NewInspectImageError(name, err)
 	}
 	return image, nil
@@ -243,6 +245,7 @@ func (d *stiDocker) PullImage(name string) (*docker.Image, error) {
 	}
 	image, err := d.client.InspectImage(name)
 	if err != nil {
+		glog.V(4).Infof("error inspecting image %s: %v", name, err)
 		return nil, errors.NewInspectImageError(name, err)
 	}
 	return image, nil
@@ -263,6 +266,7 @@ func (d *stiDocker) GetLabels(name string) (map[string]string, error) {
 	name = getImageName(name)
 	image, err := d.client.InspectImage(name)
 	if err != nil {
+		glog.V(4).Infof("error inspecting image %s: %v", name, err)
 		return nil, errors.NewInspectImageError(name, err)
 	}
 	return image.Config.Labels, nil
