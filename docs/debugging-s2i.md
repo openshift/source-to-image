@@ -73,7 +73,7 @@ Review the example [here](https://github.com/gabemontero/source-to-image/blob/ma
 
 Per this discussion point  [here](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#s2i-scripts), if your s2i related scripts are already placed in the image, but their locations are not indicated by one of the provided means, attempts to download the scripts will fail.
 
-   	E0720 21:08:37.166063 04204 main.go:328] An error ocurred: scripts inside the image:  image:///path/to/image
+   	E0720 21:08:37.166063 04204 main.go:328] An error occurred: scripts inside the image:  image:///path/to/image
 
 Properly reference the script location with the methods described in the above link.
 

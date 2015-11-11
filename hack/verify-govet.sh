@@ -30,7 +30,7 @@ do
 done
 
 # We don't want to exit on the first failure of go vet, so just keep track of
-# whether a failure occured or not.
+# whether a failure occurred or not.
 if $FAILURE
 then
   echo "FAILURE: go vet failed!"
