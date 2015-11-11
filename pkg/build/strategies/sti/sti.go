@@ -103,8 +103,11 @@ func New(req *api.Config, overrides build.Overrides) (*STI, error) {
 
 	// The sources are downloaded using the GIT downloader.
 	// TODO: Add more SCM in future.
+	// TODO: explicit decision made to customize processing for usage specifically vs.
+	// leveraging overrides; also, we ultimately want to simplify s2i usage a good bit,
+	// which would lead to replacing this quick short circuit (so this change is tactical)
 	b.source = overrides.Downloader
-	if b.source == nil {
+	if b.source == nil && !req.Usage {
 		downloader, sourceURL, err := scm.DownloaderForSource(req.Source)
 		if err != nil {
 			return nil, err
