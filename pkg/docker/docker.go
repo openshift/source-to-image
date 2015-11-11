@@ -107,6 +107,7 @@ type RunContainerOptions struct {
 	ScriptsURL      string
 	Destination     string
 	Command         string
+	Cmd             []string
 	Env             []string
 	Stdin           io.Reader
 	Stdout          io.Writer
@@ -517,6 +518,10 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 	}
 	if opts.Stdout != nil {
 		config.AttachStdout = true
+	}
+
+	if len(opts.Cmd) > 0 {
+		config.Cmd = opts.Cmd
 	}
 
 	glog.V(2).Infof("Creating container using config: %+v", config)
