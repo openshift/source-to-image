@@ -436,12 +436,15 @@ func (h *stiGit) GetInfo(repo string) *api.SourceInfo {
 		return strings.TrimSpace(string(out))
 	}
 	return &api.SourceInfo{
-		Location: git("config", "--get", "remote.origin.url"),
-		Ref:      git("rev-parse", "--abbrev-ref", "HEAD"),
-		CommitID: git("rev-parse", "--verify", "HEAD"),
-		Author:   git("--no-pager", "show", "-s", "--format=%an <%ae>", "HEAD"),
-		Date:     git("--no-pager", "show", "-s", "--format=%ad", "HEAD"),
-		Message:  git("--no-pager", "show", "-s", "--format=%<(80,trunc)%s", "HEAD"),
+		Location:       git("config", "--get", "remote.origin.url"),
+		Ref:            git("rev-parse", "--abbrev-ref", "HEAD"),
+		CommitID:       git("rev-parse", "--verify", "HEAD"),
+		AuthorName:     git("--no-pager", "show", "-s", "--format=%an", "HEAD"),
+		AuthorEmail:    git("--no-pager", "show", "-s", "--format=%ae", "HEAD"),
+		CommitterName:  git("--no-pager", "show", "-s", "--format=%cn", "HEAD"),
+		CommitterEmail: git("--no-pager", "show", "-s", "--format=%ce", "HEAD"),
+		Date:           git("--no-pager", "show", "-s", "--format=%ad", "HEAD"),
+		Message:        git("--no-pager", "show", "-s", "--format=%<(80,trunc)%s", "HEAD"),
 	}
 }
 
