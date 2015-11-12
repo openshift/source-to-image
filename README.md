@@ -151,7 +151,7 @@ Assuming Go and Docker are installed and configured, execute the following comma
 ```
 $ go get github.com/openshift/source-to-image
 $ cd ${GOPATH}/src/github.com/openshift/source-to-image
-$ export PATH=$PATH:${GOPATH}/src/github.com/openshift/source-to-image/_output/local/go/bin/
+$ export PATH=$PATH:${GOPATH}/src/github.com/openshift/source-to-image/_output/local/bin/linux/amd64/
 $ hack/build-go.sh
 ```
 
@@ -173,7 +173,7 @@ with the following test sources and publicly available images:
 
 ```
 $ s2i build git://github.com/pmorie/simple-ruby openshift/ruby-20-centos7 test-ruby-app
-$ docker run --rm -i -p :9292 -t test-ruby-app
+$ docker run --rm -i -p :8080 -t test-ruby-app
 ```
 
 ```
