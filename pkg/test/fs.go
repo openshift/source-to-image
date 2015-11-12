@@ -139,6 +139,13 @@ func (f *FakeFileSystem) Copy(sourcePath, targetPath string) error {
 	return f.CopyError
 }
 
+// CopyContents copies directory contents on the fake filesystem
+func (f *FakeFileSystem) CopyContents(sourcePath, targetPath string) error {
+	f.CopySource = sourcePath
+	f.CopyDest = targetPath
+	return f.CopyError
+}
+
 // RemoveDirectory removes a directory in the fake filesystem
 func (f *FakeFileSystem) RemoveDirectory(dir string) error {
 	f.RemoveDirName = dir
