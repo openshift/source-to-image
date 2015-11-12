@@ -220,9 +220,19 @@ type SourceInfo struct {
 	// The output image will contain this information as 'io.openshift.build.commit.date' label.
 	Date string
 
-	// Author contains information about the committer name and email address.
-	// The output image will contain this information as 'io.openshift.build.commit.author' label.
-	Author string
+	// AuthorName contains the name of the author
+	// The output image will contain this information (along with AuthorEmail) as 'io.openshift.build.commit.author' label.
+	AuthorName string
+
+	// AuthorEmail contains the e-mail of the author
+	// The output image will contain this information (along with AuthorName) as 'io.openshift.build.commit.author' lablel.
+	AuthorEmail string
+
+	// CommitterName contains the name of the committer
+	CommitterName string
+
+	// CommitterEmail contains the e-mail of the committer
+	CommitterEmail string
 
 	// Message represents the first 80 characters from the commit message.
 	// The output image will contain this information as 'io.openshift.build.commit.message' label.
