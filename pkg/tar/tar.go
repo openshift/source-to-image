@@ -19,7 +19,7 @@ import (
 // defaultTimeout is the amount of time that the untar will wait for a tar
 // stream to extract a single file. A timeout is needed to guard against broken
 // connections in which it would wait for a long time to untar and nothing would happen
-const defaultTimeout = 5 * time.Second
+const defaultTimeout = 30 * time.Second
 
 // defaultExclusionPattern is the pattern of files that will not be included in a tar
 // file when creating one. By default it is any file inside a .git metadata directory
