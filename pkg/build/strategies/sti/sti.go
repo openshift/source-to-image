@@ -284,12 +284,13 @@ func (b *STI) PostExecute(containerID, location string) error {
 		glog.Errorf("Unable to read existing labels from current builder image %s", b.config.BuilderImage)
 	}
 
+	resultLabels := mergeLabels(util.GenerateOutputImageLabels(b.sourceInfo, b.config), existingLabels)
 	opts := dockerpkg.CommitContainerOptions{
 		Command:     append([]string{}, runCmd),
 		Env:         buildEnv,
 		ContainerID: containerID,
 		Repository:  b.config.Tag,
-		Labels:      mergeLabels(util.GenerateOutputImageLabels(b.sourceInfo, b.config), existingLabels),
+		Labels:      resultLabels,
 	}
 
 	imageID, err := b.docker.CommitContainer(opts)
@@ -315,7 +316,7 @@ func (b *STI) PostExecute(containerID, location string) error {
 
 	if b.config.CallbackURL != "" {
 		b.result.Messages = b.callbackInvoker.ExecuteCallback(b.config.CallbackURL,
-			b.result.Success, b.result.Messages)
+			b.result.Success, resultLabels, b.result.Messages)
 	}
 
 	return nil
