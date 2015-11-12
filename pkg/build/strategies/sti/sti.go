@@ -158,8 +158,12 @@ func (b *STI) Build(config *api.Config) (*api.Result, error) {
 		}
 	}
 
-	glog.V(1).Infof("Running S2I script in %s", config.Tag)
-	if err := b.scripts.Execute(api.Assemble, config); err != nil {
+	if len(config.AssembleUser) > 0 {
+		glog.V(1).Infof("Running %q in %q as %q user", api.Assemble, config.Tag, config.AssembleUser)
+	} else {
+		glog.V(1).Infof("Running %q in %q", api.Assemble, config.Tag)
+	}
+	if err := b.scripts.Execute(api.Assemble, config.AssembleUser, config); err != nil {
 		switch e := err.(type) {
 		case errors.ContainerError:
 			if !isMissingRequirements(e.Output) {
@@ -386,7 +390,7 @@ func (b *STI) Save(config *api.Config) (err error) {
 }
 
 // Execute runs the specified STI script in the builder image.
-func (b *STI) Execute(command string, config *api.Config) error {
+func (b *STI) Execute(command string, user string, config *api.Config) error {
 	glog.V(2).Infof("Using image name %s", config.BuilderImage)
 
 	env, err := scripts.GetEnvironment(config)
@@ -421,6 +425,7 @@ func (b *STI) Execute(command string, config *api.Config) error {
 		Destination:     config.Destination,
 		Command:         command,
 		Env:             buildEnv,
+		User:            user,
 		PostExec:        b.postExecutor,
 		NetworkMode:     string(config.DockerNetworkMode),
 	}
