@@ -147,6 +147,9 @@ type Config struct {
 	// that is outside the specified range, then the build fails.
 	AllowedUIDs user.RangeList
 
+	// AssembleUser specifies the user to run the assemble script in container
+	AssembleUser string
+
 	// RunImage will trigger a "docker run ..." invocation of the produced image so the user
 	// can see if it operates as he would expect
 	RunImage bool

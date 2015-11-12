@@ -115,6 +115,7 @@ type RunContainerOptions struct {
 	PostExec        PostExecutor
 	TargetImage     bool
 	NetworkMode     string
+	User            string
 }
 
 // CommitContainerOptions are options passed in to the CommitContainer method
@@ -508,6 +509,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 
 	config := docker.Config{
 		Image: image,
+		User:  opts.User,
 	}
 
 	config, tarDestination := runContainerTar(opts, config, imageMetadata)
