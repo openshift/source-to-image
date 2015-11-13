@@ -236,7 +236,7 @@ func ParseFile(source string) (details *FileProtoDetails, mods *URLMods) {
 		}
 		mods = &URLMods{
 			Scheme: "file",
-			Path:   "file://" + makePathAbsolute(strings.TrimPrefix(source, "file://")),
+			Path:   makePathAbsolute(strings.TrimPrefix(source, "file://")),
 		}
 		return
 	}
@@ -279,7 +279,7 @@ func ParseFile(source string) (details *FileProtoDetails, mods *URLMods) {
 		}
 		mods = &URLMods{
 			Scheme: "file",
-			Path:   "file://" + makePathAbsolute(strings.TrimPrefix(source, "file://")),
+			Path:   makePathAbsolute(strings.TrimPrefix(source, "file://")),
 			Ref:    ref,
 		}
 		return
