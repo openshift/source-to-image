@@ -54,7 +54,7 @@ MAVEN_ARGS='-P some-repo,some-other-repo'
 Providing S2I Scripts
 --------------
 
-First, a basic reminder:  you should verify your scripts have excutable permissions.
+First, a basic reminder:  you should verify your scripts have executable permissions.
 
 Then, a few of the trickier obstacles that have arisen for users in the past:
 
