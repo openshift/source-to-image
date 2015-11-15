@@ -202,7 +202,7 @@ func (b *STI) Prepare(config *api.Config) error {
 		}
 	}
 
-	// fetch sources, for theirs .sti/bin might contain sti scripts
+	// fetch sources, for their .sti/bin might contain sti scripts
 	if len(config.Source) > 0 {
 		if b.sourceInfo, err = b.source.Download(config); err != nil {
 			return err
