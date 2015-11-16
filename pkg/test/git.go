@@ -17,6 +17,14 @@ type FakeGit struct {
 	CheckoutRepo  string
 	CheckoutRef   string
 	CheckoutError error
+
+	SubmoduleInitRepo  string
+	SubmoduleInitError error
+
+	SubmoduleUpdateRepo      string
+	SubmoduleUpdateInit      bool
+	SubmoduleUpdateRecursive bool
+	SubmoduleUpdateError     error
 }
 
 // ValidCloneSpec returns a valid GIT clone specification
@@ -49,6 +57,20 @@ func (f *FakeGit) Checkout(repo, ref string) error {
 	f.CheckoutRepo = repo
 	f.CheckoutRef = ref
 	return f.CheckoutError
+}
+
+// SubmoduleInit initializes / clones submodules.
+func (f *FakeGit) SubmoduleInit(repo string) error {
+	f.SubmoduleInitRepo = repo
+	return f.SubmoduleInitError
+}
+
+// SubmoduleUpdate checks out submodules to their correct version
+func (f *FakeGit) SubmoduleUpdate(repo string, init, recursive bool) error {
+	f.SubmoduleUpdateRepo = repo
+	f.SubmoduleUpdateRecursive = recursive
+	f.SubmoduleUpdateInit = init
+	return f.SubmoduleUpdateError
 }
 
 func (f *FakeGit) GetInfo(repo string) *api.SourceInfo {
