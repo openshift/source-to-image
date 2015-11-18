@@ -25,6 +25,7 @@ type Git interface {
 	MungeNoProtocolURL(source string, url *url.URL) error
 	Clone(source, target string, opts api.CloneConfig) error
 	Checkout(repo, ref string) error
+	SubmoduleUpdate(repo string, init, recursive bool) error
 	GetInfo(string) *api.SourceInfo
 }
 
@@ -421,6 +422,35 @@ func (h *stiGit) Checkout(repo, ref string) error {
 		Dir:    repo,
 	}
 	return h.runner.RunWithOptions(opts, "git", "checkout", ref)
+}
+
+// SubmoduleInit initializes/clones submodules
+func (h *stiGit) SubmoduleInit(repo string) error {
+	opts := util.CommandOpts{
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+		Dir:    repo,
+	}
+	return h.runner.RunWithOptions(opts, "git", "submodule", "init")
+}
+
+// SubmoduleUpdate checks out submodules to their correct version.
+// Optionally also inits submodules, optionally operates recursively.
+func (h *stiGit) SubmoduleUpdate(repo string, init, recursive bool) error {
+	updateArgs := []string{"submodule", "update"}
+	if init {
+		updateArgs = append(updateArgs, "--init")
+	}
+	if recursive {
+		updateArgs = append(updateArgs, "--recursive")
+	}
+
+	opts := util.CommandOpts{
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+		Dir:    repo,
+	}
+	return h.runner.RunWithOptions(opts, "git", updateArgs...)
 }
 
 // GetInfo retrieves the informations about the source code and commit
