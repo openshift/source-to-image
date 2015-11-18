@@ -391,7 +391,7 @@ sti::build::sti_version_vars() {
     fi
 
     # Use git describe to find the version based on annotated tags.
-    if [[ -n ${STI_GIT_VERSION-} ]] || STI_GIT_VERSION=$("${git[@]}" describe "${STI_GIT_COMMIT}^{commit}" 2>/dev/null); then
+    if [[ -n ${STI_GIT_VERSION-} ]] || STI_GIT_VERSION=$("${git[@]}" describe --tags "${STI_GIT_COMMIT}^{commit}" 2>/dev/null); then
       if [[ "${STI_GIT_TREE_STATE}" == "dirty" ]]; then
         # git describe --dirty only considers changes to existing files, but
         # that is problematic since new untracked .go files affect the build,
