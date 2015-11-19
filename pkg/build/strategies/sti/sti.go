@@ -367,8 +367,20 @@ func (b *STI) Save(config *api.Config) (err error) {
 		return b.tar.ExtractTarStream(artifactTmpDir, outReader)
 	}
 
+	user := config.AssembleUser
+	if len(user) == 0 {
+		user, err = b.docker.GetImageUser(image)
+		if err != nil {
+			return err
+		}
+		glog.V(3).Infof("The assemble user is not set, defaulting to %q user", user)
+	} else {
+		glog.V(3).Infof("Using assemble user %q to extract artifacts", user)
+	}
+
 	opts := dockerpkg.RunContainerOptions{
 		Image:           image,
+		User:            user,
 		ExternalScripts: b.externalScripts[api.SaveArtifacts],
 		ScriptsURL:      config.ScriptsURL,
 		Destination:     config.Destination,
