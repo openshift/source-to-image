@@ -12,7 +12,8 @@ function time_now()
   echo $(date +%s000)
 }
 
-WORK_DIR=$(mktemp -d /tmp/test-work.XXXX)
+mkdir -p /tmp/sti
+WORK_DIR=$(mktemp -d /tmp/sti/test-work.XXXX)
 NEEDKILL="yes"
 S2I_PID=""
 function cleanup()
