@@ -122,6 +122,7 @@ type RunContainerOptions struct {
 type CommitContainerOptions struct {
 	ContainerID string
 	Repository  string
+	User        string
 	Command     []string
 	Env         []string
 	Labels      map[string]string
@@ -599,6 +600,7 @@ func (d *stiDocker) CommitContainer(opts CommitContainerOptions) (string, error)
 			Cmd:    opts.Command,
 			Env:    opts.Env,
 			Labels: opts.Labels,
+			User:   opts.User,
 		}
 		dockerOpts.Run = &config
 		glog.V(2).Infof("Committing container with config: %+v", config)
