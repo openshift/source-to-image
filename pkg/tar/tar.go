@@ -223,7 +223,7 @@ func (t *stiTar) ExtractTarStreamWithLogging(dir string, reader io.Reader, logge
 					errorChannel <- err
 					break
 				}
-				if header.Mode&tar.TypeSymlink == tar.TypeSymlink {
+				if header.Typeflag == tar.TypeSymlink {
 					if err := extractLink(dir, header, tarReader); err != nil {
 						glog.Errorf("Error extracting link %q: %v", header.Name, err)
 						errorChannel <- err
