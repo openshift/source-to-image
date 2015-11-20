@@ -1,0 +1,16 @@
+#!/bin/sh -e
+#
+# S2I save-artifacts script for the 'nginx-centos7' image.
+# The save-artifacts script streams a tar archive to standard output.
+# The archive contains the files and folders you want to re-use in the next build.
+#
+# For more information see the documentation:
+#	https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md
+#
+# Replace this with any logic that you need in order to save all of your built artifacts from
+# your application so they can be reused in a future build to save time.
+touch /tmp/artifact
+cd /tmp
+# the final step of the assemble script is to stream a tar of the artifacts to be saved, to stdout.
+# This tar stream will be received by s2i and used as an input to the build
+tar cf - artifact
