@@ -25,7 +25,7 @@ all build:
 	hack/build-go.sh
 .PHONY: all build
 
-# Verify code is properly organized.
+# Verify if code is properly organized.
 #
 # Example:
 #   make verify
@@ -55,7 +55,7 @@ install-travis:
 # Example:
 #   make check
 #   make test
-#   make check WHAT=pkg/build GOFLAGS=-v
+#   make check WHAT=pkg/build TESTFLAGS=-v
 check:
 	hack/test-go.sh $(WHAT) $(TESTS) $(TESTFLAGS)
 .PHONY: check
