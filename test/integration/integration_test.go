@@ -379,7 +379,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 		t.Fatalf("Unexpected error occurred during build: %v", err)
 	}
 	if !resp.Success {
-		t.Fatalf("S2I Build failed.")
+		t.Fatalf("S2I build failed.")
 	}
 
 	previousImageID := resp.ImageID
