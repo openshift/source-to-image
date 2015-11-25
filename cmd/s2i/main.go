@@ -100,6 +100,7 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 			// Attempt to read the .dockercfg and extract the authentication for
 			// docker pull
 			if r, err := os.Open(cfg.DockerCfgPath); err == nil {
+				defer r.Close()
 				auths := docker.LoadImageRegistryAuth(r)
 				cfg.PullAuthentication = docker.GetImageRegistryAuth(auths, cfg.BuilderImage)
 				if cfg.Incremental {
