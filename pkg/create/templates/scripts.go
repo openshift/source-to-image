@@ -12,7 +12,7 @@ const AssembleScript = `#!/bin/bash -e
 if [ "$1" = "-h" ]; then
 	# If the '{{.ImageName}}' assemble script is executed with '-h' flag,
 	# print the usage.
-	exec /usr/local/s2i/usage
+	exec /usr/libexec/s2i/usage
 fi
 
 # Restore artifacts from the previous build (if they exist).
