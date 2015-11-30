@@ -332,7 +332,7 @@ func TestPostExecute(t *testing.T) {
 		}
 		ci := bh.callbackInvoker.(*test.FakeCallbackInvoker)
 		if tc.scriptsFromImage {
-			bh.scriptsURL = map[string]string{api.Run: "image:///usr/local/sti"}
+			bh.scriptsURL = map[string]string{api.Run: "image:///usr/libexec/s2i"}
 		}
 		err := bh.PostExecute(containerID, "cmd1")
 		if err != nil {
@@ -341,7 +341,7 @@ func TestPostExecute(t *testing.T) {
 		// Ensure CommitContainer was called with the right parameters
 		expectedCmd := []string{"cmd1/scripts/" + api.Run}
 		if tc.scriptsFromImage {
-			expectedCmd = []string{"/usr/local/sti/" + api.Run}
+			expectedCmd = []string{"/usr/libexec/s2i/" + api.Run}
 		}
 		if !reflect.DeepEqual(dh.CommitContainerOpts.Command, expectedCmd) {
 			t.Errorf("(%d) Unexpected commit container command: %#v", i, dh.CommitContainerOpts.Command)
