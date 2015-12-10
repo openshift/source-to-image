@@ -3,13 +3,13 @@ package templates
 const AssembleScript = `#!/bin/bash -e
 #
 # S2I assemble script for the '{{.ImageName}}' image.
-# The 'assemble' script builds your application source ready to run.
+# The 'assemble' script builds your application source so that it is ready to run.
 #
 # For more information refer to the documentation:
 #	https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md
 #
 
-if [ "$1" = "-h" ]; then
+if [[ "$1" == "-h" ]]; then
 	# If the '{{.ImageName}}' assemble script is executed with '-h' flag,
 	# print the usage.
 	exec /usr/libexec/s2i/usage
@@ -18,14 +18,14 @@ fi
 # Restore artifacts from the previous build (if they exist).
 #
 if [ "$(ls /tmp/artifacts/ 2>/dev/null)" ]; then
-  echo "---> Restoring build artifacts"
+  echo "---> Restoring build artifacts..."
   mv /tmp/artifacts/. ./
 fi
 
-echo "---> Installing application source"
+echo "---> Installing application source..."
 cp -Rf /tmp/src/. ./
 
-echo "---> Building application from source"
+echo "---> Building application from source..."
 # TODO: Add build steps for your application, eg npm install, bundle install
 `
 
