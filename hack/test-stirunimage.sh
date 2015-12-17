@@ -127,11 +127,11 @@ s2i build git://github.com/openshift/cakephp-ex openshift/php-55-centos7 test --
 check_result $? "${WORK_DIR}/s2i-git-proto.log"
 
 test_debug "s2i build with --run==true option"
-s2i build git://github.com/bparees/openshift-jee-sample openshift/wildfly-8-centos test-jee-app --run=true &> "${WORK_DIR}/s2i-run.log" &
+s2i build git://github.com/bparees/openshift-jee-sample openshift/wildfly-90-centos7 test-jee-app --run=true &> "${WORK_DIR}/s2i-run.log" &
 S2I_PID=$!
 TIME_SEC=1000
 TIME_MIN=$((60 * $TIME_SEC))
-max_wait=10*TIME_MIN
+max_wait=15*TIME_MIN
 echo "Waiting up to ${max_wait} for the build to finish ..."
 expire=$(($(time_now) + $max_wait))
 
@@ -148,13 +148,13 @@ while [[ $(time_now) -lt $expire ]]; do
       docker ps -a | grep test-jee-app
 
       if [ $? -eq 1 ]; then
-	  echo "[INFO] Success terminating associated docker container"
-	  touch "${WORK_DIR}/ran-clean"
-	  exit 0
+	     echo "[INFO] Success terminating associated docker container"
+	     touch "${WORK_DIR}/ran-clean"
+	     exit 0
       else
-	  echo "[INFO] Associated docker container still found, review docker ps -a output above, and here is the dump of ${WORK_DIR}/s2i-run.log"
-	  cat "${WORK_DIR}/s2i-run.log"
-	  exit 1
+	     echo "[INFO] Associated docker container still found, review docker ps -a output above, and here is the dump of ${WORK_DIR}/s2i-run.log"
+	     cat "${WORK_DIR}/s2i-run.log"
+	     exit 1
       fi
     fi
     sleep 1
