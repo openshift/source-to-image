@@ -14,7 +14,6 @@ Interested in learning more? Read on!
 
 Want to just get started now? Check out the [instructions](#getting-started).
 
-
 # Philosophy
 
 1. Simplify the process of application source + builder image -> usable image for most use cases (the
@@ -28,6 +27,8 @@ Want to just get started now? Check out the [instructions](#getting-started).
 
 
 # Anatomy of a builder image
+
+See a practical tutorial on how to create a builder image [here](examples/TUTORIAL.md)
 
 Creating builder images is easy. `s2i` looks for you to supply the following scripts to use with an
 image:
