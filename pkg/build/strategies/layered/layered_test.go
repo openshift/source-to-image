@@ -2,6 +2,9 @@ package layered
 
 import (
 	"errors"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"regexp"
 	"testing"
 
@@ -26,7 +29,50 @@ func newFakeLayered() *Layered {
 	}
 }
 
+func newFakeLayeredWithScripts(assemble, workDir string) *Layered {
+	return &Layered{
+		docker:  &docker.FakeDocker{},
+		config:  &api.Config{WorkingDir: workDir},
+		fs:      &test.FakeFileSystem{},
+		tar:     &test.FakeTar{},
+		scripts: &FakeExecutor{},
+	}
+}
+
 func TestBuildOK(t *testing.T) {
+	workDir, _ := ioutil.TempDir("", "sti")
+	scriptDir := filepath.Join(workDir, api.UploadScripts)
+	err := os.MkdirAll(scriptDir, 0700)
+	assemble := filepath.Join(scriptDir, api.Assemble)
+	file, err := os.Create(assemble)
+	if err != nil {
+		t.Errorf("Unexpected error returned: %v", err)
+	}
+	defer file.Close()
+	defer os.RemoveAll(workDir)
+	l := newFakeLayeredWithScripts(assemble, workDir)
+	l.config.BuilderImage = "test/image"
+	_, err = l.Build(l.config)
+	if err != nil {
+		t.Errorf("Unexpected error returned: %v", err)
+	}
+	if !l.config.LayeredBuild {
+		t.Errorf("Expected LayeredBuild to be true!")
+	}
+	if m, _ := regexp.MatchString(`test/image-\d+`, l.config.BuilderImage); !m {
+		t.Errorf("Expected BuilderImage test/image-withnumbers, but got %s ", l.config.BuilderImage)
+	}
+	// without config.Destination explicitly set, we should get /tmp/scripts for the scripts url
+	// assuming the assemble script we created above is off the working dir
+	if l.config.ScriptsURL != "image:///tmp/scripts" {
+		t.Errorf("Expected ScriptsURL image:///tmp/scripts, but got %s", l.config.ScriptsURL)
+	}
+	if len(l.config.Destination) != 0 {
+		t.Errorf("Unexpected Destination %s", l.config.Destination)
+	}
+}
+
+func TestBuildNoScriptsProvided(t *testing.T) {
 	l := newFakeLayered()
 	l.config.BuilderImage = "test/image"
 	_, err := l.Build(l.config)
@@ -38,9 +84,6 @@ func TestBuildOK(t *testing.T) {
 	}
 	if m, _ := regexp.MatchString(`test/image-\d+`, l.config.BuilderImage); !m {
 		t.Errorf("Expected BuilderImage test/image-withnumbers, but got %s", l.config.BuilderImage)
-	}
-	if l.config.ScriptsURL != "image:///tmp/scripts" {
-		t.Error("Expected ScriptsURL image:///tmp/scripts, but got %s", l.config.ScriptsURL)
 	}
 	if len(l.config.Destination) != 0 {
 		t.Errorf("Unexpected Destination %s", l.config.Destination)
