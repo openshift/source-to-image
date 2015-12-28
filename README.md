@@ -28,7 +28,7 @@ Want to just get started now? Check out the [instructions](#getting-started).
 
 # Anatomy of a builder image
 
-See a practical tutorial on how to create a builder image [here](examples/TUTORIAL.md)
+See a practical tutorial on how to create a builder image [here](examples/README.md)
 
 Creating builder images is easy. `s2i` looks for you to supply the following scripts to use with an
 image:
