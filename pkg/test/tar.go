@@ -52,6 +52,14 @@ func (f *FakeTar) ExtractTarStream(dir string, reader io.Reader) error {
 func (f *FakeTar) SetExclusionPattern(*regexp.Regexp) {
 }
 
+func (f *FakeTar) StreamFileAsTar(string, string, io.Writer) error {
+	return nil
+}
+
+func (f *FakeTar) StreamDirAsTar(string, string, io.Writer) error {
+	return nil
+}
+
 func (f *FakeTar) CreateTarStreamWithLogging(dir string, includeDirInPath bool, writer io.Writer, logger io.Writer) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()

@@ -19,6 +19,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/build/strategies"
+	"github.com/openshift/source-to-image/pkg/util"
 )
 
 const (
@@ -59,6 +60,11 @@ const (
 	// Port 23456 must match the port used in the fake image Dockerfiles
 	FakeScriptsHttpURL = "http://127.0.0.1:23456/sti-fake/.sti/bin"
 )
+
+// TestInjectionBuild tests the build where we inject files to assemble script.
+func TestInjectionBuild(t *testing.T) {
+	integration(t).exerciseInjectionBuild(TagCleanBuild, FakeBuilderImage, "/tmp/s2i-test-dir:/tmp")
+}
 
 type integrationTest struct {
 	t             *testing.T
@@ -358,6 +364,57 @@ func TestIncrementalBuildOnBuild(t *testing.T) {
 	integration(t).exerciseIncrementalBuild(TagIncrementalBuildOnBuild, FakeImageOnBuild, false, true, true)
 }
 
+func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injections string) {
+	t := i.t
+	err := os.Mkdir("/tmp/s2i-test-dir", 0777)
+	if err != nil {
+		t.Errorf("Unable to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll("/tmp/s2i-test-dir")
+	err = ioutil.WriteFile(filepath.Join("/tmp/s2i-test-dir/secret"), []byte("secret"), 0666)
+	if err != nil {
+		t.Errorf("Unable to write content to temporary injection file: %v", err)
+	}
+	injectionList := api.InjectionList{}
+	injectionList.Set(injections)
+	config := &api.Config{
+		DockerConfig:      dockerConfig(),
+		BuilderImage:      imageName,
+		BuilderPullPolicy: api.DefaultBuilderPullPolicy,
+		Source:            TestSource,
+		Tag:               tag,
+		Injections:        injectionList,
+	}
+	builder, err := strategies.GetStrategy(config)
+	if err != nil {
+		t.Fatalf("Unable to create builder: %v", err)
+	}
+	resp, err := builder.Build(config)
+	if err != nil {
+		t.Fatalf("Unexpected error occurred during build: %v", err)
+	}
+	if !resp.Success {
+		t.Fatalf("S2I build failed.")
+	}
+	i.checkForImage(tag)
+	containerID := i.createContainer(tag)
+	defer i.removeContainer(containerID)
+
+	// Check that the injected file is delivered to assemble script
+	i.fileExists(containerID, "/sti-fake/secret-delivered")
+
+	// Make sure the injected file does not exists in resulting image
+	files, err := util.ExpandInjectedFiles(injectionList)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	for _, f := range files {
+		if exitCode := i.runInImage(tag, "test -s "+f); exitCode == 0 {
+			t.Errorf("The file must be empty: %q, we got %q", f, err)
+		}
+	}
+}
+
 func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, removePreviousImage bool, expectClean bool, checkOnBuild bool) {
 	t := i.t
 	config := &api.Config{
@@ -457,6 +514,24 @@ func (i *integrationTest) createContainer(image string) string {
 	return container.ID
 }
 
+func (i *integrationTest) runInContainer(image string, command []string) int {
+	config := docker.Config{Image: image, AttachStdout: false, Cmd: command, AttachStdin: false}
+	container, err := i.dockerClient.CreateContainer(docker.CreateContainerOptions{Name: "", Config: &config})
+	if err != nil {
+		i.t.Errorf("Couldn't create container from image %s", image)
+	}
+
+	err = i.dockerClient.StartContainer(container.ID, &docker.HostConfig{})
+	if err != nil {
+		i.t.Errorf("Couldn't start container: %s", container.ID)
+	}
+	exitCode, err := i.dockerClient.WaitContainer(container.ID)
+	if err != nil {
+		i.t.Errorf("Couldn't start container: %s", container.ID)
+	}
+	return exitCode
+}
+
 func (i *integrationTest) removeContainer(cID string) {
 	i.dockerClient.RemoveContainer(docker.RemoveContainerOptions{cID, true, true})
 }
@@ -475,6 +550,10 @@ func (i *integrationTest) fileNotExists(cID string, filePath string) {
 	if res {
 		i.t.Errorf("Unexpected file %s in container %s", filePath, cID)
 	}
+}
+
+func (i *integrationTest) runInImage(image string, cmd string) int {
+	return i.runInContainer(image, []string{"/bin/sh", "-c", cmd})
 }
 
 func (i *integrationTest) checkBasicBuildState(cID string, workingDir string) {

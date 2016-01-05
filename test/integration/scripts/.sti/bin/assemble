@@ -3,6 +3,10 @@
 cp -Rf /tmp/src /sti-fake/
 touch /sti-fake/assemble-invoked
 
+if [ -f /tmp/secret ]; then
+  grep -q secret /tmp/secret && touch /sti-fake/secret-delivered
+fi
+
 if [ -e /tmp/artifacts/save-artifacts-invoked ]; then
   touch /sti-fake/save-artifacts-invoked
 fi

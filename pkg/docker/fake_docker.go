@@ -89,7 +89,7 @@ func (f *FakeDocker) RunContainer(opts RunContainerOptions) error {
 		return f.RunContainerError
 	}
 	if opts.OnStart != nil {
-		if err := opts.OnStart(); err != nil {
+		if err := opts.OnStart(""); err != nil {
 			return err
 		}
 	}
@@ -97,6 +97,10 @@ func (f *FakeDocker) RunContainer(opts RunContainerOptions) error {
 		opts.PostExec.PostExecute(f.RunContainerContainerID, string(opts.Command))
 	}
 	return f.RunContainerError
+}
+
+func (f *FakeDocker) UploadToContainer(srcPath, destPath, name string) error {
+	return nil
 }
 
 // GetImageID returns a fake Docker image ID
