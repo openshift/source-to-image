@@ -5,7 +5,6 @@
 package docker
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -61,13 +60,13 @@ type APIContainers struct {
 // See https://goo.gl/47a6tO for more details.
 func (c *Client) ListContainers(opts ListContainersOptions) ([]APIContainers, error) {
 	path := "/containers/json?" + queryString(opts)
-	body, _, err := c.do("GET", path, doOptions{})
+	resp, err := c.do("GET", path, doOptions{})
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 	var containers []APIContainers
-	err = json.Unmarshal(body, &containers)
-	if err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&containers); err != nil {
 		return nil, err
 	}
 	return containers, nil
@@ -126,25 +125,38 @@ type PortBinding struct {
 // and its value as found in NetworkSettings should always be nil
 type PortMapping map[string]string
 
+// ContainerNetwork represents the networking settings of a container per network.
+type ContainerNetwork struct {
+	MacAddress          string `json:"MacAddress,omitempty" yaml:"MacAddress,omitempty"`
+	GlobalIPv6PrefixLen int    `json:"GlobalIPv6PrefixLen,omitempty" yaml:"GlobalIPv6PrefixLen,omitempty"`
+	GlobalIPv6Address   string `json:"GlobalIPv6Address,omitempty" yaml:"GlobalIPv6Address,omitempty"`
+	IPv6Gateway         string `json:"IPv6Gateway,omitempty" yaml:"IPv6Gateway,omitempty"`
+	IPPrefixLen         int    `json:"IPPrefixLen,omitempty" yaml:"IPPrefixLen,omitempty"`
+	IPAddress           string `json:"IPAddress,omitempty" yaml:"IPAddress,omitempty"`
+	Gateway             string `json:"Gateway,omitempty" yaml:"Gateway,omitempty"`
+	EndpointID          string `json:"EndpointID,omitempty" yaml:"EndpointID,omitempty"`
+}
+
 // NetworkSettings contains network-related information about a container
 type NetworkSettings struct {
-	IPAddress              string                 `json:"IPAddress,omitempty" yaml:"IPAddress,omitempty"`
-	IPPrefixLen            int                    `json:"IPPrefixLen,omitempty" yaml:"IPPrefixLen,omitempty"`
-	MacAddress             string                 `json:"MacAddress,omitempty" yaml:"MacAddress,omitempty"`
-	Gateway                string                 `json:"Gateway,omitempty" yaml:"Gateway,omitempty"`
-	Bridge                 string                 `json:"Bridge,omitempty" yaml:"Bridge,omitempty"`
-	PortMapping            map[string]PortMapping `json:"PortMapping,omitempty" yaml:"PortMapping,omitempty"`
-	Ports                  map[Port][]PortBinding `json:"Ports,omitempty" yaml:"Ports,omitempty"`
-	NetworkID              string                 `json:"NetworkID,omitempty" yaml:"NetworkID,omitempty"`
-	EndpointID             string                 `json:"EndpointID,omitempty" yaml:"EndpointID,omitempty"`
-	SandboxKey             string                 `json:"SandboxKey,omitempty" yaml:"SandboxKey,omitempty"`
-	GlobalIPv6Address      string                 `json:"GlobalIPv6Address,omitempty" yaml:"GlobalIPv6Address,omitempty"`
-	GlobalIPv6PrefixLen    int                    `json:"GlobalIPv6PrefixLen,omitempty" yaml:"GlobalIPv6PrefixLen,omitempty"`
-	IPv6Gateway            string                 `json:"IPv6Gateway,omitempty" yaml:"IPv6Gateway,omitempty"`
-	LinkLocalIPv6Address   string                 `json:"LinkLocalIPv6Address,omitempty" yaml:"LinkLocalIPv6Address,omitempty"`
-	LinkLocalIPv6PrefixLen int                    `json:"LinkLocalIPv6PrefixLen,omitempty" yaml:"LinkLocalIPv6PrefixLen,omitempty"`
-	SecondaryIPAddresses   []string               `json:"SecondaryIPAddresses,omitempty" yaml:"SecondaryIPAddresses,omitempty"`
-	SecondaryIPv6Addresses []string               `json:"SecondaryIPv6Addresses,omitempty" yaml:"SecondaryIPv6Addresses,omitempty"`
+	Networks               map[string]ContainerNetwork `json:"Networks,omitempty" yaml:"Networks,omitempty"`
+	IPAddress              string                      `json:"IPAddress,omitempty" yaml:"IPAddress,omitempty"`
+	IPPrefixLen            int                         `json:"IPPrefixLen,omitempty" yaml:"IPPrefixLen,omitempty"`
+	MacAddress             string                      `json:"MacAddress,omitempty" yaml:"MacAddress,omitempty"`
+	Gateway                string                      `json:"Gateway,omitempty" yaml:"Gateway,omitempty"`
+	Bridge                 string                      `json:"Bridge,omitempty" yaml:"Bridge,omitempty"`
+	PortMapping            map[string]PortMapping      `json:"PortMapping,omitempty" yaml:"PortMapping,omitempty"`
+	Ports                  map[Port][]PortBinding      `json:"Ports,omitempty" yaml:"Ports,omitempty"`
+	NetworkID              string                      `json:"NetworkID,omitempty" yaml:"NetworkID,omitempty"`
+	EndpointID             string                      `json:"EndpointID,omitempty" yaml:"EndpointID,omitempty"`
+	SandboxKey             string                      `json:"SandboxKey,omitempty" yaml:"SandboxKey,omitempty"`
+	GlobalIPv6Address      string                      `json:"GlobalIPv6Address,omitempty" yaml:"GlobalIPv6Address,omitempty"`
+	GlobalIPv6PrefixLen    int                         `json:"GlobalIPv6PrefixLen,omitempty" yaml:"GlobalIPv6PrefixLen,omitempty"`
+	IPv6Gateway            string                      `json:"IPv6Gateway,omitempty" yaml:"IPv6Gateway,omitempty"`
+	LinkLocalIPv6Address   string                      `json:"LinkLocalIPv6Address,omitempty" yaml:"LinkLocalIPv6Address,omitempty"`
+	LinkLocalIPv6PrefixLen int                         `json:"LinkLocalIPv6PrefixLen,omitempty" yaml:"LinkLocalIPv6PrefixLen,omitempty"`
+	SecondaryIPAddresses   []string                    `json:"SecondaryIPAddresses,omitempty" yaml:"SecondaryIPAddresses,omitempty"`
+	SecondaryIPv6Addresses []string                    `json:"SecondaryIPv6Addresses,omitempty" yaml:"SecondaryIPv6Addresses,omitempty"`
 }
 
 // PortMappingAPI translates the port mappings as contained in NetworkSettings
@@ -155,8 +167,8 @@ func (settings *NetworkSettings) PortMappingAPI() []APIPort {
 		p, _ := parsePort(port.Port())
 		if len(bindings) == 0 {
 			mapping = append(mapping, APIPort{
-				PublicPort: int64(p),
-				Type:       port.Proto(),
+				PrivatePort: int64(p),
+				Type:        port.Proto(),
 			})
 			continue
 		}
@@ -186,35 +198,39 @@ func parsePort(rawPort string) (int, error) {
 // Config does not contain the options that are specific to starting a container on a
 // given host.  Those are contained in HostConfig
 type Config struct {
-	Hostname        string              `json:"Hostname,omitempty" yaml:"Hostname,omitempty"`
-	Domainname      string              `json:"Domainname,omitempty" yaml:"Domainname,omitempty"`
-	User            string              `json:"User,omitempty" yaml:"User,omitempty"`
-	Memory          int64               `json:"Memory,omitempty" yaml:"Memory,omitempty"`
-	MemorySwap      int64               `json:"MemorySwap,omitempty" yaml:"MemorySwap,omitempty"`
-	CPUShares       int64               `json:"CpuShares,omitempty" yaml:"CpuShares,omitempty"`
-	CPUSet          string              `json:"Cpuset,omitempty" yaml:"Cpuset,omitempty"`
-	AttachStdin     bool                `json:"AttachStdin,omitempty" yaml:"AttachStdin,omitempty"`
-	AttachStdout    bool                `json:"AttachStdout,omitempty" yaml:"AttachStdout,omitempty"`
-	AttachStderr    bool                `json:"AttachStderr,omitempty" yaml:"AttachStderr,omitempty"`
-	PortSpecs       []string            `json:"PortSpecs,omitempty" yaml:"PortSpecs,omitempty"`
-	ExposedPorts    map[Port]struct{}   `json:"ExposedPorts,omitempty" yaml:"ExposedPorts,omitempty"`
-	Tty             bool                `json:"Tty,omitempty" yaml:"Tty,omitempty"`
-	OpenStdin       bool                `json:"OpenStdin,omitempty" yaml:"OpenStdin,omitempty"`
-	StdinOnce       bool                `json:"StdinOnce,omitempty" yaml:"StdinOnce,omitempty"`
-	Env             []string            `json:"Env,omitempty" yaml:"Env,omitempty"`
-	Cmd             []string            `json:"Cmd" yaml:"Cmd"`
-	DNS             []string            `json:"Dns,omitempty" yaml:"Dns,omitempty"` // For Docker API v1.9 and below only
-	Image           string              `json:"Image,omitempty" yaml:"Image,omitempty"`
-	Volumes         map[string]struct{} `json:"Volumes,omitempty" yaml:"Volumes,omitempty"`
-	VolumesFrom     string              `json:"VolumesFrom,omitempty" yaml:"VolumesFrom,omitempty"`
-	WorkingDir      string              `json:"WorkingDir,omitempty" yaml:"WorkingDir,omitempty"`
-	MacAddress      string              `json:"MacAddress,omitempty" yaml:"MacAddress,omitempty"`
-	Entrypoint      []string            `json:"Entrypoint" yaml:"Entrypoint"`
-	NetworkDisabled bool                `json:"NetworkDisabled,omitempty" yaml:"NetworkDisabled,omitempty"`
-	SecurityOpts    []string            `json:"SecurityOpts,omitempty" yaml:"SecurityOpts,omitempty"`
-	OnBuild         []string            `json:"OnBuild,omitempty" yaml:"OnBuild,omitempty"`
-	Mounts          []Mount             `json:"Mounts,omitempty" yaml:"Mounts,omitempty"`
-	Labels          map[string]string   `json:"Labels,omitempty" yaml:"Labels,omitempty"`
+	Hostname          string              `json:"Hostname,omitempty" yaml:"Hostname,omitempty"`
+	Domainname        string              `json:"Domainname,omitempty" yaml:"Domainname,omitempty"`
+	User              string              `json:"User,omitempty" yaml:"User,omitempty"`
+	Memory            int64               `json:"Memory,omitempty" yaml:"Memory,omitempty"`
+	MemorySwap        int64               `json:"MemorySwap,omitempty" yaml:"MemorySwap,omitempty"`
+	MemoryReservation int64               `json:"MemoryReservation,omitempty" yaml:"MemoryReservation,omitempty"`
+	KernelMemory      int64               `json:"KernelMemory,omitempty" yaml:"KernelMemory,omitempty"`
+	CPUShares         int64               `json:"CpuShares,omitempty" yaml:"CpuShares,omitempty"`
+	CPUSet            string              `json:"Cpuset,omitempty" yaml:"Cpuset,omitempty"`
+	AttachStdin       bool                `json:"AttachStdin,omitempty" yaml:"AttachStdin,omitempty"`
+	AttachStdout      bool                `json:"AttachStdout,omitempty" yaml:"AttachStdout,omitempty"`
+	AttachStderr      bool                `json:"AttachStderr,omitempty" yaml:"AttachStderr,omitempty"`
+	PortSpecs         []string            `json:"PortSpecs,omitempty" yaml:"PortSpecs,omitempty"`
+	ExposedPorts      map[Port]struct{}   `json:"ExposedPorts,omitempty" yaml:"ExposedPorts,omitempty"`
+	StopSignal        string              `json:"StopSignal,omitempty" yaml:"StopSignal,omitempty"`
+	Tty               bool                `json:"Tty,omitempty" yaml:"Tty,omitempty"`
+	OpenStdin         bool                `json:"OpenStdin,omitempty" yaml:"OpenStdin,omitempty"`
+	StdinOnce         bool                `json:"StdinOnce,omitempty" yaml:"StdinOnce,omitempty"`
+	Env               []string            `json:"Env,omitempty" yaml:"Env,omitempty"`
+	Cmd               []string            `json:"Cmd" yaml:"Cmd"`
+	DNS               []string            `json:"Dns,omitempty" yaml:"Dns,omitempty"` // For Docker API v1.9 and below only
+	Image             string              `json:"Image,omitempty" yaml:"Image,omitempty"`
+	Volumes           map[string]struct{} `json:"Volumes,omitempty" yaml:"Volumes,omitempty"`
+	VolumeDriver      string              `json:"VolumeDriver,omitempty" yaml:"VolumeDriver,omitempty"`
+	VolumesFrom       string              `json:"VolumesFrom,omitempty" yaml:"VolumesFrom,omitempty"`
+	WorkingDir        string              `json:"WorkingDir,omitempty" yaml:"WorkingDir,omitempty"`
+	MacAddress        string              `json:"MacAddress,omitempty" yaml:"MacAddress,omitempty"`
+	Entrypoint        []string            `json:"Entrypoint" yaml:"Entrypoint"`
+	NetworkDisabled   bool                `json:"NetworkDisabled,omitempty" yaml:"NetworkDisabled,omitempty"`
+	SecurityOpts      []string            `json:"SecurityOpts,omitempty" yaml:"SecurityOpts,omitempty"`
+	OnBuild           []string            `json:"OnBuild,omitempty" yaml:"OnBuild,omitempty"`
+	Mounts            []Mount             `json:"Mounts,omitempty" yaml:"Mounts,omitempty"`
+	Labels            map[string]string   `json:"Labels,omitempty" yaml:"Labels,omitempty"`
 }
 
 // Mount represents a mount point in the container.
@@ -222,8 +238,10 @@ type Config struct {
 // It has been added in the version 1.20 of the Docker API, available since
 // Docker 1.8.
 type Mount struct {
+	Name        string
 	Source      string
 	Destination string
+	Driver      string
 	Mode        string
 	RW          bool
 }
@@ -271,13 +289,14 @@ type Container struct {
 
 	NetworkSettings *NetworkSettings `json:"NetworkSettings,omitempty" yaml:"NetworkSettings,omitempty"`
 
-	SysInitPath    string `json:"SysInitPath,omitempty" yaml:"SysInitPath,omitempty"`
-	ResolvConfPath string `json:"ResolvConfPath,omitempty" yaml:"ResolvConfPath,omitempty"`
-	HostnamePath   string `json:"HostnamePath,omitempty" yaml:"HostnamePath,omitempty"`
-	HostsPath      string `json:"HostsPath,omitempty" yaml:"HostsPath,omitempty"`
-	LogPath        string `json:"LogPath,omitempty" yaml:"LogPath,omitempty"`
-	Name           string `json:"Name,omitempty" yaml:"Name,omitempty"`
-	Driver         string `json:"Driver,omitempty" yaml:"Driver,omitempty"`
+	SysInitPath    string  `json:"SysInitPath,omitempty" yaml:"SysInitPath,omitempty"`
+	ResolvConfPath string  `json:"ResolvConfPath,omitempty" yaml:"ResolvConfPath,omitempty"`
+	HostnamePath   string  `json:"HostnamePath,omitempty" yaml:"HostnamePath,omitempty"`
+	HostsPath      string  `json:"HostsPath,omitempty" yaml:"HostsPath,omitempty"`
+	LogPath        string  `json:"LogPath,omitempty" yaml:"LogPath,omitempty"`
+	Name           string  `json:"Name,omitempty" yaml:"Name,omitempty"`
+	Driver         string  `json:"Driver,omitempty" yaml:"Driver,omitempty"`
+	Mounts         []Mount `json:"Mounts,omitempty" yaml:"Mounts,omitempty"`
 
 	Volumes    map[string]string `json:"Volumes,omitempty" yaml:"Volumes,omitempty"`
 	VolumesRW  map[string]bool   `json:"VolumesRW,omitempty" yaml:"VolumesRW,omitempty"`
@@ -304,8 +323,12 @@ type RenameContainerOptions struct {
 //
 // See https://goo.gl/laSOIy for more details.
 func (c *Client) RenameContainer(opts RenameContainerOptions) error {
-	_, _, err := c.do("POST", fmt.Sprintf("/containers/"+opts.ID+"/rename?%s", queryString(opts)), doOptions{})
-	return err
+	resp, err := c.do("POST", fmt.Sprintf("/containers/"+opts.ID+"/rename?%s", queryString(opts)), doOptions{})
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
 }
 
 // InspectContainer returns information about a container by its ID.
@@ -313,16 +336,16 @@ func (c *Client) RenameContainer(opts RenameContainerOptions) error {
 // See https://goo.gl/RdIq0b for more details.
 func (c *Client) InspectContainer(id string) (*Container, error) {
 	path := "/containers/" + id + "/json"
-	body, status, err := c.do("GET", path, doOptions{})
-	if status == http.StatusNotFound {
-		return nil, &NoSuchContainer{ID: id}
-	}
+	resp, err := c.do("GET", path, doOptions{})
 	if err != nil {
+		if e, ok := err.(*Error); ok && e.Status == http.StatusNotFound {
+			return nil, &NoSuchContainer{ID: id}
+		}
 		return nil, err
 	}
+	defer resp.Body.Close()
 	var container Container
-	err = json.Unmarshal(body, &container)
-	if err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&container); err != nil {
 		return nil, err
 	}
 	return &container, nil
@@ -333,16 +356,16 @@ func (c *Client) InspectContainer(id string) (*Container, error) {
 // See https://goo.gl/9GsTIF for more details.
 func (c *Client) ContainerChanges(id string) ([]Change, error) {
 	path := "/containers/" + id + "/changes"
-	body, status, err := c.do("GET", path, doOptions{})
-	if status == http.StatusNotFound {
-		return nil, &NoSuchContainer{ID: id}
-	}
+	resp, err := c.do("GET", path, doOptions{})
 	if err != nil {
+		if e, ok := err.(*Error); ok && e.Status == http.StatusNotFound {
+			return nil, &NoSuchContainer{ID: id}
+		}
 		return nil, err
 	}
+	defer resp.Body.Close()
 	var changes []Change
-	err = json.Unmarshal(body, &changes)
-	if err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&changes); err != nil {
 		return nil, err
 	}
 	return changes, nil
@@ -363,7 +386,7 @@ type CreateContainerOptions struct {
 // See https://goo.gl/WxQzrr for more details.
 func (c *Client) CreateContainer(opts CreateContainerOptions) (*Container, error) {
 	path := "/containers/create?" + queryString(opts)
-	body, status, err := c.do(
+	resp, err := c.do(
 		"POST",
 		path,
 		doOptions{
@@ -377,18 +400,21 @@ func (c *Client) CreateContainer(opts CreateContainerOptions) (*Container, error
 		},
 	)
 
-	if status == http.StatusNotFound {
-		return nil, ErrNoSuchImage
+	if e, ok := err.(*Error); ok {
+		if e.Status == http.StatusNotFound {
+			return nil, ErrNoSuchImage
+		}
+		if e.Status == http.StatusConflict {
+			return nil, ErrContainerAlreadyExists
+		}
 	}
-	if status == http.StatusConflict {
-		return nil, ErrContainerAlreadyExists
-	}
+
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 	var container Container
-	err = json.Unmarshal(body, &container)
-	if err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&container); err != nil {
 		return nil, err
 	}
 
@@ -449,6 +475,7 @@ type HostConfig struct {
 	Binds            []string               `json:"Binds,omitempty" yaml:"Binds,omitempty"`
 	CapAdd           []string               `json:"CapAdd,omitempty" yaml:"CapAdd,omitempty"`
 	CapDrop          []string               `json:"CapDrop,omitempty" yaml:"CapDrop,omitempty"`
+	GroupAdd         []string               `json:"GroupAdd,omitempty" yaml:"GroupAdd,omitempty"`
 	ContainerIDFile  string                 `json:"ContainerIDFile,omitempty" yaml:"ContainerIDFile,omitempty"`
 	LxcConf          []KeyValuePair         `json:"LxcConf,omitempty" yaml:"LxcConf,omitempty"`
 	Privileged       bool                   `json:"Privileged,omitempty" yaml:"Privileged,omitempty"`
@@ -456,6 +483,7 @@ type HostConfig struct {
 	Links            []string               `json:"Links,omitempty" yaml:"Links,omitempty"`
 	PublishAllPorts  bool                   `json:"PublishAllPorts,omitempty" yaml:"PublishAllPorts,omitempty"`
 	DNS              []string               `json:"Dns,omitempty" yaml:"Dns,omitempty"` // For Docker API v1.10 and above only
+	DNSOptions       []string               `json:"DnsOptions,omitempty" yaml:"DnsOptions,omitempty"`
 	DNSSearch        []string               `json:"DnsSearch,omitempty" yaml:"DnsSearch,omitempty"`
 	ExtraHosts       []string               `json:"ExtraHosts,omitempty" yaml:"ExtraHosts,omitempty"`
 	VolumesFrom      []string               `json:"VolumesFrom,omitempty" yaml:"VolumesFrom,omitempty"`
@@ -481,6 +509,7 @@ type HostConfig struct {
 	CPUPeriod        int64                  `json:"CpuPeriod,omitempty" yaml:"CpuPeriod,omitempty"`
 	BlkioWeight      int64                  `json:"BlkioWeight,omitempty" yaml:"BlkioWeight"`
 	Ulimits          []ULimit               `json:"Ulimits,omitempty" yaml:"Ulimits,omitempty"`
+	VolumeDriver     string                 `json:"VolumeDriver,omitempty" yaml:"VolumeDriver,omitempty"`
 }
 
 // StartContainer starts a container, returning an error in case of failure.
@@ -488,16 +517,17 @@ type HostConfig struct {
 // See https://goo.gl/MrBAJv for more details.
 func (c *Client) StartContainer(id string, hostConfig *HostConfig) error {
 	path := "/containers/" + id + "/start"
-	_, status, err := c.do("POST", path, doOptions{data: hostConfig, forceJSON: true})
-	if status == http.StatusNotFound {
-		return &NoSuchContainer{ID: id, Err: err}
-	}
-	if status == http.StatusNotModified {
-		return &ContainerAlreadyRunning{ID: id}
-	}
+	resp, err := c.do("POST", path, doOptions{data: hostConfig, forceJSON: true})
 	if err != nil {
+		if e, ok := err.(*Error); ok && e.Status == http.StatusNotFound {
+			return &NoSuchContainer{ID: id, Err: err}
+		}
 		return err
 	}
+	if resp.StatusCode == http.StatusNotModified {
+		return &ContainerAlreadyRunning{ID: id}
+	}
+	resp.Body.Close()
 	return nil
 }
 
@@ -507,16 +537,17 @@ func (c *Client) StartContainer(id string, hostConfig *HostConfig) error {
 // See https://goo.gl/USqsFt for more details.
 func (c *Client) StopContainer(id string, timeout uint) error {
 	path := fmt.Sprintf("/containers/%s/stop?t=%d", id, timeout)
-	_, status, err := c.do("POST", path, doOptions{})
-	if status == http.StatusNotFound {
-		return &NoSuchContainer{ID: id}
-	}
-	if status == http.StatusNotModified {
-		return &ContainerNotRunning{ID: id}
-	}
+	resp, err := c.do("POST", path, doOptions{})
 	if err != nil {
+		if e, ok := err.(*Error); ok && e.Status == http.StatusNotFound {
+			return &NoSuchContainer{ID: id}
+		}
 		return err
 	}
+	if resp.StatusCode == http.StatusNotModified {
+		return &ContainerNotRunning{ID: id}
+	}
+	resp.Body.Close()
 	return nil
 }
 
@@ -526,13 +557,14 @@ func (c *Client) StopContainer(id string, timeout uint) error {
 // See https://goo.gl/QzsDnz for more details.
 func (c *Client) RestartContainer(id string, timeout uint) error {
 	path := fmt.Sprintf("/containers/%s/restart?t=%d", id, timeout)
-	_, status, err := c.do("POST", path, doOptions{})
-	if status == http.StatusNotFound {
-		return &NoSuchContainer{ID: id}
-	}
+	resp, err := c.do("POST", path, doOptions{})
 	if err != nil {
+		if e, ok := err.(*Error); ok && e.Status == http.StatusNotFound {
+			return &NoSuchContainer{ID: id}
+		}
 		return err
 	}
+	resp.Body.Close()
 	return nil
 }
 
@@ -541,13 +573,14 @@ func (c *Client) RestartContainer(id string, timeout uint) error {
 // See https://goo.gl/OF7W9X for more details.
 func (c *Client) PauseContainer(id string) error {
 	path := fmt.Sprintf("/containers/%s/pause", id)
-	_, status, err := c.do("POST", path, doOptions{})
-	if status == http.StatusNotFound {
-		return &NoSuchContainer{ID: id}
-	}
+	resp, err := c.do("POST", path, doOptions{})
 	if err != nil {
+		if e, ok := err.(*Error); ok && e.Status == http.StatusNotFound {
+			return &NoSuchContainer{ID: id}
+		}
 		return err
 	}
+	resp.Body.Close()
 	return nil
 }
 
@@ -556,13 +589,14 @@ func (c *Client) PauseContainer(id string) error {
 // See https://goo.gl/7dwyPA for more details.
 func (c *Client) UnpauseContainer(id string) error {
 	path := fmt.Sprintf("/containers/%s/unpause", id)
-	_, status, err := c.do("POST", path, doOptions{})
-	if status == http.StatusNotFound {
-		return &NoSuchContainer{ID: id}
-	}
+	resp, err := c.do("POST", path, doOptions{})
 	if err != nil {
+		if e, ok := err.(*Error); ok && e.Status == http.StatusNotFound {
+			return &NoSuchContainer{ID: id}
+		}
 		return err
 	}
+	resp.Body.Close()
 	return nil
 }
 
@@ -585,15 +619,15 @@ func (c *Client) TopContainer(id string, psArgs string) (TopResult, error) {
 		args = fmt.Sprintf("?ps_args=%s", psArgs)
 	}
 	path := fmt.Sprintf("/containers/%s/top%s", id, args)
-	body, status, err := c.do("GET", path, doOptions{})
-	if status == http.StatusNotFound {
-		return result, &NoSuchContainer{ID: id}
-	}
+	resp, err := c.do("GET", path, doOptions{})
 	if err != nil {
+		if e, ok := err.(*Error); ok && e.Status == http.StatusNotFound {
+			return result, &NoSuchContainer{ID: id}
+		}
 		return result, err
 	}
-	err = json.Unmarshal(body, &result)
-	if err != nil {
+	defer resp.Body.Close()
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return result, err
 	}
 	return result, nil
@@ -603,17 +637,8 @@ func (c *Client) TopContainer(id string, psArgs string) (TopResult, error) {
 //
 // See https://goo.gl/GNmLHb for more details.
 type Stats struct {
-	Read    time.Time `json:"read,omitempty" yaml:"read,omitempty"`
-	Network struct {
-		RxDropped uint64 `json:"rx_dropped,omitempty" yaml:"rx_dropped,omitempty"`
-		RxBytes   uint64 `json:"rx_bytes,omitempty" yaml:"rx_bytes,omitempty"`
-		RxErrors  uint64 `json:"rx_errors,omitempty" yaml:"rx_errors,omitempty"`
-		TxPackets uint64 `json:"tx_packets,omitempty" yaml:"tx_packets,omitempty"`
-		TxDropped uint64 `json:"tx_dropped,omitempty" yaml:"tx_dropped,omitempty"`
-		RxPackets uint64 `json:"rx_packets,omitempty" yaml:"rx_packets,omitempty"`
-		TxErrors  uint64 `json:"tx_errors,omitempty" yaml:"tx_errors,omitempty"`
-		TxBytes   uint64 `json:"tx_bytes,omitempty" yaml:"tx_bytes,omitempty"`
-	} `json:"network,omitempty" yaml:"network,omitempty"`
+	Read        time.Time               `json:"read,omitempty" yaml:"read,omitempty"`
+	Networks    map[string]NetworkStats `json:"networks,omitempty" yaml:"networks,omitempty"`
 	MemoryStats struct {
 		Stats struct {
 			TotalPgmafault          uint64 `json:"total_pgmafault,omitempty" yaml:"total_pgmafault,omitempty"`
@@ -663,6 +688,18 @@ type Stats struct {
 	} `json:"blkio_stats,omitempty" yaml:"blkio_stats,omitempty"`
 	CPUStats    CPUStats `json:"cpu_stats,omitempty" yaml:"cpu_stats,omitempty"`
 	PreCPUStats CPUStats `json:"precpu_stats,omitempty"`
+}
+
+// NetworkStats is a stats entry for network stats
+type NetworkStats struct {
+	RxDropped uint64 `json:"rx_dropped,omitempty" yaml:"rx_dropped,omitempty"`
+	RxBytes   uint64 `json:"rx_bytes,omitempty" yaml:"rx_bytes,omitempty"`
+	RxErrors  uint64 `json:"rx_errors,omitempty" yaml:"rx_errors,omitempty"`
+	TxPackets uint64 `json:"tx_packets,omitempty" yaml:"tx_packets,omitempty"`
+	TxDropped uint64 `json:"tx_dropped,omitempty" yaml:"tx_dropped,omitempty"`
+	RxPackets uint64 `json:"rx_packets,omitempty" yaml:"rx_packets,omitempty"`
+	TxErrors  uint64 `json:"tx_errors,omitempty" yaml:"tx_errors,omitempty"`
+	TxBytes   uint64 `json:"tx_bytes,omitempty" yaml:"tx_bytes,omitempty"`
 }
 
 // CPUStats is a stats entry for cpu stats
@@ -768,7 +805,7 @@ func (c *Client) Stats(opts StatsOptions) (retErr error) {
 
 	decoder := json.NewDecoder(readCloser)
 	stats := new(Stats)
-	for err := decoder.Decode(&stats); err != io.EOF; err = decoder.Decode(stats) {
+	for err := decoder.Decode(stats); err != io.EOF; err = decoder.Decode(stats) {
 		if err != nil {
 			return err
 		}
@@ -797,13 +834,14 @@ type KillContainerOptions struct {
 // See https://goo.gl/hkS9i8 for more details.
 func (c *Client) KillContainer(opts KillContainerOptions) error {
 	path := "/containers/" + opts.ID + "/kill" + "?" + queryString(opts)
-	_, status, err := c.do("POST", path, doOptions{})
-	if status == http.StatusNotFound {
-		return &NoSuchContainer{ID: opts.ID}
-	}
+	resp, err := c.do("POST", path, doOptions{})
 	if err != nil {
+		if e, ok := err.(*Error); ok && e.Status == http.StatusNotFound {
+			return &NoSuchContainer{ID: opts.ID}
+		}
 		return err
 	}
+	resp.Body.Close()
 	return nil
 }
 
@@ -828,43 +866,86 @@ type RemoveContainerOptions struct {
 // See https://goo.gl/RQyX62 for more details.
 func (c *Client) RemoveContainer(opts RemoveContainerOptions) error {
 	path := "/containers/" + opts.ID + "?" + queryString(opts)
-	_, status, err := c.do("DELETE", path, doOptions{})
-	if status == http.StatusNotFound {
-		return &NoSuchContainer{ID: opts.ID}
-	}
+	resp, err := c.do("DELETE", path, doOptions{})
 	if err != nil {
+		if e, ok := err.(*Error); ok && e.Status == http.StatusNotFound {
+			return &NoSuchContainer{ID: opts.ID}
+		}
 		return err
 	}
+	resp.Body.Close()
 	return nil
 }
 
-// CopyFromContainerOptions is the set of options that can be used when copying
-// files or folders from a container.
+// UploadToContainerOptions is the set of options that can be used when
+// uploading an archive into a container.
 //
-// See https://goo.gl/4L7b07 for more details.
+// See https://goo.gl/Ss97HW for more details.
+type UploadToContainerOptions struct {
+	InputStream          io.Reader `json:"-" qs:"-"`
+	Path                 string    `qs:"path"`
+	NoOverwriteDirNonDir bool      `qs:"noOverwriteDirNonDir"`
+}
+
+// UploadToContainer uploads a tar archive to be extracted to a path in the
+// filesystem of the container.
+//
+// See https://goo.gl/Ss97HW for more details.
+func (c *Client) UploadToContainer(id string, opts UploadToContainerOptions) error {
+	url := fmt.Sprintf("/containers/%s/archive?", id) + queryString(opts)
+
+	return c.stream("PUT", url, streamOptions{
+		in: opts.InputStream,
+	})
+}
+
+// DownloadFromContainerOptions is the set of options that can be used when
+// downloading resources from a container.
+//
+// See https://goo.gl/KnZJDX for more details.
+type DownloadFromContainerOptions struct {
+	OutputStream io.Writer `json:"-" qs:"-"`
+	Path         string    `qs:"path"`
+}
+
+// DownloadFromContainer downloads a tar archive of files or folders in a container.
+//
+// See https://goo.gl/KnZJDX for more details.
+func (c *Client) DownloadFromContainer(id string, opts DownloadFromContainerOptions) error {
+	url := fmt.Sprintf("/containers/%s/archive?", id) + queryString(opts)
+
+	return c.stream("GET", url, streamOptions{
+		setRawTerminal: true,
+		stdout:         opts.OutputStream,
+	})
+}
+
+// CopyFromContainerOptions has been DEPRECATED, please use DownloadFromContainerOptions along with DownloadFromContainer.
+//
+// See https://goo.gl/R2jevW for more details.
 type CopyFromContainerOptions struct {
 	OutputStream io.Writer `json:"-"`
 	Container    string    `json:"-"`
 	Resource     string
 }
 
-// CopyFromContainer copy files or folders from a container, using a given
-// resource.
+// CopyFromContainer has been DEPRECATED, please use DownloadFromContainerOptions along with DownloadFromContainer.
 //
-// See https://goo.gl/4L7b07 for more details.
+// See https://goo.gl/R2jevW for more details.
 func (c *Client) CopyFromContainer(opts CopyFromContainerOptions) error {
 	if opts.Container == "" {
 		return &NoSuchContainer{ID: opts.Container}
 	}
 	url := fmt.Sprintf("/containers/%s/copy", opts.Container)
-	body, status, err := c.do("POST", url, doOptions{data: opts})
-	if status == http.StatusNotFound {
-		return &NoSuchContainer{ID: opts.Container}
-	}
+	resp, err := c.do("POST", url, doOptions{data: opts})
 	if err != nil {
+		if e, ok := err.(*Error); ok && e.Status == http.StatusNotFound {
+			return &NoSuchContainer{ID: opts.Container}
+		}
 		return err
 	}
-	_, err = io.Copy(opts.OutputStream, bytes.NewBuffer(body))
+	defer resp.Body.Close()
+	_, err = io.Copy(opts.OutputStream, resp.Body)
 	return err
 }
 
@@ -873,16 +954,16 @@ func (c *Client) CopyFromContainer(opts CopyFromContainerOptions) error {
 //
 // See https://goo.gl/Gc1rge for more details.
 func (c *Client) WaitContainer(id string) (int, error) {
-	body, status, err := c.do("POST", "/containers/"+id+"/wait", doOptions{})
-	if status == http.StatusNotFound {
-		return 0, &NoSuchContainer{ID: id}
-	}
+	resp, err := c.do("POST", "/containers/"+id+"/wait", doOptions{})
 	if err != nil {
+		if e, ok := err.(*Error); ok && e.Status == http.StatusNotFound {
+			return 0, &NoSuchContainer{ID: id}
+		}
 		return 0, err
 	}
+	defer resp.Body.Close()
 	var r struct{ StatusCode int }
-	err = json.Unmarshal(body, &r)
-	if err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
 		return 0, err
 	}
 	return r.StatusCode, nil
@@ -895,7 +976,7 @@ type CommitContainerOptions struct {
 	Container  string
 	Repository string `qs:"repo"`
 	Tag        string
-	Message    string `qs:"m"`
+	Message    string `qs:"comment"`
 	Author     string
 	Run        *Config `qs:"-"`
 }
@@ -905,16 +986,16 @@ type CommitContainerOptions struct {
 // See https://goo.gl/mqfoCw for more details.
 func (c *Client) CommitContainer(opts CommitContainerOptions) (*Image, error) {
 	path := "/commit?" + queryString(opts)
-	body, status, err := c.do("POST", path, doOptions{data: opts.Run})
-	if status == http.StatusNotFound {
-		return nil, &NoSuchContainer{ID: opts.Container}
-	}
+	resp, err := c.do("POST", path, doOptions{data: opts.Run})
 	if err != nil {
+		if e, ok := err.(*Error); ok && e.Status == http.StatusNotFound {
+			return nil, &NoSuchContainer{ID: opts.Container}
+		}
 		return nil, err
 	}
+	defer resp.Body.Close()
 	var image Image
-	err = json.Unmarshal(body, &image)
-	if err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&image); err != nil {
 		return nil, err
 	}
 	return &image, nil
@@ -960,8 +1041,20 @@ type AttachToContainerOptions struct {
 //
 // See https://goo.gl/NKpkFk for more details.
 func (c *Client) AttachToContainer(opts AttachToContainerOptions) error {
+	cw, err := c.AttachToContainerNonBlocking(opts)
+	if err != nil {
+		return err
+	}
+	return cw.Wait()
+}
+
+// AttachToContainerNonBlocking attaches to a container, using the given options.
+// This function does not block.
+//
+// See https://goo.gl/NKpkFk for more details.
+func (c *Client) AttachToContainerNonBlocking(opts AttachToContainerOptions) (CloseWaiter, error) {
 	if opts.Container == "" {
-		return &NoSuchContainer{ID: opts.Container}
+		return nil, &NoSuchContainer{ID: opts.Container}
 	}
 	path := "/containers/" + opts.Container + "/attach?" + queryString(opts)
 	return c.hijack("POST", path, hijackOptions{
@@ -1017,8 +1110,12 @@ func (c *Client) ResizeContainerTTY(id string, height, width int) error {
 	params := make(url.Values)
 	params.Set("h", strconv.Itoa(height))
 	params.Set("w", strconv.Itoa(width))
-	_, _, err := c.do("POST", "/containers/"+id+"/resize?"+params.Encode(), doOptions{})
-	return err
+	resp, err := c.do("POST", "/containers/"+id+"/resize?"+params.Encode(), doOptions{})
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
 }
 
 // ExportContainerOptions is the set of parameters to the ExportContainer

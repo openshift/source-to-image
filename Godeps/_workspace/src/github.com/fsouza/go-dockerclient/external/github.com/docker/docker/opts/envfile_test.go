@@ -28,8 +28,15 @@ func TestParseEnvFileGoodFile(t *testing.T) {
 # comment
 
 _foobar=foobaz
+with.dots=working
+and_underscore=working too
 `
-
+	// Adding a newline + a line with pure whitespace.
+	// This is being done like this instead of the block above
+	// because it's common for editors to trim trailing whitespace
+	// from lines, which becomes annoying since that's the
+	// exact thing we need to test.
+	content += "\n    \t  "
 	tmpFile := tmpFileWithContent(content, t)
 	defer os.Remove(tmpFile)
 
@@ -42,6 +49,8 @@ _foobar=foobaz
 		"foo=bar",
 		"baz=quux",
 		"_foobar=foobaz",
+		"with.dots=working",
+		"and_underscore=working too",
 	}
 
 	if !reflect.DeepEqual(lines, expectedLines) {
@@ -91,13 +100,13 @@ func TestParseEnvFileBadlyFormattedFile(t *testing.T) {
 	if _, ok := err.(ErrBadEnvVariable); !ok {
 		t.Fatalf("Expected a ErrBadEnvVariable, got [%v]", err)
 	}
-	expectedMessage := "poorly formatted environment: variable 'f   ' is not a valid environment variable"
+	expectedMessage := "poorly formatted environment: variable 'f   ' has white spaces"
 	if err.Error() != expectedMessage {
 		t.Fatalf("Expected [%v], got [%v]", expectedMessage, err.Error())
 	}
 }
 
-// Test ParseEnvFile for a file with a line exeeding bufio.MaxScanTokenSize
+// Test ParseEnvFile for a file with a line exceeding bufio.MaxScanTokenSize
 func TestParseEnvFileLineTooLongFile(t *testing.T) {
 	content := strings.Repeat("a", bufio.MaxScanTokenSize+42)
 	content = fmt.Sprint("foo=", content)
@@ -126,7 +135,7 @@ another invalid line`
 	if _, ok := err.(ErrBadEnvVariable); !ok {
 		t.Fatalf("Expected a ErrBadEnvvariable, got [%v]", err)
 	}
-	expectedMessage := "poorly formatted environment: variable 'first line' is not a valid environment variable"
+	expectedMessage := "poorly formatted environment: variable 'first line' has white spaces"
 	if err.Error() != expectedMessage {
 		t.Fatalf("Expected [%v], got [%v]", expectedMessage, err.Error())
 	}
