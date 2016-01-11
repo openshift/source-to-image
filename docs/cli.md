@@ -86,12 +86,36 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 | `-s (--scripts-url)`       | URL of S2I scripts (see [S2I Scripts](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#s2i-scripts)) |
 | `--recursive`              | Perform recursive git clone when getting sources using git|
 | `-q (--quiet)`             | Operate quietly, suppressing all non-error output |
+| `--inject`                 | Inject the content of the specified directory into the path in the container that runs the assemble script |
 
 #### Context directory
 
 In the case where your application resides in a directory other than your repository root
 folder, you can specify that directory using the `--context-dir` parameter. The
 specified directory will be used as your application root folder.
+
+#### Injecting directories to build
+
+If you want to inject files that should only be available during the build (ie
+when the assemble script is invoked), you can specify the directories from which
+the files will be copied into the container that runs the assemble script. To do
+so you can invoke S2I as follows:
+
+```console
+$ s2i build --inject /mydir:/container/dir file://source builder-image output-image
+```
+
+In this case the content of the `/mydir` directory will get copied into
+`/container/dir` inside the container which runs the assemble script.
+After the `assemble` script finishes, all files copied will be truncated and thus
+not available in the output image. The files are truncated instead of deleted
+because the user under which we run the container with the assemble script might not
+have permissions to delete files in the destination directory (eg. `/etc/ssl`).
+
+You can also specify multiple directories, for example: `--inject /dir1:/container/dir1 --inject /dir2:container/dir2`.
+
+You can use this feature to provide SSL certificates, private configuration
+files which contains credentials, etc. 
 
 #### Callback URL
 
