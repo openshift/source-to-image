@@ -3,9 +3,9 @@
 #
 FROM busybox
 
-RUN mkdir -p /sti-fake/src
+RUN mkdir -p /sti-fake/src && mkdir -p /opt/app-root/src
 
-WORKDIR /
+WORKDIR /opt/app-root/src
 
 # Need to serve the scripts from localhost so any potential changes to the
 # scripts are made available for integration testing.

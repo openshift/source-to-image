@@ -7,6 +7,10 @@ if [ -f /tmp/secret ]; then
   grep -q secret /tmp/secret && touch /sti-fake/secret-delivered
 fi
 
+if [ -f /opt/app-root/src/secret ]; then
+  grep -q secret /opt/app-root/src/secret && touch /sti-fake/relative-secret-delivered
+fi
+
 if [ -e /tmp/artifacts/save-artifacts-invoked ]; then
   touch /sti-fake/save-artifacts-invoked
 fi

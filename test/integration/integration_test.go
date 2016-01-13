@@ -63,7 +63,10 @@ const (
 
 // TestInjectionBuild tests the build where we inject files to assemble script.
 func TestInjectionBuild(t *testing.T) {
-	integration(t).exerciseInjectionBuild(TagCleanBuild, FakeBuilderImage, "/tmp/s2i-test-dir:/tmp")
+	integration(t).exerciseInjectionBuild(TagCleanBuild, FakeBuilderImage, []string{
+		"/tmp/s2i-test-dir:/tmp",
+		"/tmp/s2i-test-dir:",
+	})
 }
 
 type integrationTest struct {
@@ -364,7 +367,7 @@ func TestIncrementalBuildOnBuild(t *testing.T) {
 	integration(t).exerciseIncrementalBuild(TagIncrementalBuildOnBuild, FakeImageOnBuild, false, true, true)
 }
 
-func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injections string) {
+func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injections []string) {
 	t := i.t
 	err := os.Mkdir("/tmp/s2i-test-dir", 0777)
 	if err != nil {
@@ -376,7 +379,9 @@ func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injectio
 		t.Errorf("Unable to write content to temporary injection file: %v", err)
 	}
 	injectionList := api.InjectionList{}
-	injectionList.Set(injections)
+	for _, i := range injections {
+		injectionList.Set(i)
+	}
 	config := &api.Config{
 		DockerConfig:      dockerConfig(),
 		BuilderImage:      imageName,
@@ -402,6 +407,7 @@ func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injectio
 
 	// Check that the injected file is delivered to assemble script
 	i.fileExists(containerID, "/sti-fake/secret-delivered")
+	i.fileExists(containerID, "/sti-fake/relative-secret-delivered")
 
 	// Make sure the injected file does not exists in resulting image
 	files, err := util.ExpandInjectedFiles(injectionList)

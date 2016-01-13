@@ -57,6 +57,7 @@ type Docker interface {
 	GetScriptsURL(name string) (string, error)
 	RunContainer(opts RunContainerOptions) error
 	GetImageID(name string) (string, error)
+	GetImageWorkdir(name string) (string, error)
 	CommitContainer(opts CommitContainerOptions) (string, error)
 	RemoveImage(name string) error
 	CheckImage(name string) (*docker.Image, error)
@@ -162,11 +163,32 @@ func New(config *api.DockerConfig, auth docker.AuthConfiguration) (Docker, error
 	}, nil
 }
 
+// GetImageWorkdir returns the WORKDIR property for the given image name.
+// When the WORKDIR is not set or empty, return "/" instead.
+func (d *stiDocker) GetImageWorkdir(name string) (string, error) {
+	image, err := d.client.InspectImage(name)
+	if err != nil {
+		return "", err
+	}
+	workdir := image.Config.WorkingDir
+	if len(workdir) == 0 {
+		// This is a default destination used by UploadToContainer when the WORKDIR
+		// is not set or it is empty. To show user where the injections will end up,
+		// we set this to "/".
+		workdir = "/"
+	}
+	return workdir, nil
+}
+
 // UploadToContainer uploads artifacts to the container.
 // If the source is a directory, then all files and sub-folders are copied into
 // the destination (which has to be directory as well).
 // If the source is a single file, then the file copied into destination (which
 // has to be full path to a file inside the container).
+// If the destination path is empty or set to ".", then we will try to figure
+// out the WORKDIR of the image that the container was created from and use that
+// as a destination. If the WORKDIR is not set, then we copy files into "/"
+// folder (docker upload default).
 func (d *stiDocker) UploadToContainer(src, dest, name string) error {
 	path := filepath.Dir(dest)
 	f, err := os.Open(src)
