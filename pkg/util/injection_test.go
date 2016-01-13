@@ -16,7 +16,7 @@ func TestCreateInjectedFilesRemovalScript(t *testing.T) {
 		"/foo",
 		"/bar/bar",
 	}
-	name, err := CreateInjectedFilesRemovalScript(files)
+	name, err := CreateInjectedFilesRemovalScript(files, "/tmp/rm-foo")
 	defer os.Remove(name)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", name)
@@ -31,6 +31,9 @@ func TestCreateInjectedFilesRemovalScript(t *testing.T) {
 	}
 	if !strings.Contains(string(data), fmt.Sprintf("truncate -s0 %q", "/foo")) {
 		t.Errorf("Expected script to contain truncate -s0 \"/foo\", got: %q", string(data))
+	}
+	if !strings.Contains(string(data), fmt.Sprintf("truncate -s0 %q", "/tmp/rm-foo")) {
+		t.Errorf("Expected script to truncate itself, got: %q", string(data))
 	}
 }
 

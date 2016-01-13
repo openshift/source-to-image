@@ -64,6 +64,11 @@ func (f *FakeDocker) Ping() error {
 	return nil
 }
 
+// GetImageWorkdir returns the workdir
+func (f *FakeDocker) GetImageWorkdir(name string) (string, error) {
+	return "/", nil
+}
+
 // GetOnBuild returns the list of onbuild instructions for the given image
 func (f *FakeDocker) GetOnBuild(imageName string) ([]string, error) {
 	f.OnBuildImage = imageName

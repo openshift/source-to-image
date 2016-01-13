@@ -452,11 +452,16 @@ func (b *STI) Execute(command string, user string, config *api.Config) error {
 	// and wait till all injections are uploaded into the container that runs the
 	// assemble script.
 	if len(config.Injections) > 0 && command == api.Assemble {
+		workdir, err := b.docker.GetImageWorkdir(config.BuilderImage)
+		if err != nil {
+			return err
+		}
+		util.FixInjectionsWithRelativePath(workdir, &config.Injections)
 		injectedFiles, err := util.ExpandInjectedFiles(config.Injections)
 		if err != nil {
 			return err
 		}
-		rmScript, err := util.CreateInjectedFilesRemovalScript(injectedFiles)
+		rmScript, err := util.CreateInjectedFilesRemovalScript(injectedFiles, "/tmp/rm-injections")
 		if err != nil {
 			return err
 		}
