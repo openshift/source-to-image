@@ -456,7 +456,7 @@ func (b *STI) Execute(command string, user string, config *api.Config) error {
 		if err != nil {
 			return err
 		}
-		rmScript, err := util.CreateInjectedFilesRemovalScript(injectedFiles)
+		rmScript, err := util.CreateInjectedFilesRemovalScript(injectedFiles, "/tmp/rm-injections")
 		if err != nil {
 			return err
 		}

@@ -42,7 +42,9 @@ func ExpandInjectedFiles(injections api.InjectionList) ([]string, error) {
 
 // CreateInjectedFilesRemovalScript creates a shell script that contains truncation
 // of all files we injected into the container. The path to the script is returned.
-func CreateInjectedFilesRemovalScript(files []string) (string, error) {
+// When the scriptName is provided, it is also truncated together with all
+// secrets.
+func CreateInjectedFilesRemovalScript(files []string, scriptName string) (string, error) {
 	rmScript := "set -e\n"
 	for _, s := range files {
 		rmScript += fmt.Sprintf("truncate -s0 %q\n", s)
@@ -51,6 +53,9 @@ func CreateInjectedFilesRemovalScript(files []string) (string, error) {
 	f, err := ioutil.TempFile("", "s2i-injection-remove")
 	if err != nil {
 		return "", err
+	}
+	if len(scriptName) > 0 {
+		rmScript += fmt.Sprintf("truncate -s0 %q", scriptName)
 	}
 	rmScript += "set +e\n"
 	err = ioutil.WriteFile(f.Name(), []byte(rmScript), 0700)
