@@ -304,7 +304,7 @@ func setupGlog(flags *pflag.FlagSet) {
 		flags.Int32Var(levelPtr, "loglevel", 0, "Set the level of log output (0-5)")
 	}
 	// FIXME currently glog has only option to redirect output to stderr
-	// the preferred for STI would be to redirect to stdout
+	// the preferred for S2I would be to redirect to stdout
 	flag.CommandLine.Set("logtostderr", "true")
 }
 
