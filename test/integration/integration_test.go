@@ -447,13 +447,14 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 
 	previousImageID := resp.ImageID
 	config = &api.Config{
-		DockerConfig:        dockerConfig(),
-		BuilderImage:        imageName,
-		BuilderPullPolicy:   api.DefaultBuilderPullPolicy,
-		Source:              TestSource,
-		Tag:                 tag,
-		Incremental:         true,
-		RemovePreviousImage: removePreviousImage,
+		DockerConfig:            dockerConfig(),
+		BuilderImage:            imageName,
+		BuilderPullPolicy:       api.DefaultBuilderPullPolicy,
+		Source:                  TestSource,
+		Tag:                     tag,
+		Incremental:             true,
+		RemovePreviousImage:     removePreviousImage,
+		PreviousImagePullPolicy: api.PullIfNotPresent,
 	}
 
 	builder, err = strategies.GetStrategy(config)
@@ -480,7 +481,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 		}
 	} else {
 		if err != nil {
-			t.Errorf("Coudln't find previous image %s", previousImageID)
+			t.Errorf("Couldn't find previous image %s", previousImageID)
 		}
 	}
 
