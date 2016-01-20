@@ -251,6 +251,26 @@ func mergeLabels(newLabels, existingLabels map[string]string) map[string]string 
 	return result
 }
 
+// removeInjectionsFromContainer removes all files we injected into a container
+// that runs assemble by starting the container again and executing remove
+// command as root.
+func (b *STI) removeInjectionsFromContainer(containerID string) error {
+	if len(b.config.Injections) == 0 {
+		return nil
+	}
+	if err := b.docker.StartContainer(containerID, nil); err != nil {
+		return err
+	}
+	files, err := util.ExpandInjectedFiles(b.config.Injections)
+	if err != nil {
+		return err
+	}
+	if err := b.docker.RemoveContainerFiles(containerID, files); err != nil {
+		return err
+	}
+	return b.docker.KillContainer(containerID)
+}
+
 // PostExecute allows to execute post-build actions after the Docker build
 // finishes.
 func (b *STI) PostExecute(containerID, location string) error {
@@ -258,6 +278,10 @@ func (b *STI) PostExecute(containerID, location string) error {
 		err             error
 		previousImageID string
 	)
+
+	if err := b.removeInjectionsFromContainer(containerID); err != nil {
+		return err
+	}
 
 	if b.incremental && b.config.RemovePreviousImage {
 		if previousImageID, err = b.docker.GetImageID(b.config.Tag); err != nil {
@@ -461,15 +485,10 @@ func (b *STI) Execute(command string, user string, config *api.Config) error {
 		if err != nil {
 			return err
 		}
-		rmScript, err := util.CreateInjectedFilesRemovalScript(injectedFiles, "/tmp/rm-injections")
-		if err != nil {
-			return err
-		}
-		defer os.Remove(rmScript)
 		glog.V(5).Infof("Waiting for injected files to be copied into assemble container...")
+		lastFileInjected := injectedFiles[len(injectedFiles)-1]
 		opts.CommandOverrides = func(cmd string) string {
-			return fmt.Sprintf("while [ ! -f %q ]; do sleep 0.5; done; %s; result=$?; source %[1]s; exit $result",
-				"/tmp/rm-injections", cmd)
+			return fmt.Sprintf("while [ ! -f %q ]; do sleep 0.5; done; %s", lastFileInjected, cmd)
 		}
 		originalOnStart := opts.OnStart
 		opts.OnStart = func(containerID string) error {
@@ -481,8 +500,10 @@ func (b *STI) Execute(command string, user string, config *api.Config) error {
 					return err
 				}
 			}
-			if err := b.docker.UploadToContainer(rmScript, "/tmp/rm-injections", containerID); err != nil {
-				return err
+			if len(user) > 0 {
+				if err := b.docker.ChangeContainerFilesOwner(containerID, user, injectedFiles); err != nil {
+					return err
+				}
 			}
 			if originalOnStart != nil {
 				return originalOnStart(containerID)

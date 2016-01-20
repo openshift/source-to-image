@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"path"
@@ -56,6 +57,8 @@ type Docker interface {
 	RemoveContainer(id string) error
 	GetScriptsURL(name string) (string, error)
 	RunContainer(opts RunContainerOptions) error
+	StartContainer(id string, hostConfig *docker.HostConfig) error
+	KillContainer(id string) error
 	GetImageID(name string) (string, error)
 	GetImageWorkdir(name string) (string, error)
 	CommitContainer(opts CommitContainerOptions) (string, error)
@@ -67,6 +70,8 @@ type Docker interface {
 	GetImageUser(name string) (string, error)
 	GetLabels(name string) (map[string]string, error)
 	UploadToContainer(srcPath, destPath, name string) error
+	ChangeContainerFilesOwner(containerName, username string, files []string) error
+	RemoveContainerFiles(containerName string, files []string) error
 	Ping() error
 }
 
@@ -79,6 +84,7 @@ type Client interface {
 	CreateContainer(opts docker.CreateContainerOptions) (*docker.Container, error)
 	AttachToContainer(opts docker.AttachToContainerOptions) error
 	StartContainer(id string, hostConfig *docker.HostConfig) error
+	KillContainer(opts docker.KillContainerOptions) error
 	WaitContainer(id string) (int, error)
 	UploadToContainer(id string, opts docker.UploadToContainerOptions) error
 	RemoveContainer(opts docker.RemoveContainerOptions) error
@@ -86,6 +92,8 @@ type Client interface {
 	CopyFromContainer(opts docker.CopyFromContainerOptions) error
 	BuildImage(opts docker.BuildImageOptions) error
 	InspectContainer(id string) (*docker.Container, error)
+	CreateExec(opts docker.CreateExecOptions) (*docker.Exec, error)
+	StartExec(id string, opts docker.StartExecOptions) error
 	Ping() error
 }
 
@@ -161,6 +169,60 @@ func New(config *api.DockerConfig, auth docker.AuthConfiguration) (Docker, error
 		client:   client,
 		pullAuth: auth,
 	}, nil
+}
+
+// StartContainer starts an existing container.
+func (d *stiDocker) StartContainer(id string, hostConfig *docker.HostConfig) error {
+	return d.client.StartContainer(id, hostConfig)
+}
+
+// KillContainerOptions kills the container using SIGKILL.
+func (d *stiDocker) KillContainer(containerID string) error {
+	opts := docker.KillContainerOptions{ID: containerID}
+	return d.client.KillContainer(opts)
+}
+
+// dockerExec executes the command in specified container
+func (d *stiDocker) dockerExec(containerName string, command []string) error {
+	config := docker.CreateExecOptions{
+		Container:    containerName,
+		AttachStdin:  true,
+		AttachStdout: true,
+		AttachStderr: false,
+		Tty:          false,
+		Cmd:          command,
+		User:         "root",
+	}
+	execCmd, err := d.client.CreateExec(config)
+	if err != nil {
+		return err
+	}
+	var stdout, stderr bytes.Buffer
+	success := make(chan struct{})
+	opts := docker.StartExecOptions{
+		OutputStream: &stdout,
+		ErrorStream:  &stderr,
+		RawTerminal:  true,
+		Success:      success,
+	}
+	go func() {
+		err = d.client.StartExec(execCmd.ID, opts)
+	}()
+	<-success
+	glog.V(5).Infof("Executed %#v command in %q", command, containerName)
+	return err
+}
+
+// ChangeContainerFileOwner changes an owner of a single file inside the
+// container.
+func (d *stiDocker) ChangeContainerFilesOwner(containerName, username string, files []string) error {
+	return d.dockerExec(containerName, append([]string{"chown", "-R", "-c", username}, files...))
+}
+
+// ChangeContainerFileOwner changes an owner of a single file inside the
+// container.
+func (d *stiDocker) RemoveContainerFiles(containerName string, files []string) error {
+	return d.dockerExec(containerName, append([]string{"rm", "-r", "-f", "-v"}, files...))
 }
 
 // GetImageWorkdir returns the WORKDIR property for the given image name.
