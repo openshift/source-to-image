@@ -111,6 +111,18 @@ func (d *FakeDockerClient) UploadToContainer(id string, opts docker.UploadToCont
 	return nil
 }
 
+func (d *FakeDockerClient) CreateExec(opts docker.CreateExecOptions) (*docker.Exec, error) {
+	return nil, nil
+}
+
+func (d *FakeDockerClient) StartExec(id string, opts docker.StartExecOptions) error {
+	return nil
+}
+
+func (d *FakeDockerClient) KillContainer(opts docker.KillContainerOptions) error {
+	return nil
+}
+
 // WaitContainer waits for a fake container to finish
 func (d *FakeDockerClient) WaitContainer(id string) (int, error) {
 	d.WaitContainerID = id

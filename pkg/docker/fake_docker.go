@@ -47,6 +47,28 @@ type FakeDocker struct {
 	mutex sync.Mutex
 }
 
+// StartContainer starts an existing container.
+func (d *FakeDocker) StartContainer(id string, hostConfig *dockerclient.HostConfig) error {
+	return nil
+}
+
+// KillContainerOptions kills the container using SIGKILL.
+func (d *FakeDocker) KillContainer(containerID string) error {
+	return nil
+}
+
+// ChangeContainerFileOwner changes an owner of a single file inside the
+// container.
+func (d *FakeDocker) ChangeContainerFilesOwner(containerName, username string, files []string) error {
+	return nil
+}
+
+// ChangeContainerFileOwner changes an owner of a single file inside the
+// container.
+func (d *FakeDocker) RemoveContainerFiles(containerName string, files []string) error {
+	return nil
+}
+
 // IsImageInLocalRegistry checks if the image exists in the fake local registry
 func (f *FakeDocker) IsImageInLocalRegistry(imageName string) (bool, error) {
 	f.LocalRegistryImage = imageName
