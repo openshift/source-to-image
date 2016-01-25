@@ -46,10 +46,11 @@ func (b *DockerRunner) Run(config *api.Config) error {
 	defer outWriter.Close()
 
 	opts := docker.RunContainerOptions{
-		Image:       config.Tag,
-		Stdout:      outWriter,
-		Stderr:      errWriter,
-		TargetImage: true,
+		Image:        config.Tag,
+		Stdout:       outWriter,
+		Stderr:       errWriter,
+		TargetImage:  true,
+		CGroupLimits: config.CGroupLimits,
 	}
 
 	//NOTE, we've seen some Golang level deadlock issues with the streaming of cmd output to
