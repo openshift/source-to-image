@@ -12,4 +12,4 @@ WORKDIR /
 #
 # Port 23456 must match the port used in the http server in STI's
 # integration_test.go
-ENV STI_SCRIPTS_URL http://127.0.0.1:23456/.sti/bin
+ENV STI_SCRIPTS_URL http://127.0.0.1:23456/.s2i/bin
