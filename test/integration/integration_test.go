@@ -58,7 +58,7 @@ const (
 	// scripts are made available for integration testing.
 	//
 	// Port 23456 must match the port used in the fake image Dockerfiles
-	FakeScriptsHttpURL = "http://127.0.0.1:23456/sti-fake/.sti/bin"
+	FakeScriptsHttpURL = "http://127.0.0.1:23456/sti-fake/.s2i/bin"
 )
 
 // TestInjectionBuild tests the build where we inject files to assemble script.
@@ -121,7 +121,7 @@ func (i *integrationTest) setup() {
 		// using this file's dirname
 		_, filename, _, _ := runtime.Caller(0)
 		testImagesDir := filepath.Join(filepath.Dir(filename), "scripts")
-		FakeScriptsFileURL = "file://" + filepath.Join(testImagesDir, ".sti", "bin")
+		FakeScriptsFileURL = "file://" + filepath.Join(testImagesDir, ".s2i", "bin")
 
 		for _, image := range []string{TagCleanBuild, TagCleanBuildUser, TagIncrementalBuild, TagIncrementalBuildUser} {
 			i.dockerClient.RemoveImage(image)

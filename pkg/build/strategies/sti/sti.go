@@ -218,7 +218,6 @@ func (b *STI) Prepare(config *api.Config) error {
 
 	for _, r := range append(required, optional...) {
 		if r.Error == nil {
-			glog.V(1).Infof("Using %v from %s", r.Script, r.URL)
 			b.externalScripts[r.Script] = r.Downloaded
 			b.installedScripts[r.Script] = r.Installed
 			b.scriptsURL[r.Script] = r.URL
@@ -277,7 +276,7 @@ func (b *STI) PostExecute(containerID, location string) error {
 		// scripts from inside of the image, we need to strip the image part
 		// NOTE: We use path.Join instead of filepath.Join to avoid converting the
 		// path to UNC (Windows) format as we always run this inside container.
-		runCmd = path.Join(strings.TrimPrefix(runCmd, "image://"), api.Run)
+		runCmd = strings.TrimPrefix(runCmd, "image://")
 	} else {
 		// external scripts, in which case we're taking the directory to which they
 		// were extracted and append scripts dir and name

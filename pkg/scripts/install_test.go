@@ -3,310 +3,279 @@ package scripts
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	dockerClient "github.com/fsouza/go-dockerclient"
 	"github.com/openshift/source-to-image/pkg/api"
-	"github.com/openshift/source-to-image/pkg/docker"
-	"github.com/openshift/source-to-image/pkg/errors"
+	dockerpkg "github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/test"
+	"github.com/openshift/source-to-image/pkg/util"
 )
 
-func getFakeInstaller() *installer {
-	return &installer{
-		image:      "test-image",
-		scriptsURL: "http://the.scripts.url/scripts",
-		docker:     &docker.FakeDocker{},
-		downloader: &test.FakeDownloader{},
-		fs:         &test.FakeFileSystem{},
+type fakeScriptManagerConfig struct {
+	download Downloader
+	docker   dockerpkg.Docker
+	fs       util.FileSystem
+	url      string
+}
+
+func newFakeConfig() *fakeScriptManagerConfig {
+	return &fakeScriptManagerConfig{
+		docker:   &dockerpkg.FakeDocker{},
+		download: &test.FakeDownloader{},
+		fs:       &test.FakeFileSystem{},
+		url:      "http://the.scripts.url/s2i/bin",
+	}
+}
+
+func newFakeInstaller(config *fakeScriptManagerConfig) Installer {
+	m := DefaultScriptSourceManager{
+		Image:      "test-image",
+		ScriptsURL: config.url,
+		docker:     config.docker,
+		fs:         config.fs,
+		download:   config.download,
+	}
+	m.Add(&UrlScriptHandler{URL: m.ScriptsURL, download: m.download, fs: m.fs})
+	m.Add(&SourceScriptHandler{fs: m.fs})
+	defaultURL, err := m.docker.GetScriptsURL(m.Image)
+	if err == nil && defaultURL != "" {
+		m.Add(&UrlScriptHandler{URL: defaultURL, download: m.download, fs: m.fs})
+	}
+	return &m
+}
+
+func isValidInstallResult(result api.InstallResult, t *testing.T) {
+	if len(result.Script) == 0 {
+		t.Errorf("expected the Script not be empty")
+	}
+	if result.Error != nil {
+		t.Errorf("unexpected the error %v for the %q script in install result", result.Error, result.Script)
+	}
+	if !result.Downloaded {
+		t.Errorf("expected the %q script install result to be downloaded", result.Script)
+	}
+	if !result.Installed {
+		t.Errorf("expected the %q script install result to be installed", result.Script)
+	}
+	if len(result.URL) == 0 {
+		t.Errorf("expected the %q script install result to have valid URL", result.Script)
+	}
+}
+
+func TestInstallOptionalFromURL(t *testing.T) {
+	config := newFakeConfig()
+	inst := newFakeInstaller(config)
+	scripts := []string{api.Assemble, api.Run}
+	results := inst.InstallOptional(scripts, "/output")
+	for _, r := range results {
+		isValidInstallResult(r, t)
+	}
+	for _, s := range scripts {
+		downloaded := false
+		targets := config.download.(*test.FakeDownloader).Target
+		for _, t := range targets {
+			if t == "/output/upload/scripts/"+s {
+				downloaded = true
+			}
+		}
+		if !downloaded {
+			t.Errorf("the script %q was not downloaded properly (%#v)", s, targets)
+		}
+		validURL := false
+		urls := config.download.(*test.FakeDownloader).URL
+		for _, u := range urls {
+			if u.String() == config.url+"/"+s {
+				validURL = true
+			}
+		}
+		if !validURL {
+			t.Errorf("the script %q was downloaded from invalid URL (%+v), s, urls")
+		}
+	}
+}
+
+func TestInstallRequiredFromURL(t *testing.T) {
+	config := newFakeConfig()
+	config.download.(*test.FakeDownloader).Err = map[string]error{
+		config.url + "/" + api.Assemble: fmt.Errorf("download error"),
+	}
+	inst := newFakeInstaller(config)
+	scripts := []string{api.Assemble, api.Run}
+	_, err := inst.InstallRequired(scripts, "/output")
+	if err == nil {
+		t.Errorf("expected assemble to fail install")
+	}
+}
+
+func TestInstallRequiredFromDocker(t *testing.T) {
+	config := newFakeConfig()
+	// We fail the download for assemble, which means the Docker image default URL
+	// should be used instead.
+	config.download.(*test.FakeDownloader).Err = map[string]error{
+		config.url + "/" + api.Assemble: fmt.Errorf("not available"),
+	}
+	defaultDockerURL := "image:///usr/libexec/s2i/bin"
+	config.docker.(*dockerpkg.FakeDocker).DefaultURLResult = defaultDockerURL
+	inst := newFakeInstaller(config)
+	scripts := []string{api.Assemble, api.Run}
+	results, err := inst.InstallRequired(scripts, "/output")
+	if err != nil {
+		t.Errorf("unexpected error, assemble should be installed from docker image url")
+	}
+	for _, r := range results {
+		isValidInstallResult(r, t)
+	}
+	for _, s := range scripts {
+		validURL := false
+		urls := config.download.(*test.FakeDownloader).URL
+		for _, u := range urls {
+			url := config.url
+			// The assemble script should be downloaded from image default URL
+			if s == api.Assemble {
+				url = defaultDockerURL
+			}
+			if u.String() == url+"/"+s {
+				validURL = true
+			}
+		}
+		if !validURL {
+			t.Errorf("the script %q was downloaded from invalid URL (%+v), s, urls")
+		}
+	}
+}
+
+func TestInstallRequiredFromSource(t *testing.T) {
+	config := newFakeConfig()
+	// There is no other script source than the source code
+	config.url = ""
+	deprecatedSourceScripts := strings.Replace(api.SourceScripts, ".s2i", ".sti", -1)
+	config.fs.(*test.FakeFileSystem).ExistsResult = map[string]bool{
+		filepath.Join("/workdir", api.SourceScripts, api.Assemble):  true,
+		filepath.Join("/workdir", deprecatedSourceScripts, api.Run): true,
+	}
+	inst := newFakeInstaller(config)
+	scripts := []string{api.Assemble, api.Run}
+	result, err := inst.InstallRequired(scripts, "/workdir")
+	if err != nil {
+		t.Errorf("unexpected error, assemble should be installed from docker image url: %v", err)
+	}
+	for _, r := range result {
+		isValidInstallResult(r, t)
+	}
+	for _, s := range scripts {
+		validResultURL := false
+		for _, r := range result {
+			// The api.Run use deprecated path, but it should still work.
+			if s == api.Run && r.URL == sourcesRootAbbrev+".sti/bin/"+s {
+				validResultURL = true
+			}
+			if r.URL == sourcesRootAbbrev+".s2i/bin/"+s {
+				validResultURL = true
+			}
+		}
+		if !validResultURL {
+			t.Errorf("expected %q has result URL "+sourcesRootAbbrev+".s2i/bin/script>, got %#v", s, result)
+		}
+		chmodCalled := false
+		fs := config.fs.(*test.FakeFileSystem)
+		for _, f := range fs.ChmodFile {
+			if f == "/workdir/upload/scripts/"+s {
+				chmodCalled = true
+			}
+		}
+		if !chmodCalled {
+			t.Errorf("expected chmod called on /workdir/upload/scripts/%s", s)
+		}
+	}
+}
+
+// TestInstallRequiredOrder tests the proper order for retrieving the source
+// scripts.
+// The scenario here is that the assemble script does not exists in provided
+// scripts url, but it exists in source code directory. The save-artifacts does
+// not exists at provided url nor in source code, so the docker image default
+// URL should be used.
+func TestInstallRequiredOrder(t *testing.T) {
+	config := newFakeConfig()
+	config.download.(*test.FakeDownloader).Err = map[string]error{
+		config.url + "/" + api.Assemble:      fmt.Errorf("not available"),
+		config.url + "/" + api.SaveArtifacts: fmt.Errorf("not available"),
+	}
+	config.fs.(*test.FakeFileSystem).ExistsResult = map[string]bool{
+		filepath.Join("/workdir", api.SourceScripts, api.Assemble):      true,
+		filepath.Join("/workdir", api.SourceScripts, api.Run):           false,
+		filepath.Join("/workdir", api.SourceScripts, api.SaveArtifacts): false,
+	}
+	defaultDockerURL := "http://the.docker.url/s2i"
+	config.docker.(*dockerpkg.FakeDocker).DefaultURLResult = defaultDockerURL
+	scripts := []string{api.Assemble, api.Run, api.SaveArtifacts}
+	inst := newFakeInstaller(config)
+	result, err := inst.InstallRequired(scripts, "/workdir")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	for _, r := range result {
+		isValidInstallResult(r, t)
+	}
+	for _, s := range scripts {
+		found := false
+		for _, r := range result {
+			if r.Script == s && r.Script == api.Assemble && r.URL == sourcesRootAbbrev+".s2i/bin/assemble" {
+				found = true
+			}
+			if r.Script == s && r.Script == api.Run && r.URL == config.url+"/"+api.Run {
+				found = true
+			}
+			if r.Script == s && r.Script == api.SaveArtifacts && r.URL == defaultDockerURL+"/"+api.SaveArtifacts {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("the %q script installed in wrong order: %+v", s, result)
+		}
 	}
 }
 
 func TestInstallRequiredError(t *testing.T) {
-	inst := getFakeInstaller()
-	inst.downloader.(*test.FakeDownloader).Err = map[string]error{
-		inst.scriptsURL + "/" + api.Assemble: fmt.Errorf("Download Error"),
-	}
-
-	_, err := inst.InstallRequired([]string{api.Assemble, api.Run}, "/working-dir/")
+	config := newFakeConfig()
+	config.url = ""
+	scripts := []string{api.Assemble, api.Run}
+	inst := newFakeInstaller(config)
+	result, err := inst.InstallRequired(scripts, "/output")
 	if err == nil {
-		t.Error("Expected error but none got!")
+		t.Errorf("expected error, got %+v", result)
 	}
 }
 
-func TestRun(t *testing.T) {
-	inst := getFakeInstaller()
-	defaultURL := "http://the.default.url"
-	inst.docker.(*docker.FakeDocker).DefaultURLResult = defaultURL
-	scriptsURL := "http://the.scripts.url"
-	inst.scriptsURL = scriptsURL
-	workingDir := "/working-dir/"
-	fs := inst.fs.(*test.FakeFileSystem)
-	fs.ExistsResult = map[string]bool{
-		filepath.Join(workingDir, api.UserScripts, api.Assemble):    true,
-		filepath.Join(workingDir, api.UserScripts, api.Run):         true,
-		filepath.Join(workingDir, api.DefaultScripts, api.Assemble): true,
-		filepath.Join(workingDir, api.DefaultScripts, api.Run):      true,
-	}
-
-	result := inst.run([]string{api.Assemble, api.Run}, workingDir)
-	if len(result) != 2 {
-		t.Errorf("Unexpected result length, expected 2, got %d", len(result))
-	}
-	for _, r := range result {
-		if r.Error != nil {
-			t.Errorf("Unexpected error run for %v: %v", r.Script, r.Error)
-		}
-		if !r.Downloaded {
-			t.Errorf("%v was not downloaded", r.Script)
-		}
-		if !r.Installed {
-			t.Errorf("%v was not installed", r.Script)
-		}
+func TestInstallRequiredFromInvalidURL(t *testing.T) {
+	config := newFakeConfig()
+	config.url = "../invalid-url"
+	scripts := []string{api.Assemble}
+	inst := newFakeInstaller(config)
+	result, err := inst.InstallRequired(scripts, "/output")
+	if err == nil {
+		t.Errorf("expected error, got %+v", result)
 	}
 }
 
-func TestRunNoDefaultURL(t *testing.T) {
-	inst := getFakeInstaller()
-	scriptsURL := "http://the.scripts.url"
-	inst.scriptsURL = scriptsURL
-	workingDir := "/working-dir/"
-	fs := inst.fs.(*test.FakeFileSystem)
-	fs.ExistsResult = map[string]bool{
-		filepath.Join(workingDir, api.UserScripts, api.Assemble): true,
-		filepath.Join(workingDir, api.UserScripts, api.Run):      true,
+func TestNewInstaller(t *testing.T) {
+	docker := &dockerpkg.FakeDocker{DefaultURLResult: "image://docker"}
+	inst := NewInstaller("test-image", "http://foo.bar", docker, dockerClient.AuthConfiguration{})
+	sources := inst.(*DefaultScriptSourceManager).sources
+	firstHandler, ok := sources[0].(*UrlScriptHandler)
+	if !ok {
+		t.Errorf("expected first handler to be script url handler, got %#v", inst.(*DefaultScriptSourceManager).sources)
 	}
-
-	result := inst.run([]string{api.Assemble, api.Run}, workingDir)
-	if len(result) != 2 {
-		t.Errorf("Unexpected result length, expected 2, got %d", len(result))
+	if firstHandler.URL != "http://foo.bar" {
+		t.Errorf("expected first handler to handle the script url, got %+v", firstHandler)
 	}
-	for _, r := range result {
-		if r.Error != nil {
-			t.Errorf("Unexpected error run for %v: %v", r.Script, r.Error)
-		}
-		if !r.Downloaded {
-			t.Errorf("%v was not downloaded", r.Downloaded)
-		}
-		if !r.Installed {
-			t.Errorf("%v was not installed", r.Installed)
-		}
+	lastHandler, ok := sources[len(sources)-1].(*UrlScriptHandler)
+	if !ok {
+		t.Errorf("expected last handler to be docker url handler, got %#v", inst.(*DefaultScriptSourceManager).sources)
 	}
-}
-
-func TestRunEmpty(t *testing.T) {
-	inst := getFakeInstaller()
-	result := inst.run([]string{}, "")
-	if result == nil || len(result) != 0 {
-		t.Error("Unexpected result from run!")
-	}
-}
-
-func TestDownloadErrors(t *testing.T) {
-	inst := getFakeInstaller()
-	baseURL := "http://the.scripts.url"
-	dl := inst.downloader.(*test.FakeDownloader)
-	dlErr := fmt.Errorf("Download Error")
-	dl.Err = map[string]error{
-		baseURL + "/" + api.Assemble:      dlErr,
-		baseURL + "/" + api.Run:           nil,
-		baseURL + "/" + api.SaveArtifacts: dlErr,
-	}
-
-	result := inst.download(baseURL, []string{api.Assemble, api.Run, api.SaveArtifacts}, "")
-	for s, r := range result {
-		e := dl.Err[baseURL+"/"+s]
-		a := r.err
-		if e != a {
-			t.Errorf("Expected download error '%v' for %v, but got %v", e, s, a)
-		}
-	}
-}
-
-func TestInstallFromDefaultURL(t *testing.T) {
-	defaultURL := "http://the.default.url"
-	defaultResults := map[string]*downloadResult{
-		api.Assemble: {defaultURL, nil},
-		api.Run:      {defaultURL, nil},
-	}
-
-	testInstall(t, getFakeInstaller(), []string{api.Assemble, api.Run},
-		nil, nil, defaultResults, "/working-dir/",
-		defaultURL, true, true, nil)
-}
-
-func TestInstallFromScriptsURL(t *testing.T) {
-	scriptsURL := "http://the.scripts.url"
-	userResults := map[string]*downloadResult{
-		api.Assemble: {scriptsURL, nil},
-		api.Run:      {scriptsURL, nil},
-	}
-
-	defaultURL := "http://the.default.url"
-	defaultResults := map[string]*downloadResult{
-		api.Assemble: {defaultURL, nil},
-		api.Run:      {defaultURL, nil},
-	}
-
-	testInstall(t, getFakeInstaller(), []string{api.Assemble, api.Run},
-		userResults, nil, defaultResults, "/working-dir/",
-		scriptsURL, true, true, nil)
-}
-
-func TestInstallFromSourceURL(t *testing.T) {
-	sourceResults := map[string]*downloadResult{
-		api.Assemble: {api.SourceScripts, nil},
-		api.Run:      {api.SourceScripts, nil},
-	}
-
-	defaultURL := "http://the.default.url"
-	defaultResults := map[string]*downloadResult{
-		api.Assemble: {defaultURL, nil},
-		api.Run:      {defaultURL, nil},
-	}
-
-	testInstall(t, getFakeInstaller(), []string{api.Assemble, api.Run},
-		nil, sourceResults, defaultResults, "/working-dir/",
-		api.SourceScripts, true, true, nil)
-}
-
-func TestInstallScriptsFromImage(t *testing.T) {
-	defaultURL := "image:///path/in/image"
-	defaultResults := map[string]*downloadResult{
-		api.Assemble: {defaultURL, errors.NewScriptsInsideImageError(defaultURL)},
-		api.Run:      {defaultURL, errors.NewScriptsInsideImageError(defaultURL)},
-	}
-
-	testInstall(t, getFakeInstaller(), []string{api.Assemble, api.Run},
-		nil, nil, defaultResults, "/working-dir/",
-		defaultURL, false, true, nil)
-}
-
-func TestInstallJustErrors(t *testing.T) {
-	err1 := fmt.Errorf("Just errors")
-	scriptsURL := "http://the.scripts.url"
-	userResults := map[string]*downloadResult{
-		api.Assemble: {scriptsURL, err1},
-		api.Run:      {scriptsURL, err1},
-	}
-
-	err2 := fmt.Errorf("Just errors")
-	defaultURL := "image:///path/in/image"
-	defaultResults := map[string]*downloadResult{
-		api.Assemble: {defaultURL, err2},
-		api.Run:      {defaultURL, err2},
-	}
-
-	testInstall(t, getFakeInstaller(), []string{api.Assemble, api.Run},
-		userResults, nil, defaultResults, "/working-dir/",
-		defaultURL, false, false, err2)
-}
-
-func TestInstallEmpty(t *testing.T) {
-	testInstall(t, getFakeInstaller(), []string{api.Assemble, api.Run},
-		nil, nil, nil, "/working-dir/",
-		"", false, false, nil)
-}
-
-func TestInstallRenameErr(t *testing.T) {
-	inst := getFakeInstaller()
-	fsErr := fmt.Errorf("Rename Error")
-	inst.fs.(*test.FakeFileSystem).RenameError = fsErr
-
-	defaultURL := "http://the.default.url"
-	defaultResults := map[string]*downloadResult{
-		api.Assemble: {defaultURL, nil},
-		api.Run:      {defaultURL, nil},
-	}
-
-	testInstall(t, inst, []string{api.Assemble, api.Run},
-		nil, nil, defaultResults, "/working-dir/",
-		defaultURL, false, false, fsErr)
-}
-
-func TestInstallChmodErr(t *testing.T) {
-	inst := getFakeInstaller()
-	workingDir := "/working-dir/"
-	fsErr := fmt.Errorf("Chmod Error")
-	inst.fs.(*test.FakeFileSystem).ChmodError = map[string]error{
-		filepath.Join(workingDir, api.UploadScripts, api.Assemble): fsErr,
-		filepath.Join(workingDir, api.UploadScripts, api.Run):      fsErr,
-	}
-
-	defaultURL := "http://the.default.url"
-	defaultResults := map[string]*downloadResult{
-		api.Assemble: {defaultURL, nil},
-		api.Run:      {defaultURL, nil},
-	}
-
-	testInstall(t, inst, []string{api.Assemble, api.Run},
-		nil, nil, defaultResults, workingDir,
-		defaultURL, false, false, fsErr)
-}
-
-func testInstall(t *testing.T, inst *installer, scripts []string, userResults, sourceResults,
-	defaultResults map[string]*downloadResult, workingDir, expectedURL string,
-	expectedDownloaded, expectedInstalled bool, expectedError error) {
-	result := inst.install(scripts, userResults, sourceResults, defaultResults, workingDir)
-
-	if len(result) != len(scripts) {
-		t.Errorf("Unexpected result length, expected %d, got %d", len(scripts), len(result))
-	}
-	for _, r := range result {
-		if r.Error != expectedError {
-			t.Errorf("Unexpected error during install %s, expected %v, got %v", r.Script, expectedError, r.Error)
-		}
-		if r.URL != expectedURL {
-			t.Errorf("Unexpected location for %s, expected %s, got %s", r.Script, expectedURL, r.URL)
-		}
-		if r.Downloaded != expectedDownloaded {
-			t.Errorf("Unexpected download flag for %s, got %v, expected %v", r.Script, expectedDownloaded, r.Downloaded)
-		}
-		if r.Installed != expectedInstalled {
-			t.Errorf("Unexpected download flag for %s, got %v, expected %v", r.Script, expectedInstalled, r.Installed)
-		}
-	}
-}
-
-func TestInstallCombined(t *testing.T) {
-	scriptsURL := "http://the.scripts.url"
-	userResults := map[string]*downloadResult{
-		api.Assemble: {scriptsURL, nil},
-	}
-
-	sourceResults := map[string]*downloadResult{
-		api.Run: {api.SourceScripts, nil},
-	}
-
-	defaultURL := "image:///path/in/image"
-	defaultResults := map[string]*downloadResult{
-		api.Assemble:      {defaultURL, errors.NewScriptsInsideImageError(defaultURL)},
-		api.Run:           {defaultURL, errors.NewScriptsInsideImageError(defaultURL)},
-		api.SaveArtifacts: {defaultURL, errors.NewScriptsInsideImageError(defaultURL)},
-	}
-
-	inst := getFakeInstaller()
-	result := inst.install([]string{api.Assemble, api.Run, api.SaveArtifacts}, userResults, sourceResults, defaultResults, "/working-dir/")
-
-	if len(result) != 3 {
-		t.Errorf("Unexpected result length, expected 3, got %d", len(result))
-	}
-	for _, r := range result {
-		if r.Error != nil {
-			t.Errorf("Unexpected error during install %s, got %v", r.Script, r.Error)
-		}
-		switch r.Script {
-		case api.Assemble:
-			if r.URL != scriptsURL || !r.Downloaded || !r.Installed {
-				t.Errorf("Unexpected results for %s: %s, %v, %v", r.Script, r.URL, r.Downloaded, r.Installed)
-			}
-		case api.Run:
-			if r.URL != api.SourceScripts || !r.Downloaded || !r.Installed {
-				t.Errorf("Unexpected results for %s: %s, %v, %v", r.Script, r.URL, r.Downloaded, r.Installed)
-			}
-		case api.SaveArtifacts:
-			if r.URL != defaultURL || r.Downloaded || !r.Installed {
-				t.Errorf("Unexpected results for %s: %s, %v, %v", r.Script, r.URL, r.Downloaded, r.Installed)
-			}
-		}
+	if lastHandler.URL != "image://docker" {
+		t.Errorf("expected last handler to handle the docker default url, got %+v", lastHandler)
 	}
 }

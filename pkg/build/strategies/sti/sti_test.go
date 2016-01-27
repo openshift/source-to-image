@@ -332,7 +332,7 @@ func TestPostExecute(t *testing.T) {
 		}
 		ci := bh.callbackInvoker.(*test.FakeCallbackInvoker)
 		if tc.scriptsFromImage {
-			bh.scriptsURL = map[string]string{api.Run: "image:///usr/libexec/s2i"}
+			bh.scriptsURL = map[string]string{api.Run: "image:///usr/libexec/s2i/run"}
 		}
 		err := bh.PostExecute(containerID, "cmd1")
 		if err != nil {
@@ -344,7 +344,7 @@ func TestPostExecute(t *testing.T) {
 			expectedCmd = []string{"/usr/libexec/s2i/" + api.Run}
 		}
 		if !reflect.DeepEqual(dh.CommitContainerOpts.Command, expectedCmd) {
-			t.Errorf("(%d) Unexpected commit container command: %#v", i, dh.CommitContainerOpts.Command)
+			t.Errorf("(%d) Unexpected commit container command: %#v, expected %q", i, dh.CommitContainerOpts.Command, expectedCmd)
 		}
 		if dh.CommitContainerOpts.Repository != tc.tag {
 			t.Errorf("(%d) Unexpected tag commited, expected %s, got %s", i, tc.tag, dh.CommitContainerOpts.Repository)

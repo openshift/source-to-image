@@ -8,7 +8,7 @@ RUN mkdir -p /sti-fake/src && \
 
 WORKDIR /
 
-ADD scripts/.sti/bin/ /tmp/scripts/
+ADD scripts/.s2i/bin/ /tmp/scripts/
 
 # Scripts are already in the image and this is their location
 LABEL io.openshift.s2i.scripts-url=image:///tmp/scripts/
