@@ -7,6 +7,8 @@
 #       present in the pkg/ folder.
 #
 
+source "${s2i_dir}/hack/util.sh"
+
 # Exclude these packages from source-to-image explicitely
 exclude_pkgs=(
   pkg/cmd
@@ -22,7 +24,7 @@ origin_dir=$GOPATH/src/github.com/openshift/origin
 origin_s2i_godep_dir=${origin_dir}/Godeps/_workspace/src/github.com/openshift/source-to-image
 s2i_ref=$(cd ${s2i_dir} && git rev-parse --verify HEAD)
 s2i_short_ref=$(cd ${s2i_dir} && git rev-parse --short HEAD)
-s2i_godeps_ref=$(grep -m2 -A2 "openshift/source-to-image" ${origin_dir}/Godeps/Godeps.json | \
+s2i_godeps_ref=$(grep -m1 -A2 'openshift/source-to-image' ${origin_dir}/Godeps/Godeps.json | \
   grep Rev | cut -d ':' -f2 | sed -e 's/"//g' | sed -e 's/^[[:space:]]*//')
 
 pushd "${origin_dir}" >/dev/null
@@ -31,15 +33,15 @@ pushd "${origin_dir}" >/dev/null
   cp -R ${s2i_dir}/pkg ${origin_s2i_godep_dir}/.
 
   # Remove all test files
-  find ${origin_s2i_godep_dir} -type f -name "*_test.go" -exec rm -f {} \;
+  find ${origin_s2i_godep_dir} -type f -name '*_test.go' -delete
 
-  # Remove all explicitely excluded packages
+  # Remove all explicitly excluded packages
   for pkg in "${exclude_pkgs[@]}"; do
     rm -rf "${origin_s2i_godep_dir}/${pkg}"
   done
 
   # Bump the origin Godeps.json file
-  sed -i '' "s/${s2i_godeps_ref}/${s2i_ref}/g" ${origin_dir}/Godeps/Godeps.json
+  os::util::sed "s/${s2i_godeps_ref}/${s2i_ref}/g" ${origin_dir}/Godeps/Godeps.json
 
   # Make a commit with proper message
   git add Godeps && git commit -m "bump(github.com/openshift/source-to-image): ${s2i_ref}"

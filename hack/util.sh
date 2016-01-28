@@ -71,6 +71,14 @@ sti::log::error_exit() {
   exit "${code}"
 }
 
+os::util::sed() {
+  if [[ "$(go env GOHOSTOS)" == "darwin" ]]; then
+    sed -i '' $@
+  else
+    sed -i'' $@
+  fi
+}
+
 find_files() {
   find . -not \( \
       \( \
