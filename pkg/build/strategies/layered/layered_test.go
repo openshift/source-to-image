@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/api"
@@ -72,6 +73,53 @@ func TestBuildOK(t *testing.T) {
 	}
 }
 
+func TestBuildOKWithImageRef(t *testing.T) {
+	workDir, _ := ioutil.TempDir("", "sti")
+	scriptDir := filepath.Join(workDir, api.UploadScripts)
+	err := os.MkdirAll(scriptDir, 0700)
+	assemble := filepath.Join(scriptDir, api.Assemble)
+	file, err := os.Create(assemble)
+	if err != nil {
+		t.Errorf("Unexpected error returned: %v", err)
+	}
+	defer file.Close()
+	defer os.RemoveAll(workDir)
+	l := newFakeLayeredWithScripts(assemble, workDir)
+	l.config.BuilderImage = "docker.io/uptoknow/ruby-20-centos7@sha256:d6f5718b85126954d98931e654483ee794ac357e0a98f4a680c1e848d78863a1"
+	_, err = l.Build(l.config)
+	if err != nil {
+		t.Errorf("Unexpected error returned: %v", err)
+	}
+	if !l.config.LayeredBuild {
+		t.Errorf("Expected LayeredBuild to be true!")
+	}
+	if !strings.HasPrefix(l.config.BuilderImage, "docker.io/uptoknow/ruby-20-centos7:s2i-layered-") {
+		t.Errorf("Expected BuilderImage to start with docker.io/uptoknow/ruby-20-centos7:s2i-layered-, but got %s", l.config.BuilderImage)
+	}
+	l.config.BuilderImage = "uptoknow/ruby-20-centos7@sha256:d6f5718b85126954d98931e654483ee794ac357e0a98f4a680c1e848d78863a1"
+	_, err = l.Build(l.config)
+	if err != nil {
+		t.Errorf("Unexpected error returned: %v", err)
+	}
+	if !l.config.LayeredBuild {
+		t.Errorf("Expected LayeredBuild to be true!")
+	}
+	if !strings.HasPrefix(l.config.BuilderImage, "uptoknow/ruby-20-centos7:s2i-layered-") {
+		t.Errorf("Expected BuilderImage to start with uptoknow/ruby-20-centos7:s2i-layered-, but got %s", l.config.BuilderImage)
+	}
+	l.config.BuilderImage = "ruby-20-centos7@sha256:d6f5718b85126954d98931e654483ee794ac357e0a98f4a680c1e848d78863a1"
+	_, err = l.Build(l.config)
+	if err != nil {
+		t.Errorf("Unexpected error returned: %v", err)
+	}
+	if !l.config.LayeredBuild {
+		t.Errorf("Expected LayeredBuild to be true!")
+	}
+	if !strings.HasPrefix(l.config.BuilderImage, "ruby-20-centos7:s2i-layered-") {
+		t.Errorf("Expected BuilderImage to start with /ruby-20-centos7:s2i-layered-, but got %s", l.config.BuilderImage)
+	}
+}
+
 func TestBuildNoScriptsProvided(t *testing.T) {
 	l := newFakeLayered()
 	l.config.BuilderImage = "test/image"
@@ -119,9 +167,18 @@ func TestBuildErrorOpenTarFile(t *testing.T) {
 
 func TestBuildErrorBuildImage(t *testing.T) {
 	l := newFakeLayered()
+	l.config.BuilderImage = "test/image"
 	l.docker.(*docker.FakeDocker).BuildImageError = errors.New("BuildImageError")
 	_, err := l.Build(l.config)
 	if err == nil || err.Error() != "BuildImageError" {
 		t.Errorf("An error was expected for BuildImage, but got different: %v", err)
+	}
+}
+
+func TestBuildErrorBadImageName(t *testing.T) {
+	l := newFakeLayered()
+	_, err := l.Build(l.config)
+	if err == nil || !strings.Contains(err.Error(), "must be two or three segments separated by slashes") {
+		t.Errorf("An docker spec parse error was expected, but got different: %v", err)
 	}
 }
