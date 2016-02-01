@@ -18,30 +18,22 @@ type Environment struct {
 	Value string
 }
 
-// getEnvPath returns prefix/environment path.
-func getEnvPath(config *api.Config, prefix string) (string, error) {
-	envPath := filepath.Join(config.WorkingDir, api.Source, prefix, api.Environment)
-	if _, err := os.Stat(envPath); os.IsNotExist(err) {
-		return "", errors.New("no environment file found in application sources")
-	}
-	return envPath, nil
-}
-
 // GetEnvironment gets the .s2i/environment file located in the sources and
 // parse it into []environment
 func GetEnvironment(config *api.Config) ([]Environment, error) {
-	envPath, err := getEnvPath(config, ".s2i")
-	if err != nil {
-		envPath, err = getEnvPath(config, ".sti")
-		if err != nil {
-			return nil, err
+	envPath := filepath.Join(config.WorkingDir, api.Source, ".s2i", api.Environment)
+	if _, err := os.Stat(envPath); os.IsNotExist(err) {
+		// TODO: Remove this when the '.sti/environment' is deprecated.
+		envPath = filepath.Join(config.WorkingDir, api.Source, ".sti", api.Environment)
+		if _, err := os.Stat(envPath); os.IsNotExist(err) {
+			return nil, errors.New("no environment file found in application sources")
 		}
 		glog.Infof("DEPRECATED: Use .s2i/environment instead of .sti/environment")
 	}
 
 	f, err := os.Open(envPath)
 	if err != nil {
-		return nil, errors.New("unable to read environment file")
+		return nil, errors.New("unable to read custom environment file")
 	}
 	defer f.Close()
 
@@ -62,10 +54,10 @@ func GetEnvironment(config *api.Config) ([]Environment, error) {
 			Name:  strings.TrimSpace(parts[0]),
 			Value: strings.TrimSpace(parts[1]),
 		}
-		glog.V(1).Infof("Setting '%s' to '%s'", e.Name, e.Value)
 		result = append(result, e)
 	}
 
+	glog.Infof("Setting %d environment variables provided by environment file in sources", len(result))
 	return result, scanner.Err()
 }
 
