@@ -167,6 +167,9 @@ as this way is more auditable and secure.
 If you are using the `sudo docker` command already, then you will have to also use
 `sudo s2i` to give S2I permission to work with Docker directly.
 
+Be aware that being a member of the 'docker' group effectively grants root access,
+as described [here](https://github.com/docker/docker/issues/9976).
+
 # Getting Started
 
 You can start using `s2i` right away (see [releases](https://github.com/openshift/source-to-image/releases))
