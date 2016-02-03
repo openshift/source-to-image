@@ -2,7 +2,7 @@
 
 The main advantage of using s2i for building reproducible docker images is ease
 of use for developers. To meet that criteria you, as a builder image author,
-should be aware of the two basic requirements for the best possible sti
+should be aware of the two basic requirements for the best possible s2i
 performance. These are:
 
 * [required image contents](#required-image-contents)
@@ -49,7 +49,7 @@ are executable inside the builder image. The build searches the following locati
 these scripts in the following order:
 
 1. A script found at the `--scripts-url` URL
-1. A script found in the application source `.sti/bin` directory
+1. A script found in the application source `.s2i/bin` directory
 1. A script found at the default image URL (`io.openshift.s2i.scripts-url` label)
 
 Both the `io.openshift.s2i.scripts-url` label specified in the image and `--scripts-url` flag
@@ -79,18 +79,18 @@ and placing them into the appropriate directories inside the image. The workflow
 #### Example `assemble` script:
 
 **NOTE**: All the examples are written in [Bash](http://www.gnu.org/software/bash/)
-and it is assumed that the tar contents unpack into the `/tmp/sti` directory.
+and it is assumed that the tar contents unpack into the `/tmp/s2i` directory.
 
 ```
 #!/bin/bash
 
 # restore build artifacts
-if [ "$(ls /tmp/sti/artifacts/ 2>/dev/null)" ]; then
-    mv /tmp/sti/artifacts/* $HOME/.
+if [ "$(ls /tmp/s2i/artifacts/ 2>/dev/null)" ]; then
+    mv /tmp/s2i/artifacts/* $HOME/.
 fi
 
 # move the application source
-mv /tmp/sti/src $HOME/src
+mv /tmp/s2i/src $HOME/src
 
 # build application artifacts
 pushd ${HOME}

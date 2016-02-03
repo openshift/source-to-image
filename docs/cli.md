@@ -37,7 +37,7 @@ There are four log levels:
 # s2i create
 
 The `s2i create` command is responsible for bootstrapping a new S2I enabled
-image repository. This command will generate a skeleton `.sti` directory and
+image repository. This command will generate a skeleton `.s2i` directory and
 populate it with sample S2I scripts you can start hacking on.
 
 Usage:
@@ -115,7 +115,7 @@ have permissions to delete files in the destination directory (eg. `/etc/ssl`).
 You can also specify multiple directories, for example: `--inject /dir1:/container/dir1 --inject /dir2:container/dir2`.
 
 You can use this feature to provide SSL certificates, private configuration
-files which contains credentials, etc. 
+files which contains credentials, etc.
 
 #### Callback URL
 

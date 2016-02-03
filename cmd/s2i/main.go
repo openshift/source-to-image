@@ -92,7 +92,7 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 				os.Exit(1)
 			}
 
-			// Persists the current command line options and config into .stifile
+			// Persists the current command line options and config into .s2ifile
 			if useConfig {
 				config.Save(cfg, cmd)
 			}
