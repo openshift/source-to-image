@@ -78,7 +78,7 @@ README.md, if filtered by any prior rules, but then put back in by `!README.md`,
 Users can also set extra environment variables in the application source code.
 They are passed to the build, and the `assemble` script consumes them. All
 environment variables are also present in the output application image. These
-variables are defined in the `.sti/environment` file inside the application sources.
+variables are defined in the `.s2i/environment` file inside the application sources.
 The format of this file is a simple key-value, for example:
 
 ```
@@ -98,7 +98,7 @@ The `s2i build` workflow is:
 1. `s2i` creates a container based on the build image and passes it a tar file that contains:
     1. The application source in `src`, excluding any files selected by `.s2iignore`
     1. The build artifacts in `artifacts` (if applicable - see [incremental builds](#incremental-builds))
-1. `s2i` sets the environment variables from `.sti/environment` (optional)
+1. `s2i` sets the environment variables from `.s2i/environment` (optional)
 1. `s2i` starts the container and runs its `assemble` script
 1. `s2i` waits for the container to finish
 1. `s2i` commits the container, setting the CMD for the output image to be the `run` script and tagging the image with the name provided.

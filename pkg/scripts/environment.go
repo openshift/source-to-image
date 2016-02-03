@@ -18,17 +18,30 @@ type Environment struct {
 	Value string
 }
 
-// GetEnvironment gets the .sti/environment file located in the sources and
+// getEnvPath returns prefix/environment path.
+func getEnvPath(config *api.Config, prefix string) (string, error) {
+	envPath := filepath.Join(config.WorkingDir, api.Source, prefix, api.Environment)
+	if _, err := os.Stat(envPath); os.IsNotExist(err) {
+		return "", errors.New("no environment file found in application sources")
+	}
+	return envPath, nil
+}
+
+// GetEnvironment gets the .s2i/environment file located in the sources and
 // parse it into []environment
 func GetEnvironment(config *api.Config) ([]Environment, error) {
-	envPath := filepath.Join(config.WorkingDir, api.Source, ".sti", api.Environment)
-	if _, err := os.Stat(envPath); os.IsNotExist(err) {
-		return nil, errors.New("no environment file found in application sources")
+	envPath, err := getEnvPath(config, ".s2i")
+	if err != nil {
+		envPath, err = getEnvPath(config, ".sti")
+		if err != nil {
+			return nil, err
+		}
+		glog.Infof("DEPRECATED: Use .s2i/environment instead of .sti/environment")
 	}
 
 	f, err := os.Open(envPath)
 	if err != nil {
-		return nil, errors.New("unable to read .sti/environment file")
+		return nil, errors.New("unable to read environment file")
 	}
 	defer f.Close()
 
