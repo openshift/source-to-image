@@ -11,8 +11,8 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// DefaultConfigPath specifies the default location of the STI config file
-const DefaultConfigPath = ".stifile"
+// DefaultConfigPath specifies the default location of the S2I config file
+const DefaultConfigPath = ".s2ifile"
 
 // Config represents a basic serialization for the STI build options
 type Config struct {
@@ -49,8 +49,12 @@ func Save(config *api.Config, cmd *cobra.Command) {
 func Restore(config *api.Config, cmd *cobra.Command) {
 	data, err := ioutil.ReadFile(DefaultConfigPath)
 	if err != nil {
-		glog.V(1).Infof("Unable to restore %s: %v", DefaultConfigPath, err)
-		return
+		data, err = ioutil.ReadFile(".stifile")
+		if err != nil {
+			glog.V(1).Infof("Unable to restore %s: %v", DefaultConfigPath, err)
+			return
+		}
+		glog.Infof("DEPRECATED: Use %s instead of .stifile", DefaultConfigPath)
 	}
 	c := Config{}
 	if err := json.Unmarshal(data, &c); err != nil {
