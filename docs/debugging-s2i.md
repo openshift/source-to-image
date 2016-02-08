@@ -40,7 +40,7 @@ If you are passing in environment variables with the -e option from the command 
        	 I0519 14:20:51.410089 17228 util.go:34] Using my@cred.sk credentials for pulling openshift/ruby-20-centos7
      	 I0519 14:20:51.410222 17228 main.go:239] An error occurred: malformed env string: some-other-repo'
 
-To deal with this behavior, s2i by default will look for environment variables in the file `.sti/environment` in your source repository.  You can also point to a separate file with environment variable settings with the -E option.
+To deal with this behavior, s2i by default will look for environment variables in the file `.s2i/environment` in your source repository.  You can also point to a separate file with environment variable settings with the -E option.
 With both approaches, leveraging a file instead of the command line allows for the values of environment variable to contain commas.  Environment variable processing is described in the [README](https://github.com/openshift/source-to-image#anatomy-of-a-builder-image) as well.
 
 With the above example, whichever file you leverage for environment variables would have this line:
