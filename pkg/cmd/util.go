@@ -2,38 +2,13 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
-	"os/signal"
 	"path/filepath"
-	"runtime"
 	"strings"
-	"syscall"
 
-	"github.com/golang/glog"
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/spf13/cobra"
 )
-
-// InstallDumpOnSignal installs a handler for SIGQUIT signal that you can send
-// to a s2i process that is stuck. In that case a go routine dump should be
-// returned which can help debugging.
-func InstallDumpOnSignal() {
-	for {
-		sigs := make(chan os.Signal, 1)
-		signal.Notify(sigs, syscall.SIGQUIT)
-		buf := make([]byte, 1<<20)
-		for {
-			<-sigs
-			runtime.Stack(buf, true)
-			if file, err := ioutil.TempFile(os.TempDir(), "sti_dump"); err == nil {
-				defer file.Close()
-				file.Write(buf)
-			}
-			glog.Infof("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf)
-		}
-	}
-}
 
 // AddCommonFlags adds the common flags for usage, build and rebuild commands
 func AddCommonFlags(c *cobra.Command, cfg *api.Config) {

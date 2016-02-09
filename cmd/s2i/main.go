@@ -56,7 +56,6 @@ $ s2i build git://github.com/openshift/ruby-hello-world centos/ruby-22-centos7 h
 $ s2i build . centos/ruby-22-centos7 hello-world-app
 `,
 		Run: func(cmd *cobra.Command, args []string) {
-			go cmdutil.InstallDumpOnSignal()
 			if glog.V(1) {
 				glog.Infof("Running S2I version %q\n", version.Get())
 			}
