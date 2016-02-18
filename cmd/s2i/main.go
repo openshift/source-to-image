@@ -81,6 +81,9 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 			if len(cfg.BuilderPullPolicy) == 0 {
 				cfg.BuilderPullPolicy = api.DefaultBuilderPullPolicy
 			}
+			if len(cfg.PreviousImagePullPolicy) == 0 {
+				cfg.PreviousImagePullPolicy = api.DefaultPreviousImagePullPolicy
+			}
 
 			if errs := validation.ValidateConfig(cfg); len(errs) > 0 {
 				for _, e := range errs {
@@ -215,6 +218,9 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 			if len(cfg.BuilderPullPolicy) == 0 {
 				cfg.BuilderPullPolicy = api.DefaultBuilderPullPolicy
 			}
+			if len(cfg.PreviousImagePullPolicy) == 0 {
+				cfg.PreviousImagePullPolicy = api.DefaultPreviousImagePullPolicy
+			}
 
 			if glog.V(2) {
 				fmt.Printf("\n%s\n", describe.DescribeConfig(cfg))
@@ -281,6 +287,9 @@ func newCmdUsage(cfg *api.Config) *cobra.Command {
 
 			if len(cfg.BuilderPullPolicy) == 0 {
 				cfg.BuilderPullPolicy = api.DefaultBuilderPullPolicy
+			}
+			if len(cfg.PreviousImagePullPolicy) == 0 {
+				cfg.PreviousImagePullPolicy = api.DefaultPreviousImagePullPolicy
 			}
 
 			uh, err := sti.NewUsage(cfg)

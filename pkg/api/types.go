@@ -35,7 +35,7 @@ const (
 
 	// DefaultPreviousImagePullPolicy specifies policy for pulling the previously
 	// build Docker image when doing incremental build
-	DefaultPreviousImagePullPolicy = PullAlways
+	DefaultPreviousImagePullPolicy = PullIfNotPresent
 )
 
 // Config contains essential fields for performing build.
