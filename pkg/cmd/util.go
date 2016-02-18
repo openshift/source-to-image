@@ -24,6 +24,8 @@ func AddCommonFlags(c *cobra.Command, cfg *api.Config) {
 		"DEPRECATED: Always pull the builder image even if it is present locally")
 	c.Flags().VarP(&(cfg.BuilderPullPolicy), "pull-policy", "p",
 		"Specify when to pull the builder image (always, never or if-not-present)")
+	c.Flags().Var(&(cfg.PreviousImagePullPolicy), "incremental-pull-policy",
+		"Specify when to pull the previous image for incremental builds (always, never or if-not-present)")
 	c.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false,
 		"Save the temporary directory used by S2I instead of deleting it")
 	c.Flags().StringVarP(&(cfg.DockerCfgPath), "dockercfg-path", "", filepath.Join(os.Getenv("HOME"), ".docker/config.json"),
