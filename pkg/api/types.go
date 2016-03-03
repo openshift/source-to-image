@@ -107,6 +107,10 @@ type Config struct {
 	// Incremental describes whether to try to perform incremental build.
 	Incremental bool
 
+	// IncrementalFromTag sets an alternative image tag to look for existing
+	// artifacts. Tag is used by default if this is not set.
+	IncrementalFromTag string
+
 	// RemovePreviousImage describes if previous image should be removed after successful build.
 	// This applies only to incremental builds.
 	RemovePreviousImage bool
