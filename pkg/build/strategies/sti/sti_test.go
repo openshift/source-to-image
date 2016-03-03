@@ -447,6 +447,32 @@ func TestSaveArtifacts(t *testing.T) {
 	}
 }
 
+func TestSaveArtifactsCustomTag(t *testing.T) {
+	bh := testBuildHandler()
+	bh.config.WorkingDir = "/working-dir"
+	bh.config.IncrementalFromTag = "custom/tag"
+	bh.config.Tag = "image/tag"
+	fs := bh.fs.(*test.FakeFileSystem)
+	fd := bh.docker.(*docker.FakeDocker)
+	th := bh.tar.(*test.FakeTar)
+	err := bh.Save(bh.config)
+	if err != nil {
+		t.Errorf("Unexpected error when saving artifacts: %v", err)
+	}
+	expectedArtifactDir := "/working-dir/upload/artifacts"
+	if fs.MkdirDir != expectedArtifactDir {
+		t.Errorf("Mkdir was not called with the expected directory: %s",
+			fs.MkdirDir)
+	}
+	if fd.RunContainerOpts.Image != bh.config.IncrementalFromTag {
+		t.Errorf("Unexpected image sent to RunContainer: %s",
+			fd.RunContainerOpts.Image)
+	}
+	if th.ExtractTarDir != expectedArtifactDir || th.ExtractTarReader == nil {
+		t.Errorf("ExtractTar was not called with the expected parameters.")
+	}
+}
+
 func TestSaveArtifactsRunError(t *testing.T) {
 	tests := []error{
 		fmt.Errorf("Run error"),

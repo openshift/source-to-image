@@ -344,9 +344,14 @@ func (b *STI) Exists(config *api.Config) bool {
 		policy = api.DefaultPreviousImagePullPolicy
 	}
 
-	result, err := dockerpkg.PullImage(config.Tag, b.incrementalDocker, policy, false)
+	tag := config.IncrementalFromTag
+	if len(tag) == 0 {
+		tag = config.Tag
+	}
+
+	result, err := dockerpkg.PullImage(tag, b.incrementalDocker, policy, false)
 	if err != nil {
-		glog.V(2).Infof("Unable to pull previously build %q image: %v", config.Tag, err)
+		glog.V(2).Infof("Unable to pull previously built image %q: %v", tag, err)
 		return false
 	}
 
@@ -361,7 +366,10 @@ func (b *STI) Save(config *api.Config) (err error) {
 		return err
 	}
 
-	image := config.Tag
+	image := config.IncrementalFromTag
+	if len(image) == 0 {
+		image = config.Tag
+	}
 	outReader, outWriter := io.Pipe()
 	errReader, errWriter := io.Pipe()
 	defer errReader.Close()
