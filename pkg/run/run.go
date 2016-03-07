@@ -51,6 +51,7 @@ func (b *DockerRunner) Run(config *api.Config) error {
 		Stderr:       errWriter,
 		TargetImage:  true,
 		CGroupLimits: config.CGroupLimits,
+		CapDrop:      config.DropCapabilities,
 	}
 
 	//NOTE, we've seen some Golang level deadlock issues with the streaming of cmd output to
