@@ -1,8 +1,9 @@
 # source-to-image (s2i)
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/openshift/source-to-image)](https://goreportcard.com/report/github.com/openshift/source-to-image)
 [![GoDoc](https://godoc.org/github.com/openshift/source-to-image?status.png)](https://godoc.org/github.com/openshift/source-to-image)
 [![Travis](https://travis-ci.org/openshift/source-to-image.svg?branch=master)](https://travis-ci.org/openshift/source-to-image)
-
+[![License](https://img.shields.io/github/license/openshift/source-to-image.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
 
 Source-to-image (`s2i`) is a tool for building reproducible Docker images. `s2i` produces
 ready-to-run images by injecting source code into a Docker image and *assembling*
