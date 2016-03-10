@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash
 #
 # This script will create a rebase commit in the OpenShift Origin GIT repository
 # based on the current HEAD.
@@ -7,10 +7,22 @@
 #       present in the pkg/ folder.
 #
 
-source "${s2i_dir}/hack/util.sh"
+set -o errexit
+set -o nounset
+set -o pipefail
 
-# Exclude these packages from source-to-image explicitely
-exclude_pkgs=(
+readonly S2I_ROOT=$(
+  root=$(dirname "${BASH_SOURCE}")/..
+  unset CDPATH
+  cd "${root}"
+  pwd
+)
+readonly OS_ROOT="${S2I_ROOT/%\/source-to-image/\/origin}"
+
+source "${S2I_ROOT}/hack/util.sh"
+
+# Exclude these packages from source-to-image explicitly
+readonly exclude_pkgs=(
   pkg/cmd
   pkg/config
   pkg/create
@@ -19,29 +31,24 @@ exclude_pkgs=(
   pkg/version
 )
 
-s2i_dir=$GOPATH/src/github.com/openshift/source-to-image
-origin_dir=$GOPATH/src/github.com/openshift/origin
-origin_s2i_godep_dir=${origin_dir}/Godeps/_workspace/src/github.com/openshift/source-to-image
-s2i_ref=$(cd ${s2i_dir} && git rev-parse --verify HEAD)
-s2i_short_ref=$(cd ${s2i_dir} && git rev-parse --short HEAD)
-s2i_godeps_ref=$(grep -m1 -A2 'openshift/source-to-image' ${origin_dir}/Godeps/Godeps.json | \
-  grep Rev | cut -d ':' -f2 | sed -e 's/"//g' | sed -e 's/^[[:space:]]*//')
+readonly origin_s2i_godep_dir="${OS_ROOT}/Godeps/_workspace/src/github.com/openshift/source-to-image"
+readonly s2i_ref="$(git -C ${S2I_ROOT} rev-parse --verify HEAD)"
+readonly s2i_short_ref="$(git -C ${S2I_ROOT} rev-parse --short HEAD)"
+readonly s2i_godeps_ref="$(grep -m1 -A2 'openshift/source-to-image' ${OS_ROOT}/Godeps/Godeps.json |
+  grep Rev | cut -d ':' -f2 | sed -e 's/"//g' -e 's/^[[:space:]]*//')"
 
-pushd "${origin_dir}" >/dev/null
-  git checkout -b "s2i-${s2i_short_ref}-bump"
+pushd "${OS_ROOT}" >/dev/null
+  git checkout -B "s2i-${s2i_short_ref}-bump" master
   rm -rf "${origin_s2i_godep_dir}/*"
-  cp -R ${s2i_dir}/pkg ${origin_s2i_godep_dir}/.
-
-  # Remove all test files
-  find ${origin_s2i_godep_dir} -type f -name '*_test.go' -delete
+  cp -R "${S2I_ROOT}/pkg" "${origin_s2i_godep_dir}/."
 
   # Remove all explicitly excluded packages
   for pkg in "${exclude_pkgs[@]}"; do
-    rm -rf "${origin_s2i_godep_dir}/${pkg}"
+    rm -rvf "${origin_s2i_godep_dir}/${pkg}"
   done
 
   # Bump the origin Godeps.json file
-  os::util::sed "s/${s2i_godeps_ref}/${s2i_ref}/g" ${origin_dir}/Godeps/Godeps.json
+  os::util::sed "s/${s2i_godeps_ref}/${s2i_ref}/g" "${OS_ROOT}/Godeps/Godeps.json"
 
   # Make a commit with proper message
   git add Godeps && git commit -m "bump(github.com/openshift/source-to-image): ${s2i_ref}"
