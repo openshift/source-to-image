@@ -72,6 +72,7 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 | Name                       | Description                                             |
 |:-------------------------- |:--------------------------------------------------------|
 | `--callback-url`           | URL to be invoked after a successful build (see [Callback URL](#callback-url)) |
+| `-c (--copy)`             | Use local file system copy instead of git cloning the source url (allows for inclusion of empty directories) |
 | `-d (--destination)`       | Location where the scripts and sources will be placed prior doing build (see [S2I Scripts](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#s2i-scripts)) |
 | `--dockercfg-path`         | The path to the Docker configuration file |
 | `--incremental`            | Try to perform an incremental build |

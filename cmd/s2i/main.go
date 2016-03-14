@@ -181,6 +181,7 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 	buildCmd.Flags().StringSliceVar(&(cfg.DropCapabilities), "cap-drop", []string{}, "Specify a comma-separated list of capabilities to drop when running Docker containers")
 	buildCmd.Flags().StringVarP(&(oldDestination), "location", "l", "",
 		"DEPRECATED: Specify a destination location for untar operation")
+	buildCmd.Flags().BoolVarP(&(cfg.ForceCopy), "copy", "c", false, "Use local file system copy instead of git cloning the source url")
 
 	return buildCmd
 }
