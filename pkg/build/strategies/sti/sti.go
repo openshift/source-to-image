@@ -108,7 +108,7 @@ func New(req *api.Config, overrides build.Overrides) (*STI, error) {
 	// which would lead to replacing this quick short circuit (so this change is tactical)
 	b.source = overrides.Downloader
 	if b.source == nil && !req.Usage {
-		downloader, sourceURL, err := scm.DownloaderForSource(req.Source)
+		downloader, sourceURL, err := scm.DownloaderForSource(req.Source, req.ForceCopy)
 		if err != nil {
 			return nil, err
 		}
