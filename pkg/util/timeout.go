@@ -20,7 +20,10 @@ func (t *TimeoutError) Error() string {
 // time duration.
 func TimeoutAfter(t time.Duration, fn func() error) error {
 	c := make(chan error, 1)
-	go func() { defer close(c); c <- fn() }()
+	go func() {
+		defer close(c)
+		c <- fn()
+	}()
 	select {
 	case err := <-c:
 		return err
