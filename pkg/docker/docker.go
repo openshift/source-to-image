@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
@@ -17,6 +18,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/tar"
+	"github.com/openshift/source-to-image/pkg/util"
 )
 
 const (
@@ -44,6 +46,10 @@ const (
 	DefaultDestination = "/tmp"
 	// DefaultTag is the image tag, being applied if none is specified.
 	DefaultTag = "latest"
+
+	// DefaultDockerTimeout specifies a timeout for Docker API calls. When this
+	// timeout is reached, certain Docker API calls might error out.
+	DefaultDockerTimeout = 10 * time.Second
 )
 
 // Docker is the interface between STI and the Docker client
@@ -614,10 +620,16 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 	}
 	ccopts.HostConfig.CapDrop = opts.CapDrop
 	glog.V(2).Infof("Creating container %s using config: %+v, hostconfig: %+v", ccopts.Name, ccopts.Config, ccopts.HostConfig)
-	container, err := d.client.CreateContainer(ccopts)
-	if err != nil {
+
+	var container *docker.Container
+	if err := util.TimeoutAfter(DefaultDockerTimeout, func() error {
+		var createErr error
+		container, createErr = d.client.CreateContainer(ccopts)
+		return createErr
+	}); err != nil {
 		return err
 	}
+
 	defer d.RemoveContainer(container.ID)
 
 	glog.V(2).Infof("Attaching to container")
@@ -627,7 +639,9 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) (err error) {
 	attached <- <-attached
 
 	glog.V(2).Infof("Starting container")
-	if err = d.client.StartContainer(container.ID, nil); err != nil {
+	if err := util.TimeoutAfter(DefaultDockerTimeout, func() error {
+		return d.client.StartContainer(container.ID, nil)
+	}); err != nil {
 		return err
 	}
 	if opts.OnStart != nil {
