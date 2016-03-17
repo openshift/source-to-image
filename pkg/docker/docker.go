@@ -508,15 +508,11 @@ func runContainerDockerRun(container *docker.Container, d *stiDocker, image stri
 	glog.Infof("\n\n\n\n\nThe image %s has been started in container %s as a result of the --run=true option.  The container's stdout/stderr will be redirected to this command's glog output to help you validate its behavior.  You can also inspect the container with docker commands if you like.  If the container is set up to stay running, you will have to Ctrl-C to exit this command, which should also stop the container %s.  This particular invocation attempts to run with the port mappings %+v \n\n\n\n\n", image, container.ID, container.ID, liveports)
 
 	signalChan := make(chan os.Signal, 1)
-	cleanupDone := make(chan bool)
 	signal.Notify(signalChan, os.Interrupt)
-	go func() {
-		for signal := range signalChan {
-			glog.V(2).Infof("\nReceived signal '%s', stopping services...\n", signal)
-			cleanupDone <- true
-		}
-	}()
-	<-cleanupDone
+
+	// Block until user sends SIGINT.
+	signal := <-signalChan
+	glog.V(2).Infof("\nReceived signal '%s', stopping services...\n", signal)
 }
 
 // this funtion simply abstracts out the first phase of attaching to the container that was originally in line with the RunContainer() method
