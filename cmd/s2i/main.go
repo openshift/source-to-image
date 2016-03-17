@@ -333,7 +333,7 @@ func checkErr(err error) {
 			"providing us with a log from your build using --loglevel=3")
 		os.Exit(e.ErrorCode)
 	} else {
-		glog.V(1).Infof("An error occurred: %v", err)
+		glog.Errorf("An error occurred: %v", err)
 		os.Exit(1)
 	}
 }
