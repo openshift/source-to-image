@@ -1,27 +1,16 @@
 package ignore
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/golang/glog"
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/util"
-	"os"
 )
 
-func getLogLevel() (level int) {
-	for level = 5; level >= 0; level-- {
-		if glog.V(glog.Level(level)) == true {
-			break
-		}
-	}
-	return
-}
-
 func baseTest(t *testing.T, patterns []string, filesToDel []string, filesToKeep []string) {
-
 	// create working dir
 	workingDir, werr := util.NewFileSystem().CreateWorkingDirectory()
 	if werr != nil {
