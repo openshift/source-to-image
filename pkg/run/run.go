@@ -58,8 +58,12 @@ func (b *DockerRunner) Run(config *api.Config) error {
 	go docker.StreamContainerIO(outReader, nil, glog.Info)
 
 	err := b.ContainerClient.RunContainer(opts)
+	// If we get a ContainerError, the original message reports the
+	// container name. The container is temporary and its name is
+	// meaningless, therefore we make the error message more helpful by
+	// replacing the container name with the image tag.
 	if e, ok := err.(errors.ContainerError); ok {
-		return errors.NewContainerError(config.Tag, e.ErrorCode, "")
+		return errors.NewContainerError(config.Tag, e.ErrorCode, e.Output)
 	}
-	return nil
+	return err
 }
