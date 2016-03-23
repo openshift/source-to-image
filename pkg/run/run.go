@@ -1,49 +1,44 @@
-/*
-Code that supports the running of the image produced by s2i.  Triggered by the --run=true option specified on the command line.
-*/
+// Package run supports running images produced by S2I. It is used by the
+// --run=true command line option.
 package run
 
 import (
+	"io"
+
 	"github.com/golang/glog"
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/errors"
-	"io"
 )
 
-// the struct capturing the list of items needed to support the --run=true options;
-// currently, only running docker containers and only need the docker client
+// A DockerRunner allows running a Docker image as a new container, streaming
+// stdout and stderr with glog.
 type DockerRunner struct {
 	ContainerClient docker.Docker
 }
 
-// Create the DockerRunning struct for executing the methods assoicated with running
+// New creates a DockerRunner for executing the methods assoicated with running
 // the produced image in a docker container for verification purposes.
 func New(config *api.Config) (*DockerRunner, error) {
-	cc, ccerr := docker.New(config.DockerConfig, config.PullAuthentication)
-	if ccerr != nil {
-		glog.Errorf("Create of Docker Container client failed with %v \n", ccerr)
-		return nil, ccerr
+	client, err := docker.New(config.DockerConfig, config.PullAuthentication)
+	if err != nil {
+		glog.Errorf("Failed to connect to Docker daemon: %v", err)
+		return nil, err
 	}
-	dr := &DockerRunner{
-		ContainerClient: cc,
-	}
-	return dr, nil
+	return &DockerRunner{client}, nil
 }
 
-// Actually invoke the docker API to run the resulting s2i image in a container,
-// where the redirecting of the container's stdout and stderr will go to glog.
+// Run invokes the Docker API to run the image defined in config as a new
+// container. The container's stdout and stderr will be logged with glog.
 func (b *DockerRunner) Run(config *api.Config) error {
-
 	glog.V(4).Infof("Attempting to run image %s \n", config.Tag)
 
-	errOutput := ""
 	outReader, outWriter := io.Pipe()
+	defer outReader.Close()
+	defer outWriter.Close()
 	errReader, errWriter := io.Pipe()
 	defer errReader.Close()
 	defer errWriter.Close()
-	defer outReader.Close()
-	defer outWriter.Close()
 
 	opts := docker.RunContainerOptions{
 		Image:        config.Tag,
@@ -61,10 +56,10 @@ func (b *DockerRunner) Run(config *api.Config) error {
 
 	go docker.StreamContainerIO(errReader, nil, glog.Error)
 	go docker.StreamContainerIO(outReader, nil, glog.Info)
-	rerr := b.ContainerClient.RunContainer(opts)
-	if e, ok := rerr.(errors.ContainerError); ok {
-		return errors.NewContainerError(config.Tag, e.ErrorCode, errOutput)
-	}
 
+	err := b.ContainerClient.RunContainer(opts)
+	if e, ok := err.(errors.ContainerError); ok {
+		return errors.NewContainerError(config.Tag, e.ErrorCode, "")
+	}
 	return nil
 }
