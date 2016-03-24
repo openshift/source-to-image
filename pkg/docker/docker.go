@@ -48,7 +48,7 @@ const (
 
 	// DefaultDockerTimeout specifies a timeout for Docker API calls. When this
 	// timeout is reached, certain Docker API calls might error out.
-	DefaultDockerTimeout = 10 * time.Second
+	DefaultDockerTimeout = 20 * time.Second
 )
 
 // Docker is the interface between STI and the Docker client
