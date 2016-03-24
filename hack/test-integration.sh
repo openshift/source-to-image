@@ -4,33 +4,24 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-STI_ROOT=$(dirname "${BASH_SOURCE}")/..
+readonly STI_ROOT=$(dirname "${BASH_SOURCE}")/..
 
-function cleanup()
-{
-    set +e
-    echo
-    echo "Complete"
+s2i::cleanup() {
+  echo
+  echo "Complete"
 }
 
-set +e
-img_count=$(docker images | grep -c sti_test/sti-fake)
-set -e
+readonly img_count="$(docker images | grep -c sti_test/sti-fake || :)"
 
 if [ "${img_count}" != "10" ]; then
-    echo "You do not have necessary test images, be sure to run 'hack/build-test-images.sh' beforehand."
+    echo "Missing test images, run 'hack/build-test-images.sh' and try again."
     exit 1
 fi
 
-trap cleanup EXIT SIGINT
-
-export STI_TIMEOUT="-timeout 600s"
-mkdir -p /tmp/sti
-export LOG_FILE="$(mktemp -p /tmp/sti --suffix=integration.log)"
+trap s2i::cleanup EXIT SIGINT
 
 echo
-echo Integration test cases ...
-echo Log file: ${LOG_FILE}
+echo "Running integration tests ..."
 echo
 
-"${STI_ROOT}/hack/test-go.sh" test/integration -v -tags 'integration' "${@:1}" 2> ${LOG_FILE}
+STI_TIMEOUT="-timeout 600s" "${STI_ROOT}/hack/test-go.sh" test/integration -v -tags 'integration' "${@:1}"

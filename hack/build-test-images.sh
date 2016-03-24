@@ -6,28 +6,29 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-STI_ROOT=$(dirname "${BASH_SOURCE}")/..
+readonly STI_ROOT=$(dirname "${BASH_SOURCE}")/..
 
-# Go to the top of the tree.
-cd "${STI_ROOT}"
-
-
-function buildimage()
-{
-    tag=$1
-    src=$2
-    cp -R test/integration/scripts $src
-    docker build -t "${tag}" "${src}"
-    rm -rf $src/scripts
+s2i::build_test_image() {
+  local image_name="$1"
+  local tag="sti_test/${image_name}"
+  local src="test/integration/images/${image_name}"
+  cp -R test/integration/scripts "${src}"
+  docker build -t "${tag}" "${src}"
+  rm -rf "${src}/scripts"
 }
 
-buildimage sti_test/sti-fake test/integration/images/sti-fake
-buildimage sti_test/sti-fake-env test/integration/images/sti-fake-env
-buildimage sti_test/sti-fake-user test/integration/images/sti-fake-user
-buildimage sti_test/sti-fake-scripts test/integration/images/sti-fake-scripts
-buildimage sti_test/sti-fake-scripts-no-save-artifacts test/integration/images/sti-fake-scripts-no-save-artifacts
-buildimage sti_test/sti-fake-no-tar test/integration/images/sti-fake-no-tar
-buildimage sti_test/sti-fake-onbuild test/integration/images/sti-fake-onbuild
-buildimage sti_test/sti-fake-numericuser test/integration/images/sti-fake-numericuser
-buildimage sti_test/sti-fake-onbuild-rootuser test/integration/images/sti-fake-onbuild-rootuser
-buildimage sti_test/sti-fake-onbuild-numericuser test/integration/images/sti-fake-onbuild-numericuser
+(
+  # Go to the top of the tree.
+  cd "${STI_ROOT}"
+
+  s2i::build_test_image sti-fake
+  s2i::build_test_image sti-fake-env
+  s2i::build_test_image sti-fake-user
+  s2i::build_test_image sti-fake-scripts
+  s2i::build_test_image sti-fake-scripts-no-save-artifacts
+  s2i::build_test_image sti-fake-no-tar
+  s2i::build_test_image sti-fake-onbuild
+  s2i::build_test_image sti-fake-numericuser
+  s2i::build_test_image sti-fake-onbuild-rootuser
+  s2i::build_test_image sti-fake-onbuild-numericuser
+)
