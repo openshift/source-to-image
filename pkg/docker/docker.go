@@ -599,7 +599,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 	// Create a new container.
 	glog.V(2).Infof("Creating container with options {Name:%q Config:%+v HostConfig:%+v} ...", createOpts.Name, createOpts.Config, createOpts.HostConfig)
 	var container *docker.Container
-	if err := util.TimeoutAfter(DefaultDockerTimeout, func() error {
+	if err := util.TimeoutAfter(DefaultDockerTimeout, "timeout after waiting %v for Docker to create container", func() error {
 		var createErr error
 		container, createErr = d.client.CreateContainer(createOpts)
 		return createErr
@@ -630,7 +630,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 
 	// Start the container.
 	glog.V(2).Infof("Starting container %q ...", containerName)
-	if err := util.TimeoutAfter(DefaultDockerTimeout, func() error {
+	if err := util.TimeoutAfter(DefaultDockerTimeout, "timeout after waiting %v for Docker to start container", func() error {
 		return d.client.StartContainer(container.ID, nil)
 	}); err != nil {
 		return err
