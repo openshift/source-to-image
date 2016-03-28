@@ -262,7 +262,7 @@ func TestInstallRequiredFromInvalidURL(t *testing.T) {
 
 func TestNewInstaller(t *testing.T) {
 	docker := &dockerpkg.FakeDocker{DefaultURLResult: "image://docker"}
-	inst := NewInstaller("test-image", "http://foo.bar", docker, dockerClient.AuthConfiguration{})
+	inst := NewInstaller("test-image", "http://foo.bar", nil, docker, dockerClient.AuthConfiguration{})
 	sources := inst.(*DefaultScriptSourceManager).sources
 	firstHandler, ok := sources[0].(*UrlScriptHandler)
 	if !ok {
