@@ -261,6 +261,10 @@ type InstallResult struct {
 
 	// Error describes last error encountered during install operation
 	Error error
+
+	// FailedSources is a list of sources that were attempted but failed
+	// when downloading this script
+	FailedSources []string
 }
 
 // SourceInfo stores information about the source code

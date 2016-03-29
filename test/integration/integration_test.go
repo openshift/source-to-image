@@ -58,7 +58,7 @@ const (
 	// scripts are made available for integration testing.
 	//
 	// Port 23456 must match the port used in the fake image Dockerfiles
-	FakeScriptsHttpURL = "http://127.0.0.1:23456/sti-fake/.s2i/bin"
+	FakeScriptsHttpURL = "http://127.0.0.1:23456/.s2i/bin"
 )
 
 // TestInjectionBuild tests the build where we inject files to assemble script.
