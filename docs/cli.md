@@ -58,7 +58,7 @@ $ s2i build <source location> <builder image> [<tag>] [flags]
 ```
 The build command parameters are defined as follows:
 
-1. `source location` - the URL of a GIT repository or a local path to the source code
+1. `source location` - the URL of a Git repository or a local path to the source code
 1. `builder image` - the Docker image to be used in building the final image
 1. `tag` - the name of the final Docker image (if provided)
 
@@ -72,15 +72,15 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 | Name                       | Description                                             |
 |:-------------------------- |:--------------------------------------------------------|
 | `--callback-url`           | URL to be invoked after a successful build (see [Callback URL](#callback-url)) |
-| `-c (--copy)`             | Use local file system copy instead of git cloning the source url (allows for inclusion of empty directories) |
+| `-c (--copy)`              | Use local file system copy instead of git cloning the source url (allows for inclusion of empty directories) |
 | `-d (--destination)`       | Location where the scripts and sources will be placed prior doing build (see [S2I Scripts](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#s2i-scripts)) |
 | `--dockercfg-path`         | The path to the Docker configuration file |
 | `--incremental`            | Try to perform an incremental build |
 | `-e (--env)`               | Environment variables to be passed to the builder eg. `NAME=VALUE,NAME2=VALUE2,...` |
-| `-E (--environment-file)`               | Specify the path to the file with environment |
+| `-E (--environment-file)`  | Specify the path to the file with environment |
 | `--force-pull`             | Always pull the builder image, even if it is present locally (defaults to true) |
-| `--run`             | Launch the resulting image after a successful build. All output from the image is being printed to help determine image's validity. In case of a long running image you will have to Ctrl-C to exit both s2i and the running container.  (defaults to false) |
-| `-r (--ref)`               | A branch/tag that the build should use instead of MASTER (applies only to GIT source) |
+| `--run`                    | Launch the resulting image after a successful build. All output from the image is being printed to help determine image's validity. In case of a long running image you will have to Ctrl-C to exit both s2i and the running container.  (defaults to false) |
+| `-r (--ref)`               | A branch/tag that the build should use instead of MASTER (applies only to Git source) |
 | `--rm`                     | Remove the previous image during incremental builds |
 | `--save-temp-dir`          | Save the working directory used for fetching scripts and sources |
 | `--context-dir`            | Specify the directory containing your application (if not located within the root path) |
@@ -136,7 +136,7 @@ Example: data posted will be in the form:
 
 #### Example Usage
 
-Build a Ruby application from a GIT source, using the official `ruby-20-centos7` builder
+Build a Ruby application from a Git source, using the official `ruby-20-centos7` builder
 image, the resulting image will be named `ruby-app`:
 
 ```
@@ -157,7 +157,7 @@ Use this method only for development or local testing.
 
 **NOTE**: All your changes have to be commited by `git` in order to build them with S2I.
 
-Build a Java application from a GIT source, using the official `wildfly-8-centos`
+Build a Java application from a Git source, using the official `wildfly-8-centos`
 builder image but overriding the scripts URL from local directory.  The resulting
 image will be named `java-app`:
 
@@ -165,7 +165,7 @@ image will be named `java-app`:
 $ s2i build --scripts-url=file://s2iscripts git://github.com/bparees/openshift-jee-sample openshift/wildfly-8-centos java-app
 ```
 
-Build a Ruby application from a GIT source, specifying `ref`, and using the official
+Build a Ruby application from a Git source, specifying `ref`, and using the official
 `ruby-20-centos7` builder image.  The resulting image will be named `ruby-app`:
 
 ```
@@ -174,7 +174,7 @@ $ s2i build --ref=my-branch git://github.com/mfojtik/sinatra-app-example openshi
 
 ***NOTE:*** If the ref is invalid or not present in the source repository then the build will fail.
 
-Build a Ruby application from a GIT source, overriding the scripts URL from a local directory,
+Build a Ruby application from a Git source, overriding the scripts URL from a local directory,
 and specifying the scripts and sources be placed in `/opt` directory:
 
 ```

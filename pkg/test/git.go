@@ -5,7 +5,7 @@ import (
 	"net/url"
 )
 
-// FakeGit provides a fake GIT
+// FakeGit provides a fake Git
 type FakeGit struct {
 	ValidCloneSpecSource string
 	ValidCloneSpecResult bool
@@ -27,32 +27,32 @@ type FakeGit struct {
 	SubmoduleUpdateError     error
 }
 
-// ValidCloneSpec returns a valid GIT clone specification
+// ValidCloneSpec returns a valid Git clone specification
 func (f *FakeGit) ValidCloneSpec(source string) bool {
 	f.ValidCloneSpecSource = source
 	return f.ValidCloneSpecResult
 }
 
-//ValidCloneSpecRemoteOnly returns a valid GIT clone specification
+//ValidCloneSpecRemoteOnly returns a valid Git clone specification
 func (f *FakeGit) ValidCloneSpecRemoteOnly(source string) bool {
 	f.ValidCloneSpecSource = source
 	return f.ValidCloneSpecResult
 }
 
-//MungeNoProtocolURL returns a valid no protocol GIT URL
+//MungeNoProtocolURL returns a valid no protocol Git URL
 func (f *FakeGit) MungeNoProtocolURL(source string, url *url.URL) error {
 	f.ValidCloneSpecSource = source
 	return nil
 }
 
-// Clone clones the fake source GIT repository to target directory
+// Clone clones the fake source Git repository to target directory
 func (f *FakeGit) Clone(source, target string, c api.CloneConfig) error {
 	f.CloneSource = source
 	f.CloneTarget = target
 	return f.CloneError
 }
 
-// Checkout checkouts a ref in the fake GIT repository
+// Checkout checkouts a ref in the fake Git repository
 func (f *FakeGit) Checkout(repo, ref string) error {
 	f.CheckoutRepo = repo
 	f.CheckoutRef = ref

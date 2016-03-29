@@ -101,7 +101,7 @@ func New(req *api.Config, overrides build.Overrides) (*STI, error) {
 		scriptsURL:        map[string]string{},
 	}
 
-	// The sources are downloaded using the GIT downloader.
+	// The sources are downloaded using the Git downloader.
 	// TODO: Add more SCM in future.
 	// TODO: explicit decision made to customize processing for usage specifically vs.
 	// leveraging overrides; also, we ultimately want to simplify s2i usage a good bit,

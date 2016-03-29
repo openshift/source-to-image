@@ -55,7 +55,7 @@ prepare() {
     echo "ERROR: The image ${IMAGE_NAME} must exist before this script is executed."
     exit 1
   fi
-  # s2i build requires the application is a valid 'GIT' repository
+  # s2i build requires the application is a valid 'Git' repository
   pushd ${test_dir}/test-app >/dev/null
   git init
   git config user.email "build@localhost" && git config user.name "builder"

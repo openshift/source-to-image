@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# This script will create a rebase commit in the OpenShift Origin GIT repository
+# This script will create a rebase commit in the OpenShift Origin Git repository
 # based on the current HEAD.
 #
 # NOTE: Make sure all your changes are committed and there are no junk files
