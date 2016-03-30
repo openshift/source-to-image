@@ -156,7 +156,7 @@ func (b *STI) Build(config *api.Config) (*api.Result, error) {
 	if b.incremental {
 		if err := b.artifacts.Save(config); err != nil {
 			glog.Warningf("Clean build will be performed because of error saving previous build artifacts")
-			glog.V(2).Infof("ERROR: %v", err)
+			glog.V(2).Infof("error: %v", err)
 		}
 	}
 
@@ -567,7 +567,7 @@ func (b *STI) Execute(command string, user string, config *api.Config) error {
 			if err != nil {
 				// we're ignoring ErrClosedPipe, as this is information
 				// the docker container ended streaming logs
-				if glog.V(2) && err != io.ErrClosedPipe {
+				if glog.V(2) && err != io.ErrClosedPipe && err != io.EOF {
 					glog.Errorf("Error reading docker stdout, %v", err)
 				}
 				break
