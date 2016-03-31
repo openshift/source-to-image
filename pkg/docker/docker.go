@@ -3,6 +3,8 @@ package docker
 import (
 	"fmt"
 	"io"
+	"os"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"strings"
@@ -10,9 +12,6 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
-
-	"os"
-	"os/signal"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/errors"
