@@ -83,7 +83,7 @@ func StreamContainerIO(errStream io.Reader, errOutput *string, log func(...inter
 		if err != nil {
 			// we're ignoring ErrClosedPipe, as this is information
 			// the docker container ended streaming logs
-			if err != io.ErrClosedPipe && err != io.EOF {
+			if glog.V(2) && err != io.ErrClosedPipe && err != io.EOF {
 				glog.Errorf("Error reading docker stderr, %v", err)
 			}
 			break
