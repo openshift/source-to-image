@@ -78,6 +78,7 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 | `--incremental`            | Try to perform an incremental build |
 | `-e (--env)`               | Environment variables to be passed to the builder eg. `NAME=VALUE,NAME2=VALUE2,...` |
 | `-E (--environment-file)`  | Specify the path to the file with environment |
+| `--exclude`  | Regular expression for selecting files from the source tree to exclude from the build, where the default excludes the '.git' directory (see https://golang.org/pkg/regexp for syntax, but note that \"\" will be interpreted as allow all files and exclude no files) |
 | `--force-pull`             | Always pull the builder image, even if it is present locally (defaults to true) |
 | `--run`                    | Launch the resulting image after a successful build. All output from the image is being printed to help determine image's validity. In case of a long running image you will have to Ctrl-C to exit both s2i and the running container.  (defaults to false) |
 | `-r (--ref)`               | A branch/tag that the build should use instead of MASTER (applies only to Git source) |
