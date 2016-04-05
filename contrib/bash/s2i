@@ -103,7 +103,7 @@ __handle_flag()
     local flagname=${words[c]}
     # if the word contained an =
     if [[ ${words[c]} == *"="* ]]; then
-        flagname=${flagname%!=(MISSING)*} # strip everything after the =
+        flagname=${flagname%=*} # strip everything after the =
         flagname="${flagname}=" # but put the = back
     fi
     __debug "${FUNCNAME}: looking for ${flagname}"

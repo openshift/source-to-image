@@ -266,13 +266,13 @@ func newCmdCreate() *cobra.Command {
 func newCmdGenBashCompletion(root *cobra.Command) *cobra.Command {
 	return &cobra.Command{
 		Use:   "genbashcompletion",
-		Short: "Generate Bash completetion for the s2i command",
-		Long:  "Generate Bash completetion for the s2i command into standard output",
+		Short: "Generate Bash completion for the s2i command",
+		Long:  "Generate Bash completion for the s2i command into standard output",
 		Run: func(cmd *cobra.Command, args []string) {
 			// TODO: The latest version of cobra require to pass the io.Writer here.
 			var out bytes.Buffer
 			root.GenBashCompletion(&out)
-			fmt.Printf(out.String())
+			fmt.Print(out.String())
 		},
 	}
 }

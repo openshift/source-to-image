@@ -14,6 +14,15 @@ eg. `make test WHAT=pkg/build`
 * `check` - is synonym for `test`.
 * `clean` - cleans environment by removing `_output` and `Godeps/_workspace/pkg` directories.
 
+## Generating Bash completion
+
+If you are modifying or adding sub-command or command flag, make sure you update
+the generated Bash completion and include it in your PR. To update Bash
+completion, you can run the following command:
+
+    $ hack/update-generated-completions.sh
+
+This will regenerate the `./contrib/bash/s2i` file.
 
 ## Test Suites
 
