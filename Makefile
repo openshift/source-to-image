@@ -57,6 +57,7 @@ install-travis:
 #   make test
 #   make check WHAT=pkg/build TESTFLAGS=-v
 check:
+	hack/verify-bash-completion.sh
 	hack/test-go.sh $(WHAT) $(TESTS) $(TESTFLAGS)
 .PHONY: check
 

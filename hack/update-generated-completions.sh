@@ -10,5 +10,5 @@ source "${STI_ROOT}/hack/common.sh"
 
 sti::build::build_binaries "$@"
 
-echo "+++ Updating Bash completion (${STI_ROOT}/contrib/bash/s2i)"
+echo "+++ Updating Bash completion in contrib/bash/s2i"
 ${STI_LOCAL_BINPATH}/s2i genbashcompletion > ${STI_ROOT}/contrib/bash/s2i
