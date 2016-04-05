@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"os"
@@ -262,6 +263,20 @@ func newCmdCreate() *cobra.Command {
 	}
 }
 
+func newCmdGenBashCompletion(root *cobra.Command) *cobra.Command {
+	return &cobra.Command{
+		Use:   "genbashcompletion",
+		Short: "Generate Bash completetion for the s2i command",
+		Long:  "Generate Bash completetion for the s2i command into standard output",
+		Run: func(cmd *cobra.Command, args []string) {
+			// TODO: The latest version of cobra require to pass the io.Writer here.
+			var out bytes.Buffer
+			root.GenBashCompletion(&out)
+			fmt.Printf(out.String())
+		},
+	}
+}
+
 func newCmdUsage(cfg *api.Config) *cobra.Command {
 	oldScriptsFlag := ""
 	oldDestination := ""
@@ -372,6 +387,7 @@ func main() {
 		glog.Warning("sti binary is deprecated, use s2i instead")
 	}
 
+	stiCmd.AddCommand(newCmdGenBashCompletion(stiCmd))
 	err := stiCmd.Execute()
 	if err != nil {
 		os.Exit(1)
