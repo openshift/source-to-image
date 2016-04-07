@@ -84,6 +84,8 @@ func New(req *api.Config, overrides build.Overrides) (*STI, error) {
 	}
 
 	inst := scripts.NewInstaller(req.BuilderImage, req.ScriptsURL, req.ScriptDownloadProxyConfig, docker, req.PullAuthentication)
+	tarHandler := tar.New()
+	tarHandler.SetExclusionPattern(regexp.MustCompile(req.ExcludeRegExp))
 
 	b := &STI{
 		installer:         inst,
@@ -92,7 +94,7 @@ func New(req *api.Config, overrides build.Overrides) (*STI, error) {
 		incrementalDocker: incrementalDocker,
 		git:               git.New(),
 		fs:                util.NewFileSystem(),
-		tar:               tar.New(),
+		tar:               tarHandler,
 		callbackInvoker:   util.NewCallbackInvoker(),
 		requiredScripts:   []string{api.Assemble, api.Run},
 		optionalScripts:   []string{api.SaveArtifacts},
