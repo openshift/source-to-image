@@ -88,7 +88,8 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 | `-s (--scripts-url)`       | URL of S2I scripts (see [S2I Scripts](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#s2i-scripts)) |
 | `--recursive`              | Perform recursive git clone when getting sources using git|
 | `-q (--quiet)`             | Operate quietly, suppressing all non-error output |
-| `--inject`                 | Inject the content of the specified directory into the path in the container that runs the assemble script |
+| `-i (--inject)`            | Inject the content of the specified directory into the path in the container that runs the assemble script |
+| `-v (--volume)`            | Bind mounts a local directory into the container that runs the assemble script|
 
 #### Context directory
 

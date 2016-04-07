@@ -378,7 +378,7 @@ func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injectio
 	if err != nil {
 		t.Errorf("Unable to write content to temporary injection file: %v", err)
 	}
-	injectionList := api.InjectionList{}
+	injectionList := api.VolumeList{}
 	for _, i := range injections {
 		injectionList.Set(i)
 	}
