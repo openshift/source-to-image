@@ -76,7 +76,7 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 | `-d (--destination)`       | Location where the scripts and sources will be placed prior doing build (see [S2I Scripts](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#s2i-scripts)) |
 | `--dockercfg-path`         | The path to the Docker configuration file |
 | `--incremental`            | Try to perform an incremental build |
-| `-e (--env)`               | Environment variables to be passed to the builder eg. `NAME=VALUE,NAME2=VALUE2,...` |
+| `-e (--env)`               | Environment variable to be passed to the builder eg. `NAME=VALUE` |
 | `-E (--environment-file)`  | Specify the path to the file with environment |
 | `--exclude`  | Regular expression for selecting files from the source tree to exclude from the build, where the default excludes the '.git' directory (see https://golang.org/pkg/regexp for syntax, but note that \"\" will be interpreted as allow all files and exclude no files) |
 | `--force-pull`             | Always pull the builder image, even if it is present locally (defaults to true) |
@@ -216,7 +216,7 @@ $ s2i usage <builder image> [flags]
 | Name                       | Description                                             |
 |:-------------------------- |:--------------------------------------------------------|
 | `-d (--destination)`       | Location where the scripts and sources will be placed prior invoking usage (see [S2I Scripts](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#s2i-scripts))|
-| `-e (--env)`               | Environment variables passed to the builder eg. `NAME=VALUE,NAME2=VALUE2,...`) |
+| `-e (--env)`               | Environment variable passed to the builder eg. `NAME=VALUE`) |
 | `--force-pull`             | Always pull the builder image, even if it is present locally |
 | `--save-temp-dir`          | Save the working directory used for fetching scripts and sources |
 | `-s (--scripts-url)`       | URL of S2I scripts (see [Scripts URL](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#s2i-scripts))|

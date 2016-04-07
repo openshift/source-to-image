@@ -112,20 +112,15 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 				}
 			}
 
-			cfg.Environment = map[string]string{}
 			if len(cfg.EnvironmentFile) > 0 {
 				result, err := util.ReadEnvironmentFile(cfg.EnvironmentFile)
 				if err != nil {
 					glog.Warningf("Unable to read environment file %q: %v", cfg.EnvironmentFile, err)
 				} else {
-					cfg.Environment = result
+					for name, value := range result {
+						cfg.Environment = append(cfg.Environment, api.EnvironmentSpec{Name: name, Value: value})
+					}
 				}
-			}
-
-			envs, err := cmdutil.ParseEnvs(cmd, "env")
-			checkErr(err)
-			for k, v := range envs {
-				cfg.Environment[k] = v
 			}
 
 			if len(oldScriptsFlag) != 0 {
@@ -168,7 +163,7 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 
 	buildCmd.Flags().BoolVar(&(cfg.RunImage), "run", false, "Run resulting image as part of invocation of this command")
 	buildCmd.Flags().BoolVar(&(cfg.DisableRecursive), "recursive", true, "Fetch all git submodules when cloning application repository")
-	buildCmd.Flags().StringP("env", "e", "", "Specify an environment var NAME=VALUE,NAME2=VALUE2,...")
+	buildCmd.Flags().VarP(&(cfg.Environment), "env", "e", "Specify an single environment variable in NAME=VALUE format")
 	buildCmd.Flags().StringVarP(&(cfg.Ref), "ref", "r", "", "Specify a ref to check-out")
 	buildCmd.Flags().StringVarP(&(cfg.AssembleUser), "assemble-user", "", "", "Specify the user to run assemble with")
 	buildCmd.Flags().StringVarP(&(cfg.ContextDir), "context-dir", "", "", "Specify the sub-directory inside the repository with the application sources")
@@ -299,9 +294,6 @@ func newCmdUsage(cfg *api.Config) *cobra.Command {
 
 			cfg.Usage = true
 			cfg.BuilderImage = args[0]
-			envs, err := cmdutil.ParseEnvs(cmd, "env")
-			checkErr(err)
-			cfg.Environment = envs
 
 			if len(oldScriptsFlag) != 0 {
 				glog.Warning("DEPRECATED: Flag --scripts is deprecated, use --scripts-url instead")
