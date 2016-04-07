@@ -8,4 +8,4 @@ source "${STI_ROOT}/hack/common.sh"
 GO_VERSION=($(go version))
 echo "Detected go version: $(go version)"
 
-go get golang.org/x/tools/cmd/cover github.com/golang/lint/golint golang.org/x/tools/cmd/vet
+go get golang.org/x/tools/cmd/cover github.com/tools/godep
