@@ -23,6 +23,8 @@ An example can be found [`here`](nginx-app/save-artifacts).
 
 We can provide some help to the user on how to use it as a base for an application image via the `usage` script. An example can be found [`here`](nginx-app/usage).
 
+Make sure all the scripts are runnable `chmod +x assemble run save-artifacts usage`
+
 The next step is to create the builder image. In the nginx-app directory issue `docker build -t nginx-centos7 .`  
 This will create a builder image from the current Dockerfile.
 
