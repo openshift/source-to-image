@@ -29,8 +29,6 @@ Want to just get started now? Check out the [instructions](#getting-started).
 
 # Anatomy of a builder image
 
-See a practical tutorial on how to create a builder image [here](examples/README.md)
-
 Creating builder images is easy. `s2i` looks for you to supply the following scripts to use with an
 image:
 
@@ -41,6 +39,20 @@ image:
 
 Additionally for the best user experience and optimized `s2i` operation we suggest images
 to have `/bin/sh` and `tar` commands available.
+
+See a practical tutorial on how to create a builder image [here](examples/README.md) and read [this](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md) for a detailed description of the requirements and scripts along with examples of builder images.
+
+# Build workflow
+
+The `s2i build` workflow is:
+
+1. `s2i` creates a container based on the build image and passes it a tar file that contains:
+    1. The application source in `src`, excluding any files selected by `.s2iignore`
+    1. The build artifacts in `artifacts` (if applicable - see [incremental builds](#incremental-builds))
+1. `s2i` sets the environment variables from `.s2i/environment` (optional)
+1. `s2i` starts the container and runs its `assemble` script
+1. `s2i` waits for the container to finish
+1. `s2i` commits the container, setting the CMD for the output image to be the `run` script and tagging the image with the name provided.
 
 Filtering the contents of the source tree is possible if the user supplies a
 `.s2iignore` file in the root directory of the source repository, where `.s2iignore` contains regular
@@ -63,15 +75,15 @@ And the `*/*/temp*` rule prevents the filtering of any files starting with `temp
 Next, to illustrate exception rules, first consider the following example snippet of a `.s2iignore` file:
 
 
-	*.md
-	!README.md
+  *.md
+  !README.md
 
 
 With this exception rule example, README.md will not be filtered, and remain in the image s2i produces.  However, with this snippet:
 
 
-	!README.md
-	*.md
+  !README.md
+  *.md
 
 
 README.md, if filtered by any prior rules, but then put back in by `!README.md`, would be filtered, and not part of the resulting image s2i produces.  Since `*.md` follows `!README.md`, `*.md` takes precedence.
@@ -87,22 +99,6 @@ FOO=bar
 ```
 
 In this case, the value of `FOO` environment variable will be set to `bar`.
-
-See [here](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md) for a detailed description of the requirements and scripts along with examples of builder images.
-
-
-
-# Build workflow
-
-The `s2i build` workflow is:
-
-1. `s2i` creates a container based on the build image and passes it a tar file that contains:
-    1. The application source in `src`, excluding any files selected by `.s2iignore`
-    1. The build artifacts in `artifacts` (if applicable - see [incremental builds](#incremental-builds))
-1. `s2i` sets the environment variables from `.s2i/environment` (optional)
-1. `s2i` starts the container and runs its `assemble` script
-1. `s2i` waits for the container to finish
-1. `s2i` commits the container, setting the CMD for the output image to be the `run` script and tagging the image with the name provided.
 
 # Using ONBUILD images
 

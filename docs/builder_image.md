@@ -165,3 +165,7 @@ should be the following:
 **NOTE** The suggested place to put your test application built by your
 `test/run` script is `test/test-app` in your image repository, see
 [s2i create](https://github.com/openshift/source-to-image/blob/master/docs/cli.md#s2i-create).
+
+# Additional steps
+## OpenShift support
+If you are intending to use this image with [OpenShift](https://github.com/openshift/origin), review and follow the OpenShift [image creation guidelines](https://docs.openshift.org/latest/creating_images/guidelines.html).
