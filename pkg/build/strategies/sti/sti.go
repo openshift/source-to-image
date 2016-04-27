@@ -417,6 +417,7 @@ func (b *STI) Save(config *api.Config) (err error) {
 	opts := dockerpkg.RunContainerOptions{
 		Image:           image,
 		User:            user,
+		Entrypoint:      []string{"/bin/env"},
 		ExternalScripts: b.externalScripts[api.SaveArtifacts],
 		ScriptsURL:      config.ScriptsURL,
 		Destination:     config.Destination,
@@ -463,9 +464,10 @@ func (b *STI) Execute(command string, user string, config *api.Config) error {
 	}
 
 	opts := dockerpkg.RunContainerOptions{
-		Image:  config.BuilderImage,
-		Stdout: outWriter,
-		Stderr: errWriter,
+		Image:      config.BuilderImage,
+		Entrypoint: []string{"/bin/env"},
+		Stdout:     outWriter,
+		Stderr:     errWriter,
 		// The PullImage is false because the PullImage function should be called
 		// before we run the container
 		PullImage:       false,
