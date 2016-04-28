@@ -194,10 +194,11 @@ type Config struct {
 	// deciding which files to exclude from the tar stream
 	ExcludeRegExp string
 
-	// DisableImplicitBuild prevents s2i from performing a docker build operation
+	// BlockOnBuild prevents s2i from performing a docker build operation
 	// if one is necessary to execute ONBUILD commands, or to layer source code into
-	// the container for images that don't have a tar binary available.
-	DisableImplicitBuild bool
+	// the container for images that don't have a tar binary available, if the
+	// image contains ONBUILD commands that would be executed.
+	BlockOnBuild bool
 }
 
 // EnvironmentSpec specifies a single environment variable.
