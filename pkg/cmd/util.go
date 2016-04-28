@@ -1,10 +1,8 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/spf13/cobra"
@@ -32,22 +30,4 @@ func AddCommonFlags(c *cobra.Command, cfg *api.Config) {
 		"Specify the path to the Docker configuration file")
 	c.Flags().StringVarP(&(cfg.Destination), "destination", "d", "",
 		"Specify a destination location for untar operation")
-}
-
-// ParseEnvs parses the command line environemnt variable definitions
-func ParseEnvs(c *cobra.Command, name string) (map[string]string, error) {
-	env := c.Flags().Lookup(name)
-	if env == nil || len(env.Value.String()) == 0 {
-		return nil, nil
-	}
-	envs := make(map[string]string)
-	pairs := strings.Split(env.Value.String(), ",")
-	for _, pair := range pairs {
-		atoms := strings.Split(pair, "=")
-		if len(atoms) != 2 {
-			return nil, fmt.Errorf("malformed syntax for environment variable: %s", pair)
-		}
-		envs[atoms[0]] = atoms[1]
-	}
-	return envs, nil
 }

@@ -63,7 +63,10 @@ func checkDockerfile(fs *test.FakeFileSystem, t *testing.T) {
 func TestCreateDockerfile(t *testing.T) {
 	fakeRequest := &api.Config{
 		BuilderImage: "fake:onbuild",
-		Environment:  map[string]string{"FOO": "BAR", "TEST": "A VALUE"},
+		Environment: api.EnvironmentList{
+			{Name: "FOO", Value: "BAR"},
+			{Name: "TEST", Value: "A VALUE"},
+		},
 	}
 	b := newFakeOnBuild()
 	fakeFs := &test.FakeFileSystem{
