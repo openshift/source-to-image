@@ -1,6 +1,7 @@
 {
 	"ImportPath": "github.com/openshift/source-to-image",
 	"GoVersion": "go1.4.2",
+	"GodepVersion": "v62",
 	"Packages": [
 		"./..."
 	],
@@ -12,13 +13,13 @@
 		},
 		{
 			"ImportPath": "github.com/docker/docker/builder/command",
-			"Comment": "v1.4.1-2754-ga313b72",
-			"Rev": "a313b729e48d0ca9d0085f407b136def162eaf4c"
+			"Comment": "v1.4.1-4831-g0f5c9d3",
+			"Rev": "0f5c9d301b9b1cca66b3ea0f9dec3b5317d3686d"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/builder/parser",
-			"Comment": "v1.4.1-2754-ga313b72",
-			"Rev": "a313b729e48d0ca9d0085f407b136def162eaf4c"
+			"Comment": "v1.4.1-4831-g0f5c9d3",
+			"Rev": "0f5c9d301b9b1cca66b3ea0f9dec3b5317d3686d"
 		},
 		{
 			"ImportPath": "github.com/fsouza/go-dockerclient",
