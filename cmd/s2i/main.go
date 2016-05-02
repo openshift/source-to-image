@@ -200,10 +200,11 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 			}
 
 			if r, err := os.Open(cfg.DockerCfgPath); err == nil {
+				defer r.Close()
 				cfg.PullAuthentication = docker.LoadAndGetImageRegistryAuth(r, cfg.Tag)
 			}
 
-			err := build.GenerateConfigFromLabels(cfg.Tag, cfg)
+			err := build.GenerateConfigFromLabels(cfg)
 			checkErr(err)
 
 			if len(args) >= 2 {
@@ -213,6 +214,7 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 			// Attempt to read the .dockercfg and extract the authentication for
 			// docker pull
 			if r, err := os.Open(cfg.DockerCfgPath); err == nil {
+				defer r.Close()
 				cfg.PullAuthentication = docker.LoadAndGetImageRegistryAuth(r, cfg.BuilderImage)
 			}
 
