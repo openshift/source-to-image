@@ -326,7 +326,7 @@ func (builder *STI) PostExecute(containerID, location string) error {
 
 	imageID, err := builder.docker.CommitContainer(opts)
 	if err != nil {
-		return errors.NewBuildError(builder.config.Tag, err)
+		return errors.NewCommitError(builder.config.Tag, err)
 	}
 
 	builder.result.Success = true
