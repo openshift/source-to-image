@@ -75,18 +75,22 @@ And the `*/*/temp*` rule prevents the filtering of any files starting with `temp
 Next, to illustrate exception rules, first consider the following example snippet of a `.s2iignore` file:
 
 
-  *.md
-  !README.md
+```
+*.md
+!README.md
+```
 
 
 With this exception rule example, README.md will not be filtered, and remain in the image s2i produces.  However, with this snippet:
 
 
-  !README.md
-  *.md
+```
+!README.md
+*.md
+```
 
 
-README.md, if filtered by any prior rules, but then put back in by `!README.md`, would be filtered, and not part of the resulting image s2i produces.  Since `*.md` follows `!README.md`, `*.md` takes precedence.
+`README.md`, if filtered by any prior rules, but then put back in by `!README.md`, would be filtered, and not part of the resulting image s2i produces.  Since `*.md` follows `!README.md`, `*.md` takes precedence.
 
 Users can also set extra environment variables in the application source code.
 They are passed to the build, and the `assemble` script consumes them. All
