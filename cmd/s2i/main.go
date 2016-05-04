@@ -175,7 +175,8 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 	buildCmd.Flags().StringVarP(&(cfg.DisplayName), "application-name", "n", "", "Specify the display name for the application (default: output image name)")
 	buildCmd.Flags().StringVarP(&(cfg.Description), "description", "", "", "Specify the description of the application")
 	buildCmd.Flags().VarP(&(cfg.AllowedUIDs), "allowed-uids", "u", "Specify a range of allowed user ids for the builder image")
-	buildCmd.Flags().VarP(&(cfg.Injections), "inject", "i", "Specify a list of directories to inject into the assemble container")
+	buildCmd.Flags().VarP(&(cfg.Injections), "inject", "i", "Specify a directory to inject into the assemble container")
+	buildCmd.Flags().VarP(&(cfg.BuildVolumes), "volume", "v", "Specify a volume to mount into the assemble container")
 	buildCmd.Flags().StringSliceVar(&(cfg.DropCapabilities), "cap-drop", []string{}, "Specify a comma-separated list of capabilities to drop when running Docker containers")
 	buildCmd.Flags().StringVarP(&(oldDestination), "location", "l", "",
 		"DEPRECATED: Specify a destination location for untar operation")
