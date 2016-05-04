@@ -24,11 +24,12 @@ import (
 const defaultDestination = "/tmp"
 
 type Layered struct {
-	config  *api.Config
-	docker  docker.Docker
-	fs      util.FileSystem
-	tar     tar.Tar
-	scripts build.ScriptsHandler
+	config     *api.Config
+	docker     docker.Docker
+	fs         util.FileSystem
+	tar        tar.Tar
+	scripts    build.ScriptsHandler
+	hasOnBuild bool
 }
 
 func New(config *api.Config, scripts build.ScriptsHandler, overrides build.Overrides) (*Layered, error) {
@@ -126,6 +127,10 @@ func (builder *Layered) SourceTar(config *api.Config) (io.ReadCloser, error) {
 
 //Build handles the `docker build` equivalent execution, returning the success/failure details
 func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
+	if config.HasOnBuild && config.BlockOnBuild {
+		return nil, fmt.Errorf("builder image uses ONBUILD instructions but ONBUILD is not allowed.")
+	}
+
 	if err := builder.CreateDockerfile(config); err != nil {
 		return nil, err
 	}
