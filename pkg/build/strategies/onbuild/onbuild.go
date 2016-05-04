@@ -86,7 +86,7 @@ func (builder *OnBuild) SourceTar(config *api.Config) (io.ReadCloser, error) {
 // Build executes the ONBUILD kind of build
 func (builder *OnBuild) Build(config *api.Config) (*api.Result, error) {
 	if config.BlockOnBuild {
-		return nil, fmt.Errorf("builder image uses ONBUILD instructions but ONBUILD is blocked.")
+		return nil, fmt.Errorf("builder image uses ONBUILD instructions but ONBUILD is not allowed.")
 	}
 	glog.V(2).Info("Preparing the source code for build")
 	// Change the installation directory for this config to store scripts inside
