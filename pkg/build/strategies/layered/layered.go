@@ -57,7 +57,7 @@ func getDestination(config *api.Config) string {
 	return destination
 }
 
-//checkValidDirWithContents will return true if the parameter provided is a valid, accessible directory that has contents (i.e. is not empty
+// checkValidDirWithContents will return true if the parameter provided is a valid, accessible directory that has contents (i.e. is not empty)
 func checkValidDirWithContents(name string) bool {
 	items, err := ioutil.ReadDir(name)
 	if os.IsNotExist(err) {
@@ -76,32 +76,32 @@ func (builder *Layered) CreateDockerfile(config *api.Config) error {
 		return err
 	}
 
-	locations := []string{
-		filepath.Join(getDestination(config), "scripts"),
-		filepath.Join(getDestination(config), "src"),
-	}
+	scriptsDir := filepath.Join(getDestination(config), "scripts")
+	sourcesDir := filepath.Join(getDestination(config), "src")
+
+	uploadScriptsDir := path.Join(config.WorkingDir, api.UploadScripts)
 
 	buffer.WriteString(fmt.Sprintf("FROM %s\n", builder.config.BuilderImage))
 	// only COPY scripts dir if required scripts are present, i.e. the dir is not empty;
 	// even if the "scripts" dir exists, the COPY would fail if it was empty
-	scriptsIncluded := checkValidDirWithContents(path.Join(config.WorkingDir, api.UploadScripts))
+	scriptsIncluded := checkValidDirWithContents(uploadScriptsDir)
 	if scriptsIncluded {
-		glog.V(2).Infof("The scripts are included in %q directory", path.Join(config.WorkingDir, api.UploadScripts))
-		buffer.WriteString(fmt.Sprintf("COPY scripts %s\n", locations[0]))
+		glog.V(2).Infof("The scripts are included in %q directory", uploadScriptsDir)
+		buffer.WriteString(fmt.Sprintf("COPY scripts %s\n", scriptsDir))
 	} else {
 		// if an err on reading or opening dir, can't copy it
-		glog.V(2).Infof("Could not gather scripts from the directory %q", path.Join(config.WorkingDir, api.UploadScripts))
+		glog.V(2).Infof("Could not gather scripts from the directory %q", uploadScriptsDir)
 	}
-	buffer.WriteString(fmt.Sprintf("COPY src %s\n", locations[1]))
+	buffer.WriteString(fmt.Sprintf("COPY src %s\n", sourcesDir))
 
 	//TODO: We need to account for images that may not have chown. There is a proposal
 	//      to specify the owner for COPY here: https://github.com/docker/docker/pull/9934
 	if len(user) > 0 {
 		buffer.WriteString("USER root\n")
 		if scriptsIncluded {
-			buffer.WriteString(fmt.Sprintf("RUN chown -R %s %s %s\n", user, locations[0], locations[1]))
+			buffer.WriteString(fmt.Sprintf("RUN chown -R %s -- %s %s\n", user, scriptsDir, sourcesDir))
 		} else {
-			buffer.WriteString(fmt.Sprintf("RUN chown -R %s %s\n", user, locations[1]))
+			buffer.WriteString(fmt.Sprintf("RUN chown -R %s -- %s\n", user, sourcesDir))
 		}
 		buffer.WriteString(fmt.Sprintf("USER %s\n", user))
 	}

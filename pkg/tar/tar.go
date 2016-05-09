@@ -330,9 +330,9 @@ func (t *stiTar) ExtractTarStreamWithLogging(dir string, reader io.Reader, logge
 		select {
 		case err := <-errorChannel:
 			if err != nil {
-				glog.Errorf("Error extracting tar stream")
+				glog.Error("Error extracting tar stream")
 			} else {
-				glog.V(2).Infof("Done extracting tar stream")
+				glog.V(2).Info("Done extracting tar stream")
 			}
 			return err
 		case <-timeoutTimer.C:

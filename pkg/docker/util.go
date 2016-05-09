@@ -57,7 +57,7 @@ func GetImageRegistryAuth(auths *client.AuthConfigurations, imageName string) cl
 func LoadImageRegistryAuth(dockerCfg io.Reader) *client.AuthConfigurations {
 	auths, err := client.NewAuthConfigurations(dockerCfg)
 	if err != nil {
-		glog.Errorf("Unable to load docker config")
+		glog.Error("Unable to load docker config")
 		return nil
 	}
 	return auths
@@ -68,7 +68,7 @@ func LoadImageRegistryAuth(dockerCfg io.Reader) *client.AuthConfigurations {
 func LoadAndGetImageRegistryAuth(dockerCfg io.Reader, imageName string) client.AuthConfiguration {
 	auths, err := client.NewAuthConfigurations(dockerCfg)
 	if err != nil {
-		glog.Errorf("Unable to load docker config")
+		glog.Error("Unable to load docker config")
 		return client.AuthConfiguration{}
 	}
 	return GetImageRegistryAuth(auths, imageName)

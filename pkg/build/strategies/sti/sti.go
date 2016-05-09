@@ -151,13 +151,13 @@ func (builder *STI) Build(config *api.Config) (*api.Result, error) {
 		}
 		glog.V(1).Infof("Existing image for tag %s detected for incremental build", tag)
 	} else {
-		glog.V(1).Infof("Clean build will be performed")
+		glog.V(1).Info("Clean build will be performed")
 	}
 
 	glog.V(2).Infof("Performing source build from %s", config.Source)
 	if builder.incremental {
 		if err := builder.artifacts.Save(config); err != nil {
-			glog.Warningf("Clean build will be performed because of error saving previous build artifacts")
+			glog.Warning("Clean build will be performed because of error saving previous build artifacts")
 			glog.V(2).Infof("error: %v", err)
 		}
 	}
