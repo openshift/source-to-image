@@ -7,7 +7,7 @@ const TestRunScript = `
 # The main focus here is to exercise the S2I scripts.
 #
 # For more information see the documentation:
-#	https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md
+# https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md
 #
 # IMAGE_NAME specifies a name of the candidate image used for testing.
 # The image has to be available before this script is executed.
@@ -29,7 +29,7 @@ cid_file=$($MKTEMP_EXEC -u --suffix=.cid)
 
 # Since we built the candidate image locally, we don't want S2I to attempt to pull
 # it from Docker hub
-s2i_args="--force-pull=false -s ${scripts_url} --loglevel=2"
+s2i_args="--force-pull=false --loglevel=2"
 
 # Port the image exposes service to be tested
 test_port=8080
