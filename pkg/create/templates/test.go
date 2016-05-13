@@ -29,7 +29,7 @@ cid_file=$($MKTEMP_EXEC -u --suffix=.cid)
 
 # Since we built the candidate image locally, we don't want S2I to attempt to pull
 # it from Docker hub
-s2i_args="--force-pull=false --loglevel=2"
+s2i_args="--pull-policy=never --loglevel=2"
 
 # Port the image exposes service to be tested
 test_port=8080

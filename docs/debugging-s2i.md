@@ -19,8 +19,11 @@ As noted [here](https://github.com/openshift/source-to-image/#security), there a
 Image Mechanics
 --------------
 
-By default, s2i will always pull the image from the remote Docker repository rather than using the local builder image if available on the host from which you are running the `s2i` command.  However, if for performance reasons you choose to leverage the `--force-pull=false` option when running the `s2i` command,
-you must guard against the local builder image becoming stale and out of date.
+By default, s2i will use the local builder image if available on the host from
+which you are running the `s2i` command. However, if you want to always pull
+the image from the remote Docker repository to be sure that you are not using
+stale and out of date image you should provide `--pull-policy=always` option
+when running the `s2i` command.
 
 Permissions Needed During the S2I Process
 --------------
