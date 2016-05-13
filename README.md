@@ -182,7 +182,7 @@ $ docker run --rm -i -p :8080 -t test-ruby-app
 ```
 
 ```
-$ s2i build git://github.com/bparees/openshift-jee-sample openshift/wildfly-8-centos test-jee-app
+$ s2i build git://github.com/bparees/openshift-jee-sample openshift/wildfly-100-centos7 test-jee-app
 $ docker run --rm -i -p :8080 -t test-jee-app
 ```
 

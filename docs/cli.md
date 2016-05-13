@@ -79,7 +79,7 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 | `-e (--env)`               | Environment variable to be passed to the builder eg. `NAME=VALUE` |
 | `-E (--environment-file)`  | Specify the path to the file with environment |
 | `--exclude`  | Regular expression for selecting files from the source tree to exclude from the build, where the default excludes the '.git' directory (see https://golang.org/pkg/regexp for syntax, but note that \"\" will be interpreted as allow all files and exclude no files) |
-| `--force-pull`             | Always pull the builder image, even if it is present locally (defaults to true) |
+| `-p (--pull-policy)`       | Specify when to pull the builder image (`always`, `never` or `if-not-present`. Defaults to `if-not-present`) |
 | `--run`                    | Launch the resulting image after a successful build. All output from the image is being printed to help determine image's validity. In case of a long running image you will have to Ctrl-C to exit both s2i and the running container.  (defaults to false) |
 | `-r (--ref)`               | A branch/tag that the build should use instead of MASTER (applies only to Git source) |
 | `--rm`                     | Remove the previous image during incremental builds |
@@ -149,7 +149,7 @@ Build a Node.js application from a local directory, using a local image, the res
 image will be named `nodejs-app`:
 
 ```
-$ s2i build --force-pull=false /home/user/nodejs-app local-nodejs-builder nodejs-app
+$ s2i build /home/user/nodejs-app local-nodejs-builder nodejs-app
 ```
 
 In case of building from the local directory, the sources will be copied into
@@ -159,12 +159,12 @@ Use this method only for development or local testing.
 
 **NOTE**: All your changes have to be commited by `git` in order to build them with S2I.
 
-Build a Java application from a Git source, using the official `wildfly-8-centos`
+Build a Java application from a Git source, using the official `openshift/wildfly-100-centos7`
 builder image but overriding the scripts URL from local directory.  The resulting
 image will be named `java-app`:
 
 ```
-$ s2i build --scripts-url=file://s2iscripts git://github.com/bparees/openshift-jee-sample openshift/wildfly-8-centos java-app
+$ s2i build --scripts-url=file://s2iscripts git://github.com/bparees/openshift-jee-sample openshift/wildfly-100-centos7 java-app
 ```
 
 Build a Ruby application from a Git source, specifying `ref`, and using the official
@@ -218,7 +218,7 @@ $ s2i usage <builder image> [flags]
 |:-------------------------- |:--------------------------------------------------------|
 | `-d (--destination)`       | Location where the scripts and sources will be placed prior invoking usage (see [S2I Scripts](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#s2i-scripts))|
 | `-e (--env)`               | Environment variable passed to the builder eg. `NAME=VALUE`) |
-| `--force-pull`             | Always pull the builder image, even if it is present locally |
+| `-p (--pull-policy)`       | Specify when to pull the builder image (`always`, `never` or `if-not-present`) |
 | `--save-temp-dir`          | Save the working directory used for fetching scripts and sources |
 | `-s (--scripts-url)`       | URL of S2I scripts (see [Scripts URL](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#s2i-scripts))|
 
