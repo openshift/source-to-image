@@ -39,7 +39,7 @@ readonly s2i_godeps_ref="$(grep -m1 -A2 'openshift/source-to-image' ${OS_ROOT}/G
 
 pushd "${OS_ROOT}" >/dev/null
   git checkout -B "s2i-${s2i_short_ref}-bump" master
-  rm -rf "${origin_s2i_godep_dir}/*"
+  rm -rf "${origin_s2i_godep_dir}"/*
   cp -R "${S2I_ROOT}/pkg" "${origin_s2i_godep_dir}/."
 
   # Remove all explicitly excluded packages
