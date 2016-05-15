@@ -21,8 +21,8 @@ type Info struct {
 	GitVersion string `json:"gitVersion"`
 }
 
-// Get returns the overall codebase version. It's for detecting
-// what code a binary was built from.
+// Get returns the overall codebase version. It's for detecting what code a
+// binary was built from.
 func Get() Info {
 	return Info{
 		Major:      majorFromGit,

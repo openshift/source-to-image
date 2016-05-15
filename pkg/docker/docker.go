@@ -22,11 +22,12 @@ import (
 )
 
 const (
-	// Deprecated environment variable name, specifying where to look for the S2I scripts.
-	// It is now being replaced with ScriptsURLLabel.
+	// ScriptsURLEnvironment is a deprecated environment variable name that
+	// specifies where to look for S2I scripts. Use ScriptsURLLabel instead.
 	ScriptsURLEnvironment = "STI_SCRIPTS_URL"
-	// Deprecated environment variable name, specifying where to place artifacts in
-	// builder image. It is now being replaced with DestinationLabel.
+	// LocationEnvironment is a deprecated environment variable name that
+	// specifies where to place artifacts in a builder image. Use
+	// DestinationLabel instead.
 	LocationEnvironment = "STI_LOCATION"
 
 	// ScriptsURLLabel is the name of the Docker image LABEL that tells S2I where
@@ -607,7 +608,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 	// Create a new container.
 	glog.V(2).Infof("Creating container with options {Name:%q Config:%+v HostConfig:%+v} ...", createOpts.Name, createOpts.Config, createOpts.HostConfig)
 	var container *docker.Container
-	if err := util.TimeoutAfter(DefaultDockerTimeout, "timeout after waiting %v for Docker to create container", func() error {
+	if err = util.TimeoutAfter(DefaultDockerTimeout, "timeout after waiting %v for Docker to create container", func() error {
 		var createErr error
 		container, createErr = d.client.CreateContainer(createOpts)
 		return createErr
@@ -692,7 +693,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 
 		// OnStart must be done before we move on.
 		if opts.OnStart != nil {
-			if err := <-onStartDone; err != nil {
+			if err = <-onStartDone; err != nil {
 				return err
 			}
 		}

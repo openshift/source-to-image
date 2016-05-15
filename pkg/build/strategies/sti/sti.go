@@ -183,9 +183,9 @@ func (builder *STI) Build(config *api.Config) (*api.Result, error) {
 	return builder.result, nil
 }
 
-// Prepare prepares the source code and tar for build
-// NOTE, this func serves both the sti and onbuild strategies, as the OnBuild
-// struct Build func leverages the STI struct Prepare func directly below
+// Prepare prepares the source code and tar for build.
+// NOTE: this func serves both the sti and onbuild strategies, as the OnBuild
+// struct Build func leverages the STI struct Prepare func directly below.
 func (builder *STI) Prepare(config *api.Config) error {
 	var err error
 	if len(config.WorkingDir) == 0 {
@@ -201,7 +201,7 @@ func (builder *STI) Prepare(config *api.Config) error {
 
 	// Setup working directories
 	for _, v := range workingDirs {
-		if err := builder.fs.MkdirAll(filepath.Join(config.WorkingDir, v)); err != nil {
+		if err = builder.fs.MkdirAll(filepath.Join(config.WorkingDir, v)); err != nil {
 			return err
 		}
 	}
