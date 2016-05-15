@@ -436,8 +436,7 @@ sti::build::ldflag() {
   local val=${2}
 
   GO_VERSION=($(go version))
-
-  if [[ -z $(echo "${GO_VERSION[2]}" | grep -E 'go1.5') ]]; then
+  if [[ -n $(echo "${GO_VERSION[2]}" | grep -E 'go1.4') ]]; then
     echo "-X ${STI_GO_PACKAGE}/pkg/version.${key} ${val}"
   else
     echo "-X ${STI_GO_PACKAGE}/pkg/version.${key}=${val}"
