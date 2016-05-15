@@ -4,7 +4,7 @@
 
 # Handler for when we exit automatically on an error.
 # Borrowed from https://gist.github.com/ahendrix/7030300
-sti::log::errexit() {
+s2i::log::errexit() {
   local err="${PIPESTATUS[@]}"
 
   # If the shell we are in doesn't have errexit set (common in subshells) then
@@ -13,13 +13,13 @@ sti::log::errexit() {
 
   set +o xtrace
   local code="${1:-1}"
-  sti::log::error_exit "'${BASH_COMMAND}' exited with status $err" "${1:-1}" 1
+  s2i::log::error_exit "'${BASH_COMMAND}' exited with status $err" "${1:-1}" 1
 }
 
-sti::log::install_errexit() {
+s2i::log::install_errexit() {
   # trap ERR to provide an error handler whenever a command exits nonzero this
   # is a more verbose version of set -o errexit
-  trap 'sti::log::errexit' ERR
+  trap 's2i::log::errexit' ERR
 
   # setting errtrace allows our ERR trap handler to be propagated to functions,
   # expansions and subshells
@@ -30,7 +30,7 @@ sti::log::install_errexit() {
 #
 # Args:
 #  $1 The number of stack frames to skip when printing.
-sti::log::stack() {
+s2i::log::stack() {
   local stack_skip=${1:-0}
   stack_skip=$((stack_skip + 1))
   if [[ ${#FUNCNAME[@]} -gt $stack_skip ]]; then
@@ -52,7 +52,7 @@ sti::log::stack() {
 #  $1 Message to log with the error
 #  $2 The error code to return
 #  $3 The number of stack frames to skip when printing.
-sti::log::error_exit() {
+s2i::log::error_exit() {
   local message="${1:-}"
   local code="${2:-1}"
   local stack_skip="${3:-0}"
@@ -65,7 +65,7 @@ sti::log::error_exit() {
   echo "  ${1}" >&2
   }
 
-  sti::log::stack $stack_skip
+  s2i::log::stack $stack_skip
 
   echo "Exiting with status ${code}" >&2
   exit "${code}"

@@ -50,9 +50,9 @@ readonly STI_BINARY_RELEASE_WINDOWS=(
   s2i.exe
 )
 
-# sti::build::binaries_from_targets take a list of build targets and return the
+# s2i::build::binaries_from_targets take a list of build targets and return the
 # full go package to be built
-sti::build::binaries_from_targets() {
+s2i::build::binaries_from_targets() {
   local target
   for target; do
     echo "${STI_GO_PACKAGE}/${target}"
@@ -61,7 +61,7 @@ sti::build::binaries_from_targets() {
 
 # Asks golang what it thinks the host platform is.  The go tool chain does some
 # slightly different things when the target platform matches the host platform.
-sti::build::host_platform() {
+s2i::build::host_platform() {
   echo "$(go env GOHOSTOS)/$(go env GOHOSTARCH)"
 }
 
@@ -73,26 +73,26 @@ sti::build::host_platform() {
 #     are built.
 #   STI_BUILD_PLATFORMS - Incoming variable of targets to build for.  If unset
 #     then just the host architecture is built.
-sti::build::build_binaries() {
+s2i::build::build_binaries() {
   # Create a sub-shell so that we don't pollute the outer environment
   (
     # Check for `go` binary and set ${GOPATH}.
-    sti::build::setup_env
+    s2i::build::setup_env
 
     # Fetch the version.
     local version_ldflags
-    version_ldflags=$(sti::build::ldflags)
+    version_ldflags=$(s2i::build::ldflags)
 
-    sti::build::export_targets "$@"
+    s2i::build::export_targets "$@"
 
     local platform
     for platform in "${platforms[@]}"; do
-      sti::build::set_platform_envs "${platform}"
+      s2i::build::set_platform_envs "${platform}"
       echo "++ Building go targets for ${platform}:" "${targets[@]}"
       go install "${goflags[@]:+${goflags[@]}}" \
           -ldflags "${version_ldflags}" \
           "${binaries[@]}"
-      sti::build::unset_platform_envs "${platform}"
+      s2i::build::unset_platform_envs "${platform}"
     done
   )
 }
@@ -100,7 +100,7 @@ sti::build::build_binaries() {
 # Generates the set of target packages, binaries, and platforms to build for.
 # Accepts binaries via $@, and platforms via STI_BUILD_PLATFORMS, or defaults to
 # the current platform.
-sti::build::export_targets() {
+s2i::build::export_targets() {
   # Use eval to preserve embedded quoted strings.
   local goflags
   eval "goflags=(${STI_GOFLAGS:-})"
@@ -120,20 +120,20 @@ sti::build::export_targets() {
     targets=("${STI_ALL_TARGETS[@]}")
   fi
 
-  binaries=($(sti::build::binaries_from_targets "${targets[@]}"))
+  binaries=($(s2i::build::binaries_from_targets "${targets[@]}"))
 
   platforms=("${STI_BUILD_PLATFORMS[@]:+${STI_BUILD_PLATFORMS[@]}}")
   if [[ ${#platforms[@]} -eq 0 ]]; then
-    platforms=("$(sti::build::host_platform)")
+    platforms=("$(s2i::build::host_platform)")
   fi
 }
 
 
 # Takes the platform name ($1) and sets the appropriate golang env variables
 # for that platform.
-sti::build::set_platform_envs() {
+s2i::build::set_platform_envs() {
   [[ -n ${1-} ]] || {
-    echo "!!! Internal error.  No platform set in sti::build::set_platform_envs"
+    echo "!!! Internal error.  No platform set in s2i::build::set_platform_envs"
     exit 1
   }
 
@@ -143,14 +143,14 @@ sti::build::set_platform_envs() {
 
 # Takes the platform name ($1) and resets the appropriate golang env variables
 # for that platform.
-sti::build::unset_platform_envs() {
+s2i::build::unset_platform_envs() {
   unset GOOS
   unset GOARCH
 }
 
 
 # Create the GOPATH tree under $STI_ROOT
-sti::build::create_gopath_tree() {
+s2i::build::create_gopath_tree() {
   local go_pkg_dir="${STI_GOPATH}/src/${STI_GO_PACKAGE}"
   local go_pkg_basedir=$(dirname "${go_pkg_dir}")
 
@@ -162,7 +162,7 @@ sti::build::create_gopath_tree() {
 }
 
 
-# sti::build::setup_env will check that the `go` commands is available in
+# s2i::build::setup_env will check that the `go` commands is available in
 # ${PATH}. If not running on Travis, it will also check that the Go version is
 # good enough for the Kubernetes build.
 #
@@ -175,8 +175,8 @@ sti::build::create_gopath_tree() {
 #     stuff.
 #   export GOBIN - This is actively unset if already set as we want binaries
 #     placed in a predictable place.
-sti::build::setup_env() {
-  sti::build::create_gopath_tree
+s2i::build::setup_env() {
+  s2i::build::create_gopath_tree
 
   if [[ -z "$(which go)" ]]; then
     cat <<EOF
@@ -235,19 +235,19 @@ EOF
 # install' will place binaries that match the host platform directly in $GOBIN
 # while placing cross compiled binaries into `platform_arch` subdirs.  This
 # complicates pretty much everything else we do around packaging and such.
-sti::build::place_bins() {
+s2i::build::place_bins() {
   (
     local host_platform
-    host_platform=$(sti::build::host_platform)
+    host_platform=$(s2i::build::host_platform)
 
     echo "++ Placing binaries"
 
     if [[ "${STI_RELEASE_ARCHIVE-}" != "" ]]; then
-      sti::build::get_version_vars
+      s2i::build::get_version_vars
       mkdir -p "${STI_LOCAL_RELEASEPATH}"
     fi
 
-    sti::build::export_targets "$@"
+    s2i::build::export_targets "$@"
 
     for platform in "${platforms[@]}"; do
       # The substitution on platform_src below will replace all slashes with
@@ -322,10 +322,10 @@ sti::build::place_bins() {
   )
 }
 
-# sti::build::make_binary_symlinks makes symlinks for the sti
+# s2i::build::make_binary_symlinks makes symlinks for the sti
 # binary in _output/local/go/bin
-sti::build::make_binary_symlinks() {
-  platform=$(sti::build::host_platform)
+s2i::build::make_binary_symlinks() {
+  platform=$(s2i::build::host_platform)
   if [[ -f "${STI_OUTPUT_BINPATH}/${platform}/s2i" ]]; then
     for linkname in "${STI_BINARY_SYMLINKS[@]}"; do
       if [[ $platform == "windows/amd64" ]]; then
@@ -337,14 +337,14 @@ sti::build::make_binary_symlinks() {
   fi
 }
 
-# sti::build::detect_local_release_tars verifies there is only one primary and one
+# s2i::build::detect_local_release_tars verifies there is only one primary and one
 # image binaries release tar in STI_LOCAL_RELEASEPATH for the given platform specified by
 # argument 1, exiting if more than one of either is found.
 #
 # If the tars are discovered, their full paths are exported to the following env vars:
 #
 #   STI_PRIMARY_RELEASE_TAR
-sti::build::detect_local_release_tars() {
+s2i::build::detect_local_release_tars() {
   local platform="$1"
 
   if [[ ! -d "${STI_LOCAL_RELEASEPATH}" ]]; then
@@ -366,18 +366,18 @@ sti::build::detect_local_release_tars() {
 }
 
 
-# sti::build::get_version_vars loads the standard version variables as
+# s2i::build::get_version_vars loads the standard version variables as
 # ENV vars
-sti::build::get_version_vars() {
+s2i::build::get_version_vars() {
   if [[ -n ${STI_VERSION_FILE-} ]]; then
     source "${STI_VERSION_FILE}"
     return
   fi
-  sti::build::sti_version_vars
+  s2i::build::sti_version_vars
 }
 
-# sti::build::sti_version_vars looks up the current Git vars
-sti::build::sti_version_vars() {
+# s2i::build::sti_version_vars looks up the current Git vars
+s2i::build::sti_version_vars() {
   local git=(git --work-tree "${STI_ROOT}")
 
   if [[ -n ${STI_GIT_COMMIT-} ]] || STI_GIT_COMMIT=$("${git[@]}" rev-parse --short "HEAD^{commit}" 2>/dev/null); then
@@ -414,10 +414,10 @@ sti::build::sti_version_vars() {
 }
 
 # Saves the environment flags to $1
-sti::build::save_version_vars() {
+s2i::build::save_version_vars() {
   local version_file=${1-}
   [[ -n ${version_file} ]] || {
-    echo "!!! Internal error.  No file specified in sti::build::save_version_vars"
+    echo "!!! Internal error.  No file specified in s2i::build::save_version_vars"
     return 1
   }
 
@@ -431,7 +431,7 @@ EOF
 }
 
 # golang 1.5 wants `-X key=val`, but golang 1.4- REQUIRES `-X key val`
-sti::build::ldflag() {
+s2i::build::ldflag() {
   local key=${1}
   local val=${2}
 
@@ -444,8 +444,8 @@ sti::build::ldflag() {
   fi
 }
 
-# sti::build::ldflags calculates the -ldflags argument for building STI
-sti::build::ldflags() {
+# s2i::build::ldflags calculates the -ldflags argument for building STI
+s2i::build::ldflags() {
   (
     # Run this in a subshell to prevent settings/variables from leaking.
     set -o errexit
@@ -454,13 +454,13 @@ sti::build::ldflags() {
 
     cd "${STI_ROOT}"
 
-    sti::build::get_version_vars
+    s2i::build::get_version_vars
 
     declare -a ldflags=()
-    ldflags+=($(sti::build::ldflag "majorFromGit" "${STI_GIT_MAJOR}"))
-    ldflags+=($(sti::build::ldflag "minorFromGit" "${STI_GIT_MINOR}"))
-    ldflags+=($(sti::build::ldflag "versionFromGit" "${STI_GIT_VERSION}"))
-    ldflags+=($(sti::build::ldflag "commitFromGit" "${STI_GIT_COMMIT}"))
+    ldflags+=($(s2i::build::ldflag "majorFromGit" "${STI_GIT_MAJOR}"))
+    ldflags+=($(s2i::build::ldflag "minorFromGit" "${STI_GIT_MINOR}"))
+    ldflags+=($(s2i::build::ldflag "versionFromGit" "${STI_GIT_VERSION}"))
+    ldflags+=($(s2i::build::ldflag "commitFromGit" "${STI_GIT_COMMIT}"))
 
     # The -ldflags parameter takes a single string, so join the output.
     echo "${ldflags[*]-}"

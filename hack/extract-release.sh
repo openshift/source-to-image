@@ -15,9 +15,9 @@ cd "${STI_ROOT}"
 
 # Copy the linux release archives release back to the local _output/local/bin/linux/amd64 directory.
 # TODO: support different OS's?
-sti::build::detect_local_release_tars "linux-amd64"
+s2i::build::detect_local_release_tars "linux-amd64"
 
 mkdir -p "${STI_OUTPUT_BINPATH}/linux/amd64"
 tar mxzf "${STI_PRIMARY_RELEASE_TAR}" -C "${STI_OUTPUT_BINPATH}/linux/amd64"
 
-sti::build::make_binary_symlinks
+s2i::build::make_binary_symlinks
