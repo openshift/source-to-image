@@ -48,7 +48,7 @@ pushd "${OS_ROOT}" >/dev/null
   done
 
   # Bump the origin Godeps.json file
-  os::util::sed "s/${s2i_godeps_ref}/${s2i_ref}/g" "${OS_ROOT}/Godeps/Godeps.json"
+  s2i::util::sed "s/${s2i_godeps_ref}/${s2i_ref}/g" "${OS_ROOT}/Godeps/Godeps.json"
 
   # Make a commit with proper message
   git add Godeps && git commit -m "bump(github.com/openshift/source-to-image): ${s2i_ref}"

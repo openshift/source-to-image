@@ -1,11 +1,13 @@
 #!/bin/bash
 
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
-S2I_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${S2I_ROOT}/hack/common.sh"
+STARTTIME=$(date +%s)
 
-GO_VERSION=($(go version))
-echo "Detected go version: $(go version)"
+echo $(go version)
 
-go get golang.org/x/tools/cmd/cover github.com/tools/godep
+go get github.com/tools/godep github.com/golang/lint/golint
+
+ret=$?; ENDTIME=$(date +%s); echo "$0 took $(($ENDTIME - $STARTTIME)) seconds"; exit "$ret"

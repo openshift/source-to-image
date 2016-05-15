@@ -31,8 +31,8 @@ all build:
 #   make verify
 verify: build
 	hack/verify-gofmt.sh
-	hack/verify-golint.sh || true
-	hack/verify-govet.sh || true
+	hack/verify-golint.sh || true # ignored until existing lint errors are gone
+	hack/verify-govet.sh
 .PHONY: verify
 
 # Install travis dependencies
