@@ -10,11 +10,11 @@ if [[ -z $(echo "${GO_VERSION[2]}" | grep -E 'go1.[5-6]') ]]; then
   exit 0
 fi
 
-STI_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${STI_ROOT}/hack/common.sh"
-source "${STI_ROOT}/hack/util.sh"
+S2I_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${S2I_ROOT}/hack/common.sh"
+source "${S2I_ROOT}/hack/util.sh"
 
-cd "${STI_ROOT}"
+cd "${S2I_ROOT}"
 mkdir -p _output/govet
 
 FAILURE=false

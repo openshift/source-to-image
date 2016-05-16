@@ -2,8 +2,8 @@
 
 set -e
 
-STI_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${STI_ROOT}/hack/common.sh"
+S2I_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${S2I_ROOT}/hack/common.sh"
 
 GO_VERSION=($(go version))
 echo "Detected go version: $(go version)"

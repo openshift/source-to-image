@@ -1,51 +1,51 @@
 #!/bin/bash
 
 # This script provides common script functions for the hacks
-# Requires STI_ROOT to be set
+# Requires S2I_ROOT to be set
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
 # The root of the build/dist directory
-STI_ROOT=$(
+S2I_ROOT=$(
   unset CDPATH
   sti_root=$(dirname "${BASH_SOURCE}")/..
   cd "${sti_root}"
   pwd
 )
 
-STI_OUTPUT_SUBPATH="${STI_OUTPUT_SUBPATH:-_output/local}"
-STI_OUTPUT="${STI_ROOT}/${STI_OUTPUT_SUBPATH}"
-STI_OUTPUT_BINPATH="${STI_OUTPUT}/bin"
-STI_LOCAL_BINPATH="${STI_OUTPUT}/go/bin"
-STI_LOCAL_RELEASEPATH="${STI_OUTPUT}/releases"
+S2I_OUTPUT_SUBPATH="${S2I_OUTPUT_SUBPATH:-_output/local}"
+S2I_OUTPUT="${S2I_ROOT}/${S2I_OUTPUT_SUBPATH}"
+S2I_OUTPUT_BINPATH="${S2I_OUTPUT}/bin"
+S2I_LOCAL_BINPATH="${S2I_OUTPUT}/go/bin"
+S2I_LOCAL_RELEASEPATH="${S2I_OUTPUT}/releases"
 
-readonly STI_GO_PACKAGE=github.com/openshift/source-to-image
-readonly STI_GOPATH="${STI_OUTPUT}/go"
+readonly S2I_GO_PACKAGE=github.com/openshift/source-to-image
+readonly S2I_GOPATH="${S2I_OUTPUT}/go"
 
-readonly STI_CROSS_COMPILE_PLATFORMS=(
+readonly S2I_CROSS_COMPILE_PLATFORMS=(
   linux/amd64
   darwin/amd64
   windows/amd64
   linux/386
 )
-readonly STI_CROSS_COMPILE_TARGETS=(
+readonly S2I_CROSS_COMPILE_TARGETS=(
   cmd/s2i
 )
-readonly STI_CROSS_COMPILE_BINARIES=("${STI_CROSS_COMPILE_TARGETS[@]##*/}")
+readonly S2I_CROSS_COMPILE_BINARIES=("${S2I_CROSS_COMPILE_TARGETS[@]##*/}")
 
-readonly STI_ALL_TARGETS=(
-  "${STI_CROSS_COMPILE_TARGETS[@]}"
+readonly S2I_ALL_TARGETS=(
+  "${S2I_CROSS_COMPILE_TARGETS[@]}"
 )
 
-readonly STI_BINARY_SYMLINKS=(
+readonly S2I_BINARY_SYMLINKS=(
   sti
 )
-readonly STI_BINARY_COPY=(
+readonly S2I_BINARY_COPY=(
   sti
 )
-readonly STI_BINARY_RELEASE_WINDOWS=(
+readonly S2I_BINARY_RELEASE_WINDOWS=(
   sti.exe
   s2i.exe
 )
@@ -55,7 +55,7 @@ readonly STI_BINARY_RELEASE_WINDOWS=(
 s2i::build::binaries_from_targets() {
   local target
   for target; do
-    echo "${STI_GO_PACKAGE}/${target}"
+    echo "${S2I_GO_PACKAGE}/${target}"
   done
 }
 
@@ -71,7 +71,7 @@ s2i::build::host_platform() {
 # Input:
 #   $@ - targets and go flags.  If no targets are set then all binaries targets
 #     are built.
-#   STI_BUILD_PLATFORMS - Incoming variable of targets to build for.  If unset
+#   S2I_BUILD_PLATFORMS - Incoming variable of targets to build for.  If unset
 #     then just the host architecture is built.
 s2i::build::build_binaries() {
   # Create a sub-shell so that we don't pollute the outer environment
@@ -98,12 +98,12 @@ s2i::build::build_binaries() {
 }
 
 # Generates the set of target packages, binaries, and platforms to build for.
-# Accepts binaries via $@, and platforms via STI_BUILD_PLATFORMS, or defaults to
+# Accepts binaries via $@, and platforms via S2I_BUILD_PLATFORMS, or defaults to
 # the current platform.
 s2i::build::export_targets() {
   # Use eval to preserve embedded quoted strings.
   local goflags
-  eval "goflags=(${STI_GOFLAGS:-})"
+  eval "goflags=(${S2I_GOFLAGS:-})"
 
   targets=()
   local arg
@@ -117,12 +117,12 @@ s2i::build::export_targets() {
   done
 
   if [[ ${#targets[@]} -eq 0 ]]; then
-    targets=("${STI_ALL_TARGETS[@]}")
+    targets=("${S2I_ALL_TARGETS[@]}")
   fi
 
   binaries=($(s2i::build::binaries_from_targets "${targets[@]}"))
 
-  platforms=("${STI_BUILD_PLATFORMS[@]:+${STI_BUILD_PLATFORMS[@]}}")
+  platforms=("${S2I_BUILD_PLATFORMS[@]:+${S2I_BUILD_PLATFORMS[@]}}")
   if [[ ${#platforms[@]} -eq 0 ]]; then
     platforms=("$(s2i::build::host_platform)")
   fi
@@ -149,16 +149,16 @@ s2i::build::unset_platform_envs() {
 }
 
 
-# Create the GOPATH tree under $STI_ROOT
+# Create the GOPATH tree under $S2I_ROOT
 s2i::build::create_gopath_tree() {
-  local go_pkg_dir="${STI_GOPATH}/src/${STI_GO_PACKAGE}"
+  local go_pkg_dir="${S2I_GOPATH}/src/${S2I_GO_PACKAGE}"
   local go_pkg_basedir=$(dirname "${go_pkg_dir}")
 
   mkdir -p "${go_pkg_basedir}"
   rm -f "${go_pkg_dir}"
 
   # TODO: This symlink should be relative.
-  ln -s "${STI_ROOT}" "${go_pkg_dir}"
+  ln -s "${S2I_ROOT}" "${go_pkg_dir}"
 }
 
 
@@ -167,8 +167,8 @@ s2i::build::create_gopath_tree() {
 # good enough for the Kubernetes build.
 #
 # Input Vars:
-#   STI_EXTRA_GOPATH - If set, this is included in created GOPATH
-#   STI_NO_GODEPS - If set, we don't add 'Godeps/_workspace' to GOPATH
+#   S2I_EXTRA_GOPATH - If set, this is included in created GOPATH
+#   S2I_NO_GODEPS - If set, we don't add 'Godeps/_workspace' to GOPATH
 #
 # Output Vars:
 #   export GOPATH - A modified GOPATH to our created tree along with extra
@@ -206,17 +206,17 @@ EOF
     fi
   fi
 
-  GOPATH=${STI_GOPATH}
+  GOPATH=${S2I_GOPATH}
 
-  # Append STI_EXTRA_GOPATH to the GOPATH if it is defined.
-  if [[ -n ${STI_EXTRA_GOPATH:-} ]]; then
-    GOPATH="${GOPATH}:${STI_EXTRA_GOPATH}"
+  # Append S2I_EXTRA_GOPATH to the GOPATH if it is defined.
+  if [[ -n ${S2I_EXTRA_GOPATH:-} ]]; then
+    GOPATH="${GOPATH}:${S2I_EXTRA_GOPATH}"
   fi
 
-  # Append the tree maintained by `godep` to the GOPATH unless STI_NO_GODEPS
+  # Append the tree maintained by `godep` to the GOPATH unless S2I_NO_GODEPS
   # is defined.
-  if [[ -z ${STI_NO_GODEPS:-} ]]; then
-    GOPATH="${GOPATH}:${STI_ROOT}/Godeps/_workspace"
+  if [[ -z ${S2I_NO_GODEPS:-} ]]; then
+    GOPATH="${GOPATH}:${S2I_ROOT}/Godeps/_workspace"
   fi
   export GOPATH
 
@@ -225,13 +225,13 @@ EOF
 }
 
 # This will take binaries from $GOPATH/bin and copy them to the appropriate
-# place in ${STI_OUTPUT_BINDIR}
+# place in ${S2I_OUTPUT_BINDIR}
 #
-# If STI_RELEASE_ARCHIVE is set to a directory, it will have tar archives of
-# each STI_RELEASE_PLATFORMS created
+# If S2I_RELEASE_ARCHIVE is set to a directory, it will have tar archives of
+# each S2I_RELEASE_PLATFORMS created
 #
 # Ideally this wouldn't be necessary and we could just set GOBIN to
-# STI_OUTPUT_BINDIR but that won't work in the face of cross compilation.  'go
+# S2I_OUTPUT_BINDIR but that won't work in the face of cross compilation.  'go
 # install' will place binaries that match the host platform directly in $GOBIN
 # while placing cross compiled binaries into `platform_arch` subdirs.  This
 # complicates pretty much everything else we do around packaging and such.
@@ -242,9 +242,9 @@ s2i::build::place_bins() {
 
     echo "++ Placing binaries"
 
-    if [[ "${STI_RELEASE_ARCHIVE-}" != "" ]]; then
+    if [[ "${S2I_RELEASE_ARCHIVE-}" != "" ]]; then
       s2i::build::get_version_vars
-      mkdir -p "${STI_LOCAL_RELEASEPATH}"
+      mkdir -p "${S2I_LOCAL_RELEASEPATH}"
     fi
 
     s2i::build::export_targets "$@"
@@ -258,12 +258,12 @@ s2i::build::place_bins() {
       fi
 
       # Skip this directory if the platform has no binaries.
-      local full_binpath_src="${STI_GOPATH}/bin${platform_src}"
+      local full_binpath_src="${S2I_GOPATH}/bin${platform_src}"
       if [[ ! -d "${full_binpath_src}" ]]; then
         continue
       fi
 
-      mkdir -p "${STI_OUTPUT_BINPATH}/${platform}"
+      mkdir -p "${S2I_OUTPUT_BINPATH}/${platform}"
 
       # Create an array of binaries to release. Append .exe variants if the platform is windows.
       local -a binaries=()
@@ -276,20 +276,20 @@ s2i::build::place_bins() {
         fi
       done
 
-      # Move the specified release binaries to the shared STI_OUTPUT_BINPATH.
+      # Move the specified release binaries to the shared S2I_OUTPUT_BINPATH.
       for binary in "${binaries[@]}"; do
-        mv "${full_binpath_src}/${binary}" "${STI_OUTPUT_BINPATH}/${platform}/"
+        mv "${full_binpath_src}/${binary}" "${S2I_OUTPUT_BINPATH}/${platform}/"
       done
 
       # If no release archive was requested, we're done.
-      if [[ "${STI_RELEASE_ARCHIVE-}" == "" ]]; then
+      if [[ "${S2I_RELEASE_ARCHIVE-}" == "" ]]; then
         continue
       fi
 
       # Create a temporary bin directory containing only the binaries marked for release.
-      local release_binpath=$(mktemp -d sti.release.${STI_RELEASE_ARCHIVE}.XXX)
+      local release_binpath=$(mktemp -d sti.release.${S2I_RELEASE_ARCHIVE}.XXX)
       for binary in "${binaries[@]}"; do
-        cp "${STI_OUTPUT_BINPATH}/${platform}/${binary}" "${release_binpath}/"
+        cp "${S2I_OUTPUT_BINPATH}/${platform}/${binary}" "${release_binpath}/"
       done
 
       # Create binary copies where specified.
@@ -297,7 +297,7 @@ s2i::build::place_bins() {
       if [[ $platform == "windows/amd64" ]]; then
         suffix=".exe"
       fi
-      for linkname in "${STI_BINARY_COPY[@]}"; do
+      for linkname in "${S2I_BINARY_COPY[@]}"; do
         local src="${release_binpath}/s2i${suffix}"
         if [[ -f "${src}" ]]; then
           cp "${release_binpath}/s2i${suffix}" "${release_binpath}/${linkname}${suffix}"
@@ -307,15 +307,15 @@ s2i::build::place_bins() {
       # Create the release archive.
       local platform_segment="${platform//\//-}"
       if [[ $platform == "windows/amd64" ]]; then
-        local archive_name="${STI_RELEASE_ARCHIVE}-${STI_GIT_VERSION}-${STI_GIT_COMMIT}-${platform_segment}.zip"
+        local archive_name="${S2I_RELEASE_ARCHIVE}-${S2I_GIT_VERSION}-${S2I_GIT_COMMIT}-${platform_segment}.zip"
         echo "++ Creating ${archive_name}"
-        for file in "${STI_BINARY_RELEASE_WINDOWS[@]}"; do
-          zip "${STI_LOCAL_RELEASEPATH}/${archive_name}" -qj "${release_binpath}/${file}"
+        for file in "${S2I_BINARY_RELEASE_WINDOWS[@]}"; do
+          zip "${S2I_LOCAL_RELEASEPATH}/${archive_name}" -qj "${release_binpath}/${file}"
         done
       else
-        local archive_name="${STI_RELEASE_ARCHIVE}-${STI_GIT_VERSION}-${STI_GIT_COMMIT}-${platform_segment}.tar.gz"
+        local archive_name="${S2I_RELEASE_ARCHIVE}-${S2I_GIT_VERSION}-${S2I_GIT_COMMIT}-${platform_segment}.tar.gz"
         echo "++ Creating ${archive_name}"
-        tar -czf "${STI_LOCAL_RELEASEPATH}/${archive_name}" -C "${release_binpath}" .
+        tar -czf "${S2I_LOCAL_RELEASEPATH}/${archive_name}" -C "${release_binpath}" .
       fi
       rm -rf "${release_binpath}"
     done
@@ -326,51 +326,51 @@ s2i::build::place_bins() {
 # binary in _output/local/go/bin
 s2i::build::make_binary_symlinks() {
   platform=$(s2i::build::host_platform)
-  if [[ -f "${STI_OUTPUT_BINPATH}/${platform}/s2i" ]]; then
-    for linkname in "${STI_BINARY_SYMLINKS[@]}"; do
+  if [[ -f "${S2I_OUTPUT_BINPATH}/${platform}/s2i" ]]; then
+    for linkname in "${S2I_BINARY_SYMLINKS[@]}"; do
       if [[ $platform == "windows/amd64" ]]; then
-        cp s2i "${STI_OUTPUT_BINPATH}/${platform}/${linkname}.exe"
+        cp s2i "${S2I_OUTPUT_BINPATH}/${platform}/${linkname}.exe"
       else
-        ln -sf s2i "${STI_OUTPUT_BINPATH}/${platform}/${linkname}"
+        ln -sf s2i "${S2I_OUTPUT_BINPATH}/${platform}/${linkname}"
       fi
     done
   fi
 }
 
 # s2i::build::detect_local_release_tars verifies there is only one primary and one
-# image binaries release tar in STI_LOCAL_RELEASEPATH for the given platform specified by
+# image binaries release tar in S2I_LOCAL_RELEASEPATH for the given platform specified by
 # argument 1, exiting if more than one of either is found.
 #
 # If the tars are discovered, their full paths are exported to the following env vars:
 #
-#   STI_PRIMARY_RELEASE_TAR
+#   S2I_PRIMARY_RELEASE_TAR
 s2i::build::detect_local_release_tars() {
   local platform="$1"
 
-  if [[ ! -d "${STI_LOCAL_RELEASEPATH}" ]]; then
-    echo "There are no release artifacts in ${STI_LOCAL_RELEASEPATH}"
+  if [[ ! -d "${S2I_LOCAL_RELEASEPATH}" ]]; then
+    echo "There are no release artifacts in ${S2I_LOCAL_RELEASEPATH}"
     exit 2
   fi
-  if [[ ! -f "${STI_LOCAL_RELEASEPATH}/.commit" ]]; then
-    echo "There is no release .commit identifier ${STI_LOCAL_RELEASEPATH}"
+  if [[ ! -f "${S2I_LOCAL_RELEASEPATH}/.commit" ]]; then
+    echo "There is no release .commit identifier ${S2I_LOCAL_RELEASEPATH}"
     exit 2
   fi
-  local primary=$(find ${STI_LOCAL_RELEASEPATH} -maxdepth 1 -type f -name source-to-image-*-${platform}*)
+  local primary=$(find ${S2I_LOCAL_RELEASEPATH} -maxdepth 1 -type f -name source-to-image-*-${platform}*)
   if [[ $(echo "${primary}" | wc -l) -ne 1 ]]; then
-    echo "There should be exactly one ${platform} primary tar in $STI_LOCAL_RELEASEPATH"
+    echo "There should be exactly one ${platform} primary tar in $S2I_LOCAL_RELEASEPATH"
     exit 2
   fi
 
-  export STI_PRIMARY_RELEASE_TAR="${primary}"
-  export STI_RELEASE_COMMIT="$(cat ${STI_LOCAL_RELEASEPATH}/.commit)"
+  export S2I_PRIMARY_RELEASE_TAR="${primary}"
+  export S2I_RELEASE_COMMIT="$(cat ${S2I_LOCAL_RELEASEPATH}/.commit)"
 }
 
 
 # s2i::build::get_version_vars loads the standard version variables as
 # ENV vars
 s2i::build::get_version_vars() {
-  if [[ -n ${STI_VERSION_FILE-} ]]; then
-    source "${STI_VERSION_FILE}"
+  if [[ -n ${S2I_VERSION_FILE-} ]]; then
+    source "${S2I_VERSION_FILE}"
     return
   fi
   s2i::build::sti_version_vars
@@ -378,35 +378,35 @@ s2i::build::get_version_vars() {
 
 # s2i::build::sti_version_vars looks up the current Git vars
 s2i::build::sti_version_vars() {
-  local git=(git --work-tree "${STI_ROOT}")
+  local git=(git --work-tree "${S2I_ROOT}")
 
-  if [[ -n ${STI_GIT_COMMIT-} ]] || STI_GIT_COMMIT=$("${git[@]}" rev-parse --short "HEAD^{commit}" 2>/dev/null); then
-    if [[ -z ${STI_GIT_TREE_STATE-} ]]; then
+  if [[ -n ${S2I_GIT_COMMIT-} ]] || S2I_GIT_COMMIT=$("${git[@]}" rev-parse --short "HEAD^{commit}" 2>/dev/null); then
+    if [[ -z ${S2I_GIT_TREE_STATE-} ]]; then
       # Check if the tree is dirty.  default to dirty
       if git_status=$("${git[@]}" status --porcelain 2>/dev/null) && [[ -z ${git_status} ]]; then
-        STI_GIT_TREE_STATE="clean"
+        S2I_GIT_TREE_STATE="clean"
       else
-        STI_GIT_TREE_STATE="dirty"
+        S2I_GIT_TREE_STATE="dirty"
       fi
     fi
 
     # Use git describe to find the version based on annotated tags.
-    if [[ -n ${STI_GIT_VERSION-} ]] || STI_GIT_VERSION=$("${git[@]}" describe --tags "${STI_GIT_COMMIT}^{commit}" 2>/dev/null); then
-      if [[ "${STI_GIT_TREE_STATE}" == "dirty" ]]; then
+    if [[ -n ${S2I_GIT_VERSION-} ]] || S2I_GIT_VERSION=$("${git[@]}" describe --tags "${S2I_GIT_COMMIT}^{commit}" 2>/dev/null); then
+      if [[ "${S2I_GIT_TREE_STATE}" == "dirty" ]]; then
         # git describe --dirty only considers changes to existing files, but
         # that is problematic since new untracked .go files affect the build,
         # so use our idea of "dirty" from git status instead.
-        STI_GIT_VERSION+="-dirty"
+        S2I_GIT_VERSION+="-dirty"
       fi
 
       # Try to match the "git describe" output to a regex to try to extract
       # the "major" and "minor" versions and whether this is the exact tagged
       # version or whether the tree is between two tagged versions.
-      if [[ "${STI_GIT_VERSION}" =~ ^v([0-9]+)\.([0-9]+)([.-].*)?$ ]]; then
-        STI_GIT_MAJOR=${BASH_REMATCH[1]}
-        STI_GIT_MINOR=${BASH_REMATCH[2]}
+      if [[ "${S2I_GIT_VERSION}" =~ ^v([0-9]+)\.([0-9]+)([.-].*)?$ ]]; then
+        S2I_GIT_MAJOR=${BASH_REMATCH[1]}
+        S2I_GIT_MINOR=${BASH_REMATCH[2]}
         if [[ -n "${BASH_REMATCH[3]}" ]]; then
-          STI_GIT_MINOR+="+"
+          S2I_GIT_MINOR+="+"
         fi
       fi
     fi
@@ -422,11 +422,11 @@ s2i::build::save_version_vars() {
   }
 
   cat <<EOF >"${version_file}"
-STI_GIT_COMMIT='${STI_GIT_COMMIT-}'
-STI_GIT_TREE_STATE='${STI_GIT_TREE_STATE-}'
-STI_GIT_VERSION='${STI_GIT_VERSION-}'
-STI_GIT_MAJOR='${STI_GIT_MAJOR-}'
-STI_GIT_MINOR='${STI_GIT_MINOR-}'
+S2I_GIT_COMMIT='${S2I_GIT_COMMIT-}'
+S2I_GIT_TREE_STATE='${S2I_GIT_TREE_STATE-}'
+S2I_GIT_VERSION='${S2I_GIT_VERSION-}'
+S2I_GIT_MAJOR='${S2I_GIT_MAJOR-}'
+S2I_GIT_MINOR='${S2I_GIT_MINOR-}'
 EOF
 }
 
@@ -437,9 +437,9 @@ s2i::build::ldflag() {
 
   GO_VERSION=($(go version))
   if [[ -n $(echo "${GO_VERSION[2]}" | grep -E 'go1.4') ]]; then
-    echo "-X ${STI_GO_PACKAGE}/pkg/version.${key} ${val}"
+    echo "-X ${S2I_GO_PACKAGE}/pkg/version.${key} ${val}"
   else
-    echo "-X ${STI_GO_PACKAGE}/pkg/version.${key}=${val}"
+    echo "-X ${S2I_GO_PACKAGE}/pkg/version.${key}=${val}"
   fi
 }
 
@@ -451,15 +451,15 @@ s2i::build::ldflags() {
     set -o nounset
     set -o pipefail
 
-    cd "${STI_ROOT}"
+    cd "${S2I_ROOT}"
 
     s2i::build::get_version_vars
 
     declare -a ldflags=()
-    ldflags+=($(s2i::build::ldflag "majorFromGit" "${STI_GIT_MAJOR}"))
-    ldflags+=($(s2i::build::ldflag "minorFromGit" "${STI_GIT_MINOR}"))
-    ldflags+=($(s2i::build::ldflag "versionFromGit" "${STI_GIT_VERSION}"))
-    ldflags+=($(s2i::build::ldflag "commitFromGit" "${STI_GIT_COMMIT}"))
+    ldflags+=($(s2i::build::ldflag "majorFromGit" "${S2I_GIT_MAJOR}"))
+    ldflags+=($(s2i::build::ldflag "minorFromGit" "${S2I_GIT_MINOR}"))
+    ldflags+=($(s2i::build::ldflag "versionFromGit" "${S2I_GIT_VERSION}"))
+    ldflags+=($(s2i::build::ldflag "commitFromGit" "${S2I_GIT_COMMIT}"))
 
     # The -ldflags parameter takes a single string, so join the output.
     echo "${ldflags[*]-}"

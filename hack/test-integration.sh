@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-readonly STI_ROOT=$(dirname "${BASH_SOURCE}")/..
+readonly S2I_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 s2i::cleanup() {
   echo
@@ -24,4 +24,4 @@ echo
 echo "Running integration tests ..."
 echo
 
-STI_TIMEOUT="-timeout 600s" "${STI_ROOT}/hack/test-go.sh" test/integration -v -tags 'integration' "${@:1}"
+S2I_TIMEOUT="-timeout 600s" "${S2I_ROOT}/hack/test-go.sh" test/integration -v -tags 'integration' "${@:1}"

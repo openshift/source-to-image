@@ -6,7 +6,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-readonly STI_ROOT=$(dirname "${BASH_SOURCE}")/..
+readonly S2I_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 s2i::build_test_image() {
   local image_name="$1"
@@ -19,7 +19,7 @@ s2i::build_test_image() {
 
 (
   # Go to the top of the tree.
-  cd "${STI_ROOT}"
+  cd "${S2I_ROOT}"
 
   s2i::build_test_image sti-fake
   s2i::build_test_image sti-fake-env

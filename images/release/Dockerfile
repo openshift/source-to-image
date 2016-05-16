@@ -21,7 +21,7 @@ WORKDIR /go/src/github.com/openshift/source-to-image
 ENV GOARM 5
 ENV PATH $PATH:$GOROOT/bin:$GOPATH/bin
 
-ENV STI_VERSION_FILE /go/src/github.com/openshift/source-to-image/sti-version-defs
+ENV S2I_VERSION_FILE /go/src/github.com/openshift/source-to-image/sti-version-defs
 
 # Expect a tar with the source of STI (and /sti-version-defs in the root)
 CMD tar mxzf - && hack/build-cross.sh
