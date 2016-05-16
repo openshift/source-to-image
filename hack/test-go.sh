@@ -10,7 +10,7 @@ source "${STI_ROOT}/hack/common.sh"
 # Go to the top of the tree.
 cd "${STI_ROOT}"
 
-sti::build::setup_env
+s2i::build::setup_env
 
 find_test_dirs() {
   cd "${STI_ROOT}"

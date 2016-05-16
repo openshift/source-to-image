@@ -11,7 +11,7 @@ STARTTIME=$(date +%s)
 STI_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${STI_ROOT}/hack/common.sh"
 source "${STI_ROOT}/hack/util.sh"
-sti::log::install_errexit
+s2i::log::install_errexit
 
 # Go to the top of the tree.
 cd "${STI_ROOT}"
@@ -30,8 +30,8 @@ mkdir -p "${STI_OUTPUT}"
 
 # Generate version definitions.
 # You can commit a specific version by specifying STI_GIT_COMMIT="" prior to build
-sti::build::get_version_vars
-sti::build::save_version_vars "${context}/sti-version-defs"
+s2i::build::get_version_vars
+s2i::build::save_version_vars "${context}/sti-version-defs"
 
 echo "++ Building release ${STI_GIT_VERSION}"
 
