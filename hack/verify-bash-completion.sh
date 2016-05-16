@@ -4,10 +4,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-STI_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${STI_ROOT}/hack/common.sh"
+S2I_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${S2I_ROOT}/hack/common.sh"
 
-cd "${STI_ROOT}"
+cd "${S2I_ROOT}"
 
 mv contrib/bash/s2i contrib/bash/s2i-proposed
 hack/update-generated-completions.sh

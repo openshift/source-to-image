@@ -17,10 +17,10 @@ if [[ -z $(echo "${GO_VERSION[2]}" | grep -E 'go1.4|go1.5') ]]; then
   exit 0
 fi
 
-STI_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${STI_ROOT}/hack/common.sh"
+S2I_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${S2I_ROOT}/hack/common.sh"
 
-cd "${STI_ROOT}"
+cd "${S2I_ROOT}"
 
 arg="${1:-""}"
 bad_files=""
@@ -42,7 +42,7 @@ else
         -o -wholename '*/third_party/*' \
         -o -wholename '*/_output/*' \
       \) -prune \
-    \) -name '*.go' | sort -u | sed 's/^.{2}//' | xargs -n1 printf "${GOPATH}/src/${STI_GO_PACKAGE}/%s\n"
+    \) -name '*.go' | sort -u | sed 's/^.{2}//' | xargs -n1 printf "${GOPATH}/src/${S2I_GO_PACKAGE}/%s\n"
   }
   bad_files=$(find_files | xargs -n1 golint)
 fi

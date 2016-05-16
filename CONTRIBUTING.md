@@ -65,11 +65,11 @@ To run all tests with verbose output:
 
 To turn off or change the coverage mode, which is `-cover -covermode=atomic` by default, use:
 
-    $ STI_COVER="" hack/test-go.sh
+    $ S2I_COVER="" hack/test-go.sh
 
 To run tests without the go race detector, which is on by default, use:
 
-    $ STI_RACE="" hack/test-go.sh
+    $ S2I_RACE="" hack/test-go.sh
 
 A line coverage report is run by default when testing a single package.
 To create a coverage report for all packages:
