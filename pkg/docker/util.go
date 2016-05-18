@@ -16,8 +16,8 @@ import (
 	"github.com/openshift/source-to-image/pkg/util/user"
 )
 
-// DockerImageReference points to a Docker image.
-type DockerImageReference struct {
+// ImageReference points to a Docker image.
+type ImageReference struct {
 	Registry  string
 	Namespace string
 	Name      string
@@ -35,7 +35,7 @@ const (
 // image name and a given set of client authentication objects.
 func GetImageRegistryAuth(auths *client.AuthConfigurations, imageName string) client.AuthConfiguration {
 	glog.V(5).Infof("Getting docker credentials for %s", imageName)
-	spec, err := ParseDockerImageReference(imageName)
+	spec, err := ParseImageReference(imageName)
 	if err != nil {
 		glog.Errorf("Failed to parse docker reference %s", imageName)
 		return client.AuthConfiguration{}
@@ -95,13 +95,11 @@ func StreamContainerIO(errStream io.Reader, errOutput *string, log func(...inter
 	}
 }
 
-// ParseDockerImageReference parses a Docker pull spec string into a
-// DockerImageReference.
-// FIXME: This code was copied from OpenShift repository
-func ParseDockerImageReference(spec string) (DockerImageReference, error) {
-	var (
-		ref DockerImageReference
-	)
+// ParseImageReference parses a Docker pull spec string into a ImageReference.
+// FIXME: This code was copied from OpenShift repository.
+func ParseImageReference(spec string) (ImageReference, error) {
+	var ref ImageReference
+
 	// TODO replace with docker version once docker/docker PR11109 is merged upstream
 	stream, tag, id := parseRepositoryTag(spec)
 

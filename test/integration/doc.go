@@ -1,3 +1,2 @@
-// Package integration contains integration tests for STI
-
+// Package integration contains integration tests for S2I.
 package integration
