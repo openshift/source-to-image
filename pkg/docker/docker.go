@@ -12,7 +12,6 @@ import (
 	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
-	"github.com/golang/glog"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/errors"
@@ -276,14 +275,14 @@ func (d *stiDocker) UploadToContainer(src, dest, name string) error {
 		go func() {
 			defer w.Close()
 			if err := t.StreamDirAsTar(src, dest, w); err != nil {
-				glog.Errorf("Uploading directory to container failed: %v", err)
+				glog.V(0).Infof("error: Uploading directory to container failed: %v", err)
 			}
 		}()
 	} else {
 		go func() {
 			defer w.Close()
 			if err := t.StreamFileAsTar(src, filepath.Base(dest), w); err != nil {
-				glog.Errorf("Uploading files to container failed: %v", err)
+				glog.V(0).Infof("error: Uploading files to container failed: %v", err)
 			}
 		}()
 	}
@@ -353,7 +352,7 @@ func (d *stiDocker) CheckAndPullImage(name string) (*docker.Image, error) {
 		return nil, err
 	}
 	if image == nil {
-		glog.Infof("Image %q not available locally, pulling ...", name)
+		glog.V(0).Infof("Image %q not available locally, pulling ...", name)
 		return d.PullImage(name)
 	}
 
@@ -464,18 +463,18 @@ func getScriptsURL(image *docker.Image) string {
 	if len(scriptsURL) == 0 {
 		scriptsURL = getLabel(image, "io.s2i.scripts-url")
 		if len(scriptsURL) > 0 {
-			glog.Warningf("The 'io.s2i.scripts-url' label is deprecated. Use %q instead.", ScriptsURLLabel)
+			glog.V(0).Infof("warning: The 'io.s2i.scripts-url' label is deprecated. Use %q instead.", ScriptsURLLabel)
 		}
 	}
 	if len(scriptsURL) == 0 {
 		scriptsURL = getVariable(image, ScriptsURLEnvironment)
 		if len(scriptsURL) != 0 {
-			glog.Warningf("BuilderImage uses deprecated environment variable %s, please migrate it to %s label instead!",
+			glog.V(0).Infof("warning: BuilderImage uses deprecated environment variable %s, please migrate it to %s label instead!",
 				ScriptsURLEnvironment, ScriptsURLLabel)
 		}
 	}
 	if len(scriptsURL) == 0 {
-		glog.Warningf("Image does not contain a value for the %s label", ScriptsURLLabel)
+		glog.V(0).Infof("warning: Image does not contain a value for the %s label", ScriptsURLLabel)
 	} else {
 		glog.V(2).Infof("Image contains %s set to '%s'", ScriptsURLLabel, scriptsURL)
 	}
@@ -490,11 +489,11 @@ func getDestination(image *docker.Image) string {
 	}
 	// For backward compatibility, support the old label schema
 	if val := getLabel(image, "io.s2i.destination"); len(val) != 0 {
-		glog.Warningf("The 'io.s2i.destination' label is deprecated. Use %q instead.", DestinationLabel)
+		glog.V(0).Infof("warning: The 'io.s2i.destination' label is deprecated. Use %q instead.", DestinationLabel)
 		return val
 	}
 	if val := getVariable(image, LocationEnvironment); len(val) != 0 {
-		glog.Warningf("BuilderImage uses deprecated environment variable %s, please migrate it to %s label instead!",
+		glog.V(0).Infof("warning: BuilderImage uses deprecated environment variable %s, please migrate it to %s label instead!",
 			LocationEnvironment, DestinationLabel)
 		return val
 	}
@@ -572,7 +571,7 @@ func dumpContainerInfo(container *docker.Container, d *stiDocker, image string) 
 		}
 		liveports = liveports + "\n"
 	}
-	glog.Infof("\n\n\n\n\nThe image %s has been started in container %s as a result of the --run=true option.  The container's stdout/stderr will be redirected to this command's glog output to help you validate its behavior.  You can also inspect the container with docker commands if you like.  If the container is set up to stay running, you will have to Ctrl-C to exit this command, which should also stop the container %s.  This particular invocation attempts to run with the port mappings %+v \n\n\n\n\n", image, container.ID, container.ID, liveports)
+	glog.V(0).Infof("\n\n\n\n\nThe image %s has been started in container %s as a result of the --run=true option.  The container's stdout/stderr will be redirected to this command's glog output to help you validate its behavior.  You can also inspect the container with docker commands if you like.  If the container is set up to stay running, you will have to Ctrl-C to exit this command, which should also stop the container %s.  This particular invocation attempts to run with the port mappings %+v \n\n\n\n\n", image, container.ID, container.ID, liveports)
 }
 
 // RunContainer creates and starts a container using the image specified in opts
@@ -592,7 +591,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 		imageMetadata, err = d.client.InspectImage(image)
 	}
 	if err != nil {
-		glog.Errorf("Unable to get image metadata for %s: %v", image, err)
+		glog.V(0).Infof("error: Unable to get image metadata for %s: %v", image, err)
 		return err
 	}
 
@@ -622,7 +621,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 	removeContainer := func() {
 		glog.V(4).Infof("Removing container %q ...", containerName)
 		if err := d.RemoveContainer(container.ID); err != nil {
-			glog.Warningf("Failed to remove container %q: %v", containerName, err)
+			glog.V(0).Infof("warning: Failed to remove container %q: %v", containerName, err)
 		} else {
 			glog.V(4).Infof("Removed container %q", containerName)
 		}
@@ -641,7 +640,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 		attachOpts := opts.asDockerAttachToContainerOptions()
 		attachOpts.Container = container.ID
 		if _, err = d.client.AttachToContainerNonBlocking(attachOpts); err != nil {
-			glog.Errorf("Unable to attach to container %q with options %+v: %v", containerName, attachOpts, err)
+			glog.V(0).Infof("error: Unable to attach to container %q with options %+v: %v", containerName, attachOpts, err)
 			return err
 		}
 
@@ -699,7 +698,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 		}
 		// Run PostExec hook if defined.
 		if opts.PostExec != nil {
-			glog.V(2).Info("Invoking PostExecute function")
+			glog.V(2).Infof("Invoking PostExecute function")
 			if err = opts.PostExec.PostExecute(container.ID, tarDestination); err != nil {
 				return err
 			}
@@ -779,6 +778,6 @@ func (d *stiDocker) BuildImage(opts BuildImageOptions) error {
 		dockerOpts.CPUPeriod = opts.CGroupLimits.CPUPeriod
 		dockerOpts.CPUQuota = opts.CGroupLimits.CPUQuota
 	}
-	glog.V(2).Info("Building container using config: %+v", dockerOpts)
+	glog.V(2).Infof("Building container using config: %+v", dockerOpts)
 	return d.client.BuildImage(dockerOpts)
 }
