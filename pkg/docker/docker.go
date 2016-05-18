@@ -560,7 +560,7 @@ func dumpContainerInfo(container *docker.Container, d *stiDocker, image string) 
 	cont, icerr := d.client.InspectContainer(container.ID)
 	liveports := "\n\nPort Bindings:  "
 	if icerr == nil {
-		//Ports is of the follwing type:  map[docker.Port][]docker.PortBinding
+		// Ports is of the following type:  map[docker.Port][]docker.PortBinding
 		for port, bindings := range cont.NetworkSettings.Ports {
 			liveports = liveports + "\n  Container Port:  " + port.Port()
 			liveports = liveports + "\n        Protocol:  " + port.Proto()
@@ -698,7 +698,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 		}
 		// Run PostExec hook if defined.
 		if opts.PostExec != nil {
-			glog.V(2).Infof("Invoking postExecution function")
+			glog.V(2).Info("Invoking PostExecute function")
 			if err = opts.PostExec.PostExecute(container.ID, tarDestination); err != nil {
 				return err
 			}

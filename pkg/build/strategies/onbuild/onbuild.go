@@ -170,11 +170,11 @@ func (builder *OnBuild) copySTIScripts(config *api.Config) {
 	scriptsPath := filepath.Join(config.WorkingDir, "upload", "scripts")
 	sourcePath := filepath.Join(config.WorkingDir, "upload", "src")
 	if _, err := builder.fs.Stat(filepath.Join(scriptsPath, api.Run)); err == nil {
-		glog.V(3).Infof("Found S2I 'run' script, copying to application source dir")
+		glog.V(3).Info("Found S2I 'run' script, copying to application source dir")
 		builder.fs.Copy(filepath.Join(scriptsPath, api.Run), filepath.Join(sourcePath, api.Run))
 	}
 	if _, err := builder.fs.Stat(filepath.Join(scriptsPath, api.Assemble)); err == nil {
-		glog.V(3).Infof("Found S2I 'assemble' script, copying to application source dir")
+		glog.V(3).Info("Found S2I 'assemble' script, copying to application source dir")
 		builder.fs.Copy(filepath.Join(scriptsPath, api.Assemble), filepath.Join(sourcePath, api.Assemble))
 	}
 }
