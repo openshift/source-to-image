@@ -502,50 +502,57 @@ func getDestination(image *docker.Image) string {
 	return DefaultDestination
 }
 
-// this funtion simply abstracts out the tar related processing that was originally inline in RunContainer()
-func runContainerTar(opts RunContainerOptions, imageMetadata *docker.Image) (cmd []string, tarDestination string) {
-	if opts.TargetImage {
-		return
+func constructCommand(opts RunContainerOptions, imageMetadata *docker.Image, tarDestination string) []string {
+	// base directory for all S2I commands
+	commandBaseDir := determineCommandBaseDir(opts, imageMetadata, tarDestination)
+
+	// NOTE: We use path.Join instead of filepath.Join to avoid converting the
+	// path to UNC (Windows) format as we always run this inside container.
+	binaryToRun := path.Join(commandBaseDir, opts.Command)
+
+	// when calling assemble script with Stdin parameter set (the tar file)
+	// we need to first untar the whole archive and only then call the assemble script
+	if opts.Stdin != nil && (opts.Command == api.Assemble || opts.Command == api.Usage) {
+		untarAndRun := fmt.Sprintf("tar -C %s -xf - && %s", tarDestination, binaryToRun)
+
+		resultedCommand := untarAndRun
+		if opts.CommandOverrides != nil {
+			resultedCommand = opts.CommandOverrides(untarAndRun)
+		}
+		return []string{"/bin/sh", "-c", resultedCommand}
 	}
 
-	// base directory for all STI commands
-	var commandBaseDir string
-	// untar operation destination directory
-	tarDestination = opts.Destination
-	if len(tarDestination) == 0 {
-		tarDestination = getDestination(imageMetadata)
+	return []string{binaryToRun}
+}
+
+func determineTarDestinationDir(opts RunContainerOptions, imageMetadata *docker.Image) string {
+	if len(opts.Destination) != 0 {
+		return opts.Destination
 	}
+	return getDestination(imageMetadata)
+}
+
+func determineCommandBaseDir(opts RunContainerOptions, imageMetadata *docker.Image, tarDestination string) string {
 	if opts.ExternalScripts {
 		// for external scripts we must always append 'scripts' because this is
 		// the default subdirectory inside tar for them
 		// NOTE: We use path.Join instead of filepath.Join to avoid converting the
 		// path to UNC (Windows) format as we always run this inside container.
-		commandBaseDir = path.Join(tarDestination, "scripts")
 		glog.V(2).Infof("Both scripts and untarred source will be placed in '%s'", tarDestination)
-	} else {
-		// for internal scripts we can have separate path for scripts and untar operation destination
-		scriptsURL := opts.ScriptsURL
-		if len(scriptsURL) == 0 {
-			scriptsURL = getScriptsURL(imageMetadata)
-		}
-		commandBaseDir = strings.TrimPrefix(scriptsURL, "image://")
-		glog.V(2).Infof("Base directory for STI scripts is '%s'. Untarring destination is '%s'.",
-			commandBaseDir, tarDestination)
+		return path.Join(tarDestination, "scripts")
 	}
 
-	// NOTE: We use path.Join instead of filepath.Join to avoid converting the
-	// path to UNC (Windows) format as we always run this inside container.
-	cmd = []string{path.Join(commandBaseDir, string(opts.Command))}
-	// when calling assemble script with Stdin parameter set (the tar file)
-	// we need to first untar the whole archive and only then call the assemble script
-	if opts.Stdin != nil && (opts.Command == api.Assemble || opts.Command == api.Usage) {
-		cmd = []string{"/bin/sh", "-c", fmt.Sprintf("tar -C %s -xf - && %s", tarDestination, cmd[0])}
-		if opts.CommandOverrides != nil {
-			cmd = []string{"/bin/sh", "-c", opts.CommandOverrides(strings.Join(cmd[2:], " "))}
-		}
+	// for internal scripts we can have separate path for scripts and untar operation destination
+	scriptsURL := opts.ScriptsURL
+	if len(scriptsURL) == 0 {
+		scriptsURL = getScriptsURL(imageMetadata)
 	}
-	glog.V(5).Infof("Setting %q command for container ...", strings.Join(cmd, " "))
-	return cmd, tarDestination
+
+	commandBaseDir := strings.TrimPrefix(scriptsURL, "image://")
+	glog.V(2).Infof("Base directory for S2I scripts is '%s'. Untarring destination is '%s'.",
+		commandBaseDir, tarDestination)
+
+	return commandBaseDir
 }
 
 // dumpContainerInfo dumps information about a running container (port/IP/etc).
@@ -588,7 +595,13 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 		return err
 	}
 
-	cmd, tarDestination := runContainerTar(opts, imageMetadata)
+	var tarDestination string
+	var cmd []string
+	if !opts.TargetImage {
+		tarDestination = determineTarDestinationDir(opts, imageMetadata)
+		cmd = constructCommand(opts, imageMetadata, tarDestination)
+		glog.V(5).Infof("Setting %q command for container ...", strings.Join(cmd, " "))
+	}
 	createOpts.Config.Cmd = cmd
 
 	// Create a new container.
