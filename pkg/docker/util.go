@@ -10,11 +10,16 @@ import (
 	"strings"
 
 	client "github.com/fsouza/go-dockerclient"
-	"github.com/golang/glog"
+
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/errors"
+	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 	"github.com/openshift/source-to-image/pkg/util/user"
 )
+
+// glog is a placeholder until the builders pass an output stream down
+// client facing libraries should not be using glog
+var glog = utilglog.ToFile(os.Stderr, 2)
 
 // ImageReference points to a Docker image.
 type ImageReference struct {
@@ -37,7 +42,7 @@ func GetImageRegistryAuth(auths *client.AuthConfigurations, imageName string) cl
 	glog.V(5).Infof("Getting docker credentials for %s", imageName)
 	spec, err := ParseImageReference(imageName)
 	if err != nil {
-		glog.Errorf("Failed to parse docker reference %s", imageName)
+		glog.V(0).Infof("error: Failed to parse docker reference %s", imageName)
 		return client.AuthConfiguration{}
 	}
 
@@ -57,7 +62,7 @@ func GetImageRegistryAuth(auths *client.AuthConfigurations, imageName string) cl
 func LoadImageRegistryAuth(dockerCfg io.Reader) *client.AuthConfigurations {
 	auths, err := client.NewAuthConfigurations(dockerCfg)
 	if err != nil {
-		glog.Error("Unable to load docker config")
+		glog.V(0).Infof("error: Unable to load docker config")
 		return nil
 	}
 	return auths
@@ -68,7 +73,7 @@ func LoadImageRegistryAuth(dockerCfg io.Reader) *client.AuthConfigurations {
 func LoadAndGetImageRegistryAuth(dockerCfg io.Reader, imageName string) client.AuthConfiguration {
 	auths, err := client.NewAuthConfigurations(dockerCfg)
 	if err != nil {
-		glog.Error("Unable to load docker config")
+		glog.V(0).Infof("error: Unable to load docker config")
 		return client.AuthConfiguration{}
 	}
 	return GetImageRegistryAuth(auths, imageName)
@@ -83,8 +88,8 @@ func StreamContainerIO(errStream io.Reader, errOutput *string, log func(...inter
 		if err != nil {
 			// we're ignoring ErrClosedPipe, as this is information
 			// the docker container ended streaming logs
-			if glog.V(2) && err != io.ErrClosedPipe && err != io.EOF {
-				glog.Errorf("Error reading docker stderr, %v", err)
+			if glog.Is(2) && err != io.ErrClosedPipe && err != io.EOF {
+				glog.V(0).Infof("error: Error reading docker stderr, %v", err)
 			}
 			break
 		}
