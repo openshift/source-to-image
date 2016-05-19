@@ -71,7 +71,7 @@ s2i::log::error_exit() {
   exit "${code}"
 }
 
-os::util::sed() {
+s2i::util::sed() {
   if [[ "$(go env GOHOSTOS)" == "darwin" ]]; then
     sed -i '' $@
   else
@@ -79,13 +79,6 @@ os::util::sed() {
   fi
 }
 
-find_files() {
-  find . -not \( \
-      \( \
-        -wholename './_output' \
-        -o -wholename './_tools' \
-        -o -wholename './.*' \
-        -o -wholename '*/Godeps/*' \
-      \) -prune \
-    \) -name '*.go' | sort -u
+s2i::util::find_files() {
+  find . -type d -name Godeps -prune -o -name '*.go' -print
 }

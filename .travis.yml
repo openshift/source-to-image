@@ -1,13 +1,14 @@
 language: go
 
 go:
-  - 1.5.3
-  - 1.6
+  - 1.5.4
+  - 1.6.2
 
 install:
   - make install-travis
 
 script:
+  - make verify
   - make check TESTFLAGS="-p=4" TESTS="''" # empty quotes are because hack/test-go.sh requires 2 args
 
 notifications:

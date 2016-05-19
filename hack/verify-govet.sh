@@ -1,28 +1,21 @@
 #!/bin/bash
 
+set -o errexit
 set -o nounset
 set -o pipefail
 
-GO_VERSION=($(go version))
-
-if [[ -z $(echo "${GO_VERSION[2]}" | grep -E 'go1.[5-6]') ]]; then
-  echo "Unknown go version '${GO_VERSION}', skipping go vet."
-  exit 0
-fi
+echo $(go version)
 
 S2I_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${S2I_ROOT}/hack/common.sh"
 source "${S2I_ROOT}/hack/util.sh"
 
 cd "${S2I_ROOT}"
-mkdir -p _output/govet
 
 FAILURE=false
-test_dirs=$(find_files | cut -d '/' -f 1-2 | sort -u)
+test_dirs=$(s2i::util::find_files | cut -d '/' -f 1-2 | sort -u)
 for test_dir in $test_dirs
 do
-  go vet -shadow=false $test_dir
-  if [ "$?" -ne 0 ]
+  if ! go tool vet -shadow=false -composites=false $test_dir
   then
     FAILURE=true
   fi
