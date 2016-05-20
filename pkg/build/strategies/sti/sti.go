@@ -145,10 +145,7 @@ func (builder *STI) Build(config *api.Config) (*api.Result, error) {
 	}
 
 	if builder.incremental = builder.artifacts.Exists(config); builder.incremental {
-		tag := config.IncrementalFromTag
-		if len(tag) == 0 {
-			tag = config.Tag
-		}
+		tag := firstNonEmpty(config.IncrementalFromTag, config.Tag)
 		glog.V(1).Infof("Existing image for tag %s detected for incremental build", tag)
 	} else {
 		glog.V(1).Info("Clean build will be performed")
@@ -293,11 +290,7 @@ func (builder *STI) PostExecute(containerID, location string) error {
 	builder.result.Success = true
 	builder.result.ImageID = imageID
 
-	if len(builder.config.Tag) > 0 {
-		glog.V(1).Infof("Successfully built %s", builder.config.Tag)
-	} else {
-		glog.V(1).Infof("Successfully built %s", imageID)
-	}
+	glog.V(1).Infof("Successfully built %s", firstNonEmpty(builder.config.Tag, imageID))
 
 	builder.removePreviousImage(previousImageID)
 	builder.invokeCallbackUrl(labels)
@@ -397,10 +390,7 @@ func (builder *STI) Exists(config *api.Config) bool {
 		policy = api.DefaultPreviousImagePullPolicy
 	}
 
-	tag := config.IncrementalFromTag
-	if len(tag) == 0 {
-		tag = config.Tag
-	}
+	tag := firstNonEmpty(config.IncrementalFromTag, config.Tag)
 
 	result, err := dockerpkg.PullImage(tag, builder.incrementalDocker, policy, false)
 	if err != nil {
@@ -419,10 +409,8 @@ func (builder *STI) Save(config *api.Config) (err error) {
 		return err
 	}
 
-	image := config.IncrementalFromTag
-	if len(image) == 0 {
-		image = config.Tag
-	}
+	image := firstNonEmpty(config.IncrementalFromTag, config.Tag)
+
 	outReader, outWriter := io.Pipe()
 	defer outReader.Close()
 	defer outWriter.Close()
@@ -647,4 +635,13 @@ func includes(arr []string, str string) bool {
 		}
 	}
 	return false
+}
+
+func firstNonEmpty(args ...string) string {
+	for _, value := range args {
+		if len(value) > 0 {
+			return value
+		}
+	}
+	return ""
 }
