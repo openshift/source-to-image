@@ -1,6 +1,10 @@
 package test
 
-import "github.com/fsouza/go-dockerclient"
+import (
+	"errors"
+
+	"github.com/fsouza/go-dockerclient"
+)
 
 // FakeDockerClient provides a Fake client for Docker testing
 type FakeDockerClient struct {
@@ -86,6 +90,11 @@ func (d *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConf
 
 func (d *FakeDockerClient) UploadToContainer(id string, opts docker.UploadToContainerOptions) error {
 	return nil
+}
+
+// DownloadFromContainer downloads file (or directory) from the container.
+func (d *FakeDockerClient) DownloadFromContainer(id string, opts docker.DownloadFromContainerOptions) error {
+	return errors.New("not implemented")
 }
 
 // WaitContainer waits for a fake container to finish

@@ -1,7 +1,9 @@
 package test
 
 import (
+	"errors"
 	"io"
+	"path/filepath"
 	"regexp"
 	"sync"
 )
@@ -56,8 +58,18 @@ func (f *FakeTar) StreamFileAsTar(string, string, io.Writer) error {
 	return nil
 }
 
+// StreamFileAsTarWithCallback streams a single file as a TAR archive into specified writer.
+func (f *FakeTar) StreamFileAsTarWithCallback(source, name string, writer io.Writer, walkFn filepath.WalkFunc, modifyInplace bool) error {
+	return errors.New("not implemented")
+}
+
 func (f *FakeTar) StreamDirAsTar(string, string, io.Writer) error {
 	return nil
+}
+
+// StreamDirAsTarWithCallback streams a directory as a TAR archive into specified writer.
+func (f *FakeTar) StreamDirAsTarWithCallback(source string, writer io.Writer, walkFn filepath.WalkFunc, modifyInplace bool) error {
+	return errors.New("not implemented")
 }
 
 func (f *FakeTar) CreateTarStreamWithLogging(dir string, includeDirInPath bool, writer io.Writer, logger io.Writer) error {
