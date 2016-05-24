@@ -9,7 +9,7 @@ MAINTAINER Victor Palade <ipalade@redhat.com>
 # Replace this with the according version for your application.
 ENV NGINX_VERSION=1.6.3
 
-# Set the labels that are used for Openshift to describe the builder image.
+# Set the labels that are used for OpenShift to describe the builder image.
 LABEL io.k8s.description="Nginx Webserver" \
     io.k8s.display-name="Nginx 1.6.3" \
     io.openshift.expose-services="8080:http" \
