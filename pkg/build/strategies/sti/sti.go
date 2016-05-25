@@ -270,7 +270,10 @@ func mergeLabels(newLabels, existingLabels map[string]string) map[string]string 
 // finishes.
 func (builder *STI) PostExecute(containerID, location string) error {
 
-	previousImageID := builder.getPreviousImage()
+	var previousImageID string
+	if builder.incremental && builder.config.RemovePreviousImage {
+		previousImageID = builder.getPreviousImage()
+	}
 
 	buildEnv := builder.createBuildEnvironment()
 	runCmd := builder.createCommandForResultingImage(location)
@@ -292,7 +295,10 @@ func (builder *STI) PostExecute(containerID, location string) error {
 
 	glog.V(1).Infof("Successfully built %s", firstNonEmpty(builder.config.Tag, imageID))
 
-	builder.removePreviousImage(previousImageID)
+	if builder.incremental && builder.config.RemovePreviousImage {
+		builder.removePreviousImage(previousImageID)
+	}
+
 	builder.invokeCallbackUrl(labels)
 
 	return nil
@@ -301,7 +307,7 @@ func (builder *STI) PostExecute(containerID, location string) error {
 func (builder *STI) getPreviousImage() string {
 	previousImageID, err := builder.docker.GetImageID(builder.config.Tag)
 	if err != nil {
-		glog.V(0).Infof("error: Error retrieving previous image's metadata: %v", err)
+		glog.V(0).Infof("error: Error retrieving previous image's (%v) metadata: %v", builder.config.Tag, err)
 		return ""
 	}
 	return previousImageID
@@ -360,7 +366,7 @@ func (builder *STI) commitContainer(containerID, cmd, user string, env []string,
 }
 
 func (builder *STI) removePreviousImage(previousImageID string) {
-	if !builder.incremental || !builder.config.RemovePreviousImage || previousImageID == "" {
+	if previousImageID == "" {
 		return
 	}
 
