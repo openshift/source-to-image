@@ -7,59 +7,45 @@
 [![Travis](https://travis-ci.org/openshift/source-to-image.svg?branch=master)](https://travis-ci.org/openshift/source-to-image)
 [![License](https://img.shields.io/github/license/openshift/source-to-image.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
 
-Source-to-Image (`S2I`) is a tool for building reproducible Docker images. `S2I` produces
-ready-to-run images by injecting source code into a Docker image and *assembling*
-a new Docker image for the application.  The result is then ready to use with `docker run`. 
+Source-to-Image (S2I) is a toolkit and workflow for building reproducible Docker images from source code. S2I produces
+ready-to-run images by injecting source code into a Docker container and letting the container prepare that source code for execution. By creating these self-assembling **builder images**, you can version and control your build environments exactly like you use Docker images to version your runtime environments.
 
-The basic flow is:
+### How Source-to-Image works
 
-1. Start with a ruby builder image which contains ruby, bundler, rake, apache, gcc, etc, all of which are needed to install and run ruby code.  
-1. Launch a container using the builder image and injects the provided source code into a working directory within the container.
-1. The container then transforms that source code into the appropriate runnable setup - in this case, by installing dependencies and moving the source code into a directory where Apache has been preconfigured to look for a Ruby application.
+For a dynamic language like Ruby, the build-time and run-time environments are the same. Starting with a **builder image** that describes this environment - with Ruby, Bundler, Rake, Apache, GCC, and other packages needed to set up and run a Ruby application installed - source-to-image performs the following steps:
+
+1. Start a container from the builder image with the application source injected into a known directory
+1. The container process transforms that source code into the appropriate runnable setup - in this case, by installing dependencies with Bundler and moving the source code into a directory where Apache has been preconfigured to look for the Ruby `config.ru` file.
 1. Commit the new container and set the image entrypoint to be a script (provided by the builder image) that will start Apache to host the Ruby application.
 
-There are two primary patterns when building images:
-* Produce an application image which includes all development/build tooling used to assemble the application as well as the runtime environment needed to execute the application.
-* Produce an application image which only contains the final runnable application and the runtime environment.
+For compiled languages like Java, C, or Golang, the dependencies necessary for compilation might dramatically outweigh the actual runtime artifacts. To keep runtime images slim, S2I enables multiple-step build processes, where a binary artifact such as an executable or Java WAR file is created in the first builder image, extracted, and injected into an second image that simply places the executable in the correct location for execution.  
 
-The first pattern is appropriate for dynamic languages which typically need the same tools for building as execution.  The second can be used for compiled languages such as Java when it is undesirable to include build tools such as `javac` and `maven` in the runtime image.  Including build tools in the application image results in a self-contained image which can fully reproduce the application using the exact tools that originally created it.  More sophisticated flows make it possible to separate those two images into one image containing build inputs, build tools, and built artifacts and another image containing the built artifacts (provided as "source") and the runtime environment.
+For example, to create a reproducible build pipeline for Tomcat (the popular Java webserver) and Maven:
 
-Try [building your own application image](#getting-started).
+1. Create a builder image containing OpenJDK and Tomcat that expects to have a WAR file injected
+2. Create a second image that layers on top of the first image Maven and any other standard dependencies, and expects to have a Maven project injected
+3. Invoke source-to-image using the Java application source and the Maven image to create the desired application WAR
+4. Invoke source-to-image a second time using the WAR file from the previous step and the Tomcat image to create the runtime image
 
-## Philosophy
+By placing our build logic inside of images, and by combining the images into multiple steps, we can keep our runtime environment close to our build environment (same JDK, same Tomcat JARs) without requiring build tools to be deployed to production.
 
-1. Simplify the process of application source + builder image -> usable image for most use cases (the
-   80%)
-1. Define and implement a workflow for incremental builds that eventually uses only Docker
-   primitives
-1. Develop tooling that can assist in verifying that two different builder images result in the same
-   `docker run` outcome for the same input
-1. Use native Docker primitives to accomplish this - map out useful improvements to Docker that
-   benefit all image builders
-1. Allow users to build new application images in a controlled, secure, restricted environment
+Learn more about [building your own images](#getting-started).
 
-## Codified Image Construction Patterns
 
-### Image flexibility   
-S2I scripts can be written to inject application code into almost any existing Docker image, taking advantage of the existing image ecosystem.
-
-### Speed   
-With S2I, the assemble process can perform a large number of complex operations without creating a new layer at each step, resulting in a fast process. In addition, S2I scripts can be written to re-use artifacts stored in a previous version of the application image, rather than having to download or build them each time the build is run.
-
-### Patchability  
-S2I allows you to rebuild the application in a consistent way if an underlying image needs a patch due to a security issue.
-
-### Operational security  
-Building an arbitrary Dockerfile exposes the host system to root privilege escalation. This can be exploited by a malicious user because the entire Docker build process is run as a user with Docker privileges. S2I restricts the operations that can be performed as a root user and can run user
-supplied build scripts as a non-root user.  Furthermore, operations teams can supply whitelisted builder images which will not perform
-arbitrary actions such as installing random packages or downloading content from untrusted sources.
-
-### Ecosystem
-S2I encourages a shared ecosystem of images where you can leverage best practices for your applications and build processes.
+## Goals
 
 ### Reproducibility
-Produced images can include all inputs used to produce the image, ensuring the image can be reproduced precisely including the versions
-of build tools and dependencies.
+Allow build environments to be tightly versioned by encapsulating them within a Docker image and defining a simple interface (injected source code) for callers.
+
+### Flexibility   
+The scripts that process the application source code can be injected into the builder image, allowing an author to adapt existing images.
+
+### Speed   
+Instead of building multiple layers in a single Dockerfile, S2I encourages (and benefits from) authors to set up an application in a single image layer. This is both more powerful and faster than classic multi-layer builds.
+
+### Security  
+Dockerfiles are run without many of the normal operational controls of containers, usually running as root and having access to the container network. S2I can be used to control what permissions and privileges are available to the builder image since the build is launched in a single container. In concert with platforms like OpenShift, source-to-image can enable admins to tightly control what privileges developers have at build time.
+
 
 ## Anatomy of a builder image
 
