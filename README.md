@@ -1,21 +1,32 @@
-# source-to-image (s2i)
+# Source-To-Image (S2I)
+
+## Overview
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/openshift/source-to-image)](https://goreportcard.com/report/github.com/openshift/source-to-image)
 [![GoDoc](https://godoc.org/github.com/openshift/source-to-image?status.png)](https://godoc.org/github.com/openshift/source-to-image)
 [![Travis](https://travis-ci.org/openshift/source-to-image.svg?branch=master)](https://travis-ci.org/openshift/source-to-image)
 [![License](https://img.shields.io/github/license/openshift/source-to-image.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
 
-Source-to-image (`s2i`) is a tool for building reproducible Docker images. `s2i` produces
+Source-to-Image (`S2I`) is a tool for building reproducible Docker images. `S2I` produces
 ready-to-run images by injecting source code into a Docker image and *assembling*
-a new Docker image which incorporates the builder image and built source.  The result is then ready to use
-with `docker run`. `s2i` supports incremental builds which re-use previously downloaded
-dependencies, previously built artifacts, etc.
+a new Docker image for the application.  The result is then ready to use with `docker run`. 
 
-Interested in learning more? Read on!
+The basic flow is:
 
-Want to just get started now? Check out the [instructions](#getting-started).
+1. Start with a ruby builder image which contains ruby, bundler, rake, apache, gcc, etc, all of which are needed to install and run ruby code.  
+1. Launch a container using the builder image and injects the provided source code into a working directory within the container.
+1. The container then transforms that source code into the appropriate runnable setup - in this case, by installing dependencies and moving the source code into a directory where Apache has been preconfigured to look for a Ruby application.
+1. Commit the new container and set the image entrypoint to be a script (provided by the builder image) that will start Apache to host the Ruby application.
 
-# Philosophy
+There are two primary patterns when building images:
+* Produce an application image which includes all development/build tooling used to assemble the application as well as the runtime environment needed to execute the application.
+* Produce an application image which only contains the final runnable application and the runtime environment.
+
+The first pattern is appropriate for dynamic languages which typically need the same tools for building as execution.  The second can be used for compiled languages such as Java when it is undesirable to include build tools such as `javac` and `maven` in the runtime image.  Including build tools in the application image results in a self-contained image which can fully reproduce the application using the exact tools that originally created it.  More sophisticated flows make it possible to separate those two images into one image containing build inputs, build tools, and built artifacts and another image containing the built artifacts (provided as "source") and the runtime environment.
+
+Try [building your own application image](#getting-started).
+
+## Philosophy
 
 1. Simplify the process of application source + builder image -> usable image for most use cases (the
    80%)
@@ -25,9 +36,32 @@ Want to just get started now? Check out the [instructions](#getting-started).
    `docker run` outcome for the same input
 1. Use native Docker primitives to accomplish this - map out useful improvements to Docker that
    benefit all image builders
+1. Allow users to build new application images in a controlled, secure, restricted environment
 
+## Codified Image Construction Patterns
 
-# Anatomy of a builder image
+### Image flexibility   
+S2I scripts can be written to inject application code into almost any existing Docker image, taking advantage of the existing image ecosystem.
+
+### Speed   
+With S2I, the assemble process can perform a large number of complex operations without creating a new layer at each step, resulting in a fast process. In addition, S2I scripts can be written to re-use artifacts stored in a previous version of the application image, rather than having to download or build them each time the build is run.
+
+### Patchability  
+S2I allows you to rebuild the application in a consistent way if an underlying image needs a patch due to a security issue.
+
+### Operational security  
+Building an arbitrary Dockerfile exposes the host system to root privilege escalation. This can be exploited by a malicious user because the entire Docker build process is run as a user with Docker privileges. S2I restricts the operations that can be performed as a root user and can run user
+supplied build scripts as a non-root user.  Furthermore, operations teams can supply whitelisted builder images which will not perform
+arbitrary actions such as installing random packages or downloading content from untrusted sources.
+
+### Ecosystem
+S2I encourages a shared ecosystem of images where you can leverage best practices for your applications and build processes.
+
+### Reproducibility
+Produced images can include all inputs used to produce the image, ensuring the image can be reproduced precisely including the versions
+of build tools and dependencies.
+
+## Anatomy of a builder image
 
 Creating builder images is easy. `s2i` looks for you to supply the following scripts to use with an
 image:
@@ -42,7 +76,7 @@ to have `/bin/sh` and `tar` commands available.
 
 See a practical tutorial on how to create a builder image [here](examples/README.md) and read [this](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md) for a detailed description of the requirements and scripts along with examples of builder images.
 
-# Build workflow
+## Build workflow
 
 The `s2i build` workflow is:
 
@@ -104,7 +138,7 @@ FOO=bar
 
 In this case, the value of `FOO` environment variable will be set to `bar`.
 
-# Using ONBUILD images
+## Using ONBUILD images
 
 In case you want to use one of the official Docker language stack images for
 your build you don't have do anything extra. S2I is capable of recognizing the
@@ -118,7 +152,7 @@ this build strategy you will have to provide one. You can either include the 'ru
 specify a valid S2I script URL and the 'run' script will be fetched and set as
 an entrypoint in that case.
 
-## Incremental builds
+### Incremental builds
 
 `s2i` automatically detects:
 
@@ -139,14 +173,14 @@ If a `save-artifacts` script exists, a prior image already exists, and the `--in
 **NOTE**: The `save-artifacts` script is responsible for streaming out dependencies in a tar file.
 
 
-# Dependencies
+## Dependencies
 
 1. [Docker](http://www.docker.io) >= 1.6
 1. [Go](http://golang.org/) >= 1.4
 1. (optional) [Git](https://git-scm.com/)
 
 
-# Installation
+## Installation
 
 Assuming Go and Docker are installed and configured, execute the following commands:
 
@@ -157,7 +191,7 @@ $ export PATH=$PATH:${GOPATH}/src/github.com/openshift/source-to-image/_output/l
 $ hack/build-go.sh
 ```
 
-# Security
+## Security
 
 Since the `s2i` command uses the Docker client library, it has to run in the same
 security context as the `docker` command. For some systems, it is enough to add
@@ -171,7 +205,7 @@ If you are using the `sudo docker` command already, then you will have to also u
 Be aware that being a member of the 'docker' group effectively grants root access,
 as described [here](https://github.com/docker/docker/issues/9976).
 
-# Getting Started
+## Getting Started
 
 You can start using `s2i` right away (see [releases](https://github.com/openshift/source-to-image/releases))
 with the following test sources and publicly available images:
