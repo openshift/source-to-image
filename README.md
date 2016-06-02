@@ -8,7 +8,7 @@
 [![License](https://img.shields.io/github/license/openshift/source-to-image.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
 
 Source-to-Image (S2I) is a toolkit and workflow for building reproducible Docker images from source code. S2I produces
-ready-to-run images by injecting source code into a Docker container and letting the container prepare that source code for execution. By creating these self-assembling **builder images**, you can version and control your build environments exactly like you use Docker images to version your runtime environments.
+ready-to-run images by injecting source code into a Docker container and letting the container prepare that source code for execution. By creating self-assembling **builder images**, you can version and control your build environments exactly like you use Docker images to version your runtime environments.
 
 ### How Source-to-Image works
 
@@ -25,7 +25,7 @@ For example, to create a reproducible build pipeline for Tomcat (the popular Jav
 1. Create a builder image containing OpenJDK and Tomcat that expects to have a WAR file injected
 2. Create a second image that layers on top of the first image Maven and any other standard dependencies, and expects to have a Maven project injected
 3. Invoke source-to-image using the Java application source and the Maven image to create the desired application WAR
-4. Invoke source-to-image a second time using the WAR file from the previous step and the Tomcat image to create the runtime image
+4. Invoke source-to-image a second time using the WAR file from the previous step and the initial Tomcat image to create the runtime image
 
 By placing our build logic inside of images, and by combining the images into multiple steps, we can keep our runtime environment close to our build environment (same JDK, same Tomcat JARs) without requiring build tools to be deployed to production.
 
@@ -35,13 +35,13 @@ Learn more about [building your own images](#getting-started).
 ## Goals
 
 ### Reproducibility
-Allow build environments to be tightly versioned by encapsulating them within a Docker image and defining a simple interface (injected source code) for callers.
+Allow build environments to be tightly versioned by encapsulating them within a Docker image and defining a simple interface (injected source code) for callers. Reproducible builds are a key requirement to enabling security updates and continuous integration in containerized infrastructure, and builder images help ensure repeatability as well as the ability to swap runtimes.
 
 ### Flexibility   
-The scripts that process the application source code can be injected into the builder image, allowing an author to adapt existing images.
+Any existing build system that can run on Linux can be run inside of a container, and each individual builder can also be part of a larger pipeline. In addition, the scripts that process the application source code can be injected into the builder image, allowing authors to adapt existing images to enable source handling. 
 
 ### Speed   
-Instead of building multiple layers in a single Dockerfile, S2I encourages (and benefits from) authors to set up an application in a single image layer. This is both more powerful and faster than classic multi-layer builds.
+Instead of building multiple layers in a single Dockerfile, S2I encourages authors to represent an application in a single image layer. This saves time during creation and deployment, and allows for better control over the output of the final image.
 
 ### Security  
 Dockerfiles are run without many of the normal operational controls of containers, usually running as root and having access to the container network. S2I can be used to control what permissions and privileges are available to the builder image since the build is launched in a single container. In concert with platforms like OpenShift, source-to-image can enable admins to tightly control what privileges developers have at build time.
