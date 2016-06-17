@@ -30,7 +30,7 @@ const (
 	LocationEnvironment = "STI_LOCATION"
 
 	// ScriptsURLLabel is the name of the Docker image LABEL that tells S2I where
-	// to look for the S2I scripts. This label is also copied into the ouput
+	// to look for the S2I scripts. This label is also copied into the output
 	// image.
 	// The previous name of this label was 'io.s2i.scripts-url'. This is now
 	// deprecated.
@@ -445,7 +445,7 @@ func getVariable(image *docker.Image, name string) string {
 	return ""
 }
 
-// GetScriptsURL finds a scripts-url label in the given image's metadata
+// GetScriptsURL finds a scripts-url label on the given image.
 func (d *stiDocker) GetScriptsURL(image string) (string, error) {
 	imageMetadata, err := d.CheckAndPullImage(image)
 	if err != nil {
@@ -463,20 +463,21 @@ func getScriptsURL(image *docker.Image) string {
 	if len(scriptsURL) == 0 {
 		scriptsURL = getLabel(image, "io.s2i.scripts-url")
 		if len(scriptsURL) > 0 {
-			glog.V(0).Infof("warning: The 'io.s2i.scripts-url' label is deprecated. Use %q instead.", ScriptsURLLabel)
+			glog.V(0).Infof("warning: Image %s uses deprecated label 'io.s2i.scripts-url', please migrate it to %s instead!",
+				image.ID, ScriptsURLLabel)
 		}
 	}
 	if len(scriptsURL) == 0 {
 		scriptsURL = getVariable(image, ScriptsURLEnvironment)
 		if len(scriptsURL) != 0 {
-			glog.V(0).Infof("warning: BuilderImage uses deprecated environment variable %s, please migrate it to %s label instead!",
-				ScriptsURLEnvironment, ScriptsURLLabel)
+			glog.V(0).Infof("warning: Image %s uses deprecated environment variable %s, please migrate it to %s label instead!",
+				image.ID, ScriptsURLEnvironment, ScriptsURLLabel)
 		}
 	}
 	if len(scriptsURL) == 0 {
-		glog.V(0).Infof("warning: Image does not contain a value for the %s label", ScriptsURLLabel)
+		glog.V(0).Infof("warning: Image %s does not contain a value for the %s label", image.ID, ScriptsURLLabel)
 	} else {
-		glog.V(2).Infof("Image contains %s set to '%s'", ScriptsURLLabel, scriptsURL)
+		glog.V(2).Infof("Image %s contains %s set to %q", image.ID, ScriptsURLLabel, scriptsURL)
 	}
 
 	return scriptsURL
@@ -489,12 +490,13 @@ func getDestination(image *docker.Image) string {
 	}
 	// For backward compatibility, support the old label schema
 	if val := getLabel(image, "io.s2i.destination"); len(val) != 0 {
-		glog.V(0).Infof("warning: The 'io.s2i.destination' label is deprecated. Use %q instead.", DestinationLabel)
+		glog.V(0).Infof("warning: Image %s uses deprecated label 'io.s2i.destination', please migrate it to %s instead!",
+			image.ID, DestinationLabel)
 		return val
 	}
 	if val := getVariable(image, LocationEnvironment); len(val) != 0 {
-		glog.V(0).Infof("warning: BuilderImage uses deprecated environment variable %s, please migrate it to %s label instead!",
-			LocationEnvironment, DestinationLabel)
+		glog.V(0).Infof("warning: Image %s uses deprecated environment variable %s, please migrate it to %s label instead!",
+			image.ID, LocationEnvironment, DestinationLabel)
 		return val
 	}
 
