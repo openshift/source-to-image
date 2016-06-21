@@ -347,16 +347,30 @@ func (d *stiDocker) GetOnBuild(name string) ([]string, error) {
 // and returns the image metadata
 func (d *stiDocker) CheckAndPullImage(name string) (*docker.Image, error) {
 	name = getImageName(name)
+	displayName := name
+
+	if !glog.Is(3) {
+		// For less verbose log levels (less than 3), shorten long iamge names like:
+		//     "centos/php-56-centos7@sha256:51c3e2b08bd9fadefccd6ec42288680d6d7f861bdbfbd2d8d24960621e4e27f5"
+		// to include just enough characters to differentiate the build from others in the docker repository:
+		//     "centos/php-56-centos7@sha256:51c3e2b08bd..."
+		// 18 characters is somewhat arbitrary, but should be enough to avoid a name collision.
+		split := strings.Split(name, "@")
+		if len(split) > 1 && len(split[1]) > 18 {
+			displayName = split[0] + "@" + split[1][:18] + "..."
+		}
+	}
+
 	image, err := d.CheckImage(name)
 	if err != nil && err.(errors.Error).Details != docker.ErrNoSuchImage {
 		return nil, err
 	}
 	if image == nil {
-		glog.V(0).Infof("Image %q not available locally, pulling ...", name)
+		glog.V(1).Infof("Image %q not available locally, pulling ...", displayName)
 		return d.PullImage(name)
 	}
 
-	glog.V(1).Infof("Using locally available image %q", name)
+	glog.V(1).Infof("Using locally available image %q", displayName)
 	return image, nil
 }
 
