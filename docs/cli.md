@@ -24,7 +24,7 @@ at common flags that can be used with all of the subcommands.
 
 #### Log levels
 
-There are four log levels:
+There are six log levels:
 * Level `0` - produces output from containers running `assemble` script and all encountered errors
 * Level `1` - produces basic information about the executed process
 * Level `2` - produces very detailed information about the executed process

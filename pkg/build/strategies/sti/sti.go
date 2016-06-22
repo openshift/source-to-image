@@ -35,8 +35,8 @@ var (
 	}
 )
 
-// STI strategy executes the STI build.
-// For more details about STI, visit https://github.com/openshift/source-to-image
+// STI strategy executes the S2I build.
+// For more details about S2I, visit https://github.com/openshift/source-to-image
 type STI struct {
 	config            *api.Config
 	result            *api.Result

@@ -1,2 +1,2 @@
-// Package version supplies version information for STI collected at build time.
+// Package version supplies version information for S2I collected at build time.
 package version

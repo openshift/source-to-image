@@ -17,7 +17,7 @@ type DockerRunner struct {
 	ContainerClient docker.Docker
 }
 
-// New creates a DockerRunner for executing the methods assoicated with running
+// New creates a DockerRunner for executing the methods associated with running
 // the produced image in a docker container for verification purposes.
 func New(config *api.Config) (*DockerRunner, error) {
 	client, err := docker.New(config.DockerConfig, config.PullAuthentication)
