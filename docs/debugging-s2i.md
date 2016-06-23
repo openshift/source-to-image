@@ -86,7 +86,7 @@ Properly reference the script location with the methods described in the above l
 At various points when executing ONBUILD instructions (these are defined in the Dockerfile of the builder image you are using with s2i), if those instructions result in the need for root user access, but your builder image is not configured to run as root,
 then attempts to reference that image in another Dockerfile will result in permission errors.
 
-If you consider the following Dockerfile psuedo-example:
+If you consider the following Dockerfile pseudo-example:
 
 ```
 FROM foo

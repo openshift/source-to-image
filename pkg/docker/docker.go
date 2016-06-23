@@ -72,7 +72,7 @@ type Docker interface {
 	BuildImage(opts BuildImageOptions) error
 	GetImageUser(name string) (string, error)
 	GetLabels(name string) (map[string]string, error)
-	UploadToContainer(srcPath, destPath, name string) error
+	UploadToContainer(srcPath, destPath, container string) error
 	Ping() error
 }
 
@@ -260,7 +260,7 @@ func (d *stiDocker) GetImageWorkdir(name string) (string, error) {
 // out the WORKDIR of the image that the container was created from and use that
 // as a destination. If the WORKDIR is not set, then we copy files into "/"
 // folder (docker upload default).
-func (d *stiDocker) UploadToContainer(src, dest, name string) error {
+func (d *stiDocker) UploadToContainer(src, dest, container string) error {
 	path := filepath.Dir(dest)
 	f, err := os.Open(src)
 	if err != nil {
@@ -288,7 +288,7 @@ func (d *stiDocker) UploadToContainer(src, dest, name string) error {
 	}
 	glog.V(3).Infof("Uploading %q to %q ...", src, path)
 	opts := docker.UploadToContainerOptions{Path: path, InputStream: r}
-	return d.client.UploadToContainer(name, opts)
+	return d.client.UploadToContainer(container, opts)
 }
 
 // IsImageInLocalRegistry determines whether the supplied image is in the local registry.

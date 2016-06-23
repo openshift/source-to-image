@@ -14,7 +14,7 @@ import (
 // DefaultConfigPath specifies the default location of the S2I config file
 const DefaultConfigPath = ".s2ifile"
 
-// Config represents a basic serialization for the STI build options
+// Config represents a basic serialization for the S2I build options.
 type Config struct {
 	Source       string            `json:"source" yaml:"source"`
 	BuilderImage string            `json:"builderImage" yaml:"builderImage"`
@@ -22,7 +22,7 @@ type Config struct {
 	Flags        map[string]string `json:"flags,omitempty" yaml:"flags,omitempty"`
 }
 
-// Save persists the STI command line arguments into disk
+// Save persists the S2I command line arguments into disk.
 func Save(config *api.Config, cmd *cobra.Command) {
 	c := Config{
 		BuilderImage: config.BuilderImage,
