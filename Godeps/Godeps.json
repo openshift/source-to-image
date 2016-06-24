@@ -1,7 +1,7 @@
 {
 	"ImportPath": "github.com/openshift/source-to-image",
 	"GoVersion": "go1.4.2",
-	"GodepVersion": "v62",
+	"GodepVersion": "v60",
 	"Packages": [
 		"./..."
 	],
@@ -95,7 +95,7 @@
 		},
 		{
 			"ImportPath": "github.com/golang/glog",
-			"Rev": "d1c4472bf2efd3826f2b5bdcc02d8416798d678c"
+			"Rev": "23def4e6c14b4da8ac2ed8007337bc5eb5007998"
 		},
 		{
 			"ImportPath": "github.com/russross/blackfriday",
