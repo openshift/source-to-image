@@ -12,10 +12,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/util"
+	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 )
+
+var glog = utilglog.StderrLog
 
 // Git is an interface used by main STI code to extract/checkout git repositories
 type Git interface {

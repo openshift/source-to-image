@@ -390,7 +390,7 @@ func (d *stiDocker) CheckAndPullImage(name string) (*docker.Image, error) {
 		return d.PullImage(name)
 	}
 
-	glog.V(1).Infof("Using locally available image %q", displayName)
+	glog.V(3).Infof("Using locally available image %q", displayName)
 	return image, nil
 }
 

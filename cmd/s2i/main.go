@@ -11,7 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	log "github.com/golang/glog"
+	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -31,6 +32,10 @@ import (
 	"github.com/openshift/source-to-image/pkg/util"
 	"github.com/openshift/source-to-image/pkg/version"
 )
+
+// glog is a placeholder until the builders pass an output stream down
+// client facing libraries should not be using glog
+var glog = utilglog.StderrLog
 
 func newCmdVersion() *cobra.Command {
 	return &cobra.Command{
@@ -60,9 +65,7 @@ $ s2i build git://github.com/openshift/ruby-hello-world centos/ruby-22-centos7 h
 $ s2i build . centos/ruby-22-centos7 hello-world-app
 `,
 		Run: func(cmd *cobra.Command, args []string) {
-			if glog.V(1) {
-				glog.Infof("Running S2I version %q\n", version.Get())
-			}
+			glog.V(1).Infof("Running S2I version %q\n", version.Get())
 
 			// Attempt to restore the build command from the configuration file
 			if useConfig {
@@ -134,9 +137,7 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 				cfg.Destination = oldDestination
 			}
 
-			if glog.V(2) {
-				fmt.Printf("\n%s\n", describe.DescribeConfig(cfg))
-			}
+			glog.V(2).Infof("\n%s\n", describe.DescribeConfig(cfg))
 
 			if !docker.IsReachable(cfg) {
 				glog.Fatalf("Unable to connect to Docker daemon. Please set the DOCKER_HOST or make sure the Docker socket %q exists", cfg.DockerConfig.Endpoint)
@@ -227,9 +228,7 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 				cfg.PreviousImagePullPolicy = api.DefaultPreviousImagePullPolicy
 			}
 
-			if glog.V(2) {
-				fmt.Printf("\n%s\n", describe.DescribeConfig(cfg))
-			}
+			glog.V(2).Infof("\n%s\n", describe.DescribeConfig(cfg))
 
 			builder, err := strategies.GetStrategy(cfg)
 			checkErr(err)
@@ -324,13 +323,16 @@ func newCmdUsage(cfg *api.Config) *cobra.Command {
 	return usageCmd
 }
 
+// setupGlog makes --loglevel reflect in glog's -v flag
 func setupGlog(flags *pflag.FlagSet) {
+
 	from := flag.CommandLine
 	if fflag := from.Lookup("v"); fflag != nil {
-		level := fflag.Value.(*glog.Level)
-		levelPtr := (*int32)(level)
-		flags.Int32Var(levelPtr, "loglevel", 0, "Set the level of log output (0-5)")
+		level := fflag.Value.(*log.Level)
+		loglevelPtr := (*int32)(level)
+		flags.Int32Var(loglevelPtr, "loglevel", 0, "Set the level of log output (0-5)")
 	}
+
 	// FIXME currently glog has only option to redirect output to stderr
 	// the preferred for S2I would be to redirect to stdout
 	flag.CommandLine.Set("logtostderr", "true")
@@ -358,8 +360,13 @@ func checkErr(err error) {
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
+
+	// Applying partial glog flag initialization workaround from: https://github.com/kubernetes/kubernetes/issues/17162
+	// Without this fake command line parse, glog will compain its flags have not been interpreted
+	flag.CommandLine.Parse([]string{})
+
 	cfg := &api.Config{}
-	stiCmd := &cobra.Command{
+	s2iCmd := &cobra.Command{
 		Use: "s2i",
 		Long: "Source-to-image (S2I) is a tool for building repeatable docker images.\n\n" +
 			"A command line interface that injects and assembles source code into a docker image.\n" +
@@ -369,18 +376,16 @@ func main() {
 		},
 	}
 	cfg.DockerConfig = docker.GetDefaultDockerConfig()
-	stiCmd.PersistentFlags().StringVarP(&(cfg.DockerConfig.Endpoint), "url", "U", cfg.DockerConfig.Endpoint, "Set the url of the docker socket to use")
-	stiCmd.PersistentFlags().StringVar(&(cfg.DockerConfig.CertFile), "cert", cfg.DockerConfig.CertFile, "Set the path of the docker TLS certificate file")
-	stiCmd.PersistentFlags().StringVar(&(cfg.DockerConfig.KeyFile), "key", cfg.DockerConfig.KeyFile, "Set the path of the docker TLS key file")
-	stiCmd.PersistentFlags().StringVar(&(cfg.DockerConfig.CAFile), "ca", cfg.DockerConfig.CAFile, "Set the path of the docker TLS ca file")
-
-	stiCmd.AddCommand(newCmdVersion())
-	stiCmd.AddCommand(newCmdBuild(cfg))
-	stiCmd.AddCommand(newCmdRebuild(cfg))
-	stiCmd.AddCommand(newCmdUsage(cfg))
-	stiCmd.AddCommand(newCmdCreate())
-	setupGlog(stiCmd.PersistentFlags())
-
+	s2iCmd.PersistentFlags().StringVarP(&(cfg.DockerConfig.Endpoint), "url", "U", cfg.DockerConfig.Endpoint, "Set the url of the docker socket to use")
+	s2iCmd.PersistentFlags().StringVar(&(cfg.DockerConfig.CertFile), "cert", cfg.DockerConfig.CertFile, "Set the path of the docker TLS certificate file")
+	s2iCmd.PersistentFlags().StringVar(&(cfg.DockerConfig.KeyFile), "key", cfg.DockerConfig.KeyFile, "Set the path of the docker TLS key file")
+	s2iCmd.PersistentFlags().StringVar(&(cfg.DockerConfig.CAFile), "ca", cfg.DockerConfig.CAFile, "Set the path of the docker TLS ca file")
+	s2iCmd.AddCommand(newCmdVersion())
+	s2iCmd.AddCommand(newCmdBuild(cfg))
+	s2iCmd.AddCommand(newCmdRebuild(cfg))
+	s2iCmd.AddCommand(newCmdUsage(cfg))
+	s2iCmd.AddCommand(newCmdCreate())
+	setupGlog(s2iCmd.PersistentFlags())
 	basename := filepath.Base(os.Args[0])
 	// Make case-insensitive and strip executable suffix if present
 	if runtime.GOOS == "windows" {
@@ -391,8 +396,9 @@ func main() {
 		glog.Warning("sti binary is deprecated, use s2i instead")
 	}
 
-	stiCmd.AddCommand(newCmdGenBashCompletion(stiCmd))
-	err := stiCmd.Execute()
+	s2iCmd.AddCommand(newCmdGenBashCompletion(s2iCmd))
+
+	err := s2iCmd.Execute()
 	if err != nil {
 		os.Exit(1)
 	}

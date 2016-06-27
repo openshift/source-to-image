@@ -5,11 +5,13 @@ package run
 import (
 	"io"
 
-	"github.com/golang/glog"
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/errors"
+	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 )
+
+var glog = utilglog.StderrLog
 
 // A DockerRunner allows running a Docker image as a new container, streaming
 // stdout and stderr with glog.
