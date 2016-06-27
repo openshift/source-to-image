@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -355,6 +357,7 @@ func checkErr(err error) {
 }
 
 func main() {
+	rand.Seed(time.Now().UnixNano())
 	cfg := &api.Config{}
 	stiCmd := &cobra.Command{
 		Use: "s2i",

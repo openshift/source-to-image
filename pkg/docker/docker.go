@@ -3,6 +3,7 @@ package docker
 import (
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"path"
 	"path/filepath"
@@ -51,6 +52,25 @@ const (
 	// timeout is reached, certain Docker API calls might error out.
 	DefaultDockerTimeout = 20 * time.Second
 )
+
+// containerNamePrefix prefixes the name of containers launched by S2I. We
+// cannot reuse the prefix "k8s" because we don't want the containers to be
+// managed by a kubelet.
+const containerNamePrefix = "s2i"
+
+// containerName creates names for Docker containers launched by S2I. It is
+// meant to resemble Kubernetes' pkg/kubelet/dockertools.BuildDockerName.
+func containerName(image string) string {
+	uid := fmt.Sprintf("%08x", rand.Uint32())
+	// Replace invalid characters for container name with underscores.
+	image = strings.Map(func(r rune) rune {
+		if ('0' <= r && r <= '9') || ('A' <= r && r <= 'Z') || ('a' <= r && r <= 'z') {
+			return r
+		}
+		return '_'
+	}, image)
+	return fmt.Sprintf("%s_%s_%s", containerNamePrefix, image, uid)
+}
 
 // Docker is the interface between STI and the Docker client
 // It contains higher level operations called from the STI
@@ -171,7 +191,7 @@ func (rco RunContainerOptions) asDockerCreateContainerOptions() docker.CreateCon
 	config := rco.asDockerConfig()
 	hostConfig := rco.asDockerHostConfig()
 	return docker.CreateContainerOptions{
-		Name:       "",
+		Name:       containerName(rco.Image),
 		Config:     &config,
 		HostConfig: &hostConfig,
 	}
