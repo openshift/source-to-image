@@ -5,11 +5,13 @@ import (
 
 	"encoding/json"
 
-	"github.com/golang/glog"
 	"github.com/openshift/source-to-image/pkg/api"
+	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
+
+var glog = utilglog.StderrLog
 
 // DefaultConfigPath specifies the default location of the S2I config file
 const DefaultConfigPath = ".s2ifile"

@@ -5,9 +5,11 @@ import (
 	"runtime"
 	"text/template"
 
-	"github.com/golang/glog"
 	"github.com/openshift/source-to-image/pkg/create/templates"
+	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 )
+
+var glog = utilglog.StderrLog
 
 // Bootstrap defines parameters for the template processing
 type Bootstrap struct {
