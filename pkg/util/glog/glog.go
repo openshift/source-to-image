@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 
 	log "github.com/golang/glog"
 )
@@ -34,6 +35,7 @@ type VerboseLogger interface {
 // any other output to glog (no matter what the level is).
 func ToFile(x io.Writer, level int32) Logger {
 	return &FileLogger{
+		&sync.Mutex{},
 		bufio.NewWriter(x),
 		level,
 	}
@@ -63,6 +65,7 @@ func (discard) Fatal(_ ...interface{})                 {}
 // FileLogger logs the provided messages at level or below to the writer, or delegates
 // to glog.
 type FileLogger struct {
+	mutex *sync.Mutex
 	w     *bufio.Writer
 	level int32
 }
@@ -116,12 +119,15 @@ func (f *FileLogger) writeln(sev severity, line string) {
 	if log.V(log.Level(f.level + 1)) {
 		severity.delegateFn(3, line)
 	} else {
-		defer f.w.Flush()
+		// buf.io is not threadsafe, so serialize access to the stream
+		f.mutex.Lock()
+		defer f.mutex.Unlock()
 		f.w.WriteString(severity.prefix)
 		f.w.WriteString(line)
 		if !strings.HasSuffix(line, "\n") {
 			f.w.WriteByte('\n')
 		}
+		f.w.Flush()
 	}
 }
 
