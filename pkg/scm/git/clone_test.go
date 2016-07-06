@@ -19,7 +19,7 @@ func TestCloneWithContext(t *testing.T) {
 		Source:           "https://foo/bar.git",
 		ContextDir:       "subdir",
 		Ref:              "ref1",
-		DisableRecursive: true,
+		IgnoreSubmodules: true,
 	}
 	info, err := c.Download(fakeConfig)
 	if err != nil {

@@ -82,9 +82,9 @@ type Config struct {
 	// PreserveWorkingDir describes if working directory should be left after processing.
 	PreserveWorkingDir bool
 
-	// DisableRecursive disables the --recursive option for the git clone that
-	// allows to use the Git without requiring the git submodule to be called.
-	DisableRecursive bool
+	// IgnoreSubmodules determines whether we will attempt to pull in submodules
+	// (via --recursive or submodule init)
+	IgnoreSubmodules bool
 
 	// Source URL describing the location of sources used to build the result image.
 	Source string
