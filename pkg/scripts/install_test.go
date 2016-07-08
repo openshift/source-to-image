@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	dockerClient "github.com/fsouza/go-dockerclient"
 	"github.com/openshift/source-to-image/pkg/api"
 	dockerpkg "github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/test"
@@ -263,7 +262,7 @@ func TestInstallRequiredFromInvalidURL(t *testing.T) {
 
 func TestNewInstaller(t *testing.T) {
 	docker := &dockerpkg.FakeDocker{DefaultURLResult: "image://docker"}
-	inst := NewInstaller("test-image", "http://foo.bar", nil, docker, dockerClient.AuthConfiguration{})
+	inst := NewInstaller("test-image", "http://foo.bar", nil, docker, api.AuthConfig{})
 	sources := inst.(*DefaultScriptSourceManager).sources
 	firstHandler, ok := sources[0].(*URLScriptHandler)
 	if !ok {

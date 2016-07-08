@@ -1,146 +1,60 @@
 package test
 
 import (
-	"errors"
-
-	"github.com/fsouza/go-dockerclient"
+	dockertypes "github.com/docker/engine-api/types"
+	"golang.org/x/net/context"
+	"io"
 )
 
-// FakeDockerClient provides a Fake client for Docker testing
+// FakeDockerClient provides a Fake client for Docker testing, but for our direct access to the engine-api client;
+// we leverage the FakeDockerClient defined in k8s when we leverage the k8s layer
 type FakeDockerClient struct {
-	Image                *docker.Image
-	InspectImageResult   []*docker.Image
-	Container            *docker.Container
-	RemoveImageErr       error
-	InspectImageErr      []error
-	PullImageErr         error
-	CreateContainerErr   error
-	AttachToContainerErr error
-	StartContainerErr    error
-	WaitContainerResult  int
-	WaitContainerErr     error
-	RemoveContainerErr   error
-	CommitContainerErr   error
-	CopyFromContainerErr error
-	BuildImageErr        error
+	CopyToContainerID      string
+	CopyToContainerPath    string
+	CopyToContainerContent io.Reader
+	CopyToContainerOpts    dockertypes.CopyToContainerOptions
+	CopyToContainerErr     error
 
-	RemoveImageName          string
-	InspectImageName         []string
-	PullImageOpts            docker.PullImageOptions
-	PullImageAuth            docker.AuthConfiguration
-	CreateContainerOpts      docker.CreateContainerOptions
-	AttachToContainerOpts    []docker.AttachToContainerOptions
-	StartContainerID         string
-	StartContainerHostConfig *docker.HostConfig
-	WaitContainerID          string
-	RemoveContainerOpts      docker.RemoveContainerOptions
-	CommitContainerOpts      docker.CommitContainerOptions
-	CopyFromContainerOpts    docker.CopyFromContainerOptions
-	BuildImageOpts           docker.BuildImageOptions
-}
+	WaitContainerID     string
+	WaitContainerResult int
+	WaitContainerErr    error
 
-// RemoveImage removes an image from the fake client
-func (d *FakeDockerClient) RemoveImage(name string) error {
-	d.RemoveImageName = name
-	return d.RemoveImageErr
+	ContainerCommitID       string
+	ContainerCommitOptions  dockertypes.ContainerCommitOptions
+	ContainerCommitResponse dockertypes.ContainerCommitResponse
+	ContainerCommitErr      error
+
+	BuildContext       io.Reader
+	BuildImageOpts     dockertypes.ImageBuildOptions
+	BuildImageResponse dockertypes.ImageBuildResponse
+	BuildImageErr      error
 }
 
 func (d *FakeDockerClient) Ping() error {
 	return nil
 }
 
-// InspectImage inspects the fake image
-func (d *FakeDockerClient) InspectImage(name string) (*docker.Image, error) {
-	d.InspectImageName = append(d.InspectImageName, name)
-	i := len(d.InspectImageName) - 1
-	var img *docker.Image
-	if i >= len(d.InspectImageResult) {
-		img = d.Image
-	} else {
-		img = d.InspectImageResult[i]
-	}
-	var err error
-	if i >= len(d.InspectImageErr) {
-		err = nil
-	} else {
-		err = d.InspectImageErr[i]
-	}
-	return img, err
-}
-
-// PullImage pulls the fake image
-func (d *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
-	d.PullImageOpts = opts
-	d.PullImageAuth = auth
-	return d.PullImageErr
-}
-
-// CreateContainer creates a fake container
-func (d *FakeDockerClient) CreateContainer(opts docker.CreateContainerOptions) (*docker.Container, error) {
-	d.CreateContainerOpts = opts
-	return d.Container, d.CreateContainerErr
-}
-
-// StartContainer starts the fake container
-func (d *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConfig) error {
-	d.StartContainerID = id
-	d.StartContainerHostConfig = hostConfig
-	return d.StartContainerErr
-}
-
-func (d *FakeDockerClient) UploadToContainer(id string, opts docker.UploadToContainerOptions) error {
+func (d *FakeDockerClient) CopyToContainer(ctx context.Context, container, path string, content io.Reader, opts dockertypes.CopyToContainerOptions) error {
 	return nil
 }
 
-// DownloadFromContainer downloads file (or directory) from the container.
-func (d *FakeDockerClient) DownloadFromContainer(id string, opts docker.DownloadFromContainerOptions) error {
-	return errors.New("not implemented")
+func (d *FakeDockerClient) CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, dockertypes.ContainerPathStat, error) {
+	return nil, dockertypes.ContainerPathStat{}, nil
 }
 
-// WaitContainer waits for a fake container to finish
-func (d *FakeDockerClient) WaitContainer(id string) (int, error) {
-	d.WaitContainerID = id
+func (d *FakeDockerClient) ContainerWait(ctx context.Context, containerID string) (int, error) {
+	d.WaitContainerID = containerID
 	return d.WaitContainerResult, d.WaitContainerErr
 }
 
-// RemoveContainer removes the fake container
-func (d *FakeDockerClient) RemoveContainer(opts docker.RemoveContainerOptions) error {
-	d.RemoveContainerOpts = opts
-	return d.RemoveContainerErr
+func (d *FakeDockerClient) ContainerCommit(ctx context.Context, container string, options dockertypes.ContainerCommitOptions) (dockertypes.ContainerCommitResponse, error) {
+	d.ContainerCommitID = container
+	d.ContainerCommitOptions = options
+	return d.ContainerCommitResponse, d.ContainerCommitErr
 }
 
-// CommitContainer commits the fake container
-func (d *FakeDockerClient) CommitContainer(opts docker.CommitContainerOptions) (*docker.Image, error) {
-	d.CommitContainerOpts = opts
-	return d.Image, d.CommitContainerErr
-}
-
-// CopyFromContainer copies from the fake container
-func (d *FakeDockerClient) CopyFromContainer(opts docker.CopyFromContainerOptions) error {
-	d.CopyFromContainerOpts = opts
-	return d.CopyFromContainerErr
-}
-
-// BuildImage builds image
-func (d *FakeDockerClient) BuildImage(opts docker.BuildImageOptions) error {
-	d.BuildImageOpts = opts
-	return d.BuildImageErr
-}
-
-func (d *FakeDockerClient) InspectContainer(id string) (*docker.Container, error) {
-	return nil, d.BuildImageErr
-}
-
-func (d *FakeDockerClient) AttachToContainerNonBlocking(opts docker.AttachToContainerOptions) (docker.CloseWaiter, error) {
-	return fakeCloseWait{}, nil
-}
-
-type fakeCloseWait struct{}
-
-func (cw fakeCloseWait) Close() error {
-	return nil
-}
-
-func (cw fakeCloseWait) Wait() error {
-	return nil
+func (d *FakeDockerClient) ImageBuild(ctx context.Context, buildContext io.Reader, options dockertypes.ImageBuildOptions) (dockertypes.ImageBuildResponse, error) {
+	d.BuildImageOpts = options
+	d.BuildContext = buildContext
+	return d.BuildImageResponse, d.BuildImageErr
 }

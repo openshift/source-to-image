@@ -14,6 +14,7 @@ function time_now()
 
 mkdir -p /tmp/sti
 WORK_DIR=$(mktemp -d /tmp/sti/test-work.XXXX)
+mkdir -p ${WORK_DIR}
 NEEDKILL="yes"
 S2I_PID=""
 function cleanup()
@@ -24,8 +25,9 @@ function cleanup()
 	echo "Cleaning up working dir ${WORK_DIR}"
     else
 	echo "Dumping logs since did not run successfully before cleanup of ${WORK_DIR} ..."
-	cat /tmp/test-work*/*
+	cat ${WORK_DIR}/*.log
     fi
+    cat ${WORK_DIR}/*.log
     rm -rf ${WORK_DIR}
     # use sigint so that s2i post processing will remove docker container
     if [ -n "${NEEDKILL}" ]; then
@@ -62,15 +64,6 @@ function test_debug() {
     echo
 }
 
-set +e
-img_count=$(docker images | grep -c sti_test/sti-fake)
-set -e
-
-if [ "${img_count}" != "10" ]; then
-    echo "You do not have necessary test images, be sure to run 'hack/build-test-images.sh' beforehand."
-    exit 1
-fi
-
 trap cleanup EXIT SIGINT
 
 echo "working dir:  ${WORK_DIR}"
@@ -83,24 +76,24 @@ check_result $? "${WORK_DIR}/s2i-git-clone.log"
 
 test_debug "s2i build with relative path without file://"
 
-s2i build cakephp-ex openshift/php-55-centos7 test &> "${WORK_DIR}/s2i-rel-noproto.log"
+s2i build cakephp-ex openshift/php-55-centos7 test --loglevel=5 &> "${WORK_DIR}/s2i-rel-noproto.log"
 check_result $? "${WORK_DIR}/s2i-rel-noproto.log"
 
 test_debug "s2i build with relative path with file://"
 
-s2i build file://./cakephp-ex openshift/php-55-centos7 test &> "${WORK_DIR}/s2i-rel-proto.log"
+s2i build file://./cakephp-ex openshift/php-55-centos7 test --loglevel=5 &> "${WORK_DIR}/s2i-rel-proto.log"
 check_result $? "${WORK_DIR}/s2i-rel-proto.log"
 
 popd
 
 test_debug "s2i build with absolute path with file://"
 
-s2i build "file://${WORK_DIR}/cakephp-ex" openshift/php-55-centos7 test &> "${WORK_DIR}/s2i-abs-proto.log"
+s2i build "file://${WORK_DIR}/cakephp-ex" openshift/php-55-centos7 test --loglevel=5 &> "${WORK_DIR}/s2i-abs-proto.log"
 check_result $? "${WORK_DIR}/s2i-abs-proto.log"
 
 test_debug "s2i build with absolute path without file://"
 
-s2i build "${WORK_DIR}/cakephp-ex" openshift/php-55-centos7 test &> "${WORK_DIR}/s2i-abs-noproto.log"
+s2i build "${WORK_DIR}/cakephp-ex" openshift/php-55-centos7 test --loglevel=5 &> "${WORK_DIR}/s2i-abs-noproto.log"
 check_result $? "${WORK_DIR}/s2i-abs-noproto.log"
 
 ## don't do ssh tests here because credentials are needed (even for the git user), which
@@ -109,25 +102,25 @@ check_result $? "${WORK_DIR}/s2i-abs-noproto.log"
 test_debug "s2i build with non-git repo file location"
 
 rm -rf "${WORK_DIR}/cakephp-ex/.git"
-s2i build "${WORK_DIR}/cakephp-ex" openshift/php-55-centos7 test --loglevel=5 &> "${WORK_DIR}/s2i-non-repo.log"
+s2i build "${WORK_DIR}/cakephp-ex" openshift/php-55-centos7 test --loglevel=5 --loglevel=5 &> "${WORK_DIR}/s2i-non-repo.log"
 check_result $? ""
 grep "Copying sources" "${WORK_DIR}/s2i-non-repo.log"
 check_result $? "${WORK_DIR}/s2i-non-repo.log"
 
 test_debug "s2i usage"
 
-s2i usage openshift/ruby-20-centos7 &> "${WORK_DIR}/s2i-usage.log"
+s2i usage openshift/ruby-20-centos7 --loglevel=5 &> "${WORK_DIR}/s2i-usage.log"
 check_result $? ""
 grep "Sample invocation" "${WORK_DIR}/s2i-usage.log"
 check_result $? "${WORK_DIR}/s2i-usage.log"
 
 test_debug "s2i build with git proto"
 
-s2i build git://github.com/openshift/cakephp-ex openshift/php-55-centos7 test --run=true &> "${WORK_DIR}/s2i-git-proto.log" &
+s2i build git://github.com/openshift/cakephp-ex openshift/php-55-centos7 test --run=true --loglevel=5 &> "${WORK_DIR}/s2i-git-proto.log" &
 check_result $? "${WORK_DIR}/s2i-git-proto.log"
 
 test_debug "s2i build with --run==true option"
-s2i build git://github.com/bparees/openshift-jee-sample openshift/wildfly-90-centos7 test-jee-app --run=true &> "${WORK_DIR}/s2i-run.log" &
+s2i build git://github.com/bparees/openshift-jee-sample openshift/wildfly-90-centos7 test-jee-app --run=true --loglevel=5 &> "${WORK_DIR}/s2i-run.log" &
 S2I_PID=$!
 TIME_SEC=1000
 TIME_MIN=$((60 * $TIME_SEC))

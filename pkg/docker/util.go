@@ -2,14 +2,15 @@ package docker
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	client "github.com/fsouza/go-dockerclient"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/errors"
@@ -30,6 +31,15 @@ type ImageReference struct {
 	ID        string
 }
 
+type AuthConfigurations struct {
+	Configs map[string]api.AuthConfig
+}
+
+type dockerConfig struct {
+	Auth  string `json:"auth"`
+	Email string `json:"email"`
+}
+
 const (
 	// maxErrorOutput is the maximum length of the error output saved for processing
 	maxErrorOutput  = 1024
@@ -38,12 +48,12 @@ const (
 
 // GetImageRegistryAuth retrieves the appropriate docker client authentication object for a given
 // image name and a given set of client authentication objects.
-func GetImageRegistryAuth(auths *client.AuthConfigurations, imageName string) client.AuthConfiguration {
+func GetImageRegistryAuth(auths *AuthConfigurations, imageName string) api.AuthConfig {
 	glog.V(5).Infof("Getting docker credentials for %s", imageName)
 	spec, err := ParseImageReference(imageName)
 	if err != nil {
 		glog.V(0).Infof("error: Failed to parse docker reference %s", imageName)
-		return client.AuthConfiguration{}
+		return api.AuthConfig{}
 	}
 
 	if auth, ok := auths.Configs[spec.Registry]; ok {
@@ -54,13 +64,13 @@ func GetImageRegistryAuth(auths *client.AuthConfigurations, imageName string) cl
 		glog.V(5).Infof("Using %s credentials for pulling %s", auth.Email, imageName)
 		return auth
 	}
-	return client.AuthConfiguration{}
+	return api.AuthConfig{}
 }
 
 // LoadImageRegistryAuth loads and returns the set of client auth objects from a docker config
 // json file.
-func LoadImageRegistryAuth(dockerCfg io.Reader) *client.AuthConfigurations {
-	auths, err := client.NewAuthConfigurations(dockerCfg)
+func LoadImageRegistryAuth(dockerCfg io.Reader) *AuthConfigurations {
+	auths, err := NewAuthConfigurations(dockerCfg)
 	if err != nil {
 		glog.V(0).Infof("error: Unable to load docker config")
 		return nil
@@ -68,13 +78,74 @@ func LoadImageRegistryAuth(dockerCfg io.Reader) *client.AuthConfigurations {
 	return auths
 }
 
+// begin borrowed from fsouza
+func NewAuthConfigurations(r io.Reader) (*AuthConfigurations, error) {
+	var auth *AuthConfigurations
+	confs, err := parseDockerConfig(r)
+	if err != nil {
+		return nil, err
+	}
+	auth, err = authConfigs(confs)
+	if err != nil {
+		return nil, err
+	}
+	return auth, nil
+}
+
+func parseDockerConfig(r io.Reader) (map[string]dockerConfig, error) {
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(r)
+	byteData := buf.Bytes()
+
+	confsWrapper := struct {
+		Auths map[string]dockerConfig `json:"auths"`
+	}{}
+	if err := json.Unmarshal(byteData, &confsWrapper); err == nil {
+		if len(confsWrapper.Auths) > 0 {
+			return confsWrapper.Auths, nil
+		}
+	}
+
+	var confs map[string]dockerConfig
+	if err := json.Unmarshal(byteData, &confs); err != nil {
+		return nil, err
+	}
+	return confs, nil
+}
+
+// authConfigs converts a dockerConfigs map to a AuthConfigurations object.
+func authConfigs(confs map[string]dockerConfig) (*AuthConfigurations, error) {
+	c := &AuthConfigurations{
+		Configs: make(map[string]api.AuthConfig),
+	}
+	for reg, conf := range confs {
+		data, err := base64.StdEncoding.DecodeString(conf.Auth)
+		if err != nil {
+			return nil, err
+		}
+		userpass := strings.SplitN(string(data), ":", 2)
+		if len(userpass) != 2 {
+			return nil, fmt.Errorf("cannot parse username/password from %s", userpass)
+		}
+		c.Configs[reg] = api.AuthConfig{
+			Email:         conf.Email,
+			Username:      userpass[0],
+			Password:      userpass[1],
+			ServerAddress: reg,
+		}
+	}
+	return c, nil
+}
+
+// end borrowed from fsouza
+
 // LoadAndGetImageRegistryAuth loads the set of client auth objects from a docker config file
 // and returns the appropriate client auth object for a given image name.
-func LoadAndGetImageRegistryAuth(dockerCfg io.Reader, imageName string) client.AuthConfiguration {
-	auths, err := client.NewAuthConfigurations(dockerCfg)
+func LoadAndGetImageRegistryAuth(dockerCfg io.Reader, imageName string) api.AuthConfig {
+	auths, err := NewAuthConfigurations(dockerCfg)
 	if err != nil {
 		glog.V(0).Infof("error: Unable to load docker config")
-		return client.AuthConfiguration{}
+		return api.AuthConfig{}
 	}
 	return GetImageRegistryAuth(auths, imageName)
 }
@@ -179,7 +250,7 @@ func PullImage(name string, d Docker, policy api.PullPolicy, force bool) (*PullR
 	}
 
 	var (
-		image *client.Image
+		image *api.Image
 		err   error
 	)
 	switch policy {
