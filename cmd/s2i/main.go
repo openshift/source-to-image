@@ -81,6 +81,10 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 				}
 			}
 
+			if cfg.Incremental && len(cfg.RuntimeImage) > 0 {
+				fmt.Fprintln(os.Stderr, "ERROR: Incremental build with runtime image isn't supported")
+				os.Exit(1)
+			}
 			if cfg.ForcePull {
 				glog.Warning("DEPRECATED: The '--force-pull' option is deprecated. Use '--pull-policy' instead")
 			}
@@ -114,6 +118,9 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 				cfg.PullAuthentication = docker.GetImageRegistryAuth(auths, cfg.BuilderImage)
 				if cfg.Incremental {
 					cfg.IncrementalAuthentication = docker.GetImageRegistryAuth(auths, cfg.Tag)
+				}
+				if len(cfg.RuntimeImage) > 0 {
+					cfg.RuntimeAuthentication = docker.GetImageRegistryAuth(auths, cfg.RuntimeImage)
 				}
 			}
 
@@ -184,6 +191,8 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 	buildCmd.Flags().StringVarP(&(oldDestination), "location", "l", "",
 		"DEPRECATED: Specify a destination location for untar operation")
 	buildCmd.Flags().BoolVarP(&(cfg.ForceCopy), "copy", "c", false, "Use local file system copy instead of git cloning the source url")
+	buildCmd.Flags().StringVar(&(cfg.RuntimeImage), "runtime-image", "", "Image that will be used as the base for the runtime image")
+	buildCmd.Flags().VarP(&(cfg.RuntimeArtifacts), "runtime-artifact", "a", "Specify a file or directory to be copied from the builder to the runtime image")
 
 	return buildCmd
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/api"
@@ -58,19 +59,20 @@ func newFakeBaseSTI() *STI {
 
 func newFakeSTI(f *FakeSTI) *STI {
 	s := &STI{
-		config:    &api.Config{},
-		result:    &api.Result{},
-		docker:    &docker.FakeDocker{},
-		installer: &test.FakeInstaller{},
-		git:       &test.FakeGit{},
-		fs:        &test.FakeFileSystem{},
-		tar:       &test.FakeTar{},
-		preparer:  f,
-		ignorer:   &ignore.DockerIgnorer{},
-		artifacts: f,
-		scripts:   f,
-		garbage:   f,
-		layered:   &FakeDockerBuild{f},
+		config:        &api.Config{},
+		result:        &api.Result{},
+		docker:        &docker.FakeDocker{},
+		runtimeDocker: &docker.FakeDocker{},
+		installer:     &test.FakeInstaller{},
+		git:           &test.FakeGit{},
+		fs:            &test.FakeFileSystem{},
+		tar:           &test.FakeTar{},
+		preparer:      f,
+		ignorer:       &ignore.DockerIgnorer{},
+		artifacts:     f,
+		scripts:       f,
+		garbage:       f,
+		layered:       &FakeDockerBuild{f},
 	}
 	s.source = &git.Clone{Git: s.git, FileSystem: s.fs}
 	return s
@@ -305,6 +307,7 @@ func testBuildHandler() *STI {
 		callbackInvoker:   &test.FakeCallbackInvoker{},
 	}
 	s.source = &git.Clone{Git: s.git, FileSystem: s.fs}
+	s.initPostExecutorSteps()
 	return s
 }
 
@@ -715,39 +718,134 @@ func TestPrepareErrorOptionalDownloadAndInstall(t *testing.T) {
 	}
 }
 
-func equalArrayContents(a []string, b []string) bool {
-	if len(a) != len(b) {
-		return false
+func TestPrepareUseCustomRuntimeArtifacts(t *testing.T) {
+	expectedMapping := "/src:dst"
+
+	builder := newFakeSTI(&FakeSTI{})
+
+	config := builder.config
+	config.RuntimeImage = "my-app"
+	config.RuntimeArtifacts.Set(expectedMapping)
+
+	if err := builder.Prepare(config); err != nil {
+		t.Fatalf("Prepare() unexpectedly failed with error: %v", err)
 	}
-	for _, e := range a {
-		found := false
-		for _, f := range b {
-			if f == e {
-				found = true
-			}
-		}
-		if !found {
-			return false
-		}
+
+	if actualMapping := config.RuntimeArtifacts.String(); actualMapping != expectedMapping {
+		t.Errorf("Prepare() shouldn't change mapping, but it was modified from %v to %v", expectedMapping, actualMapping)
 	}
-	return true
 }
 
-func TestGenerateConfigEnv(t *testing.T) {
-	rh := newFakeSTI(&FakeSTI{})
-	testEnv := api.EnvironmentList{
-		{Name: "Key1", Value: "Value1"},
-		{Name: "Key2", Value: "Value2"},
-		{Name: "Key3", Value: "Value3"},
-		{Name: "Key4", Value: "Value=4"},
-		{Name: "Key5", Value: "Value,5"},
+func TestPrepareFailForEmptyRuntimeArtifacts(t *testing.T) {
+	builder := newFakeSTI(&FakeSTI{})
+
+	docker := builder.docker.(*docker.FakeDocker)
+	docker.AssembleInputFilesResult = ""
+
+	config := builder.config
+	config.RuntimeImage = "my-app"
+
+	if len(config.RuntimeArtifacts) > 0 {
+		t.Fatalf("RuntimeArtifacts must be empty by default")
 	}
-	rh.config.Environment = testEnv
-	result := rh.generateConfigEnv()
-	expected := []string{"Key1=Value1", "Key2=Value2", "Key3=Value3", "Key4=Value=4", "Key5=Value,5"}
-	if !equalArrayContents(result, expected) {
-		t.Errorf("Unexpected result. Expected: %#v. Actual: %#v",
-			expected, result)
+
+	err := builder.Prepare(config)
+	if err == nil {
+		t.Errorf("Prepare() should fail but it didn't")
+
+	} else if expectedError := "No runtime artifacts to copy"; !strings.Contains(err.Error(), expectedError) {
+		t.Errorf("Prepare() should fail with error that contains text %q but failed with error: %q", expectedError, err)
+	}
+}
+
+func TestPrepareRuntimeArtifactsValidation(t *testing.T) {
+	testCases := []struct {
+		mapping       string
+		expectedError string
+	}{
+		{
+			mapping:       "src:dst",
+			expectedError: "source must be an absolute path",
+		},
+		{
+			mapping:       "/src:/dst",
+			expectedError: "destination must be a relative path",
+		},
+		{
+			mapping:       "/src:../dst",
+			expectedError: "destination cannot start with '..'",
+		},
+	}
+
+	for _, testCase := range testCases {
+		for _, mappingFromUser := range []bool{true, false} {
+			builder := newFakeSTI(&FakeSTI{})
+
+			config := builder.config
+			config.RuntimeImage = "my-app"
+
+			if mappingFromUser {
+				config.RuntimeArtifacts.Set(testCase.mapping)
+			} else {
+				docker := builder.docker.(*docker.FakeDocker)
+				docker.AssembleInputFilesResult = testCase.mapping
+			}
+
+			err := builder.Prepare(config)
+			if err == nil {
+				t.Errorf("Prepare() should fail but it didn't")
+
+			} else if !strings.Contains(err.Error(), testCase.expectedError) {
+				t.Errorf("Prepare() should fail to validate mapping %q with error that contains text %q but failed with error: %q", testCase.mapping, testCase.expectedError, err)
+			}
+		}
+	}
+}
+
+func TestPrepareSetRuntimeArtifacts(t *testing.T) {
+	for _, mapping := range []string{"/src:dst", "/src1:dst1;/src1:dst1"} {
+
+		expectedMapping := strings.Replace(mapping, ";", ",", -1)
+
+		builder := newFakeSTI(&FakeSTI{})
+
+		docker := builder.docker.(*docker.FakeDocker)
+		docker.AssembleInputFilesResult = mapping
+
+		config := builder.config
+		config.RuntimeImage = "my-app"
+
+		if len(config.RuntimeArtifacts) > 0 {
+			t.Fatalf("RuntimeArtifacts must be empty by default")
+		}
+
+		if err := builder.Prepare(config); err != nil {
+			t.Fatalf("Prepare() unexpectedly failed with error: %v", err)
+		}
+
+		if actualMapping := config.RuntimeArtifacts.String(); actualMapping != expectedMapping {
+			t.Errorf("Prepare() shouldn't change mapping, but it was modified from %v to %v", expectedMapping, actualMapping)
+		}
+	}
+}
+
+func TestPrepareDownloadAssembleRuntime(t *testing.T) {
+	installer := &test.FakeInstaller{}
+
+	builder := newFakeSTI(&FakeSTI{})
+	builder.runtimeInstaller = installer
+	builder.optionalRuntimeScripts = []string{api.AssembleRuntime}
+
+	config := builder.config
+	config.RuntimeImage = "my-app"
+	config.RuntimeArtifacts.Set("/src:dst")
+
+	if err := builder.Prepare(config); err != nil {
+		t.Fatalf("Prepare() unexpectedly failed with error: %v", err)
+	}
+
+	if len(installer.Scripts) != 1 || installer.Scripts[0][0] != api.AssembleRuntime {
+		t.Errorf("Prepare() should download %q script but it downloaded %v", api.AssembleRuntime, installer.Scripts)
 	}
 }
 
