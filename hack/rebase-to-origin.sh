@@ -31,7 +31,7 @@ readonly exclude_pkgs=(
   pkg/version
 )
 
-readonly origin_s2i_godep_dir="${OS_ROOT}/Godeps/_workspace/src/github.com/openshift/source-to-image"
+readonly origin_s2i_vendor_dir="${OS_ROOT}/vendor/github.com/openshift/source-to-image"
 readonly s2i_ref="$(git -C ${S2I_ROOT} rev-parse --verify HEAD)"
 readonly s2i_short_ref="$(git -C ${S2I_ROOT} rev-parse --short HEAD)"
 readonly s2i_godeps_ref="$(grep -m1 -A2 'openshift/source-to-image' ${OS_ROOT}/Godeps/Godeps.json |
@@ -39,17 +39,18 @@ readonly s2i_godeps_ref="$(grep -m1 -A2 'openshift/source-to-image' ${OS_ROOT}/G
 
 pushd "${OS_ROOT}" >/dev/null
   git checkout -B "s2i-${s2i_short_ref}-bump" master
-  rm -rf "${origin_s2i_godep_dir}"/*
-  cp -R "${S2I_ROOT}/pkg" "${origin_s2i_godep_dir}/."
-
+  rm -rf "${origin_s2i_vendor_dir}"/*
+  cp -R "${S2I_ROOT}/pkg" "${origin_s2i_vendor_dir}/."
+  # remove test files from the vendor folder.
+  find ${origin_s2i_vendor_dir}/pkg -name "*_test.go" -delete
   # Remove all explicitly excluded packages
   for pkg in "${exclude_pkgs[@]}"; do
-    rm -rvf "${origin_s2i_godep_dir}/${pkg}"
+    rm -rvf "${origin_s2i_vendor_dir}/${pkg}"
   done
 
   # Bump the origin Godeps.json file
   s2i::util::sed "s/${s2i_godeps_ref}/${s2i_ref}/g" "${OS_ROOT}/Godeps/Godeps.json"
 
   # Make a commit with proper message
-  git add Godeps && git commit -m "bump(github.com/openshift/source-to-image): ${s2i_ref}"
+  git add Godeps vendor && git commit -m "bump(github.com/openshift/source-to-image): ${s2i_ref}"
 popd
