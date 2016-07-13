@@ -4,7 +4,7 @@
 
 For dynamic languages like PHP, Python, or Ruby, the build-time and run-time environments are the same. In this case using the builder as a base image for a resulting application image is natural.
 
-For compiled languages like C/C++, Java, or Golang, the dependencies necessary for compilation might dramatically outweigh the size of the actual runtime artifacts, or provide attack surface areas that are undesirable in an application image. To keep runtime images slim, S2I enables a multiple-step build processes, where a binary artifact such as an executable or Java WAR file is created in the first builder image, extracted, and injected into an second image that simply places the executable in the correct location for execution. To give you even more abilities to customize a resulting image, S2I is also executing an `assemble-runtime` script inside of this (runtime) image. In this way you may do final adjustments by modifying files before an image will be committed.
+For compiled languages like C, C++, Go, or Java, the dependencies necessary for compilation might dramatically outweigh the size of the actual runtime artifacts, or provide attack surface areas that are undesirable in an application image. To keep runtime images slim, S2I enables a multiple-step build processes, where a binary artifact such as an executable or Java WAR file is created in the first builder image, extracted, and injected into a second image that simply places the executable in the correct location for execution. To give you even more abilities to customize a resulting image, S2I is also executing an `assemble-runtime` script inside of this (runtime) image. In this way you may do final adjustments by modifying files before an image will be committed.
 
 The following diagram illustrates the build workflow:
 
@@ -84,4 +84,3 @@ Builder and runtime containers have the same environment. In other words `assemb
 ### Extended build and incremental build
 
 In the current implementation it is not possible to do an extended incremental build. This combination is invalid and the build will fail.
-
