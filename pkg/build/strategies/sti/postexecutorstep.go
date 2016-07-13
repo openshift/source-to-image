@@ -224,24 +224,18 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 	artifactsDir := filepath.Join(step.builder.config.WorkingDir, api.RuntimeArtifactsDir)
 
 	// We copy scripts to a directory with artifacts to upload files in one shot
-	if err := step.copyScriptIfNeeded(api.AssembleRuntime, artifactsDir); err != nil {
-		return err
-	}
-
-	// "run" script must be inside of "scripts" subdir, see createCommandForExecutingRunScript()
-	if err := step.copyScriptIfNeeded(api.Run, filepath.Join(artifactsDir, "scripts")); err != nil {
-		return err
+	for _, script := range []string{api.AssembleRuntime, api.Run} {
+		// scripts must be inside of "scripts" subdir, see createCommandForExecutingRunScript()
+		destinationDir := filepath.Join(artifactsDir, "scripts")
+		if err := step.copyScriptIfNeeded(script, destinationDir); err != nil {
+			return err
+		}
 	}
 
 	image := step.builder.config.RuntimeImage
 	workDir, err := step.docker.GetImageWorkdir(image)
 	if err != nil {
 		return fmt.Errorf("Couldn't get working dir of %q image: %v", image, err)
-	}
-
-	user, err := step.docker.GetImageUser(image)
-	if err != nil {
-		return fmt.Errorf("Couldn't get user of %q image: %v", image, err)
 	}
 
 	commandBaseDir := workDir
@@ -259,7 +253,7 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 	}
 
 	cmd := fmt.Sprintf(
-		"while [ ! -f %q ]; do sleep 0.5; done; %s/%s; exit $?",
+		"while [ ! -f %q ]; do sleep 0.5; done; %s/scripts/%s; exit $?",
 		lastFileDstPath,
 		commandBaseDir,
 		api.AssembleRuntime,
@@ -276,7 +270,6 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 		CapDrop:         step.builder.config.DropCapabilities,
 		PostExec:        step.builder.postExecutor,
 		Env:             step.builder.env,
-		User:            user,
 	}
 
 	opts.OnStart = func(containerID string) error {
