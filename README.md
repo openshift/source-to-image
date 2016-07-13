@@ -18,7 +18,7 @@ For a dynamic language like Ruby, the build-time and run-time environments are t
 1. The container process transforms that source code into the appropriate runnable setup - in this case, by installing dependencies with Bundler and moving the source code into a directory where Apache has been preconfigured to look for the Ruby `config.ru` file.
 1. Commit the new container and set the image entrypoint to be a script (provided by the builder image) that will start Apache to host the Ruby application.
 
-For compiled languages like Java, C, or Golang, the dependencies necessary for compilation might dramatically outweigh the actual runtime artifacts. To keep runtime images slim, S2I enables multiple-step build processes, where a binary artifact such as an executable or Java WAR file is created in the first builder image, extracted, and injected into an second image that simply places the executable in the correct location for execution.
+For compiled languages like Java, C, or Golang, the dependencies necessary for compilation might dramatically outweigh the actual runtime artifacts. To keep runtime images slim, S2I enables a multiple-step build processes, where a binary artifact such as an executable or Java WAR file is created in the first builder image, extracted, and injected into a second runtime image that simply places the executable in the correct location for execution.
 
 For example, to create a reproducible build pipeline for Tomcat (the popular Java webserver) and Maven:
 
@@ -29,7 +29,7 @@ For example, to create a reproducible build pipeline for Tomcat (the popular Jav
 
 By placing our build logic inside of images, and by combining the images into multiple steps, we can keep our runtime environment close to our build environment (same JDK, same Tomcat JARs) without requiring build tools to be deployed to production.
 
-Learn more about [building your own images](#getting-started).
+Learn more about [building your own images](#getting-started) and [how to use a non-builder image for the final application image](https://github.com/openshift/source-to-image/blob/master/docs/runtime_image.md).
 
 
 ## Goals

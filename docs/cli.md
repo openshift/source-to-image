@@ -25,7 +25,7 @@ at common flags that can be used with all of the subcommands.
 #### Log levels
 
 There are six log levels:
-* Level `0` - produces output from containers running `assemble` script and all encountered errors
+* Level `0` - produces output from containers running `assemble` and `assemble-runtime` scripts and all encountered errors
 * Level `1` - produces basic information about the executed process
 * Level `2` - produces very detailed information about the executed process
 * Level `3` - produces very detailed information about the executed process, along with listing tar contents
@@ -90,6 +90,8 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 | `-q (--quiet)`             | Operate quietly, suppressing all non-error output |
 | `-i (--inject)`            | Inject the content of the specified directory into the path in the container that runs the assemble script |
 | `-v (--volume)`            | Bind mounts a local directory into the container that runs the assemble script|
+| `--runtime-image`          | Image that will be used as the base for the runtime image (see [How to use a non-builder image for the final application image](https://github.com/openshift/source-to-image/blob/master/docs/runtime_image.md)) |
+| `-a (--runtime-artifact)`  | Specify a file or directory to be copied from the builder to the runtime image  (see [How to use a non-builder image for the final application image](https://github.com/openshift/source-to-image/blob/master/docs/runtime_image.md)) |
 
 #### Context directory
 
