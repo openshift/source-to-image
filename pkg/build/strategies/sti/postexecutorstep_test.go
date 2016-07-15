@@ -124,6 +124,7 @@ func TestCommitImageStep(t *testing.T) {
 		expectedImageID := "image-xxx"
 		expectedImageTag := "v1"
 		expectedImageUser := "jboss"
+		expectedEntrypoint := []string{"test_entrypoint"}
 
 		displayName := "MyApp"
 		description := "My Application is awesome!"
@@ -145,6 +146,7 @@ func TestCommitImageStep(t *testing.T) {
 		docker := builder.docker.(*docker.FakeDocker)
 		docker.CommitContainerResult = expectedImageID
 		docker.GetImageUserResult = expectedImageUser
+		docker.GetImageEntrypointResult = expectedEntrypoint
 		docker.Labels = baseImageLabels
 
 		ctx := &postExecutorStepContext{
@@ -191,6 +193,10 @@ func TestCommitImageStep(t *testing.T) {
 
 		if commitOpts.User != expectedImageUser {
 			t.Errorf("should commit container with User: %q, but commited with %q", expectedImageUser, commitOpts.User)
+		}
+
+		if !reflect.DeepEqual(commitOpts.Entrypoint, expectedEntrypoint) {
+			t.Errorf("should commit container with Entrypoint: %q, but commited with %q", expectedEntrypoint, commitOpts.Entrypoint)
 		}
 
 		if !reflect.DeepEqual(commitOpts.Labels, expectedLabels) {
