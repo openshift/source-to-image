@@ -7,8 +7,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
-	"syscall"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	dockerpkg "github.com/openshift/source-to-image/pkg/docker"
@@ -277,6 +277,10 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 			if err != nil {
 				return err
 			}
+			// chmod does nothing on windows anyway.
+			if runtime.GOOS == "windows" {
+				return nil
+			}
 			// Skip chmod for symlinks
 			if info.Mode()&os.ModeSymlink != 0 {
 				return nil
@@ -284,7 +288,9 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 			// file should be writable by owner (u=w) and readable by other users (a=r),
 			// executable bit should be left as is
 			mode := os.FileMode(0644)
-			if info.IsDir() || info.Mode()&syscall.S_IEXEC != 0 {
+			// syscall.S_IEXEC == 0x40 but we can't reference the constant if we want
+			// to build releases for windows.
+			if info.IsDir() || info.Mode()&0x40 != 0 {
 				mode = 0755
 			}
 			return step.fs.Chmod(path, mode)
