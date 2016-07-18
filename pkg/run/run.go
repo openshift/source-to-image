@@ -11,7 +11,11 @@ import (
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 )
 
-var glog = utilglog.StderrLog
+var (
+	// DefaultEntrypoint is the default entry point used when starting containers
+	DefaultEntrypoint = []string{"/bin/env"}
+	glog              = utilglog.StderrLog
+)
 
 // A DockerRunner allows running a Docker image as a new container, streaming
 // stdout and stderr with glog.
@@ -44,6 +48,7 @@ func (b *DockerRunner) Run(config *api.Config) error {
 
 	opts := docker.RunContainerOptions{
 		Image:        config.Tag,
+		Entrypoint:   DefaultEntrypoint,
 		Stdout:       outWriter,
 		Stderr:       errWriter,
 		TargetImage:  true,
@@ -51,7 +56,7 @@ func (b *DockerRunner) Run(config *api.Config) error {
 		CapDrop:      config.DropCapabilities,
 	}
 
-	//NOTE, we've seen some Golang level deadlock issues with the streaming of cmd output to
+	// NOTE, we've seen some Golang level deadlock issues with the streaming of cmd output to
 	// glog, but part of the deadlock seems to have occurred when stdout was "silent"
 	// and produced no data, such as when we would do a git clone with the --quiet option.
 	// We have not seen the hang when the Cmd produces output to stdout.

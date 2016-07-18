@@ -17,6 +17,7 @@ import (
 	dockerpkg "github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/ignore"
+	"github.com/openshift/source-to-image/pkg/run"
 	"github.com/openshift/source-to-image/pkg/scm"
 	"github.com/openshift/source-to-image/pkg/scm/git"
 	"github.com/openshift/source-to-image/pkg/scripts"
@@ -322,8 +323,8 @@ func (builder *STI) SetScripts(required, optional []string) {
 	builder.optionalScripts = optional
 }
 
-// PostExecute allows to execute post-build actions after the Docker build
-// finishes.
+// PostExecute allows to execute post-build actions after the Docker
+// container execution finishes.
 func (builder *STI) PostExecute(containerID, destination string) error {
 	builder.postExecutorStepsContext.containerID = containerID
 	builder.postExecutorStepsContext.destination = destination
@@ -411,6 +412,7 @@ func (builder *STI) Save(config *api.Config) (err error) {
 	opts := dockerpkg.RunContainerOptions{
 		Image:           image,
 		User:            user,
+		Entrypoint:      run.DefaultEntrypoint,
 		ExternalScripts: builder.externalScripts[api.SaveArtifacts],
 		ScriptsURL:      config.ScriptsURL,
 		Destination:     config.Destination,
@@ -454,9 +456,10 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 	}
 
 	opts := dockerpkg.RunContainerOptions{
-		Image:  config.BuilderImage,
-		Stdout: outWriter,
-		Stderr: errWriter,
+		Image:      config.BuilderImage,
+		Entrypoint: run.DefaultEntrypoint,
+		Stdout:     outWriter,
+		Stderr:     errWriter,
 		// The PullImage is false because the PullImage function should be called
 		// before we run the container
 		PullImage:       false,

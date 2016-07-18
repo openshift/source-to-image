@@ -13,6 +13,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/api"
 	dockerpkg "github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/errors"
+	"github.com/openshift/source-to-image/pkg/run"
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
 )
@@ -53,10 +54,10 @@ type storePreviousImageStep struct {
 
 func (step *storePreviousImageStep) execute(ctx *postExecutorStepContext) error {
 	if step.builder.incremental && step.builder.config.RemovePreviousImage {
-		glog.V(3).Info("Executing step: remember previous image")
+		glog.V(3).Info("Executing step: store previous image")
 		ctx.previousImageID = step.getPreviousImage()
 	} else {
-		glog.V(3).Info("Skipping step: remember previous image")
+		glog.V(3).Info("Skipping step: store previous image")
 	}
 	return nil
 }
@@ -114,7 +115,19 @@ func (step *commitImageStep) execute(ctx *postExecutorStepContext) error {
 
 	ctx.labels = createLabelsForResultingImage(step.builder, step.docker, step.image)
 
-	ctx.imageID, err = commitContainer(step.docker, ctx.containerID, cmd, user, step.builder.config.Tag, step.builder.env, ctx.labels)
+	// Set the image entrypoint back to its original value on commit, the running
+	// container has "env" as its entrypoint and we don't want to commit that.
+	entrypoint, err := step.docker.GetImageEntrypoint(step.image)
+	if err != nil {
+		return fmt.Errorf("Couldn't get entrypoint of %q image: %v", step.image, err)
+	}
+	// If the image has no explicit entrypoint, set it to an empty array
+	// so we don't default to leaving the entrypoint as "env" upon commit.
+	if entrypoint == nil {
+		entrypoint = []string{}
+	}
+
+	ctx.imageID, err = commitContainer(step.docker, ctx.containerID, cmd, user, step.builder.config.Tag, step.builder.env, entrypoint, ctx.labels)
 	if err != nil {
 		return err
 	}
@@ -261,6 +274,7 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 
 	opts := dockerpkg.RunContainerOptions{
 		Image:           image,
+		Entrypoint:      run.DefaultEntrypoint,
 		PullImage:       false, // The PullImage is false because we've already pulled the image
 		CommandExplicit: []string{"/bin/sh", "-c", cmd},
 		Stdout:          outWriter,
@@ -375,10 +389,11 @@ func (step *invokeCallbackStep) execute(ctx *postExecutorStepContext) error {
 
 // shared methods
 
-func commitContainer(docker dockerpkg.Docker, containerID, cmd, user, tag string, env []string, labels map[string]string) (string, error) {
+func commitContainer(docker dockerpkg.Docker, containerID, cmd, user, tag string, env, entrypoint []string, labels map[string]string) (string, error) {
 	opts := dockerpkg.CommitContainerOptions{
 		Command:     []string{cmd},
 		Env:         env,
+		Entrypoint:  entrypoint,
 		ContainerID: containerID,
 		Repository:  tag,
 		User:        user,
