@@ -10,6 +10,8 @@
 Source-to-Image (S2I) is a toolkit and workflow for building reproducible Docker images from source code. S2I produces
 ready-to-run images by injecting source code into a Docker container and letting the container prepare that source code for execution. By creating self-assembling **builder images**, you can version and control your build environments exactly like you use Docker images to version your runtime environments.
 
+For a deep dive on S2I you can view [this presentation](https://www.youtube.com/watch?v=flI6zx9wH6M).
+
 ### How Source-to-Image works
 
 For a dynamic language like Ruby, the build-time and run-time environments are the same. Starting with a **builder image** that describes this environment - with Ruby, Bundler, Rake, Apache, GCC, and other packages needed to set up and run a Ruby application installed - source-to-image performs the following steps:
