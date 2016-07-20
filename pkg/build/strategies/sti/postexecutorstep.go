@@ -13,7 +13,6 @@ import (
 	"github.com/openshift/source-to-image/pkg/api"
 	dockerpkg "github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/errors"
-	"github.com/openshift/source-to-image/pkg/run"
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
 )
@@ -274,7 +273,7 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 
 	opts := dockerpkg.RunContainerOptions{
 		Image:           image,
-		Entrypoint:      run.DefaultEntrypoint,
+		Entrypoint:      DefaultEntrypoint,
 		PullImage:       false, // The PullImage is false because we've already pulled the image
 		CommandExplicit: []string{"/bin/sh", "-c", cmd},
 		Stdout:          outWriter,

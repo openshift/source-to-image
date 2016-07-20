@@ -6,15 +6,14 @@ import (
 	"io"
 
 	"github.com/openshift/source-to-image/pkg/api"
+	"github.com/openshift/source-to-image/pkg/build/strategies/sti"
 	"github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/errors"
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 )
 
 var (
-	// DefaultEntrypoint is the default entry point used when starting containers
-	DefaultEntrypoint = []string{"/bin/env"}
-	glog              = utilglog.StderrLog
+	glog = utilglog.StderrLog
 )
 
 // A DockerRunner allows running a Docker image as a new container, streaming
@@ -48,7 +47,7 @@ func (b *DockerRunner) Run(config *api.Config) error {
 
 	opts := docker.RunContainerOptions{
 		Image:        config.Tag,
-		Entrypoint:   DefaultEntrypoint,
+		Entrypoint:   sti.DefaultEntrypoint,
 		Stdout:       outWriter,
 		Stderr:       errWriter,
 		TargetImage:  true,
