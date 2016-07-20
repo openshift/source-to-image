@@ -17,7 +17,6 @@ import (
 	dockerpkg "github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/ignore"
-	"github.com/openshift/source-to-image/pkg/run"
 	"github.com/openshift/source-to-image/pkg/scm"
 	"github.com/openshift/source-to-image/pkg/scm/git"
 	"github.com/openshift/source-to-image/pkg/scripts"
@@ -26,9 +25,12 @@ import (
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 )
 
-var glog = utilglog.StderrLog
-
 var (
+	// DefaultEntrypoint is the default entry point used when starting containers
+	DefaultEntrypoint = []string{"/bin/env"}
+
+	glog = utilglog.StderrLog
+
 	// List of directories that needs to be present inside working dir
 	workingDirs = []string{
 		api.UploadScripts,
@@ -412,7 +414,7 @@ func (builder *STI) Save(config *api.Config) (err error) {
 	opts := dockerpkg.RunContainerOptions{
 		Image:           image,
 		User:            user,
-		Entrypoint:      run.DefaultEntrypoint,
+		Entrypoint:      DefaultEntrypoint,
 		ExternalScripts: builder.externalScripts[api.SaveArtifacts],
 		ScriptsURL:      config.ScriptsURL,
 		Destination:     config.Destination,
@@ -457,7 +459,7 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 
 	opts := dockerpkg.RunContainerOptions{
 		Image:      config.BuilderImage,
-		Entrypoint: run.DefaultEntrypoint,
+		Entrypoint: DefaultEntrypoint,
 		Stdout:     outWriter,
 		Stderr:     errWriter,
 		// The PullImage is false because the PullImage function should be called
