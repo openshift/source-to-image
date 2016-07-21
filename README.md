@@ -12,9 +12,18 @@ ready-to-run images by injecting source code into a Docker container and letting
 
 For a deep dive on S2I you can view [this presentation](https://www.youtube.com/watch?v=flI6zx9wH6M).
 
+Want to try it right now?  Download the [latest release](https://github.com/openshift/source-to-image/releases/tag/v1.1.0) and run:
+
+	$ s2i build git://github.com/openshift/django-ex centos/python-35-centos7 hello-python
+	$ docker run -p 8080:8080 hello-python
+
+Now browse to http://localhost:8080 to see the running application.
+
+You've just built and run a new Docker application image from source code in a git repository, no Dockerfile necessary.
+
 ### How Source-to-Image works
 
-For a dynamic language like Ruby, the build-time and run-time environments are the same. Starting with a **builder image** that describes this environment - with Ruby, Bundler, Rake, Apache, GCC, and other packages needed to set up and run a Ruby application installed - source-to-image performs the following steps:
+For a dynamic language like Ruby, the build-time and run-time environments are typically the same. Starting with a **builder image** that describes this environment - with Ruby, Bundler, Rake, Apache, GCC, and other packages needed to set up and run a Ruby application installed - source-to-image performs the following steps:
 
 1. Start a container from the builder image with the application source injected into a known directory
 1. The container process transforms that source code into the appropriate runnable setup - in this case, by installing dependencies with Bundler and moving the source code into a directory where Apache has been preconfigured to look for the Ruby `config.ru` file.
