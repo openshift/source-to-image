@@ -1,8 +1,9 @@
 package test
 
 import (
-	"github.com/openshift/source-to-image/pkg/api"
 	"net/url"
+
+	"github.com/openshift/source-to-image/pkg/api"
 )
 
 // FakeGit provides a fake Git
@@ -28,9 +29,9 @@ type FakeGit struct {
 }
 
 // ValidCloneSpec returns a valid Git clone specification
-func (f *FakeGit) ValidCloneSpec(source string) bool {
+func (f *FakeGit) ValidCloneSpec(source string) (bool, error) {
 	f.ValidCloneSpecSource = source
-	return f.ValidCloneSpecResult
+	return f.ValidCloneSpecResult, nil
 }
 
 //ValidCloneSpecRemoteOnly returns a valid Git clone specification

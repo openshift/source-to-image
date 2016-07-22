@@ -14,7 +14,11 @@ func createLocalGitDirectory(t *testing.T) string {
 	if err != nil {
 		t.Error(err)
 	}
-	os.Mkdir(filepath.Join(dir, ".git"), 0600)
+	os.MkdirAll(filepath.Join(dir, ".git/refs/heads"), 0777)
+	os.MkdirAll(filepath.Join(dir, ".git/refs/remotes"), 0777)
+	os.MkdirAll(filepath.Join(dir, ".git/branches"), 0777)
+	os.MkdirAll(filepath.Join(dir, ".git/objects/foo"), 0777)
+	os.Create(filepath.Join(dir, ".git/objects/foo") + "bar")
 	return dir
 }
 
