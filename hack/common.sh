@@ -206,6 +206,10 @@ EOF
     fi
   fi
 
+  # For any tools that expect this to be set (it is default in golang 1.6),
+  # force vendor experiment.
+  export GO15VENDOREXPERIMENT=1
+
   GOPATH=${S2I_GOPATH}
 
   # Append S2I_EXTRA_GOPATH to the GOPATH if it is defined.

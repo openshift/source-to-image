@@ -18,8 +18,8 @@
 		},
 		{
 			"ImportPath": "github.com/Sirupsen/logrus/formatters/logstash",
-			"Comment": "v0.7.3-4-gaaf92c9",
-			"Rev": "aaf92c95712104318fc35409745f1533aa5ff327"
+			"Comment": "v0.10.0-21-g32055c3",
+			"Rev": "32055c351ea8b00b96d70f28db48d9840feaf0ec"
 		},
 		{
 			"ImportPath": "github.com/beorn7/perks/quantile",
