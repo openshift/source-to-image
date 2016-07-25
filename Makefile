@@ -9,7 +9,6 @@
 #   release: Build release.
 
 OUT_DIR = _output
-OUT_PKG_DIR = Godeps/_workspace/pkg
 
 export GOFLAGS
 
@@ -66,7 +65,7 @@ check:
 # Example:
 #   make clean
 clean:
-	rm -rf $(OUT_DIR) $(OUT_PKG_DIR)
+	rm -rf $(OUT_DIR)
 .PHONY: clean
 
 # Build the release.

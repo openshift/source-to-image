@@ -168,7 +168,7 @@ s2i::build::create_gopath_tree() {
 #
 # Input Vars:
 #   S2I_EXTRA_GOPATH - If set, this is included in created GOPATH
-#   S2I_NO_GODEPS - If set, we don't add 'Godeps/_workspace' to GOPATH
+#   S2I_NO_GODEPS - If set, we don't add 'vendor' to GOPATH
 #
 # Output Vars:
 #   export GOPATH - A modified GOPATH to our created tree along with extra
@@ -216,7 +216,7 @@ EOF
   # Append the tree maintained by `godep` to the GOPATH unless S2I_NO_GODEPS
   # is defined.
   if [[ -z ${S2I_NO_GODEPS:-} ]]; then
-    GOPATH="${GOPATH}:${S2I_ROOT}/Godeps/_workspace"
+    GOPATH="${GOPATH}:${S2I_ROOT}/vendor"
   fi
   export GOPATH
 

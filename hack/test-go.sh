@@ -19,7 +19,7 @@ find_test_dirs() {
         -wholename './Godeps' \
         -o -wholename './release' \
         -o -wholename './target' \
-        -o -wholename '*/Godeps/*' \
+        -o -wholename './vendor' \
         -o -wholename '*/_output/*' \
         -o -wholename './.git' \
       \) -prune \
