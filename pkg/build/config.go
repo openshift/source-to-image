@@ -14,7 +14,7 @@ func GenerateConfigFromLabels(config *api.Config) error {
 	if err != nil {
 		return err
 	}
-	labels := result.Image.Config.Labels
+	labels := result.Image.ConfigLabels
 
 	if builderVersion, ok := labels["io.openshift.builder-version"]; ok {
 		config.BuilderImageVersion = builderVersion
