@@ -10,27 +10,79 @@ import (
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/api"
+	"github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/test"
 )
 
+// Creates a git directory with one unlikely but possible commit hash
 func createLocalGitDirectory(t *testing.T) string {
-	dir, err := ioutil.TempDir(os.TempDir(), "s2i-test")
+	dir, err := ioutil.TempDir(os.TempDir(), "gitdir-s2i-test")
 	if err != nil {
 		t.Error(err)
 	}
-	os.Mkdir(filepath.Join(dir, ".git"), 0600)
+	os.MkdirAll(filepath.Join(dir, ".git/refs/heads"), 0777)
+	os.MkdirAll(filepath.Join(dir, ".git/refs/remotes"), 0777)
+	os.MkdirAll(filepath.Join(dir, ".git/branches"), 0777)
+	os.MkdirAll(filepath.Join(dir, ".git/objects/fo"), 0777)
+	os.Create(filepath.Join(dir, ".git/objects/fo") + "12345678901234567890123456789012345678") // 40 character SHA-1 hash
 	return dir
 }
 
-func TestIsLocalGitRepository(t *testing.T) {
+func createEmptyLocalGitDirectory(t *testing.T) string {
+	dir, err := ioutil.TempDir(os.TempDir(), "gitdir-s2i-test")
+	if err != nil {
+		t.Error(err)
+	}
+	os.MkdirAll(filepath.Join(dir, ".git/refs/heads"), 0777)
+	os.MkdirAll(filepath.Join(dir, ".git/refs/remotes"), 0777)
+	os.MkdirAll(filepath.Join(dir, ".git/branches"), 0777)
+	os.MkdirAll(filepath.Join(dir, ".git/objects"), 0777)
+	return dir
+}
+
+func TestIsValidGitRepository(t *testing.T) {
 	d := createLocalGitDirectory(t)
 	defer os.RemoveAll(d)
-	if isLocalGitRepository(d) == false {
+
+	// We have a .git that is populated
+	// Should return true with no error
+	ok, err := isValidGitRepository(d)
+	if !ok {
 		t.Errorf("The %q directory is git repository", d)
 	}
-	os.RemoveAll(filepath.Join(d, ".git"))
-	if isLocalGitRepository(d) == true {
+
+	if err != nil {
+		t.Errorf("isValidGitRepository returned an unexpected error: %q", err.Error())
+	}
+
+	d = createEmptyLocalGitDirectory(t)
+	defer os.RemoveAll(d)
+
+	// There are no tracking objects in the .git repository
+	// Should return true with an EmptyGitRepositoryError
+	ok, err = isValidGitRepository(d)
+	if !ok {
+		t.Errorf("The %q directory is a git repository, but is empty", d)
+	}
+
+	if err != nil {
+		if e, ok := err.(errors.Error); !ok || e.ErrorCode != errors.EmptyGitRepositoryError {
+			t.Errorf("isValidGitRepository returned an unexpected error: %q, expecting EmptyGitRepositoryError", err.Error())
+		}
+	} else {
+		t.Errorf("isValidGitRepository returned no error, expecting EmptyGitRepositoryError")
+	}
+
+	d = filepath.Join(d, ".git")
+
+	// There is no .git in the provided directory
+	// Should return false with no error
+	if ok, err = isValidGitRepository(d); ok {
 		t.Errorf("The %q directory is not git repository", d)
+	}
+
+	if err != nil {
+		t.Errorf("isValidGitRepository returned an unexpected error: %q", err.Error())
 	}
 }
 
@@ -70,13 +122,13 @@ func TestValidCloneSpec(t *testing.T) {
 	gh := New()
 
 	for _, scenario := range valid {
-		result := gh.ValidCloneSpec(scenario)
+		result, _ := gh.ValidCloneSpec(scenario)
 		if result == false {
 			t.Error(scenario)
 		}
 	}
 	for _, scenario := range invalid {
-		result := gh.ValidCloneSpec(scenario)
+		result, _ := gh.ValidCloneSpec(scenario)
 		if result {
 			t.Error(scenario)
 		}
