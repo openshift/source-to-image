@@ -4,7 +4,9 @@
 FROM busybox
 
 RUN mkdir -p /sti-fake/src && \
-    mkdir -p /tmp/scripts
+    mkdir -p /tmp/scripts && \
+	mkdir /usr/bin && \
+	ln -s /bin/env /usr/bin/env
 
 WORKDIR /
 

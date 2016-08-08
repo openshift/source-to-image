@@ -3,7 +3,9 @@
 #
 FROM busybox
 
-RUN mkdir -p /sti-fake/src && mkdir -p /opt/app-root/src
+RUN mkdir -p /sti-fake/src && mkdir -p /opt/app-root/src && \
+	mkdir /usr/bin && \
+	ln -s /bin/env /usr/bin/env
 
 WORKDIR /opt/app-root/src
 

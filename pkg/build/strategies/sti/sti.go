@@ -27,7 +27,7 @@ import (
 
 var (
 	// DefaultEntrypoint is the default entry point used when starting containers
-	DefaultEntrypoint = []string{"/bin/env"}
+	DefaultEntrypoint = []string{"/usr/bin/env"}
 
 	glog = utilglog.StderrLog
 
