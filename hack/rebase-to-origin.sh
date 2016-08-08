@@ -26,6 +26,7 @@ readonly exclude_pkgs=(
   pkg/cmd
   pkg/config
   pkg/create
+  pkg/docker/test
   pkg/run
   pkg/test
   pkg/version
@@ -41,6 +42,7 @@ pushd "${OS_ROOT}" >/dev/null
   git checkout -B "s2i-${s2i_short_ref}-bump" master
   rm -rf "${origin_s2i_vendor_dir}"/*
   cp -R "${S2I_ROOT}/pkg" "${origin_s2i_vendor_dir}/."
+  cp "${S2I_ROOT}/LICENSE" "${origin_s2i_vendor_dir}/."
   # remove test files from the vendor folder.
   find ${origin_s2i_vendor_dir}/pkg -name "*_test.go" -delete
   # Remove all explicitly excluded packages
