@@ -120,12 +120,18 @@ func New(config *api.Config, overrides build.Overrides) (*STI, error) {
 	}
 
 	if len(config.RuntimeImage) > 0 {
-		builder.runtimeInstaller = scripts.NewInstaller(config.RuntimeImage, config.ScriptsURL, config.ScriptDownloadProxyConfig, docker, config.PullAuthentication)
-
 		builder.runtimeDocker, err = dockerpkg.New(config.DockerConfig, config.RuntimeAuthentication)
 		if err != nil {
 			return builder, err
 		}
+
+		builder.runtimeInstaller = scripts.NewInstaller(
+			config.RuntimeImage,
+			config.ScriptsURL,
+			config.ScriptDownloadProxyConfig,
+			builder.runtimeDocker,
+			config.RuntimeAuthentication,
+		)
 	}
 
 	// The sources are downloaded using the Git downloader.
