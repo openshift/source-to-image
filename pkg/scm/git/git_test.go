@@ -2,7 +2,6 @@ package git
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -14,34 +13,8 @@ import (
 	"github.com/openshift/source-to-image/pkg/test"
 )
 
-// Creates a git directory with one unlikely but possible commit hash
-func createLocalGitDirectory(t *testing.T) string {
-	dir, err := ioutil.TempDir(os.TempDir(), "gitdir-s2i-test")
-	if err != nil {
-		t.Error(err)
-	}
-	os.MkdirAll(filepath.Join(dir, ".git/refs/heads"), 0777)
-	os.MkdirAll(filepath.Join(dir, ".git/refs/remotes"), 0777)
-	os.MkdirAll(filepath.Join(dir, ".git/branches"), 0777)
-	os.MkdirAll(filepath.Join(dir, ".git/objects/fo"), 0777)
-	os.Create(filepath.Join(dir, ".git/objects/fo") + "12345678901234567890123456789012345678") // 40 character SHA-1 hash
-	return dir
-}
-
-func createEmptyLocalGitDirectory(t *testing.T) string {
-	dir, err := ioutil.TempDir(os.TempDir(), "gitdir-s2i-test")
-	if err != nil {
-		t.Error(err)
-	}
-	os.MkdirAll(filepath.Join(dir, ".git/refs/heads"), 0777)
-	os.MkdirAll(filepath.Join(dir, ".git/refs/remotes"), 0777)
-	os.MkdirAll(filepath.Join(dir, ".git/branches"), 0777)
-	os.MkdirAll(filepath.Join(dir, ".git/objects"), 0777)
-	return dir
-}
-
 func TestIsValidGitRepository(t *testing.T) {
-	d := createLocalGitDirectory(t)
+	d := test.CreateLocalGitDirectory(t)
 	defer os.RemoveAll(d)
 
 	// We have a .git that is populated
@@ -55,7 +28,7 @@ func TestIsValidGitRepository(t *testing.T) {
 		t.Errorf("isValidGitRepository returned an unexpected error: %q", err.Error())
 	}
 
-	d = createEmptyLocalGitDirectory(t)
+	d = test.CreateEmptyLocalGitDirectory(t)
 	defer os.RemoveAll(d)
 
 	// There are no tracking objects in the .git repository
@@ -87,7 +60,7 @@ func TestIsValidGitRepository(t *testing.T) {
 }
 
 func TestValidCloneSpec(t *testing.T) {
-	gitLocalDir := createLocalGitDirectory(t)
+	gitLocalDir := test.CreateLocalGitDirectory(t)
 	defer os.RemoveAll(gitLocalDir)
 
 	valid := []string{"git@github.com:user/repo.git",
@@ -171,7 +144,7 @@ func TestValidCloneSpecRemoteOnly(t *testing.T) {
 }
 
 func TestMungeNoProtocolURL(t *testing.T) {
-	gitLocalDir := createLocalGitDirectory(t)
+	gitLocalDir := test.CreateLocalGitDirectory(t)
 	defer os.RemoveAll(gitLocalDir)
 
 	gh := New()

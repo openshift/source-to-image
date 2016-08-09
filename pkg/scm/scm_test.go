@@ -3,27 +3,15 @@ package scm
 import (
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/openshift/source-to-image/pkg/test"
 )
 
-func createLocalGitDirectory(t *testing.T) string {
-	dir, err := ioutil.TempDir(os.TempDir(), "gitdir-s2i-test")
-	if err != nil {
-		t.Error(err)
-	}
-	os.MkdirAll(filepath.Join(dir, ".git/refs/heads"), 0777)
-	os.MkdirAll(filepath.Join(dir, ".git/refs/remotes"), 0777)
-	os.MkdirAll(filepath.Join(dir, ".git/branches"), 0777)
-	os.MkdirAll(filepath.Join(dir, ".git/objects/foo"), 0777)
-	os.Create(filepath.Join(dir, ".git/objects/foo") + "bar")
-	return dir
-}
-
 func TestDownloaderForSource(t *testing.T) {
-	gitLocalDir := createLocalGitDirectory(t)
+	gitLocalDir := test.CreateLocalGitDirectory(t)
 	defer os.RemoveAll(gitLocalDir)
 	localDir, _ := ioutil.TempDir(os.TempDir(), "localdir-s2i-test")
 	defer os.RemoveAll(localDir)
@@ -72,7 +60,7 @@ func TestDownloaderForSource(t *testing.T) {
 }
 
 func TestDownloaderForSourceOnRelativeGit(t *testing.T) {
-	gitLocalDir := createLocalGitDirectory(t)
+	gitLocalDir := test.CreateLocalGitDirectory(t)
 	defer os.RemoveAll(gitLocalDir)
 	os.Chdir(gitLocalDir)
 	r, s, err := DownloaderForSource(".", false)
@@ -88,7 +76,7 @@ func TestDownloaderForSourceOnRelativeGit(t *testing.T) {
 }
 
 func TestDownloaderForceCopy(t *testing.T) {
-	gitLocalDir := createLocalGitDirectory(t)
+	gitLocalDir := test.CreateLocalGitDirectory(t)
 	defer os.RemoveAll(gitLocalDir)
 	os.Chdir(gitLocalDir)
 	r, s, err := DownloaderForSource(".", true)
