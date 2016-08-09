@@ -1,7 +1,11 @@
 package test
 
 import (
+	"io/ioutil"
 	"net/url"
+	"os"
+	"path/filepath"
+	"testing"
 
 	"github.com/openshift/source-to-image/pkg/api"
 )
@@ -80,4 +84,30 @@ func (f *FakeGit) GetInfo(repo string) *api.SourceInfo {
 		CommitID: "1bf4f04",
 		Location: "file:///foo",
 	}
+}
+
+// Creates a git directory with one unlikely but possible commit hash
+func CreateLocalGitDirectory(t *testing.T) string {
+	dir, err := ioutil.TempDir(os.TempDir(), "gitdir-s2i-test")
+	if err != nil {
+		t.Error(err)
+	}
+	os.MkdirAll(filepath.Join(dir, ".git/refs/heads"), 0777)
+	os.MkdirAll(filepath.Join(dir, ".git/refs/remotes"), 0777)
+	os.MkdirAll(filepath.Join(dir, ".git/branches"), 0777)
+	os.MkdirAll(filepath.Join(dir, ".git/objects/fo"), 0777)
+	os.Create(filepath.Join(dir, ".git/objects/fo") + "12345678901234567890123456789012345678") // 40 character SHA-1 hash
+	return dir
+}
+
+func CreateEmptyLocalGitDirectory(t *testing.T) string {
+	dir, err := ioutil.TempDir(os.TempDir(), "gitdir-s2i-test")
+	if err != nil {
+		t.Error(err)
+	}
+	os.MkdirAll(filepath.Join(dir, ".git/refs/heads"), 0777)
+	os.MkdirAll(filepath.Join(dir, ".git/refs/remotes"), 0777)
+	os.MkdirAll(filepath.Join(dir, ".git/branches"), 0777)
+	os.MkdirAll(filepath.Join(dir, ".git/objects"), 0777)
+	return dir
 }
