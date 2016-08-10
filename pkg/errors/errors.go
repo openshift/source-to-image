@@ -21,7 +21,6 @@ const (
 	STIContainerError
 	SourcePathError
 	UserNotAllowedError
-	MissingGitBinaryError
 	EmptyGitRepositoryError
 )
 
@@ -232,16 +231,6 @@ func NewUserNotAllowedError(image string, onbuild bool) error {
 		Message:    msg,
 		ErrorCode:  UserNotAllowedError,
 		Suggestion: fmt.Sprintf("modify image %q to use a numeric user within the allowed range or build without the --allowed-uids flag", image),
-	}
-}
-
-// NewMissingGitBinaryError returns a new error that indicates that we couldn't
-// find a Git binary in the path.
-func NewMissingGitBinaryError() error {
-	return Error{
-		Message:    "Git was not found in the PATH",
-		ErrorCode:  MissingGitBinaryError,
-		Suggestion: "Install Git from your distribution's vendor, or use --copy to ignore the repository.",
 	}
 }
 
