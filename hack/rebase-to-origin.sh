@@ -28,7 +28,6 @@ readonly exclude_pkgs=(
   pkg/create
   pkg/docker/test
   pkg/run
-  pkg/test
   pkg/version
 )
 
