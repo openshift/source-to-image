@@ -27,7 +27,7 @@ func DownloaderForSource(s string, forceCopy bool) (build.Downloader, string, er
 	details, mods, err := git.ParseFile(s)
 	glog.V(4).Infof("return from ParseFile file exists %v proto specified %v use copy %v", details.FileExists, details.ProtoSpecified, details.UseCopy)
 	if err != nil {
-		if e, ok := err.(errors.Error); !forceCopy || !(ok && (e.ErrorCode == errors.EmptyGitRepositoryError || e.ErrorCode == errors.MissingGitBinaryError)) {
+		if e, ok := err.(errors.Error); !forceCopy || !(ok && (e.ErrorCode == errors.EmptyGitRepositoryError)) {
 			return nil, s, err
 		}
 	}
