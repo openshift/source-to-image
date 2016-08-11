@@ -60,8 +60,8 @@ func (b *DockerRunner) Run(config *api.Config) error {
 	// and produced no data, such as when we would do a git clone with the --quiet option.
 	// We have not seen the hang when the Cmd produces output to stdout.
 
-	go docker.StreamContainerIO(errReader, nil, glog.Error)
-	go docker.StreamContainerIO(outReader, nil, glog.Info)
+	go docker.StreamContainerIO(errReader, nil, func(a ...interface{}) { glog.Error(a...) })
+	go docker.StreamContainerIO(outReader, nil, func(a ...interface{}) { glog.Info(a...) })
 
 	err := b.ContainerClient.RunContainer(opts)
 	// If we get a ContainerError, the original message reports the
