@@ -62,15 +62,6 @@ function test_debug() {
     echo
 }
 
-set +e
-img_count=$(docker images | grep -c sti_test/sti-fake)
-set -e
-
-if [ "${img_count}" != "10" ]; then
-    echo "You do not have necessary test images, be sure to run 'hack/build-test-images.sh' beforehand."
-    exit 1
-fi
-
 trap cleanup EXIT SIGINT
 
 echo "working dir:  ${WORK_DIR}"
@@ -113,6 +104,12 @@ s2i build "${WORK_DIR}/cakephp-ex" openshift/php-55-centos7 test --loglevel=5 &>
 check_result $? ""
 grep "Copying sources" "${WORK_DIR}/s2i-non-repo.log"
 check_result $? "${WORK_DIR}/s2i-non-repo.log"
+
+test_debug "s2i rebuild"
+s2i build https://github.com/openshift/sti-php.git --context-dir=5.5/test/test-app registry.access.redhat.com/openshift3/php-55-rhel7 rack-test-app --incremental=true --loglevel=5 &> "${WORK_DIR}/s2i-pre-rebuild.log"
+check_result $? "${WORK_DIR}/s2i-pre-rebuild.log"
+s2i rebuild rack-test-app:latest rack-test-app:v1 --force-pull=false -p never --loglevel=5 &> "${WORK_DIR}/s2i-rebuild.log"
+check_result $? "${WORK_DIR}/s2i-rebuild.log"
 
 test_debug "s2i usage"
 

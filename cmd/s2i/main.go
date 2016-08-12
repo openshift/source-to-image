@@ -216,7 +216,9 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 				cfg.PullAuthentication = docker.LoadAndGetImageRegistryAuth(r, cfg.Tag)
 			}
 
-			err := build.GenerateConfigFromLabels(cfg)
+			pr, err := docker.GetRebuildImage(cfg)
+			checkErr(err)
+			err = build.GenerateConfigFromLabels(cfg, pr)
 			checkErr(err)
 
 			if len(args) >= 2 {
