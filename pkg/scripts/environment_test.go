@@ -6,19 +6,6 @@ import (
 	"github.com/openshift/source-to-image/pkg/api"
 )
 
-func TestConvertEnvironment(t *testing.T) {
-	env := []Environment{
-		{"FOO", "BAR"},
-	}
-	result := ConvertEnvironment(env)
-	if len(result) != 1 {
-		t.Errorf("Expected 1 item, got %d", len(result))
-	}
-	if result[0] != "FOO=BAR" {
-		t.Errorf("Expected FOO=BAR, got %v", result)
-	}
-}
-
 func TestConvertEnvironmentList(t *testing.T) {
 	testEnv := api.EnvironmentList{
 		{Name: "Key1", Value: "Value1"},

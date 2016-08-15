@@ -358,7 +358,7 @@ func createBuildEnvironment(config *api.Config) []string {
 		glog.V(3).Infof("No user environment provided (%v)", err)
 	}
 
-	return append(scripts.ConvertEnvironment(env), scripts.ConvertEnvironmentList(config.Environment)...)
+	return append(scripts.ConvertEnvironmentList(env), scripts.ConvertEnvironmentList(config.Environment)...)
 }
 
 // Exists determines if the current build supports incremental workflow.
