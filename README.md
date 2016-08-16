@@ -12,7 +12,7 @@ ready-to-run images by injecting source code into a Docker container and letting
 
 For a deep dive on S2I you can view [this presentation](https://www.youtube.com/watch?v=flI6zx9wH6M).
 
-Want to try it right now?  Download the [latest release](https://github.com/openshift/source-to-image/releases/tag/v1.1.0) and run:
+Want to try it right now?  Download the [latest release](https://github.com/openshift/source-to-image/releases/latest) and run:
 
 	$ s2i build git://github.com/openshift/django-ex centos/python-35-centos7 hello-python
 	$ docker run -p 8080:8080 hello-python
@@ -39,9 +39,6 @@ For example, to create a reproducible build pipeline for Tomcat (the popular Jav
 4. Invoke source-to-image a second time using the WAR file from the previous step and the initial Tomcat image to create the runtime image
 
 By placing our build logic inside of images, and by combining the images into multiple steps, we can keep our runtime environment close to our build environment (same JDK, same Tomcat JARs) without requiring build tools to be deployed to production.
-
-Learn more about [building your own images](#getting-started) and [how to use a non-builder image for the final application image](https://github.com/openshift/source-to-image/blob/master/docs/runtime_image.md).
-
 
 ## Goals
 
@@ -71,7 +68,7 @@ image:
 Additionally for the best user experience and optimized `s2i` operation we suggest images
 to have `/bin/sh` and `tar` commands available.
 
-See a practical tutorial on how to create a builder image [here](examples/README.md) and read [this](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md) for a detailed description of the requirements and scripts along with examples of builder images.
+See [a practical tutorial on how to create a builder image](examples/README.md) and read [a detailed description of the requirements and scripts along with examples of builder images](docs/builder_image.md).
 
 ## Build workflow
 
@@ -240,7 +237,10 @@ $ s2i build git://github.com/bparees/openshift-jee-sample openshift/wildfly-100-
 $ docker run --rm -i -p :8080 -t test-jee-app
 ```
 
-Interested in more advanced `s2i` usage? See [here](https://github.com/openshift/source-to-image/blob/master/docs/cli.md)
-for detailed descriptions of the different CLI commands with examples.
+Want to know more? Read the following resources:
 
-Running into some issues and need some advice debugging?  Peruse [here](https://github.com/openshift/source-to-image/blob/master/docs/debugging-s2i.md) for some tips.
+* [Descriptions and examples of the S2I commands](docs/cli.md)
+* [Instructions for using builder images](docs/user_guide.md)
+* [Guidance for S2I builder image creators](docs/builder_image.md)
+* [Using a non-builder image for the base of the application image](docs/runtime_image.md)
+* [Troubleshooting and debugging S2I problems](docs/debugging-s2i.md)
