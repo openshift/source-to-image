@@ -80,5 +80,5 @@ s2i::util::sed() {
 }
 
 s2i::util::find_files() {
-  find . -type d -name Godeps -prune -o -name '*.go' -print
+  find . -type d -name vendor -prune -o -name '*.go' -print
 }

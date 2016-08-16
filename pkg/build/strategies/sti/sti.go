@@ -437,6 +437,9 @@ func (builder *STI) Save(config *api.Config) (err error) {
 	go dockerpkg.StreamContainerIO(errReader, nil, func(a ...interface{}) { glog.Info(a...) })
 	err = builder.docker.RunContainer(opts)
 	if e, ok := err.(errors.ContainerError); ok {
+		// even with deferred close above, close errReader now so we avoid data race condition on errOutput;
+		// closing will cause StreamContainerIO to exit, thus releasing the writer in the equation
+		errReader.Close()
 		return errors.NewSaveArtifactsError(image, e.Output, err)
 	}
 	return err
@@ -598,6 +601,9 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 		wg.Done()
 	}
 	if e, ok := err.(errors.ContainerError); ok {
+		// even with deferred close above, close errReader now so we avoid data race condition on errOutput;
+		// closing will cause StreamContainerIO to exit, thus releasing the writer in the equation
+		errReader.Close()
 		return errors.NewContainerError(config.BuilderImage, e.ErrorCode, errOutput)
 	}
 	return err
