@@ -15,7 +15,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -959,9 +958,10 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 		errorChannel := make(chan error)
 		timeoutTimer := time.NewTimer(DefaultDockerTimeout)
 		var attachLoggingError error
-		// unit tests found a DATA RACE on attachLoggingError; a simple mutex sufficed for proper coordination; note, the holdHijacedConnection will exit
-		// if the container wait exits
-		var mutex sync.Mutex
+		// unit tests found a DATA RACE on attachLoggingError; at first a simple mutex seemed sufficient, but a race condition in holdHijackedConnection manifested
+		// where <-receiveStdout would block even after the container had exitted, blocking the return with attachLoggingError; rather than trying to discern if the
+		// container exited in holdHijackedConnection, we'll using channel based signaling coupled with a time to avoid blocking forever
+		attachExit := make(chan bool, 1)
 		go func() {
 			ctx, cancel := getDefaultContext(DefaultDockerTimeout)
 			defer cancel()
@@ -973,9 +973,8 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 			}
 			defer resp.Close()
 			sopts := opts.asDockerAttachToStreamOptions()
-			mutex.Lock()
-			defer mutex.Unlock()
 			attachLoggingError = d.holdHijackedConnection(sopts.RawTerminal, sopts.InputStream, sopts.OutputStream, sopts.ErrorStream, resp)
+			attachExit <- true
 		}()
 
 		// this error check should handle the result from the d.client.ContainerAttach call ... we progress to start when that occurs
@@ -1056,9 +1055,12 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 			}
 		}
 
-		mutex.Lock()
-		defer mutex.Unlock()
-		return attachLoggingError
+		select {
+		case <-attachExit:
+			return attachLoggingError
+		case <-time.After(DefaultDockerTimeout):
+			return nil
+		}
 	})
 
 }
