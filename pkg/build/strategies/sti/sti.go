@@ -26,9 +26,6 @@ import (
 )
 
 var (
-	// DefaultEntrypoint is the default entry point used when starting containers
-	DefaultEntrypoint = []string{"/usr/bin/env"}
-
 	glog = utilglog.StderrLog
 
 	// List of directories that needs to be present inside working dir
@@ -420,7 +417,6 @@ func (builder *STI) Save(config *api.Config) (err error) {
 	opts := dockerpkg.RunContainerOptions{
 		Image:           image,
 		User:            user,
-		Entrypoint:      DefaultEntrypoint,
 		ExternalScripts: builder.externalScripts[api.SaveArtifacts],
 		ScriptsURL:      config.ScriptsURL,
 		Destination:     config.Destination,
@@ -467,10 +463,9 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 	}
 
 	opts := dockerpkg.RunContainerOptions{
-		Image:      config.BuilderImage,
-		Entrypoint: DefaultEntrypoint,
-		Stdout:     outWriter,
-		Stderr:     errWriter,
+		Image:  config.BuilderImage,
+		Stdout: outWriter,
+		Stderr: errWriter,
 		// The PullImage is false because the PullImage function should be called
 		// before we run the container
 		PullImage:       false,

@@ -18,9 +18,14 @@ import (
 	"github.com/openshift/source-to-image/pkg/util/user"
 )
 
-// glog is a placeholder until the builders pass an output stream down
-// client facing libraries should not be using glog
-var glog = utilglog.StderrLog
+var (
+	// glog is a placeholder until the builders pass an output stream down
+	// client facing libraries should not be using glog
+	glog = utilglog.StderrLog
+
+	// DefaultEntrypoint is the default entry point used when starting containers
+	DefaultEntrypoint = []string{"/usr/bin/env"}
+)
 
 // ImageReference points to a Docker image.
 type ImageReference struct {
