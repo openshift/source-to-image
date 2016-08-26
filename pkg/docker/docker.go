@@ -67,7 +67,7 @@ const (
 
 	// DefaultDockerTimeout specifies a timeout for Docker API calls. When this
 	// timeout is reached, certain Docker API calls might error out.
-	DefaultDockerTimeout = 20 * time.Second
+	DefaultDockerTimeout = 60 * time.Second
 
 	// DefaultShmSize is the default shared memory size to use (in bytes) if not specified.
 	DefaultShmSize = int64(1024 * 1024 * 64)
