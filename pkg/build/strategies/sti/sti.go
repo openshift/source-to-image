@@ -565,7 +565,6 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 		}()
 
 		opts.Stdin = r
-		defer wg.Wait()
 	}
 
 	go func(reader io.Reader) {
@@ -596,9 +595,8 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 	go dockerpkg.StreamContainerIO(errReader, &errOutput, func(a ...interface{}) { glog.Info(a...) })
 
 	err := builder.docker.RunContainer(opts)
-	if util.IsTimeoutError(err) {
-		// Cancel waiting for source input if the container timeouts
-		wg.Done()
+	if !config.LayeredBuild && !util.IsTimeoutError(err) {
+		defer wg.Wait()
 	}
 	if e, ok := err.(errors.ContainerError); ok {
 		// even with deferred close above, close errReader now so we avoid data race condition on errOutput;
