@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"github.com/openshift/source-to-image/pkg/api"
-	"github.com/openshift/source-to-image/pkg/build/strategies/sti"
 	"github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/errors"
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
@@ -47,7 +46,6 @@ func (b *DockerRunner) Run(config *api.Config) error {
 
 	opts := docker.RunContainerOptions{
 		Image:        config.Tag,
-		Entrypoint:   sti.DefaultEntrypoint,
 		Stdout:       outWriter,
 		Stderr:       errWriter,
 		TargetImage:  true,

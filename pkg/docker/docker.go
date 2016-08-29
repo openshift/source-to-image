@@ -878,25 +878,24 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 		}
 	}
 
-	// if the original image has no entrypoint, and the run invocation
-	// is trying to set an entrypoint, ignore it.  We only want to
-	// set the entrypoint if we need to override a default entrypoint
-	// in the image.  This allows us to still work with a minimal image
-	// that does not contain "/usr/bin/env" since we don't attempt to override
-	// the entrypoint.
-	if len(opts.Entrypoint) != 0 {
-		entrypoint, err := d.GetImageEntrypoint(image)
-		if err != nil {
-			return err
-		}
-		if len(entrypoint) == 0 {
-			opts.Entrypoint = nil
-		}
-	}
-
 	if err != nil {
 		glog.V(0).Infof("error: Unable to get image metadata for %s: %v", image, err)
 		return err
+	}
+
+	entrypoint, err := d.GetImageEntrypoint(image)
+	if err != nil {
+		return fmt.Errorf("Couldn't get entrypoint of %q image: %v", image, err)
+	}
+
+	// If the image has an entrypoint already defined,
+	// it will be overridden either by DefaultEntrypoint,
+	// or by the value in opts.Entrypoint.
+	// If the image does not have an entrypoint, but
+	// opts.Entrypoint is supplied, opts.Entrypoint will
+	// be respected.
+	if len(entrypoint) != 0 && len(opts.Entrypoint) == 0 {
+		opts.Entrypoint = DefaultEntrypoint
 	}
 
 	// tarDestination will be passed as location to PostExecute function
