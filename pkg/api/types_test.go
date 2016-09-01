@@ -35,6 +35,7 @@ func TestVolumeListSet(t *testing.T) {
 			for _, g := range got {
 				if g.Source == exp.Source && g.Destination == exp.Destination {
 					found = true
+					break
 				}
 			}
 			if !found {
@@ -72,6 +73,7 @@ func TestEnvironmentSet(t *testing.T) {
 			for _, g := range got {
 				if g.Name == exp.Name && g.Value == exp.Value {
 					found = true
+					break
 				}
 			}
 			if !found {
