@@ -57,6 +57,7 @@ func TestExpandInjectedFiles(t *testing.T) {
 		for _, f := range files {
 			if f == exp {
 				found = true
+				break
 			}
 		}
 		if !found {
