@@ -540,11 +540,12 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 		// TODO: be able to pass a stream directly to the Docker build to avoid the double temp hit
 		r, w := io.Pipe()
 		go func() {
+			// reminder, multiple defers follow a stack, LIFO order of processing
+			defer wg.Done()
 			// Wait for the injections to complete and check the error. Do not start
 			// streaming the sources when the injection failed.
 			<-injectionComplete
 			if injectionError != nil {
-				wg.Done()
 				return
 			}
 			glog.V(2).Info("starting the source uploading ...")
@@ -554,7 +555,6 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 				if r := recover(); r != nil {
 					glog.Errorf("recovered panic: %#v", r)
 				}
-				wg.Done()
 			}()
 			err = builder.tar.CreateTarStream(uploadDir, false, w)
 		}()
