@@ -115,7 +115,7 @@ test_connection() {
   while [ $attempt -le $max_attempts ]; do
     echo "Sending GET request to http://$(container_ip):${test_port}/"
     if (echo "$OSTYPE" | egrep -qs 'darwin'); then
-      echo "Warning for OSX users: if you can't access the container's IP ${container_ip} directly (because you use boot2docker for example)"
+      echo "Warning for OSX users: if you can't access the container's IP $(container_ip) directly (because you use boot2docker for example)"
       echo "you should run the curl command in a container, for example using:"
       echo "docker run --rm -it sequenceiq/alpine-curl curl -s -w %{http_code} -o /dev/null http://$(container_ip):${test_port}/"
     fi
