@@ -18,8 +18,8 @@
 		},
 		{
 			"ImportPath": "github.com/Sirupsen/logrus",
-			"Comment": "v0.10.0-21-g32055c3",
-			"Rev": "32055c351ea8b00b96d70f28db48d9840feaf0ec"
+			"Comment": "v0.10.0-38-g3ec0642",
+			"Rev": "3ec0642a7fb6488f65b06f9040adc67e3990296a"
 		},
 		{
 			"ImportPath": "github.com/Sirupsen/logrus/formatters/logstash",
