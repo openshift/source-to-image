@@ -229,6 +229,8 @@ Note: Syslog hook also support connecting to local syslog (Ex. "/dev/log" or "/v
 | [ElasticSearch](https://github.com/sohlich/elogrus) | Hook for logging to ElasticSearch|
 | [Sumorus](https://github.com/doublefree/sumorus) | Hook for logging to [SumoLogic](https://www.sumologic.com/)|
 | [Logstash](https://github.com/bshuster-repo/logrus-logstash-hook) | Hook for logging to [Logstash](https://www.elastic.co/products/logstash) |
+| [Logmatic.io](https://github.com/logmatic/logmatic-go) | Hook for logging to [Logmatic.io](http://logmatic.io/) |
+
 
 #### Level logging
 
@@ -384,3 +386,36 @@ assert.Equal("Hello error", hook.LastEntry().Message)
 hook.Reset()
 assert.Nil(hook.LastEntry())
 ```
+
+#### Fatal handlers
+
+Logrus can register one or more functions that will be called when any `fatal`
+level message is logged. The registered handlers will be executed before
+logrus performs a `os.Exit(1)`. This behavior may be helpful if callers need
+to gracefully shutdown. Unlike a `panic("Something went wrong...")` call which can be intercepted with a deferred `recover` a call to `os.Exit(1)` can not be intercepted.
+
+```
+...
+handler := func() {
+  // gracefully shutdown something...
+}
+logrus.RegisterExitHandler(handler)
+...
+```
+
+#### Thread safty
+
+By default Logger is protected by mutex for concurrent writes, this mutex is invoked when calling hooks and writing logs.
+If you are sure such locking is not needed, you can call logger.SetNoLock() to disable the locking.
+
+Situation when locking is not needed includes:
+
+* You have no hooks registered, or hooks calling is already thread-safe.
+
+* Writing to logger.Out is already thread-safe, for example:
+
+  1) logger.Out is protected by locks.
+
+  2) logger.Out is a os.File handler opened with `O_APPEND` flag, and every write is smaller than 4k. (This allow multi-thread/multi-process writing)
+
+     (Refer to http://www.notthewizard.com/2014/06/17/are-files-appends-really-atomic/)
