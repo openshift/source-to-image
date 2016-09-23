@@ -12,6 +12,11 @@
 			"Rev": "'75cd24fc2f2c2a2088577d12123ddee5f54e0675'"
 		},
 		{
+			"ImportPath": "github.com/Microsoft/go-winio",
+			"Comment": "v0.3.5",
+			"Rev": "4f1a71750d95a5a8a46c40a67ffbed8129c2f138"
+		},
+		{
 			"ImportPath": "github.com/Sirupsen/logrus",
 			"Comment": "v0.10.0-21-g32055c3",
 			"Rev": "32055c351ea8b00b96d70f28db48d9840feaf0ec"
