@@ -55,9 +55,10 @@ func (step *storePreviousImageStep) execute(ctx *postExecutorStepContext) error 
 	if step.builder.incremental && step.builder.config.RemovePreviousImage {
 		glog.V(3).Info("Executing step: store previous image")
 		ctx.previousImageID = step.getPreviousImage()
-	} else {
-		glog.V(3).Info("Skipping step: store previous image")
+		return nil
 	}
+
+	glog.V(3).Info("Skipping step: store previous image")
 	return nil
 }
 
@@ -79,9 +80,10 @@ func (step *removePreviousImageStep) execute(ctx *postExecutorStepContext) error
 	if step.builder.incremental && step.builder.config.RemovePreviousImage {
 		glog.V(3).Info("Executing step: remove previous image")
 		step.removePreviousImage(ctx.previousImageID)
-	} else {
-		glog.V(3).Info("Skipping step: remove previous image")
+		return nil
 	}
+
+	glog.V(3).Info("Skipping step: remove previous image")
 	return nil
 }
 
@@ -128,6 +130,7 @@ func (step *commitImageStep) execute(ctx *postExecutorStepContext) error {
 
 	ctx.imageID, err = commitContainer(step.docker, ctx.containerID, cmd, user, step.builder.config.Tag, step.builder.env, entrypoint, ctx.labels)
 	if err != nil {
+		step.builder.result.BuildInfo.FailureReason = api.ReasonCommitContainerFailed
 		return err
 	}
 
@@ -383,10 +386,10 @@ func (step *invokeCallbackStep) execute(ctx *postExecutorStepContext) error {
 		glog.V(3).Info("Executing step: invoke callback url")
 		step.builder.result.Messages = step.callbackInvoker.ExecuteCallback(step.builder.config.CallbackURL,
 			step.builder.result.Success, ctx.labels, step.builder.result.Messages)
-	} else {
-		glog.V(3).Info("Skipping step: invoke callback url")
+		return nil
 	}
 
+	glog.V(3).Info("Skipping step: invoke callback url")
 	return nil
 }
 

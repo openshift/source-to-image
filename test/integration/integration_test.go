@@ -293,7 +293,7 @@ func (i *integrationTest) exerciseCleanAllowedUIDsBuild(tag, imageName string, e
 		ScriptsURL:        "",
 	}
 	config.AllowedUIDs.Set("1-")
-	_, err := strategies.GetStrategy(config)
+	_, _, err := strategies.GetStrategy(config)
 	if err != nil && !expectError {
 		t.Fatalf("Cannot create a new builder: %v", err)
 	}
@@ -349,7 +349,7 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 		CallbackURL:       callbackURL,
 		ScriptsURL:        scriptsURL}
 
-	b, err := strategies.GetStrategy(config)
+	b, _, err := strategies.GetStrategy(config)
 	if err != nil {
 		t.Fatalf("Cannot create a new builder.")
 	}
@@ -432,7 +432,7 @@ func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injectio
 		Tag:               tag,
 		Injections:        injectionList,
 	}
-	builder, err := strategies.GetStrategy(config)
+	builder, _, err := strategies.GetStrategy(config)
 	if err != nil {
 		t.Fatalf("Unable to create builder: %v", err)
 	}
@@ -475,7 +475,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 		RemovePreviousImage: removePreviousImage,
 	}
 
-	builder, err := strategies.GetStrategy(config)
+	builder, _, err := strategies.GetStrategy(config)
 	if err != nil {
 		t.Fatalf("Unable to create builder: %v", err)
 	}
@@ -499,7 +499,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 		PreviousImagePullPolicy: api.PullIfNotPresent,
 	}
 
-	builder, err = strategies.GetStrategy(config)
+	builder, _, err = strategies.GetStrategy(config)
 	if err != nil {
 		t.Fatalf("Unable to create incremental builder: %v", err)
 	}

@@ -138,24 +138,30 @@ func (builder *Layered) SourceTar(config *api.Config) (io.ReadCloser, error) {
 // Build handles the `docker build` equivalent execution, returning the
 // success/failure details.
 func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
+	buildResult := &api.Result{}
+
 	if config.HasOnBuild && config.BlockOnBuild {
-		return nil, fmt.Errorf("builder image uses ONBUILD instructions but ONBUILD is not allowed")
+		buildResult.BuildInfo.FailureReason = api.ReasonOnBuildForbidden
+		return buildResult, fmt.Errorf("builder image uses ONBUILD instructions but ONBUILD is not allowed")
 	}
 
 	if err := builder.CreateDockerfile(config); err != nil {
-		return nil, err
+		buildResult.BuildInfo.FailureReason = api.ReasonDockerFileCreateFailed
+		return buildResult, err
 	}
 
 	glog.V(2).Info("Creating application source code image")
 	tarStream, err := builder.SourceTar(config)
 	if err != nil {
-		return nil, err
+		buildResult.BuildInfo.FailureReason = api.ReasonTarSourceFailed
+		return buildResult, err
 	}
 	defer tarStream.Close()
 
 	namedReference, err := reference.ParseNamed(builder.config.BuilderImage)
 	if err != nil {
-		return nil, err
+		buildResult.BuildInfo.FailureReason = api.ReasonGenericS2IBuildFailed
+		return buildResult, err
 	}
 	newBuilderImage := fmt.Sprintf("%s:s2i-layered-%d", namedReference.Name(), time.Now().UnixNano())
 
@@ -187,7 +193,8 @@ func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 
 	glog.V(2).Infof("Building new image %s with scripts and sources already inside", newBuilderImage)
 	if err = builder.docker.BuildImage(opts); err != nil {
-		return nil, err
+		buildResult.BuildInfo.FailureReason = api.ReasonDockerImageBuildFailed
+		return buildResult, err
 	}
 
 	// upon successful build we need to modify current config
@@ -202,21 +209,22 @@ func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 	} else {
 		builder.config.ScriptsURL, err = builder.docker.GetScriptsURL(newBuilderImage)
 		if err != nil {
-			return nil, err
+			buildResult.BuildInfo.FailureReason = api.ReasonGenericS2IBuildFailed
+			return buildResult, err
 		}
 	}
 
 	glog.V(2).Infof("Building %s using sti-enabled image", builder.config.Tag)
 	if err := builder.scripts.Execute(api.Assemble, config.AssembleUser, builder.config); err != nil {
+		buildResult.BuildInfo.FailureReason = api.ReasonAssembleFailed
 		switch e := err.(type) {
 		case errors.ContainerError:
-			return nil, errors.NewAssembleError(builder.config.Tag, e.Output, e)
+			return buildResult, errors.NewAssembleError(builder.config.Tag, e.Output, e)
 		default:
-			return nil, err
+			return buildResult, err
 		}
 	}
+	buildResult.Success = true
 
-	return &api.Result{
-		Success: true,
-	}, nil
+	return buildResult, nil
 }
