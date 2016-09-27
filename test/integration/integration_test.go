@@ -82,6 +82,15 @@ type integrationTest struct {
 	setupComplete bool
 }
 
+func (i integrationTest) InspectImage(name string) (*dockertypes.ImageInspect, error) {
+	ctx, _ := context.WithTimeout(context.Background(), 2*time.Minute)
+	resp, _, err := i.engineClient.ImageInspectWithRaw(ctx, name, true)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
 var (
 	FakeScriptsFileURL string
 )
@@ -124,7 +133,7 @@ func dockerClient(config *api.DockerConfig) (dockertools.DockerInterface, docker
 	if err != nil {
 		return nil, dockerapi.Client{}, err
 	}
-	k8sDocker := dockertools.ConnectToDockerOrDie(config.Endpoint)
+	k8sDocker := dockertools.ConnectToDockerOrDie(config.Endpoint, 0)
 	return k8sDocker, *client, nil
 }
 
@@ -503,7 +512,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 	defer i.removeContainer(containerID)
 	i.checkIncrementalBuildState(containerID, resp.WorkingDir, expectClean)
 
-	_, err = i.dockerClient.InspectImage(previousImageID)
+	_, err = i.InspectImage(previousImageID)
 	if removePreviousImage {
 		if err == nil {
 			t.Errorf("Previous image %s not deleted", previousImageID)
@@ -521,7 +530,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 
 // Support methods
 func (i *integrationTest) checkForImage(tag string) {
-	_, err := i.dockerClient.InspectImage(tag)
+	_, err := i.InspectImage(tag)
 	if err != nil {
 		i.t.Errorf("Couldn't find image with tag: %s", tag)
 	}

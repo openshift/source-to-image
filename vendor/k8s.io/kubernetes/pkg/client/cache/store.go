@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,6 +44,7 @@ type Store interface {
 	// given list. Store takes ownership of the list, you should not reference
 	// it after calling this function.
 	Replace([]interface{}, string) error
+	Resync() error
 }
 
 // KeyFunc knows how to make a key from an object. Implementations should be deterministic.
@@ -98,7 +99,7 @@ func SplitMetaNamespaceKey(key string) (namespace, name string, err error) {
 		// name only, no namespace
 		return "", parts[0], nil
 	case 2:
-		// name and namespace
+		// namespace and name
 		return parts[0], parts[1], nil
 	}
 
@@ -215,6 +216,11 @@ func (c *cache) Replace(list []interface{}, resourceVersion string) error {
 	}
 	c.cacheStorage.Replace(items, resourceVersion)
 	return nil
+}
+
+// Resync touches all items in the store to force processing
+func (c *cache) Resync() error {
+	return c.cacheStorage.Resync()
 }
 
 // NewStore returns a Store implemented simply with a map and a lock.
