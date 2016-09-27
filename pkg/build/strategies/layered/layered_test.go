@@ -60,8 +60,8 @@ func TestBuildOK(t *testing.T) {
 	if !l.config.LayeredBuild {
 		t.Errorf("Expected LayeredBuild to be true!")
 	}
-	if m, _ := regexp.MatchString(`test/image-\d+`, l.config.BuilderImage); !m {
-		t.Errorf("Expected BuilderImage test/image-withnumbers, but got %s", l.config.BuilderImage)
+	if m, _ := regexp.MatchString(`test/image:s2i-layered-\d+`, l.config.BuilderImage); !m {
+		t.Errorf("Expected BuilderImage test/image:s2i-layered-withnumbers, but got %s", l.config.BuilderImage)
 	}
 	// without config.Destination explicitly set, we should get /tmp/scripts for the scripts url
 	// assuming the assemble script we created above is off the working dir
@@ -130,8 +130,8 @@ func TestBuildNoScriptsProvided(t *testing.T) {
 	if !l.config.LayeredBuild {
 		t.Errorf("Expected LayeredBuild to be true!")
 	}
-	if m, _ := regexp.MatchString(`test/image-\d+`, l.config.BuilderImage); !m {
-		t.Errorf("Expected BuilderImage test/image-withnumbers, but got %s", l.config.BuilderImage)
+	if m, _ := regexp.MatchString(`test/image:s2i-layered-\d+`, l.config.BuilderImage); !m {
+		t.Errorf("Expected BuilderImage test/image:s2i-layered-withnumbers, but got %s", l.config.BuilderImage)
 	}
 	if len(l.config.Destination) != 0 {
 		t.Errorf("Unexpected Destination %s", l.config.Destination)
@@ -178,8 +178,8 @@ func TestBuildErrorBuildImage(t *testing.T) {
 func TestBuildErrorBadImageName(t *testing.T) {
 	l := newFakeLayered()
 	_, err := l.Build(l.config)
-	if err == nil || !strings.Contains(err.Error(), "must be two or three segments separated by slashes") {
-		t.Errorf("An docker spec parse error was expected, but got different: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "repository name must have at least one component") {
+		t.Errorf("A docker spec parse error was expected, but got different: %v", err)
 	}
 }
 
