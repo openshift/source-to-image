@@ -639,8 +639,10 @@ func (d *stiDocker) GetLabels(name string) (map[string]string, error) {
 
 // getImageName checks the image name and adds DefaultTag if none is specified
 func getImageName(name string) string {
-	_, tag, _ := parseRepositoryTag(name)
-	if len(tag) == 0 {
+	_, tag, id := parseRepositoryTag(name)
+	if len(tag) == 0 && len(id) == 0 {
+		//_, tag, _ := parseRepositoryTag(name)
+		//if len(tag) == 0 {
 		return strings.Join([]string{name, DefaultTag}, ":")
 	}
 
