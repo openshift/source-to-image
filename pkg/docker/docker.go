@@ -128,6 +128,7 @@ type Client interface {
 	CopyToContainer(ctx context.Context, container, path string, content io.Reader, opts dockertypes.CopyToContainerOptions) error
 	CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, dockertypes.ContainerPathStat, error)
 	ImageBuild(ctx context.Context, buildContext io.Reader, options dockertypes.ImageBuildOptions) (dockertypes.ImageBuildResponse, error)
+	ImageInspectWithRaw(ctx context.Context, imageID string, getSize bool) (dockertypes.ImageInspect, []byte, error)
 }
 
 type stiDocker struct {
@@ -137,6 +138,18 @@ type stiDocker struct {
 	dialer           *net.Dialer
 	pullAuth         dockertypes.AuthConfig
 	endpoint         string
+}
+
+func (s stiDocker) InspectImage(name string) (*dockertypes.ImageInspect, error) {
+	ctx, _ := context.WithTimeout(context.Background(), 2*time.Minute)
+	resp, _, err := s.client.ImageInspectWithRaw(ctx, name, true)
+	if err != nil {
+		if dockerapi.IsErrImageNotFound(err) {
+			return nil, fmt.Errorf("no such image :%q", name)
+		}
+		return nil, err
+	}
+	return &resp, nil
 }
 
 type PostExecutor interface {
@@ -295,7 +308,7 @@ func New(config *api.DockerConfig, auth api.AuthConfig) (Docker, error) {
 	if err != nil {
 		return nil, err
 	}
-	k8sDocker := dockertools.ConnectToDockerOrDie(config.Endpoint)
+	k8sDocker := dockertools.ConnectToDockerOrDie(config.Endpoint, 0)
 	return &stiDocker{
 		kubeDockerClient: k8sDocker,
 		client:           client,
@@ -318,7 +331,7 @@ func getDefaultContext(timeout time.Duration) (context.Context, context.CancelFu
 // GetImageWorkdir returns the WORKDIR property for the given image name.
 // When the WORKDIR is not set or empty, return "/" instead.
 func (d *stiDocker) GetImageWorkdir(name string) (string, error) {
-	resp, err := d.kubeDockerClient.InspectImage(name)
+	resp, err := d.InspectImage(name)
 	if err != nil {
 		return "", err
 	}
@@ -334,7 +347,7 @@ func (d *stiDocker) GetImageWorkdir(name string) (string, error) {
 
 // GetImageEntrypoint returns the ENTRYPOINT property for the given image name.
 func (d *stiDocker) GetImageEntrypoint(name string) ([]string, error) {
-	image, err := d.kubeDockerClient.InspectImage(name)
+	image, err := d.InspectImage(name)
 	if err != nil {
 		return nil, err
 	}
@@ -469,7 +482,7 @@ func (d *stiDocker) DownloadFromContainer(containerPath string, w io.Writer, con
 // IsImageInLocalRegistry determines whether the supplied image is in the local registry.
 func (d *stiDocker) IsImageInLocalRegistry(name string) (bool, error) {
 	name = getImageName(name)
-	resp, err := d.kubeDockerClient.InspectImage(name)
+	resp, err := d.InspectImage(name)
 	if resp != nil {
 		return true, nil
 	}
@@ -483,7 +496,7 @@ func (d *stiDocker) IsImageInLocalRegistry(name string) (bool, error) {
 // an image if one has been specified
 func (d *stiDocker) GetImageUser(name string) (string, error) {
 	name = getImageName(name)
-	resp, err := d.kubeDockerClient.InspectImage(name)
+	resp, err := d.InspectImage(name)
 	if err != nil {
 		glog.V(4).Infof("error inspecting image %s: %v", name, err)
 		return "", errors.NewInspectImageError(name, err)
@@ -512,7 +525,7 @@ func (d *stiDocker) IsImageOnBuild(name string) bool {
 // for the given image
 func (d *stiDocker) GetOnBuild(name string) ([]string, error) {
 	name = getImageName(name)
-	resp, err := d.kubeDockerClient.InspectImage(name)
+	resp, err := d.InspectImage(name)
 	if err != nil {
 		glog.V(4).Infof("error inspecting image %s: %v", name, err)
 		return nil, errors.NewInspectImageError(name, err)
@@ -554,7 +567,7 @@ func (d *stiDocker) CheckAndPullImage(name string) (*api.Image, error) {
 // CheckImage checks image from the local registry.
 func (d *stiDocker) CheckImage(name string) (*api.Image, error) {
 	name = getImageName(name)
-	inspect, err := d.kubeDockerClient.InspectImage(name)
+	inspect, err := d.InspectImage(name)
 	if err != nil {
 		glog.V(4).Infof("error inspecting image %s: %v", name, err)
 		return nil, errors.NewInspectImageError(name, err)
@@ -575,7 +588,7 @@ func (d *stiDocker) PullImage(name string) (*api.Image, error) {
 	if err != nil {
 		return nil, errors.NewPullImageError(name, err)
 	}
-	resp, err := d.kubeDockerClient.InspectImage(name)
+	resp, err := d.InspectImage(name)
 	if err != nil {
 		return nil, errors.NewPullImageError(name, err)
 	}
@@ -616,7 +629,7 @@ func (d *stiDocker) RemoveContainer(id string) error {
 // GetLabels retrieves the labels of the given image.
 func (d *stiDocker) GetLabels(name string) (map[string]string, error) {
 	name = getImageName(name)
-	resp, err := d.kubeDockerClient.InspectImage(name)
+	resp, err := d.InspectImage(name)
 	if err != nil {
 		glog.V(4).Infof("error inspecting image %s: %v", name, err)
 		return nil, errors.NewInspectImageError(name, err)
@@ -869,7 +882,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 
 	// get info about the specified image
 	image := createOpts.Config.Image
-	inspect, err := d.kubeDockerClient.InspectImage(image)
+	inspect, err := d.InspectImage(image)
 	imageMetadata := &api.Image{}
 	if err == nil {
 		updateImageWithInspect(imageMetadata, inspect)
@@ -1071,7 +1084,7 @@ func containerNameOrID(c *dockertypes.ContainerCreateResponse) string {
 // GetImageID retrieves the ID of the image identified by name
 func (d *stiDocker) GetImageID(name string) (string, error) {
 	name = getImageName(name)
-	image, err := d.kubeDockerClient.InspectImage(name)
+	image, err := d.InspectImage(name)
 	if err != nil {
 		return "", err
 	}

@@ -31,127 +31,11 @@ func TestContainerName(t *testing.T) {
 
 func getDocker(client Client) *stiDocker {
 	//k8s has its own fake docker client mechanism
-	k8sDocker := dockertools.ConnectToDockerOrDie("fake://")
+	k8sDocker := dockertools.ConnectToDockerOrDie("fake://", 0)
 	return &stiDocker{
 		kubeDockerClient: k8sDocker,
 		client:           client,
 		pullAuth:         dockertypes.AuthConfig{},
-	}
-}
-
-//NOTE, neither k8s kube client nor engine api make their error types public, so we cannot access / instantiate them like we did for the analogous
-// ones in go-dockerclient.
-// Hence, we test with errors created in these tests and set on the fake client  vs. those actually defined in k8s/engine-api.
-// Also, the fake client does not save the parameters passed in; but instead, you can confirm that it was called via AssertCalls
-
-func TestIsImageInLocalRegistry(t *testing.T) {
-	type testDef struct {
-		imageName      string
-		docker         test.FakeDockerClient
-		expectedResult bool
-		expectedError  string
-	}
-	tests := map[string]testDef{
-		"ImageFound":    {"a_test_image", test.FakeDockerClient{}, true, ""},
-		"ImageNotFound": {"a_test_image:sometag", test.FakeDockerClient{}, false, "unable to get metadata for a_test_image:sometag"},
-	}
-
-	for test, def := range tests {
-		dh := getDocker(&def.docker)
-		fake := dh.kubeDockerClient.(*dockertools.FakeDockerClient)
-		if def.expectedResult {
-			fake.Image = &dockertypes.ImageInspect{ID: def.imageName}
-		}
-
-		result, err := dh.IsImageInLocalRegistry(def.imageName)
-
-		if e := fake.AssertCalls([]string{"inspect_image"}); e != nil {
-			t.Errorf("%+v", e)
-		}
-
-		if result != def.expectedResult {
-			t.Errorf("Test - %s: Expected result: %v. Got: %v", test, def.expectedResult, result)
-		}
-		if err != nil && len(def.expectedError) > 0 && !strings.Contains(err.Error(), def.expectedError) {
-			t.Errorf("Test - %s: Expected error: Got: %+v", test, err)
-		}
-	}
-}
-func TestCheckAndPullImage(t *testing.T) {
-	// in addition to the deltas mentioned up top, kube fake client can't distinguish between exists and successful pull, and
-	// pull options with engine-api don't reference repo name like go-dockerclient did ... removed tests related to that
-	type testDef struct {
-		imageName     string
-		docker        test.FakeDockerClient
-		calls         []string
-		errorStage    string
-		expectedError string
-		maskedError   string
-	}
-	imageExistsTest := testDef{
-		imageName: "test_image",
-		docker:    test.FakeDockerClient{},
-		calls:     []string{"inspect_image"},
-	}
-	imageDoesNotExistsTest := testDef{
-		imageName:   "test_image",
-		docker:      test.FakeDockerClient{},
-		calls:       []string{"inspect_image", "pull", "inspect_image"},
-		errorStage:  "inspect_image",
-		maskedError: "no such image",
-	}
-	inspectErrorTest := testDef{
-		imageName:     "test_image",
-		docker:        test.FakeDockerClient{},
-		calls:         []string{"inspect_image"},
-		errorStage:    "inspect_image",
-		expectedError: "unable to get metadata for test_image:latest",
-	}
-	pullErrorTest := testDef{
-		imageName:     "test_image",
-		docker:        test.FakeDockerClient{},
-		calls:         []string{"inspect_image", "pull"},
-		errorStage:    "pull",
-		expectedError: "unable to get test_image:latest",
-	}
-	tests := map[string]testDef{
-		"ImageExists":       imageExistsTest,
-		"ImageDoesNotExist": imageDoesNotExistsTest,
-		"InspectError":      inspectErrorTest,
-		"PullError":         pullErrorTest,
-	}
-
-	for test, def := range tests {
-		dh := getDocker(&def.docker)
-		fake := dh.kubeDockerClient.(*dockertools.FakeDockerClient)
-		if len(def.maskedError) > 0 {
-			fake.ClearErrors()
-			fake.InjectError(def.errorStage, fmt.Errorf(def.maskedError))
-			fake.Image = nil
-		} else if len(def.expectedError) > 0 {
-			fake.ClearErrors()
-			fake.InjectError(def.errorStage, fmt.Errorf(def.expectedError))
-			fake.Image = nil
-		} else {
-			fake.Image = &dockertypes.ImageInspect{ID: def.imageName}
-		}
-
-		resultImage, resultErr := dh.CheckAndPullImage(def.imageName)
-
-		if e := fake.AssertCalls(def.calls); e != nil {
-			t.Errorf("%s %+v", test, e)
-		}
-
-		if len(def.maskedError) > 0 && resultErr != nil {
-			t.Errorf("%s: Unexpected error -- %v", test, resultErr)
-		}
-
-		if len(def.expectedError) > 0 && (resultErr == nil || resultErr.Error() != def.expectedError) {
-			t.Errorf("%s: Unexpected error result -- %v", test, resultErr)
-		}
-		if fake.Image != nil && (resultImage == nil || resultImage.ID != def.imageName) {
-			t.Errorf("%s: Unexpected image result -- %+v instead of %+v", test, resultImage, fake.Image)
-		}
 	}
 }
 
@@ -380,7 +264,7 @@ func TestGetScriptsURL(t *testing.T) {
 	}
 	tests := map[string]urltest{
 		"not present": {
-			calls: []string{"inspect_image"},
+			calls: []string{},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{
 					Env:    []string{"Env1=value1"},
@@ -395,7 +279,7 @@ func TestGetScriptsURL(t *testing.T) {
 		},
 
 		"env in containerConfig": {
-			calls: []string{"inspect_image"},
+			calls: []string{},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{
 					Env: []string{"Env1=value1", ScriptsURLEnvironment + "=test_url_value"},
@@ -406,7 +290,7 @@ func TestGetScriptsURL(t *testing.T) {
 		},
 
 		"env in image config": {
-			calls: []string{"inspect_image"},
+			calls: []string{},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{},
 				Config: &dockercontainer.Config{
@@ -421,7 +305,7 @@ func TestGetScriptsURL(t *testing.T) {
 		},
 
 		"label in containerConfig": {
-			calls: []string{"inspect_image"},
+			calls: []string{},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{
 					Labels: map[string]string{ScriptsURLLabel: "test_url_value"},
@@ -432,7 +316,7 @@ func TestGetScriptsURL(t *testing.T) {
 		},
 
 		"label in image config": {
-			calls: []string{"inspect_image"},
+			calls: []string{},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{},
 				Config: &dockercontainer.Config{
@@ -443,7 +327,7 @@ func TestGetScriptsURL(t *testing.T) {
 		},
 
 		"inspect error": {
-			calls:      []string{"inspect_image", "pull"},
+			calls:      []string{"pull"},
 			image:      dockertypes.ImageInspect{},
 			inspectErr: fmt.Errorf("Inspect error"),
 		},
@@ -455,9 +339,9 @@ func TestGetScriptsURL(t *testing.T) {
 		if tst.inspectErr != nil {
 			fake.ClearErrors()
 			fake.InjectError("pull", tst.inspectErr)
-			fake.Image = nil
+			fakeDocker.Image = nil
 		} else {
-			fake.Image = &tst.image
+			fakeDocker.Image = &tst.image
 		}
 		url, err := dh.GetScriptsURL("test/image")
 
@@ -622,7 +506,7 @@ func TestRunContainer(t *testing.T) {
 		dh := getDocker(fakeDocker)
 		fake := dh.kubeDockerClient.(*dockertools.FakeDockerClient)
 		tst.image.ID = "test/image"
-		fake.Image = &tst.image
+		fakeDocker.Image = &tst.image
 		if len(fake.ContainerMap) > 0 {
 			t.Errorf("newly created fake client should have empty container map: %+v", fake.ContainerMap)
 		}
@@ -673,33 +557,14 @@ func TestGetImageID(t *testing.T) {
 	fakeDocker := &test.FakeDockerClient{}
 	dh := getDocker(fakeDocker)
 	fake := dh.kubeDockerClient.(*dockertools.FakeDockerClient)
-	fake.Image = &dockertypes.ImageInspect{ID: "test-abcd"}
+	fakeDocker.Image = &dockertypes.ImageInspect{ID: "test-abcd"}
 	id, err := dh.GetImageID("test/image")
-	if e := fake.AssertCalls([]string{"inspect_image"}); e != nil {
+	if e := fake.AssertCalls([]string{}); e != nil {
 		t.Errorf("%+v", e)
 	}
 	if err != nil {
 		t.Errorf("Unexpected error returned: %v", err)
 	} else if id != "test-abcd" {
-		t.Errorf("Unexpected image id returned: %s", id)
-	}
-}
-
-func TestGetImageIDError(t *testing.T) {
-	expected := fmt.Errorf("Image Error")
-	fakeDocker := &test.FakeDockerClient{}
-	dh := getDocker(fakeDocker)
-	fake := dh.kubeDockerClient.(*dockertools.FakeDockerClient)
-	fake.Image = &dockertypes.ImageInspect{ID: "test-abcd"}
-	fake.InjectError("inspect_image", expected)
-	id, err := dh.GetImageID("test/image")
-	if e := fake.AssertCalls([]string{"inspect_image"}); e != nil {
-		t.Errorf("%+v", e)
-	}
-	if err != expected {
-		t.Errorf("Unexpected error returned: %v", err)
-	}
-	if id != "" {
 		t.Errorf("Unexpected image id returned: %s", id)
 	}
 }
