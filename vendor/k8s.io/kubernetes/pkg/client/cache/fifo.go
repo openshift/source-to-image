@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,11 +18,27 @@ package cache
 
 import (
 	"sync"
+
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // PopProcessFunc is passed to Pop() method of Queue interface.
 // It is supposed to process the element popped from the queue.
 type PopProcessFunc func(interface{}) error
+
+// ErrRequeue may be returned by a PopProcessFunc to safely requeue
+// the current item. The value of Err will be returned from Pop.
+type ErrRequeue struct {
+	// Err is returned by the Pop function
+	Err error
+}
+
+func (e ErrRequeue) Error() string {
+	if e.Err == nil {
+		return "the popped item should be requeued without returning an error"
+	}
+	return e.Err.Error()
+}
 
 // Queue is exactly like a Store, but has a Pop() method too.
 type Queue interface {
@@ -30,6 +46,8 @@ type Queue interface {
 
 	// Pop blocks until it has something to process.
 	// It returns the object that was process and the result of processing.
+	// The PopProcessFunc may return an ErrRequeue{...} to indicate the item
+	// should be requeued before releasing the lock on the queue.
 	Pop(PopProcessFunc) (interface{}, error)
 
 	// AddIfNotPresent adds a value previously
@@ -127,15 +145,21 @@ func (f *FIFO) AddIfNotPresent(obj interface{}) error {
 	}
 	f.lock.Lock()
 	defer f.lock.Unlock()
+	f.addIfNotPresent(id, obj)
+	return nil
+}
+
+// addIfNotPresent assumes the fifo lock is already held and adds the the provided
+// item to the queue under id if it does not already exist.
+func (f *FIFO) addIfNotPresent(id string, obj interface{}) {
 	f.populated = true
 	if _, exists := f.items[id]; exists {
-		return nil
+		return
 	}
 
 	f.queue = append(f.queue, id)
 	f.items[id] = obj
 	f.cond.Broadcast()
-	return nil
 }
 
 // Update is the same as Add in this implementation.
@@ -222,7 +246,12 @@ func (f *FIFO) Pop(process PopProcessFunc) (interface{}, error) {
 			continue
 		}
 		delete(f.items, id)
-		return item, process(item)
+		err := process(item)
+		if e, ok := err.(ErrRequeue); ok {
+			f.addIfNotPresent(id, item)
+			err = e.Err
+		}
+		return item, err
 	}
 }
 
@@ -252,6 +281,26 @@ func (f *FIFO) Replace(list []interface{}, resourceVersion string) error {
 	f.queue = f.queue[:0]
 	for id := range items {
 		f.queue = append(f.queue, id)
+	}
+	if len(f.queue) > 0 {
+		f.cond.Broadcast()
+	}
+	return nil
+}
+
+// Resync will touch all objects to put them into the processing queue
+func (f *FIFO) Resync() error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	inQueue := sets.NewString()
+	for _, id := range f.queue {
+		inQueue.Insert(id)
+	}
+	for id := range f.items {
+		if !inQueue.Has(id) {
+			f.queue = append(f.queue, id)
+		}
 	}
 	if len(f.queue) > 0 {
 		f.cond.Broadcast()

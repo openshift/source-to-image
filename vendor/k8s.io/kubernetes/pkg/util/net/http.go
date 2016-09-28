@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,6 +26,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/golang/glog"
+	"golang.org/x/net/http2"
 )
 
 // IsProbableEOF returns true if the given error resembles a connection termination
@@ -53,9 +56,9 @@ func IsProbableEOF(err error) bool {
 
 var defaultTransport = http.DefaultTransport.(*http.Transport)
 
-// SetTransportDefaults applies the defaults from http.DefaultTransport
+// SetOldTransportDefaults applies the defaults from http.DefaultTransport
 // for the Proxy, Dial, and TLSHandshakeTimeout fields if unset
-func SetTransportDefaults(t *http.Transport) *http.Transport {
+func SetOldTransportDefaults(t *http.Transport) *http.Transport {
 	if t.Proxy == nil || isDefault(t.Proxy) {
 		// http.ProxyFromEnvironment doesn't respect CIDRs and that makes it impossible to exclude things like pod and service IPs from proxy settings
 		// ProxierWithNoProxyCIDR allows CIDR rules in NO_PROXY
@@ -66,6 +69,19 @@ func SetTransportDefaults(t *http.Transport) *http.Transport {
 	}
 	if t.TLSHandshakeTimeout == 0 {
 		t.TLSHandshakeTimeout = defaultTransport.TLSHandshakeTimeout
+	}
+	return t
+}
+
+// SetTransportDefaults applies the defaults from http.DefaultTransport
+// for the Proxy, Dial, and TLSHandshakeTimeout fields if unset
+func SetTransportDefaults(t *http.Transport) *http.Transport {
+	t = SetOldTransportDefaults(t)
+	// Allow HTTP2 clients but default off for now
+	if s := os.Getenv("ENABLE_HTTP2"); len(s) > 0 {
+		if err := http2.ConfigureTransport(t); err != nil {
+			glog.Warningf("Transport failed http2 configuration: %v", err)
+		}
 	}
 	return t
 }
@@ -89,6 +105,34 @@ func Dialer(transport http.RoundTripper) (DialFunc, error) {
 		return Dialer(transport.WrappedRoundTripper())
 	default:
 		return nil, fmt.Errorf("unknown transport type: %v", transport)
+	}
+}
+
+// CloneTLSConfig returns a tls.Config with all exported fields except SessionTicketsDisabled and SessionTicketKey copied.
+// This makes it safe to call CloneTLSConfig on a config in active use by a server.
+// TODO: replace with tls.Config#Clone when we move to go1.8
+func CloneTLSConfig(cfg *tls.Config) *tls.Config {
+	if cfg == nil {
+		return &tls.Config{}
+	}
+	return &tls.Config{
+		Rand:                     cfg.Rand,
+		Time:                     cfg.Time,
+		Certificates:             cfg.Certificates,
+		NameToCertificate:        cfg.NameToCertificate,
+		GetCertificate:           cfg.GetCertificate,
+		RootCAs:                  cfg.RootCAs,
+		NextProtos:               cfg.NextProtos,
+		ServerName:               cfg.ServerName,
+		ClientAuth:               cfg.ClientAuth,
+		ClientCAs:                cfg.ClientCAs,
+		InsecureSkipVerify:       cfg.InsecureSkipVerify,
+		CipherSuites:             cfg.CipherSuites,
+		PreferServerCipherSuites: cfg.PreferServerCipherSuites,
+		ClientSessionCache:       cfg.ClientSessionCache,
+		MinVersion:               cfg.MinVersion,
+		MaxVersion:               cfg.MaxVersion,
+		CurvePreferences:         cfg.CurvePreferences,
 	}
 }
 
