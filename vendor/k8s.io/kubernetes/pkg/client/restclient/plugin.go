@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ type AuthProvider interface {
 
 // Factory generates an AuthProvider plugin.
 //  clusterAddress is the address of the current cluster.
-//  config is the inital configuration for this plugin.
+//  config is the initial configuration for this plugin.
 //  persister allows the plugin to save updated configuration.
 type Factory func(clusterAddress string, config map[string]string, persister AuthProviderConfigPersister) (AuthProvider, error)
 

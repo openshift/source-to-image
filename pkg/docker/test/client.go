@@ -2,6 +2,7 @@ package test
 
 import (
 	"bytes"
+	"errors"
 	dockertypes "github.com/docker/engine-api/types"
 	"golang.org/x/net/context"
 	"io"
@@ -78,6 +79,14 @@ type FakeDockerClient struct {
 
 	BuildImageOpts dockertypes.ImageBuildOptions
 	BuildImageErr  error
+	Image          *dockertypes.ImageInspect
+}
+
+func (d *FakeDockerClient) ImageInspectWithRaw(ctx context.Context, imageID string, getSize bool) (dockertypes.ImageInspect, []byte, error) {
+	if d.Image != nil {
+		return *d.Image, nil, nil
+	}
+	return dockertypes.ImageInspect{}, nil, errors.New("not found")
 }
 
 func (d *FakeDockerClient) Ping() error {

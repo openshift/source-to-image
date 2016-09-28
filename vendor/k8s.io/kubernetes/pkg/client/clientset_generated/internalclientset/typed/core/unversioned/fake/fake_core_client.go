@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -80,10 +80,6 @@ func (c *FakeCore) ResourceQuotas(namespace string) unversioned.ResourceQuotaInt
 
 func (c *FakeCore) Secrets(namespace string) unversioned.SecretInterface {
 	return &FakeSecrets{c, namespace}
-}
-
-func (c *FakeCore) SecurityContextConstraints() unversioned.SecurityContextConstraintsInterface {
-	return &FakeSecurityContextConstraints{c}
 }
 
 func (c *FakeCore) Services(namespace string) unversioned.ServiceInterface {

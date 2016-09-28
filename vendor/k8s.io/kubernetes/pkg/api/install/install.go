@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,10 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/v1beta3"
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -40,7 +38,7 @@ const importPrefix = "k8s.io/kubernetes/pkg/api"
 var accessor = meta.NewAccessor()
 
 // availableVersions lists all known external versions for this group from most preferred to least preferred
-var availableVersions = []unversioned.GroupVersion{v1.SchemeGroupVersion, v1beta3.SchemeGroupVersion}
+var availableVersions = []unversioned.GroupVersion{v1.SchemeGroupVersion}
 
 func init() {
 	registered.RegisterVersions(availableVersions)
@@ -99,7 +97,6 @@ func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper 
 		"Namespace",
 		"PersistentVolume",
 		"ComponentStatus",
-		"SecurityContextConstraints",
 	)
 
 	// these kinds should be excluded from the list of resources
@@ -128,11 +125,6 @@ func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper 
 // string, or an error if the version is not known.
 func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
 	switch version {
-	case v1beta3.SchemeGroupVersion:
-		return &meta.VersionInterfaces{
-			ObjectConvertor:  api.Scheme,
-			MetadataAccessor: accessor,
-		}, nil
 	case v1.SchemeGroupVersion:
 		return &meta.VersionInterfaces{
 			ObjectConvertor:  api.Scheme,
@@ -146,7 +138,10 @@ func interfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, e
 
 func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
 	// add the internal version to Scheme
-	api.AddToScheme(api.Scheme)
+	if err := api.AddToScheme(api.Scheme); err != nil {
+		// Programmer error, detect immediately
+		panic(err)
+	}
 	// add the enabled external versions to Scheme
 	for _, v := range externalVersions {
 		if !registered.IsEnabledVersion(v) {
@@ -155,94 +150,10 @@ func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
 		}
 		switch v {
 		case v1.SchemeGroupVersion:
-			v1.AddToScheme(api.Scheme)
-		case v1beta3.SchemeGroupVersion:
-			v1beta3.AddToScheme(api.Scheme)
+			if err := v1.AddToScheme(api.Scheme); err != nil {
+				// Programmer error, detect immediately
+				panic(err)
+			}
 		}
 	}
-
-	// This is a "fast-path" that avoids reflection for common types. It focuses on the objects that are
-	// converted the most in the cluster.
-	// TODO: generate one of these for every external API group - this is to prove the impact
-	api.Scheme.AddGenericConversionFunc(func(objA, objB interface{}, s conversion.Scope) (bool, error) {
-		switch a := objA.(type) {
-		case *v1.Pod:
-			switch b := objB.(type) {
-			case *api.Pod:
-				return true, v1.Convert_v1_Pod_To_api_Pod(a, b, s)
-			}
-		case *api.Pod:
-			switch b := objB.(type) {
-			case *v1.Pod:
-				return true, v1.Convert_api_Pod_To_v1_Pod(a, b, s)
-			}
-
-		case *v1.Event:
-			switch b := objB.(type) {
-			case *api.Event:
-				return true, v1.Convert_v1_Event_To_api_Event(a, b, s)
-			}
-		case *api.Event:
-			switch b := objB.(type) {
-			case *v1.Event:
-				return true, v1.Convert_api_Event_To_v1_Event(a, b, s)
-			}
-
-		case *v1.ReplicationController:
-			switch b := objB.(type) {
-			case *api.ReplicationController:
-				return true, v1.Convert_v1_ReplicationController_To_api_ReplicationController(a, b, s)
-			}
-		case *api.ReplicationController:
-			switch b := objB.(type) {
-			case *v1.ReplicationController:
-				return true, v1.Convert_api_ReplicationController_To_v1_ReplicationController(a, b, s)
-			}
-
-		case *v1.Node:
-			switch b := objB.(type) {
-			case *api.Node:
-				return true, v1.Convert_v1_Node_To_api_Node(a, b, s)
-			}
-		case *api.Node:
-			switch b := objB.(type) {
-			case *v1.Node:
-				return true, v1.Convert_api_Node_To_v1_Node(a, b, s)
-			}
-
-		case *v1.Namespace:
-			switch b := objB.(type) {
-			case *api.Namespace:
-				return true, v1.Convert_v1_Namespace_To_api_Namespace(a, b, s)
-			}
-		case *api.Namespace:
-			switch b := objB.(type) {
-			case *v1.Namespace:
-				return true, v1.Convert_api_Namespace_To_v1_Namespace(a, b, s)
-			}
-
-		case *v1.Service:
-			switch b := objB.(type) {
-			case *api.Service:
-				return true, v1.Convert_v1_Service_To_api_Service(a, b, s)
-			}
-		case *api.Service:
-			switch b := objB.(type) {
-			case *v1.Service:
-				return true, v1.Convert_api_Service_To_v1_Service(a, b, s)
-			}
-
-		case *v1.Endpoints:
-			switch b := objB.(type) {
-			case *api.Endpoints:
-				return true, v1.Convert_v1_Endpoints_To_api_Endpoints(a, b, s)
-			}
-		case *api.Endpoints:
-			switch b := objB.(type) {
-			case *v1.Endpoints:
-				return true, v1.Convert_api_Endpoints_To_v1_Endpoints(a, b, s)
-			}
-		}
-		return false, nil
-	})
 }

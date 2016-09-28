@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,12 +34,12 @@ func (c *FakeExtensions) Deployments(namespace string) unversioned.DeploymentInt
 	return &FakeDeployments{c, namespace}
 }
 
-func (c *FakeExtensions) HorizontalPodAutoscalers(namespace string) unversioned.HorizontalPodAutoscalerInterface {
-	return &FakeHorizontalPodAutoscalers{c, namespace}
-}
-
 func (c *FakeExtensions) Ingresses(namespace string) unversioned.IngressInterface {
 	return &FakeIngresses{c, namespace}
+}
+
+func (c *FakeExtensions) PodSecurityPolicies() unversioned.PodSecurityPolicyInterface {
+	return &FakePodSecurityPolicies{c}
 }
 
 func (c *FakeExtensions) ReplicaSets(namespace string) unversioned.ReplicaSetInterface {

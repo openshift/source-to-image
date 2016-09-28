@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -29,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
-func addConversionFuncs(scheme *runtime.Scheme) {
+func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add non-generated conversion functions
 	err := scheme.AddConversionFuncs(
 		Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus,
@@ -42,17 +43,22 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		Convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,
 		Convert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec,
 		Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec,
+		// autoscaling
+		Convert_autoscaling_CrossVersionObjectReference_To_v1beta1_SubresourceReference,
+		Convert_v1beta1_SubresourceReference_To_autoscaling_CrossVersionObjectReference,
+		Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPodAutoscalerSpec,
+		Convert_v1beta1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec,
 		// batch
 		Convert_batch_JobSpec_To_v1beta1_JobSpec,
 		Convert_v1beta1_JobSpec_To_batch_JobSpec,
 	)
 	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
+		return err
 	}
 
 	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
-	for _, kind := range []string{"DaemonSet", "Deployment", "Ingress"} {
+	for _, k := range []string{"DaemonSet", "Deployment", "Ingress"} {
+		kind := k // don't close over range variables
 		err = api.Scheme.AddFieldLabelConversionFunc("extensions/v1beta1", kind,
 			func(label, value string) (string, string, error) {
 				switch label {
@@ -61,14 +67,14 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 				default:
 					return "", "", fmt.Errorf("field label %q not supported for %q", label, kind)
 				}
-			})
+			},
+		)
 		if err != nil {
-			// If one of the conversion functions is malformed, detect it immediately.
-			panic(err)
+			return err
 		}
 	}
 
-	err = api.Scheme.AddFieldLabelConversionFunc("extensions/v1beta1", "Job",
+	return api.Scheme.AddFieldLabelConversionFunc("extensions/v1beta1", "Job",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name", "metadata.namespace", "status.successful":
@@ -76,11 +82,8 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}
-		})
-	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+		},
+	)
 }
 
 func Convert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.ScaleStatus, out *ScaleStatus, s conversion.Scope) error {
@@ -343,6 +346,56 @@ func Convert_v1beta1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s
 
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
+	}
+	return nil
+}
+
+func Convert_autoscaling_CrossVersionObjectReference_To_v1beta1_SubresourceReference(in *autoscaling.CrossVersionObjectReference, out *SubresourceReference, s conversion.Scope) error {
+	out.Kind = in.Kind
+	out.Name = in.Name
+	out.APIVersion = in.APIVersion
+	out.Subresource = "scale"
+	return nil
+}
+
+func Convert_v1beta1_SubresourceReference_To_autoscaling_CrossVersionObjectReference(in *SubresourceReference, out *autoscaling.CrossVersionObjectReference, s conversion.Scope) error {
+	out.Kind = in.Kind
+	out.Name = in.Name
+	out.APIVersion = in.APIVersion
+	return nil
+}
+
+func Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPodAutoscalerSpec(in *autoscaling.HorizontalPodAutoscalerSpec, out *HorizontalPodAutoscalerSpec, s conversion.Scope) error {
+	if err := Convert_autoscaling_CrossVersionObjectReference_To_v1beta1_SubresourceReference(&in.ScaleTargetRef, &out.ScaleRef, s); err != nil {
+		return err
+	}
+	if in.MinReplicas != nil {
+		out.MinReplicas = new(int32)
+		*out.MinReplicas = *in.MinReplicas
+	} else {
+		out.MinReplicas = nil
+	}
+	out.MaxReplicas = in.MaxReplicas
+	if in.TargetCPUUtilizationPercentage != nil {
+		out.CPUUtilization = &CPUTargetUtilization{TargetPercentage: *in.TargetCPUUtilizationPercentage}
+	}
+	return nil
+}
+
+func Convert_v1beta1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec(in *HorizontalPodAutoscalerSpec, out *autoscaling.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
+	if err := Convert_v1beta1_SubresourceReference_To_autoscaling_CrossVersionObjectReference(&in.ScaleRef, &out.ScaleTargetRef, s); err != nil {
+		return err
+	}
+	if in.MinReplicas != nil {
+		out.MinReplicas = new(int32)
+		*out.MinReplicas = int32(*in.MinReplicas)
+	} else {
+		out.MinReplicas = nil
+	}
+	out.MaxReplicas = int32(in.MaxReplicas)
+	if in.CPUUtilization != nil {
+		out.TargetCPUUtilizationPercentage = new(int32)
+		*out.TargetCPUUtilizationPercentage = int32(in.CPUUtilization.TargetPercentage)
 	}
 	return nil
 }
