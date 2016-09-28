@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -50,6 +50,7 @@ type ThreadSafeStore interface {
 	// AddIndexers adds more indexers to this store.  If you call this after you already have data
 	// in the store, the results are undefined.
 	AddIndexers(newIndexers Indexers) error
+	Resync() error
 }
 
 // threadSafeMap implements ThreadSafeStore
@@ -150,7 +151,7 @@ func (c *threadSafeMap) Index(indexName string, obj interface{}) ([]interface{},
 	returnKeySet := sets.String{}
 	for _, indexKey := range indexKeys {
 		set := index[indexKey]
-		for _, key := range set.List() {
+		for _, key := range set.UnsortedList() {
 			returnKeySet.Insert(key)
 		}
 	}
@@ -260,15 +261,21 @@ func (c *threadSafeMap) deleteFromIndices(obj interface{}, key string) error {
 		}
 
 		index := c.indices[name]
+		if index == nil {
+			continue
+		}
 		for _, indexValue := range indexValues {
-			if index != nil {
-				set := index[indexValue]
-				if set != nil {
-					set.Delete(key)
-				}
+			set := index[indexValue]
+			if set != nil {
+				set.Delete(key)
 			}
 		}
 	}
+	return nil
+}
+
+func (c *threadSafeMap) Resync() error {
+	// Nothing to do
 	return nil
 }
 
