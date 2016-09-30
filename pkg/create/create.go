@@ -42,6 +42,7 @@ func (b *Bootstrap) AddTests() {
 	os.MkdirAll(b.DestinationDir+"/"+"test/test-app", 0700)
 	b.process(templates.TestRunScript, "test/run", 0700)
 	b.process(templates.Makefile, "Makefile", 0600)
+	b.process(templates.Gitignore, "test/.gitignore", 0644)
 }
 
 func (b *Bootstrap) process(t string, dst string, perm os.FileMode) {
