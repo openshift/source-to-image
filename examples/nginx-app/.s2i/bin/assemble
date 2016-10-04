@@ -18,11 +18,11 @@ fi
 # according to the application directory that you chose.
 if [ "$(ls /tmp/artifacts/ 2>/dev/null)" ]; then
   echo "---> Restoring build artifacts..."
-  mv /tmp/artifacts/* /usr/share/nginx/html/
+  mv /tmp/artifacts/* .
 fi
 # Override our default nginx index.html file.
 # This is what we consider in this example `installing the application`
 # here you can go ahead an replace this with the actual building of python modules,
 # bundle install, and anything else you need.
 echo "---> Building and installing application from source..."
-cp -Rf /tmp/src/index.html /usr/share/nginx/html/index.html
+cp -Rf /tmp/src/index.html .
