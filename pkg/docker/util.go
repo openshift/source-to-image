@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/docker/distribution/reference"
+	"github.com/docker/engine-api/client"
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/errors"
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
@@ -287,7 +288,8 @@ func IsReachable(config *api.Config) bool {
 	if err != nil {
 		return false
 	}
-	return d.Ping() == nil
+	_, err = d.Version()
+	return err == nil
 }
 
 func pullAndCheck(image string, docker Docker, pullPolicy api.PullPolicy, config *api.Config, forcePull bool) (*PullResult, error) {
@@ -344,10 +346,9 @@ func GetRuntimeImage(config *api.Config, docker Docker) error {
 func GetDefaultDockerConfig() *api.DockerConfig {
 	cfg := &api.DockerConfig{}
 	if cfg.Endpoint = os.Getenv("DOCKER_HOST"); cfg.Endpoint == "" {
-		cfg.Endpoint = "unix:///var/run/docker.sock"
+		cfg.Endpoint = client.DefaultDockerHost
 	}
-	if os.Getenv("DOCKER_TLS_VERIFY") == "1" {
-		certPath := os.Getenv("DOCKER_CERT_PATH")
+	if certPath := os.Getenv("DOCKER_CERT_PATH"); certPath != "" {
 		cfg.CertFile = filepath.Join(certPath, "cert.pem")
 		cfg.KeyFile = filepath.Join(certPath, "key.pem")
 		cfg.CAFile = filepath.Join(certPath, "ca.pem")

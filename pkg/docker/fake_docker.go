@@ -2,9 +2,11 @@ package docker
 
 import (
 	"errors"
-	"github.com/openshift/source-to-image/pkg/api"
 	"io"
 	"path/filepath"
+
+	dockertypes "github.com/docker/engine-api/types"
+	"github.com/openshift/source-to-image/pkg/api"
 )
 
 // FakeDocker provides a fake docker interface
@@ -62,9 +64,9 @@ func (f *FakeDocker) IsImageOnBuild(imageName string) bool {
 	return f.IsOnBuildResult
 }
 
-// Ping tells id the Docker deamon is reachable
-func (f *FakeDocker) Ping() error {
-	return nil
+// Version returns information of the docker client and server host
+func (f *FakeDocker) Version() (dockertypes.Version, error) {
+	return dockertypes.Version{}, nil
 }
 
 // GetImageWorkdir returns the workdir
