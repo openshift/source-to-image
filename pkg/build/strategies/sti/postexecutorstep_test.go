@@ -132,15 +132,20 @@ func TestCommitImageStep(t *testing.T) {
 		baseImageLabels := make(map[string]string)
 		baseImageLabels["vendor"] = "CentOS"
 
+		configLabels := make(map[string]string)
+		configLabels["distribution-scope"] = "private"
+
 		expectedLabels := make(map[string]string)
 		expectedLabels["io.k8s.description"] = description
 		expectedLabels["io.k8s.display-name"] = displayName
 		expectedLabels["vendor"] = "CentOS"
+		expectedLabels["distribution-scope"] = "private"
 
 		builder := newFakeBaseSTI()
 		builder.config.DisplayName = displayName
 		builder.config.Description = description
 		builder.config.Tag = expectedImageTag
+		builder.config.Labels = configLabels
 		builder.env = expectedEnv
 
 		docker := builder.docker.(*docker.FakeDocker)

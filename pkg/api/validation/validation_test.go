@@ -51,6 +51,46 @@ func TestValidation(t *testing.T) {
 			},
 			[]ValidationError{},
 		},
+		{
+			&api.Config{
+				Source:            "http://github.com/openshift/source",
+				BuilderImage:      "openshift/builder",
+				DockerConfig:      &api.DockerConfig{Endpoint: "/var/run/docker.socket"},
+				BuilderPullPolicy: api.DefaultBuilderPullPolicy,
+				Labels:            nil,
+			},
+			[]ValidationError{},
+		},
+		{
+			&api.Config{
+				Source:            "http://github.com/openshift/source",
+				BuilderImage:      "openshift/builder",
+				DockerConfig:      &api.DockerConfig{Endpoint: "/var/run/docker.socket"},
+				BuilderPullPolicy: api.DefaultBuilderPullPolicy,
+				Labels:            map[string]string{},
+			},
+			[]ValidationError{},
+		},
+		{
+			&api.Config{
+				Source:            "http://github.com/openshift/source",
+				BuilderImage:      "openshift/builder",
+				DockerConfig:      &api.DockerConfig{Endpoint: "/var/run/docker.socket"},
+				BuilderPullPolicy: api.DefaultBuilderPullPolicy,
+				Labels:            map[string]string{"some": "thing", "other": "value"},
+			},
+			[]ValidationError{},
+		},
+		{
+			&api.Config{
+				Source:            "http://github.com/openshift/source",
+				BuilderImage:      "openshift/builder",
+				DockerConfig:      &api.DockerConfig{Endpoint: "/var/run/docker.socket"},
+				BuilderPullPolicy: api.DefaultBuilderPullPolicy,
+				Labels:            map[string]string{"some": "thing", "": "emptykey"},
+			},
+			[]ValidationError{{ValidationErrorInvalidValue, "labels"}},
+		},
 	}
 	for _, test := range testCases {
 		result := ValidateConfig(test.value)
