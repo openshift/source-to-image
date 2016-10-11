@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"sync"
+
+	"github.com/openshift/source-to-image/pkg/tar"
 )
 
 // FakeTar provides a fake UNIX tar interface
@@ -54,6 +56,10 @@ func (f *FakeTar) ExtractTarStreamWithLogging(dir string, reader io.Reader, logg
 	f.ExtractTarDir = dir
 	f.ExtractTarReader = reader
 	return f.ExtractTarError
+}
+
+func (f *FakeTar) ExtractTarStreamFromTarReader(dir string, tarReader tar.Reader, logger io.Writer) error {
+	return errors.New("not implemented")
 }
 
 func (f *FakeTar) ExtractTarStream(dir string, reader io.Reader) error {
