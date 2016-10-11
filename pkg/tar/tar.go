@@ -323,13 +323,15 @@ func (t *stiTar) ExtractTarStream(dir string, reader io.Reader) error {
 // exceeds the value of timeout
 func (t *stiTar) ExtractTarStreamWithLogging(dir string, reader io.Reader, logger io.Writer) error {
 	tarReader := tar.NewReader(reader)
-	errorChannel := make(chan error)
-	timeout := t.timeout
-	timeoutTimer := time.NewTimer(timeout)
+	errorChannel := make(chan error, 1)
+	timeoutTimer := time.NewTimer(t.timeout)
 	go func() {
 		for {
 			header, err := tarReader.Next()
-			timeoutTimer.Reset(timeout)
+			if !timeoutTimer.Stop() {
+				break
+			}
+			timeoutTimer.Reset(t.timeout)
 			if err == io.EOF {
 				errorChannel <- nil
 				break
