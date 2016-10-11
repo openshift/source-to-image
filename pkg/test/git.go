@@ -86,7 +86,7 @@ func (f *FakeGit) GetInfo(repo string) *api.SourceInfo {
 	}
 }
 
-// Creates a git directory with one unlikely but possible commit hash
+// CreateLocalGitDirectory creates a git directory with one unlikely but possible commit hash
 func CreateLocalGitDirectory(t *testing.T) string {
 	dir, err := ioutil.TempDir(os.TempDir(), "gitdir-s2i-test")
 	if err != nil {

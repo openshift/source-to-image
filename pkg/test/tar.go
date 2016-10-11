@@ -25,8 +25,17 @@ type FakeTar struct {
 func (f *FakeTar) Copy() *FakeTar {
 	f.lock.Lock()
 	defer f.lock.Unlock()
-	n := *f
-	return &n
+	// copy everything except .lock...
+	n := &FakeTar{
+		CreateTarBase:    f.CreateTarBase,
+		CreateTarDir:     f.CreateTarDir,
+		CreateTarResult:  f.CreateTarResult,
+		CreateTarError:   f.CreateTarError,
+		ExtractTarDir:    f.ExtractTarDir,
+		ExtractTarReader: f.ExtractTarReader,
+		ExtractTarError:  f.ExtractTarError,
+	}
+	return n
 }
 
 // CreateTarFile creates a new fake UNIX tar file
@@ -38,7 +47,7 @@ func (f *FakeTar) CreateTarFile(base, dir string) (string, error) {
 	return f.CreateTarResult, f.CreateTarError
 }
 
-// ExtractTarStream streams a content of fake tar
+// ExtractTarStreamWithLogging streams a content of fake tar
 func (f *FakeTar) ExtractTarStreamWithLogging(dir string, reader io.Reader, logger io.Writer) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
