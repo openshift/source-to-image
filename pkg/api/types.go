@@ -325,7 +325,85 @@ type Result struct {
 
 	// ImageID describes resulting image ID.
 	ImageID string
+
+	// BuildInfo holds information about the result of a build.
+	BuildInfo BuildInfo
 }
+
+// BuildInfo holds information about a particular step in the build process.
+type BuildInfo struct {
+	// FailureReason is a camel case reason that is used by the machine to reply
+	// back to the OpenShift builder with information why any of the steps in the
+	// build, failed.
+	FailureReason StepFailureReason
+}
+
+// StepFailureReason holds the type of failure that occured during the build
+// process.
+type StepFailureReason string
+
+const (
+	// ReasonAssembleFailed is the reason associated with the Assemble script
+	// failing.
+	ReasonAssembleFailed StepFailureReason = "AssembleFailed"
+
+	// ReasonPullBuilderImageFailed is the reason associated with failing to pull
+	// the builder image.
+	ReasonPullBuilderImageFailed StepFailureReason = "PullBuilderImageFailed"
+
+	// ReasonPullRuntimeImageFailed is the reason associated with failing to pull
+	// the runtime image.
+	ReasonPullRuntimeImageFailed StepFailureReason = "PullRuntimeImageFailed"
+
+	// ReasonCommitContainerFailed is the reason associated with failing to
+	// commit the container to the final image.
+	ReasonCommitContainerFailed StepFailureReason = "ContainerCommitFailed"
+
+	// ReasonFetchSourceFailed is the reason associated with failing to download
+	// the source of the build.
+	ReasonFetchSourceFailed StepFailureReason = "FetchSourceFailed"
+
+	// ReasonDockerImageBuildFailed is the reasons associated with a failed
+	// Docker image build.
+	ReasonDockerImageBuildFailed StepFailureReason = "DockerImageBuildFailed"
+
+	// ReasonDockerFileCreateFailed is the reason associated with failing to create a
+	// Dockerfile for a build.
+	ReasonDockerFileCreateFailed StepFailureReason = "DockerFileCreationFailed"
+
+	// ReasonInvalidArtifactsMapping is the reason associated with an
+	// invalid artifacts mapping of files that need to be copied.
+	ReasonInvalidArtifactsMapping StepFailureReason = "InvalidArtifactsMapping"
+
+	// ReasonArtifactsFetchFailed is the reason associated with a failure to
+	// download specified scripts in the application image.
+	ReasonArtifactsFetchFailed StepFailureReason = "FetchScriptsFailed"
+
+	// ReasonFSOperationFailed is the reason associated with a failed fs
+	// operation. Create, remove directory, copy file, etc.
+	ReasonFSOperationFailed StepFailureReason = "FileSystemOperationFailed"
+
+	// ReasonInstallScriptsFailed is the reason associated with a failure to
+	// install scripts in the builder image.
+	ReasonInstallScriptsFailed StepFailureReason = "InstallScriptsFailed"
+
+	// ReasonGenericS2IBuildFailed is the reason associated with a broad range of
+	// failure.
+	ReasonGenericS2IBuildFailed StepFailureReason = "GenericS2IBuildFailed"
+
+	// ReasonUnmetS2IDependencies is the failure reason associated with a
+	// builder image that doesn't contain required dependencies for building the
+	// app.
+	ReasonUnmetS2IDependencies StepFailureReason = "UnmetBuilderImageDependencies"
+
+	// ReasonTarSourceFailed is the failurea reason associated with a failure to
+	// tar the current source.
+	ReasonTarSourceFailed StepFailureReason = "TarSourceFailed"
+
+	// ReasonOnBuildForbidden is the failure reason associated with an image that
+	// uses the ONBUILD instruction when it's not allowed.
+	ReasonOnBuildForbidden StepFailureReason = "OnBuildForbidden"
+)
 
 // InstallResult structure describes the result of install operation
 type InstallResult struct {
