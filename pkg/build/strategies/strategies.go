@@ -6,6 +6,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/build/strategies/onbuild"
 	"github.com/openshift/source-to-image/pkg/build/strategies/sti"
 	"github.com/openshift/source-to-image/pkg/docker"
+	utilstatus "github.com/openshift/source-to-image/pkg/util/status"
 )
 
 // GetStrategy decides what build strategy will be used for the STI build.
@@ -22,7 +23,7 @@ func Strategy(config *api.Config, overrides build.Overrides) (build.Builder, api
 
 	image, err := docker.GetBuilderImage(config)
 	if err != nil {
-		buildInfo.FailureReason = api.ReasonPullBuilderImageFailed
+		buildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonPullBuilderImageFailed, utilstatus.ReasonMessagePullBuilderImageFailed)
 		return nil, buildInfo, err
 	}
 	config.HasOnBuild = image.OnBuild
@@ -32,7 +33,7 @@ func Strategy(config *api.Config, overrides build.Overrides) (build.Builder, api
 	if image.OnBuild && !config.BlockOnBuild {
 		builder, err = onbuild.New(config, overrides)
 		if err != nil {
-			buildInfo.FailureReason = api.ReasonGenericS2IBuildFailed
+			buildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
 			return nil, buildInfo, err
 		}
 		return builder, buildInfo, nil
@@ -40,7 +41,7 @@ func Strategy(config *api.Config, overrides build.Overrides) (build.Builder, api
 
 	builder, err = sti.New(config, overrides)
 	if err != nil {
-		buildInfo.FailureReason = api.ReasonGenericS2IBuildFailed
+		buildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
 		return nil, buildInfo, err
 	}
 	return builder, buildInfo, err

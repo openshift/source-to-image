@@ -20,6 +20,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
+	utilstatus "github.com/openshift/source-to-image/pkg/util/status"
 )
 
 var glog = utilglog.StderrLog
@@ -141,26 +142,26 @@ func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 	buildResult := &api.Result{}
 
 	if config.HasOnBuild && config.BlockOnBuild {
-		buildResult.BuildInfo.FailureReason = api.ReasonOnBuildForbidden
+		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonOnBuildForbidden, utilstatus.ReasonMessageOnBuildForbidden)
 		return buildResult, fmt.Errorf("builder image uses ONBUILD instructions but ONBUILD is not allowed")
 	}
 
 	if err := builder.CreateDockerfile(config); err != nil {
-		buildResult.BuildInfo.FailureReason = api.ReasonDockerFileCreateFailed
+		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonDockerfileCreateFailed, utilstatus.ReasonMessageDockerfileCreateFailed)
 		return buildResult, err
 	}
 
 	glog.V(2).Info("Creating application source code image")
 	tarStream, err := builder.SourceTar(config)
 	if err != nil {
-		buildResult.BuildInfo.FailureReason = api.ReasonTarSourceFailed
+		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonTarSourceFailed, utilstatus.ReasonMessageTarSourceFailed)
 		return buildResult, err
 	}
 	defer tarStream.Close()
 
 	namedReference, err := reference.ParseNamed(builder.config.BuilderImage)
 	if err != nil {
-		buildResult.BuildInfo.FailureReason = api.ReasonGenericS2IBuildFailed
+		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
 		return buildResult, err
 	}
 	newBuilderImage := fmt.Sprintf("%s:s2i-layered-%d", namedReference.Name(), time.Now().UnixNano())
@@ -193,7 +194,7 @@ func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 
 	glog.V(2).Infof("Building new image %s with scripts and sources already inside", newBuilderImage)
 	if err = builder.docker.BuildImage(opts); err != nil {
-		buildResult.BuildInfo.FailureReason = api.ReasonDockerImageBuildFailed
+		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonDockerImageBuildFailed, utilstatus.ReasonMessageDockerImageBuildFailed)
 		return buildResult, err
 	}
 
@@ -209,14 +210,14 @@ func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 	} else {
 		builder.config.ScriptsURL, err = builder.docker.GetScriptsURL(newBuilderImage)
 		if err != nil {
-			buildResult.BuildInfo.FailureReason = api.ReasonGenericS2IBuildFailed
+			buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
 			return buildResult, err
 		}
 	}
 
 	glog.V(2).Infof("Building %s using sti-enabled image", builder.config.Tag)
 	if err := builder.scripts.Execute(api.Assemble, config.AssembleUser, builder.config); err != nil {
-		buildResult.BuildInfo.FailureReason = api.ReasonAssembleFailed
+		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonAssembleFailed, utilstatus.ReasonMessageAssembleFailed)
 		switch e := err.(type) {
 		case errors.ContainerError:
 			return buildResult, errors.NewAssembleError(builder.config.Tag, e.Output, e)
