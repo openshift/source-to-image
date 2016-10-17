@@ -60,8 +60,8 @@ func TestBuildOK(t *testing.T) {
 	if !l.config.LayeredBuild {
 		t.Errorf("Expected LayeredBuild to be true!")
 	}
-	if m, _ := regexp.MatchString(`test/image:s2i-layered-\d+`, l.config.BuilderImage); !m {
-		t.Errorf("Expected BuilderImage test/image:s2i-layered-withnumbers, but got %s", l.config.BuilderImage)
+	if m, _ := regexp.MatchString(`s2i-layered-temp-image-\d+`, l.config.BuilderImage); !m {
+		t.Errorf("Expected BuilderImage s2i-layered-temp-image-withnumbers, but got %s", l.config.BuilderImage)
 	}
 	// without config.Destination explicitly set, we should get /tmp/scripts for the scripts url
 	// assuming the assemble script we created above is off the working dir
@@ -93,8 +93,8 @@ func TestBuildOKWithImageRef(t *testing.T) {
 	if !l.config.LayeredBuild {
 		t.Errorf("Expected LayeredBuild to be true!")
 	}
-	if !strings.HasPrefix(l.config.BuilderImage, "docker.io/uptoknow/ruby-20-centos7:s2i-layered-") {
-		t.Errorf("Expected BuilderImage to start with docker.io/uptoknow/ruby-20-centos7:s2i-layered-, but got %s", l.config.BuilderImage)
+	if !strings.HasPrefix(l.config.BuilderImage, "s2i-layered-temp-image-") {
+		t.Errorf("Expected BuilderImage to start with s2i-layered-temp-image-, but got %s", l.config.BuilderImage)
 	}
 	l.config.BuilderImage = "uptoknow/ruby-20-centos7@sha256:d6f5718b85126954d98931e654483ee794ac357e0a98f4a680c1e848d78863a1"
 	_, err = l.Build(l.config)
@@ -104,8 +104,8 @@ func TestBuildOKWithImageRef(t *testing.T) {
 	if !l.config.LayeredBuild {
 		t.Errorf("Expected LayeredBuild to be true!")
 	}
-	if !strings.HasPrefix(l.config.BuilderImage, "uptoknow/ruby-20-centos7:s2i-layered-") {
-		t.Errorf("Expected BuilderImage to start with uptoknow/ruby-20-centos7:s2i-layered-, but got %s", l.config.BuilderImage)
+	if !strings.HasPrefix(l.config.BuilderImage, "s2i-layered-temp-image-") {
+		t.Errorf("Expected BuilderImage to start with s2i-layered-temp-image-, but got %s", l.config.BuilderImage)
 	}
 	l.config.BuilderImage = "ruby-20-centos7@sha256:d6f5718b85126954d98931e654483ee794ac357e0a98f4a680c1e848d78863a1"
 	_, err = l.Build(l.config)
@@ -115,8 +115,8 @@ func TestBuildOKWithImageRef(t *testing.T) {
 	if !l.config.LayeredBuild {
 		t.Errorf("Expected LayeredBuild to be true!")
 	}
-	if !strings.HasPrefix(l.config.BuilderImage, "ruby-20-centos7:s2i-layered-") {
-		t.Errorf("Expected BuilderImage to start with /ruby-20-centos7:s2i-layered-, but got %s", l.config.BuilderImage)
+	if !strings.HasPrefix(l.config.BuilderImage, "s2i-layered-temp-image-") {
+		t.Errorf("Expected BuilderImage to start with s2i-layered-temp-image-, but got %s", l.config.BuilderImage)
 	}
 }
 
@@ -130,8 +130,8 @@ func TestBuildNoScriptsProvided(t *testing.T) {
 	if !l.config.LayeredBuild {
 		t.Errorf("Expected LayeredBuild to be true!")
 	}
-	if m, _ := regexp.MatchString(`test/image:s2i-layered-\d+`, l.config.BuilderImage); !m {
-		t.Errorf("Expected BuilderImage test/image:s2i-layered-withnumbers, but got %s", l.config.BuilderImage)
+	if m, _ := regexp.MatchString(`s2i-layered-temp-image-\d+`, l.config.BuilderImage); !m {
+		t.Errorf("Expected BuilderImage s2i-layered-temp-image-withnumbers, but got %s", l.config.BuilderImage)
 	}
 	if len(l.config.Destination) != 0 {
 		t.Errorf("Unexpected Destination %s", l.config.Destination)
@@ -140,6 +140,7 @@ func TestBuildNoScriptsProvided(t *testing.T) {
 
 func TestBuildErrorWriteDockerfile(t *testing.T) {
 	l := newFakeLayered()
+	l.config.BuilderImage = "test/image"
 	l.fs.(*test.FakeFileSystem).WriteFileError = errors.New("WriteDockerfileError")
 	_, err := l.Build(l.config)
 	if err == nil || err.Error() != "WriteDockerfileError" {
@@ -149,6 +150,7 @@ func TestBuildErrorWriteDockerfile(t *testing.T) {
 
 func TestBuildErrorCreateTarFile(t *testing.T) {
 	l := newFakeLayered()
+	l.config.BuilderImage = "test/image"
 	l.tar.(*test.FakeTar).CreateTarError = errors.New("CreateTarError")
 	_, err := l.Build(l.config)
 	if err == nil || err.Error() != "CreateTarError" {
@@ -158,6 +160,7 @@ func TestBuildErrorCreateTarFile(t *testing.T) {
 
 func TestBuildErrorOpenTarFile(t *testing.T) {
 	l := newFakeLayered()
+	l.config.BuilderImage = "test/image"
 	l.fs.(*test.FakeFileSystem).OpenError = errors.New("OpenTarError")
 	_, err := l.Build(l.config)
 	if err == nil || err.Error() != "OpenTarError" {
@@ -178,8 +181,8 @@ func TestBuildErrorBuildImage(t *testing.T) {
 func TestBuildErrorBadImageName(t *testing.T) {
 	l := newFakeLayered()
 	_, err := l.Build(l.config)
-	if err == nil || !strings.Contains(err.Error(), "repository name must have at least one component") {
-		t.Errorf("A docker spec parse error was expected, but got different: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "builder image name cannot be empty") {
+		t.Errorf("A builder image name cannot be empty error was expected, but got different: %v", err)
 	}
 }
 
