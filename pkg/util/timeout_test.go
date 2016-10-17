@@ -9,30 +9,30 @@ import (
 
 func TestTimeoutAfter(t *testing.T) {
 	type testCase struct {
-		fn      func() error
+		fn      func(*time.Timer) error
 		msg     string
 		timeout time.Duration
 		expect  interface{}
 	}
 	table := []testCase{
 		{
-			fn:      func() error { time.Sleep(1 * time.Second); return nil },
+			fn:      func(timer *time.Timer) error { time.Sleep(1 * time.Second); return nil },
 			timeout: 50 * time.Millisecond,
 			expect:  &TimeoutError{after: 50 * time.Millisecond},
 		},
 		{
-			fn:      func() error { return fmt.Errorf("foo") },
+			fn:      func(timer *time.Timer) error { return fmt.Errorf("foo") },
 			timeout: 50 * time.Millisecond,
 			expect:  fmt.Errorf("foo"),
 		},
 		{
-			fn:      func() error { time.Sleep(1 * time.Second); return fmt.Errorf("foo") },
-			msg:     "bar %v",
+			fn:      func(timer *time.Timer) error { time.Sleep(1 * time.Second); return fmt.Errorf("foo") },
+			msg:     "bar",
 			timeout: 50 * time.Millisecond,
-			expect:  fmt.Errorf("bar 50ms"),
+			expect:  fmt.Errorf("bar timed out after 50ms"),
 		},
 		{
-			fn:      func() error { return nil },
+			fn:      func(timer *time.Timer) error { return nil },
 			timeout: 50 * time.Millisecond,
 			expect:  nil,
 		},

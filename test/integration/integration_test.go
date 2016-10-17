@@ -25,8 +25,6 @@ import (
 	"github.com/openshift/source-to-image/pkg/build/strategies"
 	"github.com/openshift/source-to-image/pkg/util"
 	"golang.org/x/net/context"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
-	k8snet "k8s.io/kubernetes/pkg/util/net"
 )
 
 const (
@@ -68,6 +66,10 @@ const (
 	FakeScriptsHttpURL = "http://127.0.0.1:23456/.s2i/bin"
 )
 
+func getDefaultContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), 20*time.Second)
+}
+
 // TestInjectionBuild tests the build where we inject files to assemble script.
 func TestInjectionBuild(t *testing.T) {
 	integration(t).exerciseInjectionBuild(TagCleanBuild, FakeBuilderImage, []string{
@@ -78,13 +80,13 @@ func TestInjectionBuild(t *testing.T) {
 
 type integrationTest struct {
 	t             *testing.T
-	dockerClient  dockertools.DockerInterface
-	engineClient  dockerapi.Client
+	engineClient  *dockerapi.Client
 	setupComplete bool
 }
 
 func (i integrationTest) InspectImage(name string) (*dockertypes.ImageInspect, error) {
-	ctx, _ := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := getDefaultContext()
+	defer cancel()
 	resp, _, err := i.engineClient.ImageInspectWithRaw(ctx, name, true)
 	if err != nil {
 		if dockerapi.IsErrImageNotFound(err) {
@@ -113,32 +115,33 @@ func dockerConfig() *api.DockerConfig {
 	return cfg
 }
 
-func dockerClient(config *api.DockerConfig) (dockertools.DockerInterface, dockerapi.Client, error) {
-	var client *dockerapi.Client
+func dockerClient(config *api.DockerConfig) (*dockerapi.Client, error) {
 	var httpClient *http.Client
+
 	if config.CertFile != "" && config.KeyFile != "" && config.CAFile != "" {
 		tlscOptions := tlsconfig.Options{
-			CAFile:   config.CAFile,
-			CertFile: config.CertFile,
-			KeyFile:  config.KeyFile,
+			CAFile:             config.CAFile,
+			CertFile:           config.CertFile,
+			KeyFile:            config.KeyFile,
+			InsecureSkipVerify: os.Getenv("DOCKER_TLS_VERIFY") == "",
 		}
-		tlsc, tlsErr := tlsconfig.Client(tlscOptions)
-		if tlsErr != nil {
-			return nil, dockerapi.Client{}, tlsErr
+		tlsc, err := tlsconfig.Client(tlscOptions)
+		if err != nil {
+			return nil, err
 		}
+
 		httpClient = &http.Client{
-			Transport: k8snet.SetTransportDefaults(&http.Transport{
+			Transport: &http.Transport{
 				TLSClientConfig: tlsc,
-			}),
+			},
 		}
 	}
 
-	client, err := dockerapi.NewClient(config.Endpoint, "", httpClient, nil)
+	client, err := dockerapi.NewClient(config.Endpoint, os.Getenv("DOCKER_API_VERSION"), httpClient, nil)
 	if err != nil {
-		return nil, dockerapi.Client{}, err
+		return nil, err
 	}
-	k8sDocker := dockertools.ConnectToDockerOrDie(config.Endpoint, 0)
-	return k8sDocker, *client, nil
+	return client, nil
 }
 
 func getLogLevel() (level int) {
@@ -153,7 +156,7 @@ func getLogLevel() (level int) {
 // setup sets up integration tests
 func (i *integrationTest) setup() {
 	var err error
-	i.dockerClient, i.engineClient, err = dockerClient(dockerConfig())
+	i.engineClient, err = dockerClient(dockerConfig())
 	if err != nil {
 		i.t.Errorf("%+v", err)
 		return
@@ -166,7 +169,9 @@ func (i *integrationTest) setup() {
 		FakeScriptsFileURL = "file://" + filepath.Join(testImagesDir, ".s2i", "bin")
 
 		for _, image := range []string{TagCleanBuild, TagCleanBuildUser, TagIncrementalBuild, TagIncrementalBuildUser} {
-			i.dockerClient.RemoveImage(image, dockertypes.ImageRemoveOptions{})
+			ctx, cancel := getDefaultContext()
+			i.engineClient.ImageRemove(ctx, image, dockertypes.ImageRemoveOptions{})
+			cancel()
 		}
 
 		go http.ListenAndServe(":23456", http.FileServer(http.Dir(testImagesDir)))
@@ -541,22 +546,26 @@ func (i *integrationTest) checkForImage(tag string) {
 }
 
 func (i *integrationTest) createContainer(image string) string {
+	ctx, cancel := getDefaultContext()
+	defer cancel()
 	opts := dockertypes.ContainerCreateConfig{Name: "", Config: &dockercontainer.Config{Image: image}}
-	container, err := i.dockerClient.CreateContainer(opts)
+	container, err := i.engineClient.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, opts.Name)
 	if err != nil {
 		i.t.Errorf("Couldn't create container from image %s with error %+v", image, err)
 		return ""
 	}
 
-	err = i.dockerClient.StartContainer(container.ID)
+	ctx, cancel = getDefaultContext()
+	defer cancel()
+	err = i.engineClient.ContainerStart(ctx, container.ID)
 	if err != nil {
 		i.t.Errorf("Couldn't start container: %s with error %+v", container.ID, err)
 		return ""
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel = getDefaultContext()
 	defer cancel()
-	exitCode, err := i.engineClient.ContainerWait(ctx, container.ID)
+	exitCode, _ := i.engineClient.ContainerWait(ctx, container.ID)
 	if exitCode != 0 {
 		i.t.Errorf("Bad exit code from container: %d", exitCode)
 		return ""
@@ -566,18 +575,22 @@ func (i *integrationTest) createContainer(image string) string {
 }
 
 func (i *integrationTest) runInContainer(image string, command []string) int {
+	ctx, cancel := getDefaultContext()
+	defer cancel()
 	opts := dockertypes.ContainerCreateConfig{Name: "", Config: &dockercontainer.Config{Image: image, AttachStdout: false, AttachStdin: false, Cmd: dockerstrslice.StrSlice(command)}}
-	container, err := i.dockerClient.CreateContainer(opts)
-	if err != nil || container == nil {
+	container, err := i.engineClient.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, opts.Name)
+	if err != nil {
 		i.t.Errorf("Couldn't create container from image %s err %+v", image, err)
 		return -1
 	}
 
-	err = i.dockerClient.StartContainer(container.ID)
+	ctx, cancel = getDefaultContext()
+	defer cancel()
+	err = i.engineClient.ContainerStart(ctx, container.ID)
 	if err != nil {
 		i.t.Errorf("Couldn't start container: %s", container.ID)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel = getDefaultContext()
 	defer cancel()
 	exitCode, err := i.engineClient.ContainerWait(ctx, container.ID)
 	if err != nil {
@@ -587,7 +600,14 @@ func (i *integrationTest) runInContainer(image string, command []string) int {
 }
 
 func (i *integrationTest) removeContainer(cID string) {
-	i.dockerClient.RemoveContainer(cID, dockertypes.ContainerRemoveOptions{true, true, true})
+	ctx, cancel := getDefaultContext()
+	defer cancel()
+	removeOpts := dockertypes.ContainerRemoveOptions{
+		RemoveVolumes: true,
+		RemoveLinks:   true,
+		Force:         true,
+	}
+	i.engineClient.ContainerRemove(ctx, cID, removeOpts)
 }
 
 func (i *integrationTest) fileExists(cID string, filePath string) {
@@ -631,7 +651,7 @@ func (i *integrationTest) checkIncrementalBuildState(cID string, workingDir stri
 }
 
 func (i *integrationTest) fileExistsInContainer(cID string, filePath string) bool {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := getDefaultContext()
 	defer cancel()
 	rdr, stats, err := i.engineClient.CopyFromContainer(ctx, cID, filePath)
 	if err != nil {

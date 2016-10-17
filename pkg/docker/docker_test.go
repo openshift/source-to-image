@@ -17,7 +17,6 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
 	dockerstrslice "github.com/docker/engine-api/types/strslice"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 )
 
 func TestContainerName(t *testing.T) {
@@ -30,29 +29,24 @@ func TestContainerName(t *testing.T) {
 }
 
 func getDocker(client Client) *stiDocker {
-	//k8s has its own fake docker client mechanism
-	k8sDocker := dockertools.ConnectToDockerOrDie("fake://", 0)
 	return &stiDocker{
-		kubeDockerClient: k8sDocker,
-		client:           client,
-		pullAuth:         dockertypes.AuthConfig{},
+		client:   client,
+		pullAuth: dockertypes.AuthConfig{},
 	}
 }
 
 func TestRemoveContainer(t *testing.T) {
-	fakeDocker := &test.FakeDockerClient{}
+	fakeDocker := test.NewFakeDockerClient()
 	dh := getDocker(fakeDocker)
-	fake := dh.kubeDockerClient.(*dockertools.FakeDockerClient)
 	containerID := "testContainerId"
-	fakeContainer := dockertools.FakeContainer{ID: containerID}
-	fake.SetFakeContainers([]*dockertools.FakeContainer{&fakeContainer})
+	fakeDocker.Containers[containerID] = dockercontainer.Config{}
 	err := dh.RemoveContainer(containerID)
 	if err != nil {
 		t.Errorf("%+v", err)
 	}
-	err = fake.AssertCalls([]string{"remove"})
-	if err != nil {
-		t.Errorf("%v+v", err)
+	expectedCalls := []string{"remove"}
+	if !reflect.DeepEqual(fakeDocker.Calls, expectedCalls) {
+		t.Errorf("Expected fakeDocker.Calls %v, got %v", expectedCalls, fakeDocker.Calls)
 	}
 }
 
@@ -256,15 +250,14 @@ func TestImageBuild(t *testing.T) {
 
 func TestGetScriptsURL(t *testing.T) {
 	type urltest struct {
-		image       dockertypes.ImageInspect
-		result      string
-		calls       []string
-		inspectErr  error
-		errExpected bool
+		image      dockertypes.ImageInspect
+		result     string
+		calls      []string
+		inspectErr error
 	}
 	tests := map[string]urltest{
 		"not present": {
-			calls: []string{},
+			calls: []string{"inspect_image"},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{
 					Env:    []string{"Env1=value1"},
@@ -279,7 +272,7 @@ func TestGetScriptsURL(t *testing.T) {
 		},
 
 		"env in containerConfig": {
-			calls: []string{},
+			calls: []string{"inspect_image"},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{
 					Env: []string{"Env1=value1", ScriptsURLEnvironment + "=test_url_value"},
@@ -290,7 +283,7 @@ func TestGetScriptsURL(t *testing.T) {
 		},
 
 		"env in image config": {
-			calls: []string{},
+			calls: []string{"inspect_image"},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{},
 				Config: &dockercontainer.Config{
@@ -305,7 +298,7 @@ func TestGetScriptsURL(t *testing.T) {
 		},
 
 		"label in containerConfig": {
-			calls: []string{},
+			calls: []string{"inspect_image"},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{
 					Labels: map[string]string{ScriptsURLLabel: "test_url_value"},
@@ -316,7 +309,7 @@ func TestGetScriptsURL(t *testing.T) {
 		},
 
 		"label in image config": {
-			calls: []string{},
+			calls: []string{"inspect_image"},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{},
 				Config: &dockercontainer.Config{
@@ -327,31 +320,27 @@ func TestGetScriptsURL(t *testing.T) {
 		},
 
 		"inspect error": {
-			calls:      []string{"pull"},
+			calls:      []string{"inspect_image", "pull"},
 			image:      dockertypes.ImageInspect{},
 			inspectErr: fmt.Errorf("Inspect error"),
 		},
 	}
 	for desc, tst := range tests {
-		fakeDocker := &test.FakeDockerClient{}
+		fakeDocker := test.NewFakeDockerClient()
 		dh := getDocker(fakeDocker)
-		fake := dh.kubeDockerClient.(*dockertools.FakeDockerClient)
+		tst.image.ID = "test/image:latest"
 		if tst.inspectErr != nil {
-			fake.ClearErrors()
-			fake.InjectError("pull", tst.inspectErr)
-			fakeDocker.Image = nil
+			fakeDocker.PullFail = tst.inspectErr
 		} else {
-			fakeDocker.Image = &tst.image
+			fakeDocker.Images = map[string]dockertypes.ImageInspect{tst.image.ID: tst.image}
 		}
-		url, err := dh.GetScriptsURL("test/image")
+		url, err := dh.GetScriptsURL(tst.image.ID)
 
-		if e := fake.AssertCalls(tst.calls); e != nil {
-			t.Errorf("%s: %+v", desc, e)
+		if !reflect.DeepEqual(fakeDocker.Calls, tst.calls) {
+			t.Errorf("%s: Expected fakeDocker.Calls %v, got %v", desc, tst.calls, fakeDocker.Calls)
 		}
 		if err != nil && tst.inspectErr == nil {
 			t.Errorf("%s: Unexpected error returned: %v", desc, err)
-		} else if err == nil && tst.errExpected {
-			t.Errorf("%s: Expected error. Did not get one.", desc)
 		}
 		if tst.inspectErr == nil && url != tst.result {
 			t.Errorf("%s: Unexpected result. Expected: %s Actual: %s",
@@ -373,7 +362,7 @@ func TestRunContainer(t *testing.T) {
 
 	tests := map[string]runtest{
 		"default": {
-			calls: []string{"inspect_image", "inspect_image", "create", "start", "remove", "attach"},
+			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{},
 				Config:          &dockercontainer.Config{},
@@ -383,7 +372,7 @@ func TestRunContainer(t *testing.T) {
 			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /tmp -xf - && /tmp/scripts/%s", api.Assemble)},
 		},
 		"paramDestination": {
-			calls: []string{"inspect_image", "inspect_image", "create", "start", "remove", "attach"},
+			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{},
 				Config:          &dockercontainer.Config{},
@@ -394,7 +383,7 @@ func TestRunContainer(t *testing.T) {
 			cmdExpected:      []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /opt/test -xf - && /opt/test/scripts/%s", api.Assemble)},
 		},
 		"paramDestination&paramScripts": {
-			calls: []string{"inspect_image", "inspect_image", "create", "start", "remove", "attach"},
+			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{},
 				Config:          &dockercontainer.Config{},
@@ -406,7 +395,7 @@ func TestRunContainer(t *testing.T) {
 			cmdExpected:      []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /opt/test -xf - && /opt/test/scripts/%s", api.Assemble)},
 		},
 		"scriptsInsideImageEnvironment": {
-			calls: []string{"inspect_image", "inspect_image", "create", "start", "remove", "attach"},
+			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{
 					Env: []string{ScriptsURLEnvironment + "=image:///opt/bin/"},
@@ -418,7 +407,7 @@ func TestRunContainer(t *testing.T) {
 			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /tmp -xf - && /opt/bin/%s", api.Assemble)},
 		},
 		"scriptsInsideImageLabel": {
-			calls: []string{"inspect_image", "inspect_image", "create", "start", "remove", "attach"},
+			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{
 					Labels: map[string]string{ScriptsURLLabel: "image:///opt/bin/"},
@@ -430,7 +419,7 @@ func TestRunContainer(t *testing.T) {
 			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /tmp -xf - && /opt/bin/%s", api.Assemble)},
 		},
 		"scriptsInsideImageEnvironmentWithParamDestination": {
-			calls: []string{"inspect_image", "inspect_image", "create", "start", "remove", "attach"},
+			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{
 					Env: []string{ScriptsURLEnvironment + "=image:///opt/bin"},
@@ -443,7 +432,7 @@ func TestRunContainer(t *testing.T) {
 			cmdExpected:      []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /opt/sti -xf - && /opt/bin/%s", api.Assemble)},
 		},
 		"scriptsInsideImageLabelWithParamDestination": {
-			calls: []string{"inspect_image", "inspect_image", "create", "start", "remove", "attach"},
+			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{
 					Labels: map[string]string{ScriptsURLLabel: "image:///opt/bin"},
@@ -456,7 +445,7 @@ func TestRunContainer(t *testing.T) {
 			cmdExpected:      []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /opt/sti -xf - && /opt/bin/%s", api.Assemble)},
 		},
 		"paramDestinationFromImageEnvironment": {
-			calls: []string{"inspect_image", "inspect_image", "create", "start", "remove", "attach"},
+			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{
 					Env: []string{LocationEnvironment + "=/opt", ScriptsURLEnvironment + "=http://my.test.url/test?param=one"},
@@ -468,7 +457,7 @@ func TestRunContainer(t *testing.T) {
 			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /opt -xf - && /opt/scripts/%s", api.Assemble)},
 		},
 		"paramDestinationFromImageLabel": {
-			calls: []string{"inspect_image", "inspect_image", "create", "start", "remove", "attach"},
+			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{
 					Labels: map[string]string{DestinationLabel: "/opt", ScriptsURLLabel: "http://my.test.url/test?param=one"},
@@ -480,7 +469,7 @@ func TestRunContainer(t *testing.T) {
 			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /opt -xf - && /opt/scripts/%s", api.Assemble)},
 		},
 		"usageCommand": {
-			calls: []string{"inspect_image", "inspect_image", "create", "start", "remove", "attach"},
+			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{},
 				Config:          &dockercontainer.Config{},
@@ -490,7 +479,7 @@ func TestRunContainer(t *testing.T) {
 			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /tmp -xf - && /tmp/scripts/%s", api.Usage)},
 		},
 		"otherCommand": {
-			calls: []string{"inspect_image", "inspect_image", "create", "start", "remove", "attach"},
+			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
 			image: dockertypes.ImageInspect{
 				ContainerConfig: &dockercontainer.Config{},
 				Config:          &dockercontainer.Config{},
@@ -502,13 +491,12 @@ func TestRunContainer(t *testing.T) {
 	}
 
 	for desc, tst := range tests {
-		fakeDocker := &test.FakeDockerClient{}
+		fakeDocker := test.NewFakeDockerClient()
 		dh := getDocker(fakeDocker)
-		fake := dh.kubeDockerClient.(*dockertools.FakeDockerClient)
-		tst.image.ID = "test/image"
-		fakeDocker.Image = &tst.image
-		if len(fake.ContainerMap) > 0 {
-			t.Errorf("newly created fake client should have empty container map: %+v", fake.ContainerMap)
+		tst.image.ID = "test/image:latest"
+		fakeDocker.Images = map[string]dockertypes.ImageInspect{tst.image.ID: tst.image}
+		if len(fakeDocker.Containers) > 0 {
+			t.Errorf("newly created fake client should have empty container map: %+v", fakeDocker.Containers)
 		}
 
 		//NOTE: the combo of the fake k8s client, go 1.6, and using os.Stderr/os.Stdout caused what appeared to be go test crashes
@@ -530,50 +518,50 @@ func TestRunContainer(t *testing.T) {
 		}
 
 		// container ID will be random, so don't look up directly ... just get the 1 entry which should be there
-		if len(fake.ContainerMap) != 1 {
-			t.Errorf("fake container map should only have 1 entry: %+v", fake.ContainerMap)
+		if len(fakeDocker.Containers) != 1 {
+			t.Errorf("fake container map should only have 1 entry: %+v", fakeDocker.Containers)
 		}
 
-		for _, container := range fake.ContainerMap {
+		for _, container := range fakeDocker.Containers {
 			// Validate the Container parameters
-			if container.Config == nil {
-				t.Errorf("%s: container config not set: %+v", desc, container)
+			if container.Image != "test/image:latest" {
+				t.Errorf("%s: Unexpected create config image: %s", desc, container.Image)
 			}
-			if container.Config.Image != "test/image:latest" {
-				t.Errorf("%s: Unexpected create config image: %s", desc, container.Config.Image)
+			if !reflect.DeepEqual(container.Cmd, dockerstrslice.StrSlice(tst.cmdExpected)) {
+				t.Errorf("%s: Unexpected create config command: %#v instead of %q", desc, container.Cmd, strings.Join(tst.cmdExpected, " "))
 			}
-			if !reflect.DeepEqual(container.Config.Cmd, dockerstrslice.StrSlice(tst.cmdExpected)) {
-				t.Errorf("%s: Unexpected create config command: %#v instead of %q", desc, container.Config.Cmd, strings.Join(tst.cmdExpected, " "))
+			if !reflect.DeepEqual(container.Env, []string{"Key1=Value1", "Key2=Value2"}) {
+				t.Errorf("%s: Unexpected create config env: %#v", desc, container.Env)
 			}
-			if !reflect.DeepEqual(container.Config.Env, []string{"Key1=Value1", "Key2=Value2"}) {
-				t.Errorf("%s: Unexpected create config env: %#v", desc, container.Config.Env)
+			if !reflect.DeepEqual(fakeDocker.Calls, tst.calls) {
+				t.Errorf("%s: Expected fakeDocker.Calls %v, got %v", desc, tst.calls, fakeDocker.Calls)
 			}
 		}
-
 	}
 }
 
 func TestGetImageID(t *testing.T) {
-	fakeDocker := &test.FakeDockerClient{}
+	fakeDocker := test.NewFakeDockerClient()
 	dh := getDocker(fakeDocker)
-	fake := dh.kubeDockerClient.(*dockertools.FakeDockerClient)
-	fakeDocker.Image = &dockertypes.ImageInspect{ID: "test-abcd"}
-	id, err := dh.GetImageID("test/image")
-	if e := fake.AssertCalls([]string{}); e != nil {
-		t.Errorf("%+v", e)
+	image := dockertypes.ImageInspect{ID: "test-abcd:latest"}
+	fakeDocker.Images = map[string]dockertypes.ImageInspect{image.ID: image}
+	id, err := dh.GetImageID("test-abcd")
+	expectedCalls := []string{"inspect_image"}
+	if !reflect.DeepEqual(fakeDocker.Calls, expectedCalls) {
+		t.Errorf("Expected fakeDocker.Calls %v, got %v", expectedCalls, fakeDocker.Calls)
 	}
 	if err != nil {
 		t.Errorf("Unexpected error returned: %v", err)
-	} else if id != "test-abcd" {
+	} else if id != image.ID {
 		t.Errorf("Unexpected image id returned: %s", id)
 	}
 }
 
 func TestRemoveImage(t *testing.T) {
-	fakeDocker := &test.FakeDockerClient{}
+	fakeDocker := test.NewFakeDockerClient()
 	dh := getDocker(fakeDocker)
-	fake := dh.kubeDockerClient.(*dockertools.FakeDockerClient)
-	fake.Images = []dockertypes.Image{{ID: "test-abcd"}}
+	image := dockertypes.ImageInspect{ID: "test-abcd"}
+	fakeDocker.Images = map[string]dockertypes.ImageInspect{image.ID: image}
 	err := dh.RemoveImage("test-abcd")
 	if err != nil {
 		t.Errorf("Unexpected error removing image: %s", err)
