@@ -23,6 +23,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
+	utilstatus "github.com/openshift/source-to-image/pkg/util/status"
 )
 
 var (
@@ -201,12 +202,12 @@ func (builder *STI) Build(config *api.Config) (*api.Result, error) {
 		glog.V(1).Infof("Running %q in %q", api.Assemble, config.Tag)
 	}
 	if err := builder.scripts.Execute(api.Assemble, config.AssembleUser, config); err != nil {
-		builder.result.BuildInfo.FailureReason = api.ReasonAssembleFailed
+		builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonAssembleFailed, utilstatus.ReasonMessageAssembleFailed)
 
 		switch e := err.(type) {
 		case errors.ContainerError:
 			if !isMissingRequirements(e.Output) {
-				builder.result.BuildInfo.FailureReason = api.ReasonUnmetS2IDependencies
+				builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonUnmetS2IDependencies, utilstatus.ReasonMessageUnmetS2IDependencies)
 				return builder.result, err
 			}
 			glog.V(1).Info("Image is missing basic requirements (sh or tar), layered build will be performed")
@@ -231,7 +232,7 @@ func (builder *STI) Prepare(config *api.Config) error {
 
 	if len(config.WorkingDir) == 0 {
 		if config.WorkingDir, err = builder.fs.CreateWorkingDirectory(); err != nil {
-			builder.result.BuildInfo.FailureReason = api.ReasonFSOperationFailed
+			builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonFSOperationFailed, utilstatus.ReasonMessageFSOperationFailed)
 			return err
 		}
 	}
@@ -240,7 +241,7 @@ func (builder *STI) Prepare(config *api.Config) error {
 
 	if len(config.RuntimeImage) > 0 {
 		if err = dockerpkg.GetRuntimeImage(config, builder.runtimeDocker); err != nil {
-			builder.result.BuildInfo.FailureReason = api.ReasonPullRuntimeImageFailed
+			builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonPullRuntimeImageFailed, utilstatus.ReasonMessagePullRuntimeImageFailed)
 			glog.Errorf("Unable to pull runtime image %q: %v", config.RuntimeImage, err)
 			return err
 		}
@@ -249,16 +250,16 @@ func (builder *STI) Prepare(config *api.Config) error {
 		if len(builder.config.RuntimeArtifacts) == 0 {
 			mapping, err := builder.docker.GetAssembleInputFiles(config.RuntimeImage)
 			if err != nil {
-				builder.result.BuildInfo.FailureReason = api.ReasonInvalidArtifactsMapping
+				builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonInvalidArtifactsMapping, utilstatus.ReasonMessageInvalidArtifactsMapping)
 				return err
 			}
 			if len(mapping) == 0 {
-				builder.result.BuildInfo.FailureReason = api.ReasonGenericS2IBuildFailed
+				builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
 				return fmt.Errorf("No runtime artifacts to copy were specified")
 			}
 			for _, value := range strings.Split(mapping, ";") {
 				if err = builder.config.RuntimeArtifacts.Set(value); err != nil {
-					builder.result.BuildInfo.FailureReason = api.ReasonGenericS2IBuildFailed
+					builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
 					return fmt.Errorf("Couldn't parse %q label with value %q on image %q: %v",
 						dockerpkg.AssembleInputFilesLabel, mapping, config.RuntimeImage, err)
 				}
@@ -280,7 +281,7 @@ func (builder *STI) Prepare(config *api.Config) error {
 				continue
 			}
 			if volumeErr != nil {
-				builder.result.BuildInfo.FailureReason = api.ReasonInvalidArtifactsMapping
+				builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonInvalidArtifactsMapping, utilstatus.ReasonMessageInvalidArtifactsMapping)
 				return volumeErr
 			}
 		}
@@ -289,7 +290,7 @@ func (builder *STI) Prepare(config *api.Config) error {
 	// Setup working directories
 	for _, v := range workingDirs {
 		if err = builder.fs.MkdirAll(filepath.Join(config.WorkingDir, v)); err != nil {
-			builder.result.BuildInfo.FailureReason = api.ReasonFSOperationFailed
+			builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonFSOperationFailed, utilstatus.ReasonMessageFSOperationFailed)
 			return err
 		}
 	}
@@ -297,7 +298,7 @@ func (builder *STI) Prepare(config *api.Config) error {
 	// fetch sources, for their .s2i/bin might contain s2i scripts
 	if len(config.Source) > 0 {
 		if builder.sourceInfo, err = builder.source.Download(config); err != nil {
-			builder.result.BuildInfo.FailureReason = api.ReasonFetchSourceFailed
+			builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonFetchSourceFailed, utilstatus.ReasonMessageFetchSourceFailed)
 			return err
 		}
 	}
@@ -305,7 +306,7 @@ func (builder *STI) Prepare(config *api.Config) error {
 	// get the scripts
 	required, err := builder.installer.InstallRequired(builder.requiredScripts, config.WorkingDir)
 	if err != nil {
-		builder.result.BuildInfo.FailureReason = api.ReasonInstallScriptsFailed
+		builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonInstallScriptsFailed, utilstatus.ReasonMessageInstallScriptsFailed)
 		return err
 	}
 	optional := builder.installer.InstallOptional(builder.optionalScripts, config.WorkingDir)
@@ -326,7 +327,7 @@ func (builder *STI) Prepare(config *api.Config) error {
 			}
 		}
 		if failedCount == len(requiredAndOptional) {
-			builder.result.BuildInfo.FailureReason = api.ReasonArtifactsFetchFailed
+			builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonArtifactsFetchFailed, utilstatus.ReasonMessageArtifactsFetchFailed)
 			return fmt.Errorf("Could not download any scripts from URL %v", config.ScriptsURL)
 		}
 	}
@@ -416,7 +417,7 @@ func (builder *STI) Save(config *api.Config) (err error) {
 	}
 
 	if err = builder.fs.Mkdir(artifactTmpDir); err != nil {
-		builder.result.BuildInfo.FailureReason = api.ReasonFSOperationFailed
+		builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonFSOperationFailed, utilstatus.ReasonMessageFSOperationFailed)
 		return err
 	}
 
@@ -437,7 +438,7 @@ func (builder *STI) Save(config *api.Config) (err error) {
 	if len(user) == 0 {
 		user, err = builder.docker.GetImageUser(image)
 		if err != nil {
-			builder.result.BuildInfo.FailureReason = api.ReasonGenericS2IBuildFailed
+			builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
 			return err
 		}
 		glog.V(3).Infof("The assemble user is not set, defaulting to %q user", user)
@@ -471,7 +472,8 @@ func (builder *STI) Save(config *api.Config) (err error) {
 		errReader.Close()
 		err = errors.NewSaveArtifactsError(image, e.Output, err)
 	}
-	builder.result.BuildInfo.FailureReason = api.ReasonGenericS2IBuildFailed
+
+	builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
 	return err
 }
 
@@ -524,18 +526,18 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 	if len(config.Injections) > 0 && command == api.Assemble {
 		workdir, err := builder.docker.GetImageWorkdir(config.BuilderImage)
 		if err != nil {
-			builder.result.BuildInfo.FailureReason = api.ReasonGenericS2IBuildFailed
+			builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
 			return err
 		}
 		config.Injections = util.FixInjectionsWithRelativePath(workdir, config.Injections)
 		injectedFiles, err := util.ExpandInjectedFiles(config.Injections)
 		if err != nil {
-			builder.result.BuildInfo.FailureReason = api.ReasonInstallScriptsFailed
+			builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonInstallScriptsFailed, utilstatus.ReasonMessageInstallScriptsFailed)
 			return err
 		}
 		rmScript, err := util.CreateInjectedFilesRemovalScript(injectedFiles, "/tmp/rm-injections")
 		if err != nil {
-			builder.result.BuildInfo.FailureReason = api.ReasonGenericS2IBuildFailed
+			builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
 			return err
 		}
 		defer os.Remove(rmScript)

@@ -17,6 +17,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/scripts"
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
+	utilstatus "github.com/openshift/source-to-image/pkg/util/status"
 )
 
 // OnBuild strategy executes the simple Docker build in case the image does not
@@ -91,7 +92,7 @@ func (builder *OnBuild) Build(config *api.Config) (*api.Result, error) {
 	buildResult := &api.Result{}
 
 	if config.BlockOnBuild {
-		buildResult.BuildInfo.FailureReason = api.ReasonOnBuildForbidden
+		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonOnBuildForbidden, utilstatus.ReasonMessageOnBuildForbidden)
 		return buildResult, fmt.Errorf("builder image uses ONBUILD instructions but ONBUILD is not allowed")
 	}
 	glog.V(2).Info("Preparing the source code for build")
@@ -106,14 +107,14 @@ func (builder *OnBuild) Build(config *api.Config) (*api.Result, error) {
 
 	glog.V(2).Info("Creating application Dockerfile")
 	if err := builder.CreateDockerfile(config); err != nil {
-		buildResult.BuildInfo.FailureReason = api.ReasonDockerFileCreateFailed
+		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonDockerfileCreateFailed, utilstatus.ReasonMessageDockerfileCreateFailed)
 		return buildResult, err
 	}
 
 	glog.V(2).Info("Creating application source code image")
 	tarStream, err := builder.SourceTar(config)
 	if err != nil {
-		buildResult.BuildInfo.FailureReason = api.ReasonTarSourceFailed
+		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonTarSourceFailed, utilstatus.ReasonMessageTarSourceFailed)
 		return buildResult, err
 	}
 	defer tarStream.Close()
@@ -127,7 +128,7 @@ func (builder *OnBuild) Build(config *api.Config) (*api.Result, error) {
 
 	glog.V(2).Info("Building the application source")
 	if err = builder.docker.BuildImage(opts); err != nil {
-		buildResult.BuildInfo.FailureReason = api.ReasonDockerImageBuildFailed
+		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonDockerImageBuildFailed, utilstatus.ReasonMessageDockerImageBuildFailed)
 		return buildResult, err
 	}
 
@@ -138,7 +139,7 @@ func (builder *OnBuild) Build(config *api.Config) (*api.Result, error) {
 
 	if len(opts.Name) > 0 {
 		if imageID, err = builder.docker.GetImageID(opts.Name); err != nil {
-			buildResult.BuildInfo.FailureReason = api.ReasonGenericS2IBuildFailed
+			buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
 			return buildResult, err
 		}
 	}

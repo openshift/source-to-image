@@ -15,6 +15,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
+	utilstatus "github.com/openshift/source-to-image/pkg/util/status"
 )
 
 type postExecutorStepContext struct {
@@ -130,7 +131,7 @@ func (step *commitImageStep) execute(ctx *postExecutorStepContext) error {
 
 	ctx.imageID, err = commitContainer(step.docker, ctx.containerID, cmd, user, step.builder.config.Tag, step.builder.env, entrypoint, ctx.labels)
 	if err != nil {
-		step.builder.result.BuildInfo.FailureReason = api.ReasonCommitContainerFailed
+		step.builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonCommitContainerFailed, utilstatus.ReasonMessageCommitContainerFailed)
 		return err
 	}
 
