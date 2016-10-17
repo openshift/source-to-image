@@ -57,6 +57,14 @@ func TestIsValidGitRepository(t *testing.T) {
 	if err != nil {
 		t.Errorf("isValidGitRepository returned an unexpected error: %q", err.Error())
 	}
+
+	d = test.CreateLocalGitDirectoryWithSubmodule(t)
+	defer os.RemoveAll(d)
+
+	ok, err = isValidGitRepository(filepath.Join(d, "submodule"))
+	if !ok || err != nil {
+		t.Errorf("Expected isValidGitRepository to return true, nil on submodule; got %v, %v", ok, err)
+	}
 }
 
 func TestValidCloneSpec(t *testing.T) {
