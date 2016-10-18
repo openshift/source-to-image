@@ -51,14 +51,14 @@ func TestRemoveContainer(t *testing.T) {
 }
 
 func TestCommitContainer(t *testing.T) {
-	type commit_test struct {
+	type commitTest struct {
 		containerID     string
 		containerTag    string
 		expectedImageID string
 		expectedError   error
 	}
 
-	tests := map[string]commit_test{
+	tests := map[string]commitTest{
 		"valid": {
 			containerID:     "test-container-id",
 			containerTag:    "test-container-tag",
@@ -106,13 +106,13 @@ func TestCommitContainer(t *testing.T) {
 }
 
 func TestCopyToContainer(t *testing.T) {
-	type copyto_test struct {
+	type copyToTest struct {
 		containerID string
 		src         string
 		destPath    string
 	}
 
-	tests := map[string]copyto_test{
+	tests := map[string]copyToTest{
 		"valid": {
 			containerID: "test-container-id",
 			src:         "foo",
@@ -175,13 +175,13 @@ func TestCopyToContainer(t *testing.T) {
 }
 
 func TestCopyFromContainer(t *testing.T) {
-	type copyfrom_test struct {
+	type copyFromTest struct {
 		containerID   string
 		srcPath       string
 		expectedError error
 	}
 
-	tests := map[string]copyfrom_test{
+	tests := map[string]copyFromTest{
 		"valid": {
 			containerID: "test-container-id",
 			srcPath:     "/foo/bar",
@@ -214,12 +214,12 @@ func TestCopyFromContainer(t *testing.T) {
 }
 
 func TestImageBuild(t *testing.T) {
-	type wait_test struct {
+	type waitTest struct {
 		imageID       string
 		expectedError error
 	}
 
-	tests := map[string]wait_test{
+	tests := map[string]waitTest{
 		"valid": {
 			imageID: "test-container-id",
 		},

@@ -540,7 +540,7 @@ func (h *stiGit) SubmoduleUpdate(repo string, init, recursive bool) error {
 	return h.runner.RunWithOptions(opts, "git", updateArgs...)
 }
 
-// GetInfo retrieves the informations about the source code and commit
+// GetInfo retrieves the information about the source code and commit
 func (h *stiGit) GetInfo(repo string) *api.SourceInfo {
 	git := func(arg ...string) string {
 		command := exec.Command("git", arg...)

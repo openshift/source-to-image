@@ -1,5 +1,6 @@
 package templates
 
+// AssembleScript is a default assemble script laid down by s2i create
 const AssembleScript = `#!/bin/bash -e
 #
 # S2I assemble script for the '{{.ImageName}}' image.
@@ -29,6 +30,7 @@ echo "---> Building application from source..."
 # TODO: Add build steps for your application, eg npm install, bundle install
 `
 
+// RunScript is a default run script laid down by s2i create
 const RunScript = `#!/bin/bash -e
 #
 # S2I run script for the '{{.ImageName}}' image.
@@ -41,6 +43,7 @@ const RunScript = `#!/bin/bash -e
 exec <start your server here>
 `
 
+// UsageScript is a default usage script laid down by s2i create
 const UsageScript = `#!/bin/bash -e
 cat <<EOF
 This is the {{.ImageName}} S2I image:
@@ -55,6 +58,8 @@ docker run <application image>
 EOF
 `
 
+// SaveArtifactsScript is a default save artifacts script laid down by s2i
+// create
 const SaveArtifactsScript = `#!/bin/sh -e
 #
 # S2I save-artifacts script for the '{{.ImageName}}' image.

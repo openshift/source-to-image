@@ -151,10 +151,12 @@ func (d stiDocker) InspectImage(name string) (*dockertypes.ImageInspect, error) 
 	return &resp, nil
 }
 
+// PostExecutor is an interface which provides a PostExecute function
 type PostExecutor interface {
 	PostExecute(containerID, destination string) error
 }
 
+// PullResult is the result returned by the PullImage function
 type PullResult struct {
 	OnBuild bool
 	Image   *api.Image

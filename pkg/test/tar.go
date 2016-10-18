@@ -24,6 +24,7 @@ type FakeTar struct {
 	lock sync.Mutex
 }
 
+// Copy returns a copy of the FakeTar object
 func (f *FakeTar) Copy() *FakeTar {
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -58,17 +59,21 @@ func (f *FakeTar) ExtractTarStreamWithLogging(dir string, reader io.Reader, logg
 	return f.ExtractTarError
 }
 
+// ExtractTarStreamFromTarReader streams a content of fake tar from a tar.Reader
 func (f *FakeTar) ExtractTarStreamFromTarReader(dir string, tarReader tar.Reader, logger io.Writer) error {
 	return errors.New("not implemented")
 }
 
+// ExtractTarStream streams a content of fake tar
 func (f *FakeTar) ExtractTarStream(dir string, reader io.Reader) error {
 	return f.ExtractTarStreamWithLogging(dir, reader, nil)
 }
 
+// SetExclusionPattern sets the exclusion pattern
 func (f *FakeTar) SetExclusionPattern(*regexp.Regexp) {
 }
 
+// StreamFileAsTar streams a single file as a TAR archive into specified writer.
 func (f *FakeTar) StreamFileAsTar(string, string, io.Writer) error {
 	return nil
 }
@@ -78,6 +83,7 @@ func (f *FakeTar) StreamFileAsTarWithCallback(source, name string, writer io.Wri
 	return errors.New("not implemented")
 }
 
+// StreamDirAsTar streams a directory as a TAR archive into specified writer.
 func (f *FakeTar) StreamDirAsTar(string, string, io.Writer) error {
 	return nil
 }
@@ -87,6 +93,8 @@ func (f *FakeTar) StreamDirAsTarWithCallback(source string, writer io.Writer, wa
 	return errors.New("not implemented")
 }
 
+// CreateTarStreamWithLogging creates a tar from the given directory and streams
+// it to the given writer.
 func (f *FakeTar) CreateTarStreamWithLogging(dir string, includeDirInPath bool, writer io.Writer, logger io.Writer) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -94,6 +102,8 @@ func (f *FakeTar) CreateTarStreamWithLogging(dir string, includeDirInPath bool, 
 	return f.CreateTarError
 }
 
+// CreateTarStream creates a tar from the given directory and streams it to the
+// given writer.
 func (f *FakeTar) CreateTarStream(dir string, includeDirInPath bool, writer io.Writer) error {
 	return f.CreateTarStreamWithLogging(dir, includeDirInPath, writer, nil)
 }

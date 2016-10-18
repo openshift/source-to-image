@@ -63,7 +63,7 @@ const (
 	// scripts are made available for integration testing.
 	//
 	// Port 23456 must match the port used in the fake image Dockerfiles
-	FakeScriptsHttpURL = "http://127.0.0.1:23456/.s2i/bin"
+	FakeScriptsHTTPURL = "http://127.0.0.1:23456/.s2i/bin"
 )
 
 func getDefaultContext() (context.Context, context.CancelFunc) {
@@ -238,7 +238,7 @@ func TestCleanBuildFileScriptsURL(t *testing.T) {
 }
 
 func TestCleanBuildHttpScriptsURL(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBuilderImage, FakeScriptsHttpURL, true, true)
+	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBuilderImage, FakeScriptsHTTPURL, true, true)
 }
 
 func TestCleanBuildScripts(t *testing.T) {

@@ -1,5 +1,6 @@
 package templates
 
+// Dockerfile is a default Dockerfile laid down by s2i create
 const Dockerfile = `
 # {{.ImageName}}
 FROM openshift/base-centos7

@@ -1,5 +1,6 @@
 package templates
 
+// TestRunScript is a simple test script that verifies the S2I image.
 const TestRunScript = `
 #!/bin/bash
 #
@@ -156,6 +157,7 @@ cleanup
 
 `
 
+// Makefile contains a sample Makefile which can build and test a container.
 const Makefile = `
 IMAGE_NAME = {{.ImageName}}
 
@@ -168,5 +170,6 @@ test:
 	IMAGE_NAME=$(IMAGE_NAME)-candidate test/run
 `
 
+// Gitignore is a sample .gitignore file
 const Gitignore = `.git/
 `

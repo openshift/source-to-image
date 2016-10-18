@@ -15,49 +15,49 @@ import (
 	"golang.org/x/net/context"
 )
 
-type FakeDockerAddr struct {
+// FakeConn fakes a net.Conn
+type FakeConn struct {
 }
 
-func (a FakeDockerAddr) Network() string {
-	return ""
-}
-
-func (a FakeDockerAddr) String() string {
-	return ""
-}
-
-type FakeDockerConn struct {
-}
-
-func (c FakeDockerConn) Read(b []byte) (n int, err error) {
+// Read reads bytes
+func (c FakeConn) Read(b []byte) (n int, err error) {
 	return 0, nil
 }
 
-func (c FakeDockerConn) Write(b []byte) (n int, err error) {
+// Write writes bytes
+func (c FakeConn) Write(b []byte) (n int, err error) {
 	return 0, nil
 }
 
-func (c FakeDockerConn) Close() error {
+// Close closes the connection
+func (c FakeConn) Close() error {
 	return nil
 }
 
-func (c FakeDockerConn) LocalAddr() net.Addr {
-	return FakeDockerAddr{}
+// LocalAddr returns the local address
+func (c FakeConn) LocalAddr() net.Addr {
+	ip, _ := net.ResolveIPAddr("ip4", "127.0.0.1")
+	return ip
 }
 
-func (c FakeDockerConn) RemoteAddr() net.Addr {
-	return FakeDockerAddr{}
+// RemoteAddr returns the remote address
+func (c FakeConn) RemoteAddr() net.Addr {
+	ip, _ := net.ResolveIPAddr("ip4", "127.0.0.1")
+	return ip
 }
 
-func (c FakeDockerConn) SetDeadline(t time.Time) error {
+// SetDeadline sets the deadline
+func (c FakeConn) SetDeadline(t time.Time) error {
 	return nil
 }
 
-func (c FakeDockerConn) SetReadDeadline(t time.Time) error {
+// SetReadDeadline sets the read deadline
+func (c FakeConn) SetReadDeadline(t time.Time) error {
 	return nil
 }
 
-func (c FakeDockerConn) SetWriteDeadline(t time.Time) error {
+// SetWriteDeadline sets the write deadline
+func (c FakeConn) SetWriteDeadline(t time.Time) error {
 	return nil
 }
 
@@ -91,6 +91,7 @@ type FakeDockerClient struct {
 	Calls []string
 }
 
+// NewFakeDockerClient returns a new FakeDockerClient
 func NewFakeDockerClient() *FakeDockerClient {
 	return &FakeDockerClient{
 		Images:     make(map[string]dockertypes.ImageInspect),
@@ -99,6 +100,7 @@ func NewFakeDockerClient() *FakeDockerClient {
 	}
 }
 
+// ImageInspectWithRaw returns the image information and its raw representation.
 func (d *FakeDockerClient) ImageInspectWithRaw(ctx context.Context, imageID string, getSize bool) (dockertypes.ImageInspect, []byte, error) {
 	d.Calls = append(d.Calls, "inspect_image")
 
@@ -108,6 +110,7 @@ func (d *FakeDockerClient) ImageInspectWithRaw(ctx context.Context, imageID stri
 	return dockertypes.ImageInspect{}, nil, fmt.Errorf("No such image: %q", imageID)
 }
 
+// CopyToContainer copies content into the container filesystem.
 func (d *FakeDockerClient) CopyToContainer(ctx context.Context, container, path string, content io.Reader, opts dockertypes.CopyToContainerOptions) error {
 	d.CopyToContainerID = container
 	d.CopyToContainerPath = path
@@ -115,28 +118,34 @@ func (d *FakeDockerClient) CopyToContainer(ctx context.Context, container, path 
 	return nil
 }
 
+// CopyFromContainer gets the content from the container and returns it as a Reader
+// to manipulate it in the host. It's up to the caller to close the reader.
 func (d *FakeDockerClient) CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, dockertypes.ContainerPathStat, error) {
 	d.CopyFromContainerID = container
 	d.CopyFromContainerPath = srcPath
 	return ioutil.NopCloser(bytes.NewReader([]byte(""))), dockertypes.ContainerPathStat{}, d.CopyFromContainerErr
 }
 
+// ContainerWait pauses execution until a container exits.
 func (d *FakeDockerClient) ContainerWait(ctx context.Context, containerID string) (int, error) {
 	d.WaitContainerID = containerID
 	return d.WaitContainerResult, d.WaitContainerErr
 }
 
+// ContainerCommit applies changes into a container and creates a new tagged image.
 func (d *FakeDockerClient) ContainerCommit(ctx context.Context, container string, options dockertypes.ContainerCommitOptions) (dockertypes.ContainerCommitResponse, error) {
 	d.ContainerCommitID = container
 	d.ContainerCommitOptions = options
 	return d.ContainerCommitResponse, d.ContainerCommitErr
 }
 
+// ContainerAttach attaches a connection to a container in the server.
 func (d *FakeDockerClient) ContainerAttach(ctx context.Context, container string, options dockertypes.ContainerAttachOptions) (dockertypes.HijackedResponse, error) {
 	d.Calls = append(d.Calls, "attach")
-	return dockertypes.HijackedResponse{Conn: FakeDockerConn{}}, nil
+	return dockertypes.HijackedResponse{Conn: FakeConn{}}, nil
 }
 
+// ImageBuild sends request to the daemon to build images.
 func (d *FakeDockerClient) ImageBuild(ctx context.Context, buildContext io.Reader, options dockertypes.ImageBuildOptions) (dockertypes.ImageBuildResponse, error) {
 	d.BuildImageOpts = options
 	return dockertypes.ImageBuildResponse{
@@ -144,6 +153,7 @@ func (d *FakeDockerClient) ImageBuild(ctx context.Context, buildContext io.Reade
 	}, d.BuildImageErr
 }
 
+// ContainerCreate creates a new container based in the given configuration.
 func (d *FakeDockerClient) ContainerCreate(ctx context.Context, config *dockercontainer.Config, hostConfig *dockercontainer.HostConfig, networkingConfig *dockernetwork.NetworkingConfig, containerName string) (dockertypes.ContainerCreateResponse, error) {
 	d.Calls = append(d.Calls, "create")
 
@@ -151,11 +161,13 @@ func (d *FakeDockerClient) ContainerCreate(ctx context.Context, config *dockerco
 	return dockertypes.ContainerCreateResponse{}, nil
 }
 
+// ContainerInspect returns the container information.
 func (d *FakeDockerClient) ContainerInspect(ctx context.Context, containerID string) (dockertypes.ContainerJSON, error) {
 	d.Calls = append(d.Calls, "inspect_container")
 	return dockertypes.ContainerJSON{}, nil
 }
 
+// ContainerRemove kills and removes a container from the docker host.
 func (d *FakeDockerClient) ContainerRemove(ctx context.Context, containerID string, options dockertypes.ContainerRemoveOptions) error {
 	d.Calls = append(d.Calls, "remove")
 
@@ -166,11 +178,13 @@ func (d *FakeDockerClient) ContainerRemove(ctx context.Context, containerID stri
 	return errors.New("container does not exist")
 }
 
+// ContainerStart sends a request to the docker daemon to start a container.
 func (d *FakeDockerClient) ContainerStart(ctx context.Context, containerID string) error {
 	d.Calls = append(d.Calls, "start")
 	return nil
 }
 
+// ImagePull requests the docker host to pull an image from a remote registry.
 func (d *FakeDockerClient) ImagePull(ctx context.Context, ref string, options dockertypes.ImagePullOptions) (io.ReadCloser, error) {
 	d.Calls = append(d.Calls, "pull")
 
@@ -181,6 +195,7 @@ func (d *FakeDockerClient) ImagePull(ctx context.Context, ref string, options do
 	return ioutil.NopCloser(bytes.NewReader([]byte{})), nil
 }
 
+// ImageRemove removes an image from the docker host.
 func (d *FakeDockerClient) ImageRemove(ctx context.Context, imageID string, options dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error) {
 	d.Calls = append(d.Calls, "remove_image")
 
@@ -191,6 +206,7 @@ func (d *FakeDockerClient) ImageRemove(ctx context.Context, imageID string, opti
 	return []dockertypes.ImageDelete{}, errors.New("image does not exist")
 }
 
+// ServerVersion returns information of the docker client and server host.
 func (d *FakeDockerClient) ServerVersion(ctx context.Context) (dockertypes.Version, error) {
 	return dockertypes.Version{}, nil
 }
