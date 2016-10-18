@@ -30,7 +30,7 @@ all build:
 #   make verify
 verify: build
 	hack/verify-gofmt.sh
-	hack/verify-golint.sh || true # ignored until existing lint errors are gone
+	hack/verify-golint.sh
 	hack/verify-govet.sh
 .PHONY: verify
 

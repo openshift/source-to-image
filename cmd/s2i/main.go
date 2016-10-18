@@ -144,7 +144,7 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 				cfg.Destination = oldDestination
 			}
 
-			glog.V(2).Infof("\n%s\n", describe.DescribeConfig(cfg))
+			glog.V(2).Infof("\n%s\n", describe.Config(cfg))
 
 			if !docker.IsReachable(cfg) {
 				glog.Fatalf("Unable to connect to Docker daemon. Please set the DOCKER_HOST or make sure the Docker socket %q exists", cfg.DockerConfig.Endpoint)
@@ -239,7 +239,7 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 				cfg.PreviousImagePullPolicy = api.DefaultPreviousImagePullPolicy
 			}
 
-			glog.V(2).Infof("\n%s\n", describe.DescribeConfig(cfg))
+			glog.V(2).Infof("\n%s\n", describe.Config(cfg))
 
 			builder, _, err := strategies.GetStrategy(cfg)
 			checkErr(err)

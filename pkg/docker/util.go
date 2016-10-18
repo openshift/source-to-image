@@ -29,6 +29,8 @@ var (
 	DefaultEntrypoint = []string{"/usr/bin/env"}
 )
 
+// AuthConfigurations maps a registry name to an AuthConfig, as used for example
+// in the .dockercfg file
 type AuthConfigurations struct {
 	Configs map[string]api.AuthConfig
 }
@@ -342,6 +344,8 @@ func GetRuntimeImage(config *api.Config, docker Docker) error {
 	return err
 }
 
+// GetDefaultDockerConfig checks relevant Docker environment variables to
+// provide defaults for our command line flags
 func GetDefaultDockerConfig() *api.DockerConfig {
 	cfg := &api.DockerConfig{}
 	if cfg.Endpoint = os.Getenv("DOCKER_HOST"); cfg.Endpoint == "" {

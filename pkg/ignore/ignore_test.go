@@ -63,7 +63,7 @@ func baseTest(t *testing.T, patterns []string, filesToDel []string, filesToKeep 
 	}
 
 	// create slices the store files to create, maps for files which should be deleted, files which should be kept
-	filesToCreate := make([]string, 0)
+	filesToCreate := []string{}
 	filesToDelCheck := make(map[string]string)
 	for _, fileToDel := range filesToDel {
 		filesToDelCheck[fileToDel] = fileToDel

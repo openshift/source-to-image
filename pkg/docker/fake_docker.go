@@ -114,6 +114,7 @@ func (f *FakeDocker) RunContainer(opts RunContainerOptions) error {
 	return f.RunContainerError
 }
 
+// UploadToContainer uploads artifacts to the container.
 func (f *FakeDocker) UploadToContainer(srcPath, destPath, container string) error {
 	return nil
 }
@@ -184,6 +185,7 @@ func (f *FakeDocker) BuildImage(opts BuildImageOptions) error {
 	return f.BuildImageError
 }
 
+// GetLabels returns the labels of the image
 func (f *FakeDocker) GetLabels(name string) (map[string]string, error) {
 	return f.Labels, f.LabelsError
 }

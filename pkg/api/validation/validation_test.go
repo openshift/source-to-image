@@ -10,7 +10,7 @@ import (
 func TestValidation(t *testing.T) {
 	testCases := []struct {
 		value    *api.Config
-		expected []ValidationError
+		expected []Error
 	}{
 		{
 			&api.Config{
@@ -19,7 +19,7 @@ func TestValidation(t *testing.T) {
 				DockerConfig:      &api.DockerConfig{Endpoint: "/var/run/docker.socket"},
 				BuilderPullPolicy: api.DefaultBuilderPullPolicy,
 			},
-			[]ValidationError{},
+			[]Error{},
 		},
 		{
 			&api.Config{
@@ -29,7 +29,7 @@ func TestValidation(t *testing.T) {
 				DockerNetworkMode: "foobar",
 				BuilderPullPolicy: api.DefaultBuilderPullPolicy,
 			},
-			[]ValidationError{{ValidationErrorInvalidValue, "dockerNetworkMode"}},
+			[]Error{{ErrorInvalidValue, "dockerNetworkMode"}},
 		},
 		{
 			&api.Config{
@@ -39,7 +39,7 @@ func TestValidation(t *testing.T) {
 				DockerNetworkMode: api.NewDockerNetworkModeContainer("8d873e496bc3e80a1cb22e67f7de7be5b0633e27916b1144978d1419c0abfcdb"),
 				BuilderPullPolicy: api.DefaultBuilderPullPolicy,
 			},
-			[]ValidationError{},
+			[]Error{},
 		},
 		{
 			&api.Config{
@@ -49,7 +49,7 @@ func TestValidation(t *testing.T) {
 				DockerNetworkMode: api.NewDockerNetworkModeContainer("8d873e496bc3e80a1cb22e67f7de7be5b0633e27916b1144978d1419c0abfcdb"),
 				BuilderPullPolicy: api.DefaultBuilderPullPolicy,
 			},
-			[]ValidationError{},
+			[]Error{},
 		},
 		{
 			&api.Config{
@@ -59,7 +59,7 @@ func TestValidation(t *testing.T) {
 				BuilderPullPolicy: api.DefaultBuilderPullPolicy,
 				Labels:            nil,
 			},
-			[]ValidationError{},
+			[]Error{},
 		},
 		{
 			&api.Config{
@@ -69,7 +69,7 @@ func TestValidation(t *testing.T) {
 				BuilderPullPolicy: api.DefaultBuilderPullPolicy,
 				Labels:            map[string]string{},
 			},
-			[]ValidationError{},
+			[]Error{},
 		},
 		{
 			&api.Config{
@@ -79,7 +79,7 @@ func TestValidation(t *testing.T) {
 				BuilderPullPolicy: api.DefaultBuilderPullPolicy,
 				Labels:            map[string]string{"some": "thing", "other": "value"},
 			},
-			[]ValidationError{},
+			[]Error{},
 		},
 		{
 			&api.Config{
@@ -89,7 +89,7 @@ func TestValidation(t *testing.T) {
 				BuilderPullPolicy: api.DefaultBuilderPullPolicy,
 				Labels:            map[string]string{"some": "thing", "": "emptykey"},
 			},
-			[]ValidationError{{ValidationErrorInvalidValue, "labels"}},
+			[]Error{{ErrorInvalidValue, "labels"}},
 		},
 	}
 	for _, test := range testCases {

@@ -79,6 +79,7 @@ func (f *FakeGit) SubmoduleUpdate(repo string, init, recursive bool) error {
 	return f.SubmoduleUpdateError
 }
 
+// GetInfo retrieves the information about the source code and commit
 func (f *FakeGit) GetInfo(repo string) *api.SourceInfo {
 	return &api.SourceInfo{
 		Ref:      "master",
@@ -113,6 +114,7 @@ func CreateLocalGitDirectory(t *testing.T) string {
 	return dir
 }
 
+// CreateEmptyLocalGitDirectory creates a git directory with no checkin yet
 func CreateEmptyLocalGitDirectory(t *testing.T) string {
 	dir, err := ioutil.TempDir(os.TempDir(), "gitdir-s2i-test")
 	if err != nil {
