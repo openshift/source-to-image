@@ -187,6 +187,11 @@
 			"Rev": "4eb8c2fb1dcb10fa3bf9bd7031f3a25a8ce2fef6"
 		},
 		{
+			"ImportPath": "github.com/openshift/origin/pkg/image/reference",
+			"Comment": "v1.4.0-alpha.0-490-g2142bdb",
+			"Rev": "2142bdbbad43d7cd47bd74da5dbcd3d4e7901f0b"
+		},
+		{
 			"ImportPath": "github.com/russross/blackfriday",
 			"Comment": "v1.3",
 			"Rev": "8cec3a854e68dba10faabbe31c089abf4a3e57a6"

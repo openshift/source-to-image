@@ -12,7 +12,6 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/docker/distribution/reference"
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/build"
 	"github.com/openshift/source-to-image/pkg/docker"
@@ -146,6 +145,11 @@ func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 		return buildResult, fmt.Errorf("builder image uses ONBUILD instructions but ONBUILD is not allowed")
 	}
 
+	if config.BuilderImage == "" {
+		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
+		return buildResult, fmt.Errorf("builder image name cannot be empty")
+	}
+
 	if err := builder.CreateDockerfile(config); err != nil {
 		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonDockerfileCreateFailed, utilstatus.ReasonMessageDockerfileCreateFailed)
 		return buildResult, err
@@ -159,12 +163,7 @@ func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 	}
 	defer tarStream.Close()
 
-	namedReference, err := reference.ParseNamed(builder.config.BuilderImage)
-	if err != nil {
-		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
-		return buildResult, err
-	}
-	newBuilderImage := fmt.Sprintf("%s:s2i-layered-%d", namedReference.Name(), time.Now().UnixNano())
+	newBuilderImage := fmt.Sprintf("s2i-layered-temp-image-%d", time.Now().UnixNano())
 
 	outReader, outWriter := io.Pipe()
 	defer outReader.Close()

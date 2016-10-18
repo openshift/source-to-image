@@ -12,8 +12,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/docker/distribution/reference"
 	"github.com/docker/engine-api/client"
+	"github.com/openshift/origin/pkg/image/reference"
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/errors"
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
@@ -48,16 +48,15 @@ const (
 // image name and a given set of client authentication objects.
 func GetImageRegistryAuth(auths *AuthConfigurations, imageName string) api.AuthConfig {
 	glog.V(5).Infof("Getting docker credentials for %s", imageName)
-	namedReference, err := reference.ParseNamed(imageName)
+	ref, err := reference.ParseNamedDockerImageReference(imageName)
 	if err != nil {
 		glog.V(0).Infof("error: Failed to parse docker reference %s", imageName)
 		return api.AuthConfig{}
 	}
 
-	hostname, _ := reference.SplitHostname(namedReference)
-	if strings.ContainsAny(hostname, ":.") || hostname == "localhost" {
-		if auth, ok := auths.Configs[hostname]; ok {
-			glog.V(5).Infof("Using %s[%s] credentials for pulling %s", auth.Email, hostname, imageName)
+	if ref.Registry != "" {
+		if auth, ok := auths.Configs[ref.Registry]; ok {
+			glog.V(5).Infof("Using %s[%s] credentials for pulling %s", auth.Email, ref.Registry, imageName)
 			return auth
 		}
 	}
