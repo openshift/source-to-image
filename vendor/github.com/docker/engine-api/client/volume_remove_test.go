@@ -16,7 +16,7 @@ func TestVolumeRemoveError(t *testing.T) {
 		transport: newMockClient(nil, errorMock(http.StatusInternalServerError, "Server error")),
 	}
 
-	err := client.VolumeRemove(context.Background(), "volume_id")
+	err := client.VolumeRemove(context.Background(), "volume_id", false)
 	if err == nil || err.Error() != "Error response from daemon: Server error" {
 		t.Fatalf("expected a Server Error, got %v", err)
 	}
@@ -40,7 +40,7 @@ func TestVolumeRemove(t *testing.T) {
 		}),
 	}
 
-	err := client.VolumeRemove(context.Background(), "volume_id")
+	err := client.VolumeRemove(context.Background(), "volume_id", false)
 	if err != nil {
 		t.Fatal(err)
 	}
