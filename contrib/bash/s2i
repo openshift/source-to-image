@@ -354,6 +354,8 @@ _s2i()
     flags+=("--cert=")
     flags+=("--key=")
     flags+=("--loglevel=")
+    flags+=("--tls")
+    flags+=("--tlsverify")
     flags+=("--url=")
     two_word_flags+=("-U")
 

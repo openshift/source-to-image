@@ -2,12 +2,14 @@ package client
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
 	"golang.org/x/net/context"
 )
@@ -16,7 +18,7 @@ func TestContainerUpdateError(t *testing.T) {
 	client := &Client{
 		transport: newMockClient(nil, errorMock(http.StatusInternalServerError, "Server error")),
 	}
-	err := client.ContainerUpdate(context.Background(), "nothing", container.UpdateConfig{})
+	_, err := client.ContainerUpdate(context.Background(), "nothing", container.UpdateConfig{})
 	if err == nil || err.Error() != "Error response from daemon: Server error" {
 		t.Fatalf("expected a Server Error, got %v", err)
 	}
@@ -24,19 +26,26 @@ func TestContainerUpdateError(t *testing.T) {
 
 func TestContainerUpdate(t *testing.T) {
 	expectedURL := "/containers/container_id/update"
+
 	client := &Client{
 		transport: newMockClient(nil, func(req *http.Request) (*http.Response, error) {
 			if !strings.HasPrefix(req.URL.Path, expectedURL) {
 				return nil, fmt.Errorf("Expected URL '%s', got '%s'", expectedURL, req.URL)
 			}
+
+			b, err := json.Marshal(types.ContainerUpdateResponse{})
+			if err != nil {
+				return nil, err
+			}
+
 			return &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(bytes.NewReader([]byte(""))),
+				Body:       ioutil.NopCloser(bytes.NewReader(b)),
 			}, nil
 		}),
 	}
 
-	err := client.ContainerUpdate(context.Background(), "container_id", container.UpdateConfig{
+	_, err := client.ContainerUpdate(context.Background(), "container_id", container.UpdateConfig{
 		Resources: container.Resources{
 			CPUPeriod: 1,
 		},

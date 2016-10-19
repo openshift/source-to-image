@@ -18,11 +18,10 @@ import (
 	dockerapi "github.com/docker/engine-api/client"
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
-	dockerstrslice "github.com/docker/engine-api/types/strslice"
-	"github.com/docker/go-connections/tlsconfig"
 	"github.com/golang/glog"
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/build/strategies"
+	"github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/util"
 	"golang.org/x/net/context"
 )
@@ -87,7 +86,7 @@ type integrationTest struct {
 func (i integrationTest) InspectImage(name string) (*dockertypes.ImageInspect, error) {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	resp, _, err := i.engineClient.ImageInspectWithRaw(ctx, name, true)
+	resp, _, err := i.engineClient.ImageInspectWithRaw(ctx, name)
 	if err != nil {
 		if dockerapi.IsErrImageNotFound(err) {
 			return nil, fmt.Errorf("no such image :%q", name)
@@ -101,49 +100,6 @@ var (
 	FakeScriptsFileURL string
 )
 
-func dockerConfig() *api.DockerConfig {
-	cfg := &api.DockerConfig{}
-	if cfg.Endpoint = os.Getenv("DOCKER_HOST"); cfg.Endpoint == "" {
-		cfg.Endpoint = DefaultDockerSocket
-	}
-	if os.Getenv("DOCKER_TLS_VERIFY") == "1" {
-		certPath := os.Getenv("DOCKER_CERT_PATH")
-		cfg.CertFile = filepath.Join(certPath, "cert.pem")
-		cfg.KeyFile = filepath.Join(certPath, "key.pem")
-		cfg.CAFile = filepath.Join(certPath, "ca.pem")
-	}
-	return cfg
-}
-
-func dockerClient(config *api.DockerConfig) (*dockerapi.Client, error) {
-	var httpClient *http.Client
-
-	if config.CertFile != "" && config.KeyFile != "" && config.CAFile != "" {
-		tlscOptions := tlsconfig.Options{
-			CAFile:             config.CAFile,
-			CertFile:           config.CertFile,
-			KeyFile:            config.KeyFile,
-			InsecureSkipVerify: os.Getenv("DOCKER_TLS_VERIFY") == "",
-		}
-		tlsc, err := tlsconfig.Client(tlscOptions)
-		if err != nil {
-			return nil, err
-		}
-
-		httpClient = &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: tlsc,
-			},
-		}
-	}
-
-	client, err := dockerapi.NewClient(config.Endpoint, os.Getenv("DOCKER_API_VERSION"), httpClient, nil)
-	if err != nil {
-		return nil, err
-	}
-	return client, nil
-}
-
 func getLogLevel() (level int) {
 	for level = 5; level >= 0; level-- {
 		if glog.V(glog.Level(level)) == true {
@@ -156,7 +112,7 @@ func getLogLevel() (level int) {
 // setup sets up integration tests
 func (i *integrationTest) setup() {
 	var err error
-	i.engineClient, err = dockerClient(dockerConfig())
+	i.engineClient, err = docker.NewEngineAPIClient(docker.GetDefaultDockerConfig())
 	if err != nil {
 		i.t.Errorf("%+v", err)
 		return
@@ -289,7 +245,7 @@ func TestAllowedUIDsOnBuildNumericUser(t *testing.T) {
 func (i *integrationTest) exerciseCleanAllowedUIDsBuild(tag, imageName string, expectError bool) {
 	t := i.t
 	config := &api.Config{
-		DockerConfig:      dockerConfig(),
+		DockerConfig:      docker.GetDefaultDockerConfig(),
 		BuilderImage:      imageName,
 		BuilderPullPolicy: api.DefaultBuilderPullPolicy,
 		Source:            TestSource,
@@ -345,7 +301,7 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 	}
 
 	config := &api.Config{
-		DockerConfig:      dockerConfig(),
+		DockerConfig:      docker.GetDefaultDockerConfig(),
 		BuilderImage:      imageName,
 		BuilderPullPolicy: api.DefaultBuilderPullPolicy,
 		Source:            TestSource,
@@ -430,7 +386,7 @@ func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injectio
 		injectionList.Set(i)
 	}
 	config := &api.Config{
-		DockerConfig:      dockerConfig(),
+		DockerConfig:      docker.GetDefaultDockerConfig(),
 		BuilderImage:      imageName,
 		BuilderPullPolicy: api.DefaultBuilderPullPolicy,
 		Source:            TestSource,
@@ -471,7 +427,7 @@ func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injectio
 func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, removePreviousImage bool, expectClean bool, checkOnBuild bool) {
 	t := i.t
 	config := &api.Config{
-		DockerConfig:        dockerConfig(),
+		DockerConfig:        docker.GetDefaultDockerConfig(),
 		BuilderImage:        imageName,
 		BuilderPullPolicy:   api.DefaultBuilderPullPolicy,
 		Source:              TestSource,
@@ -494,7 +450,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 
 	previousImageID := resp.ImageID
 	config = &api.Config{
-		DockerConfig:            dockerConfig(),
+		DockerConfig:            docker.GetDefaultDockerConfig(),
 		BuilderImage:            imageName,
 		BuilderPullPolicy:       api.DefaultBuilderPullPolicy,
 		Source:                  TestSource,
@@ -557,7 +513,7 @@ func (i *integrationTest) createContainer(image string) string {
 
 	ctx, cancel = getDefaultContext()
 	defer cancel()
-	err = i.engineClient.ContainerStart(ctx, container.ID)
+	err = i.engineClient.ContainerStart(ctx, container.ID, dockertypes.ContainerStartOptions{})
 	if err != nil {
 		i.t.Errorf("Couldn't start container: %s with error %+v", container.ID, err)
 		return ""
@@ -577,7 +533,7 @@ func (i *integrationTest) createContainer(image string) string {
 func (i *integrationTest) runInContainer(image string, command []string) int {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	opts := dockertypes.ContainerCreateConfig{Name: "", Config: &dockercontainer.Config{Image: image, AttachStdout: false, AttachStdin: false, Cmd: dockerstrslice.StrSlice(command)}}
+	opts := dockertypes.ContainerCreateConfig{Name: "", Config: &dockercontainer.Config{Image: image, AttachStdout: false, AttachStdin: false, Cmd: command}}
 	container, err := i.engineClient.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, opts.Name)
 	if err != nil {
 		i.t.Errorf("Couldn't create container from image %s err %+v", image, err)
@@ -586,7 +542,7 @@ func (i *integrationTest) runInContainer(image string, command []string) int {
 
 	ctx, cancel = getDefaultContext()
 	defer cancel()
-	err = i.engineClient.ContainerStart(ctx, container.ID)
+	err = i.engineClient.ContainerStart(ctx, container.ID, dockertypes.ContainerStartOptions{})
 	if err != nil {
 		i.t.Errorf("Couldn't start container: %s", container.ID)
 	}

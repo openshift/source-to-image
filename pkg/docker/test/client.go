@@ -101,7 +101,7 @@ func NewFakeDockerClient() *FakeDockerClient {
 }
 
 // ImageInspectWithRaw returns the image information and its raw representation.
-func (d *FakeDockerClient) ImageInspectWithRaw(ctx context.Context, imageID string, getSize bool) (dockertypes.ImageInspect, []byte, error) {
+func (d *FakeDockerClient) ImageInspectWithRaw(ctx context.Context, imageID string) (dockertypes.ImageInspect, []byte, error) {
 	d.Calls = append(d.Calls, "inspect_image")
 
 	if _, exists := d.Images[imageID]; exists {
@@ -179,7 +179,7 @@ func (d *FakeDockerClient) ContainerRemove(ctx context.Context, containerID stri
 }
 
 // ContainerStart sends a request to the docker daemon to start a container.
-func (d *FakeDockerClient) ContainerStart(ctx context.Context, containerID string) error {
+func (d *FakeDockerClient) ContainerStart(ctx context.Context, containerID string, options dockertypes.ContainerStartOptions) error {
 	d.Calls = append(d.Calls, "start")
 	return nil
 }

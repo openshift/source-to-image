@@ -146,8 +146,9 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 
 			glog.V(2).Infof("\n%s\n", describe.Config(cfg))
 
-			if !docker.IsReachable(cfg) {
-				glog.Fatalf("Unable to connect to Docker daemon. Please set the DOCKER_HOST or make sure the Docker socket %q exists", cfg.DockerConfig.Endpoint)
+			err := docker.CheckReachable(cfg)
+			if err != nil {
+				glog.Fatal(err)
 			}
 
 			builder, _, err := strategies.GetStrategy(cfg)
@@ -391,6 +392,8 @@ func main() {
 	s2iCmd.PersistentFlags().StringVar(&(cfg.DockerConfig.CertFile), "cert", cfg.DockerConfig.CertFile, "Set the path of the docker TLS certificate file")
 	s2iCmd.PersistentFlags().StringVar(&(cfg.DockerConfig.KeyFile), "key", cfg.DockerConfig.KeyFile, "Set the path of the docker TLS key file")
 	s2iCmd.PersistentFlags().StringVar(&(cfg.DockerConfig.CAFile), "ca", cfg.DockerConfig.CAFile, "Set the path of the docker TLS ca file")
+	s2iCmd.PersistentFlags().BoolVar(&(cfg.DockerConfig.UseTLS), "tls", cfg.DockerConfig.UseTLS, "Use TLS to connect to docker; implied by --tlsverify")
+	s2iCmd.PersistentFlags().BoolVar(&(cfg.DockerConfig.TLSVerify), "tlsverify", cfg.DockerConfig.TLSVerify, "Use TLS to connect to docker and verify the remote")
 	s2iCmd.AddCommand(newCmdVersion())
 	s2iCmd.AddCommand(newCmdBuild(cfg))
 	s2iCmd.AddCommand(newCmdRebuild(cfg))
