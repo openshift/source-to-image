@@ -125,17 +125,6 @@ func (builder *Layered) CreateDockerfile(config *api.Config) error {
 	return nil
 }
 
-// SourceTar returns a stream to the source tar file.
-// TODO: this should stop generating a file, and instead stream the tar.
-func (builder *Layered) SourceTar(config *api.Config) (io.ReadCloser, error) {
-	uploadDir := filepath.Join(config.WorkingDir, "upload")
-	tarFileName, err := builder.tar.CreateTarFile(builder.config.WorkingDir, uploadDir)
-	if err != nil {
-		return nil, err
-	}
-	return builder.fs.Open(tarFileName)
-}
-
 // Build handles the `docker build` equivalent execution, returning the
 // success/failure details.
 func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
@@ -157,11 +146,7 @@ func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 	}
 
 	glog.V(2).Info("Creating application source code image")
-	tarStream, err := builder.SourceTar(config)
-	if err != nil {
-		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonTarSourceFailed, utilstatus.ReasonMessageTarSourceFailed)
-		return buildResult, err
-	}
+	tarStream := builder.tar.CreateTarStreamReader(filepath.Join(config.WorkingDir, "upload"), false)
 	defer tarStream.Close()
 
 	newBuilderImage := fmt.Sprintf("s2i-layered-temp-image-%d", time.Now().UnixNano())
@@ -193,7 +178,7 @@ func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 	}(outReader)
 
 	glog.V(2).Infof("Building new image %s with scripts and sources already inside", newBuilderImage)
-	if err = builder.docker.BuildImage(opts); err != nil {
+	if err := builder.docker.BuildImage(opts); err != nil {
 		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonDockerImageBuildFailed, utilstatus.ReasonMessageDockerImageBuildFailed)
 		return buildResult, err
 	}
@@ -208,6 +193,7 @@ func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 	if scriptsIncluded {
 		builder.config.ScriptsURL = "image://" + path.Join(getDestination(config), "scripts")
 	} else {
+		var err error
 		builder.config.ScriptsURL, err = builder.docker.GetScriptsURL(newBuilderImage)
 		if err != nil {
 			buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)

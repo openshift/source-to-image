@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"archive/tar"
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
@@ -28,7 +29,7 @@ import (
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/errors"
-	"github.com/openshift/source-to-image/pkg/tar"
+	s2itar "github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
 	"github.com/openshift/source-to-image/pkg/util/interrupt"
 )
@@ -113,7 +114,7 @@ type Docker interface {
 	GetImageEntrypoint(name string) ([]string, error)
 	GetLabels(name string) (map[string]string, error)
 	UploadToContainer(srcPath, destPath, container string) error
-	UploadToContainerWithCallback(srcPath, destPath, container string, walkFn filepath.WalkFunc, modifyInplace bool) error
+	UploadToContainerWithTarWriter(srcPath, destPath, container string, makeTarWriter func(io.Writer) s2itar.Writer) error
 	DownloadFromContainer(containerPath string, w io.Writer, container string) error
 	Version() (dockertypes.Version, error)
 }
@@ -360,62 +361,40 @@ func (d *stiDocker) GetImageEntrypoint(name string) ([]string, error) {
 
 // UploadToContainer uploads artifacts to the container.
 func (d *stiDocker) UploadToContainer(src, dest, container string) error {
-	makeFileWorldWritable := func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		// Skip chmod if on windows OS and for symlinks
-		if runtime.GOOS == "windows" || info.Mode()&os.ModeSymlink != 0 {
-			return nil
-		}
-		mode := os.FileMode(0666)
-		if info.IsDir() {
-			mode = 0777
-		}
-		return os.Chmod(path, mode)
+	makeWorldWritable := func(writer io.Writer) s2itar.Writer {
+		return s2itar.ChmodAdapter{Writer: tar.NewWriter(writer), NewFileMode: 0666, NewExecFileMode: 0666, NewDirMode: 0777}
 	}
-	return d.UploadToContainerWithCallback(src, dest, container, makeFileWorldWritable, false)
+
+	return d.UploadToContainerWithTarWriter(src, dest, container, makeWorldWritable)
 }
 
-// UploadToContainerWithCallback uploads artifacts to the container.
+// UploadToContainerWithTarWriter uploads artifacts to the container.
 // If the source is a directory, then all files and sub-folders are copied into
 // the destination (which has to be directory as well).
 // If the source is a single file, then the file copied into destination (which
 // has to be full path to a file inside the container).
-// If the destination path is empty or set to ".", then we will try to figure
-// out the WORKDIR of the image that the container was created from and use that
-// as a destination. If the WORKDIR is not set, then we copy files into "/"
-// folder (docker upload default).
-func (d *stiDocker) UploadToContainerWithCallback(src, dest, container string, walkFn filepath.WalkFunc, modifyInplace bool) error {
+func (d *stiDocker) UploadToContainerWithTarWriter(src, dest, container string, makeTarWriter func(io.Writer) s2itar.Writer) error {
 	path := filepath.Dir(dest)
-	f, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	info, _ := f.Stat()
-	defer f.Close()
-	t := tar.New()
 	r, w := io.Pipe()
-	if info.IsDir() {
-		path = dest
-		go func() {
-			defer w.Close()
-			if err := t.StreamDirAsTarWithCallback(src, w, walkFn, modifyInplace); err != nil {
-				glog.V(0).Infof("error: Uploading directory to container failed: %v", err)
-			}
-		}()
-	} else {
-		go func() {
-			defer w.Close()
-			if err := t.StreamFileAsTarWithCallback(src, filepath.Base(dest), w, walkFn, modifyInplace); err != nil {
-				glog.V(0).Infof("error: Uploading files to container failed: %v", err)
-			}
-		}()
-	}
+	go func() {
+		tarWriter := makeTarWriter(w)
+		tarWriter = s2itar.RenameAdapter{Writer: tarWriter, Old: filepath.Base(src), New: filepath.Base(dest)}
+
+		err := s2itar.New().CreateTarStreamToTarWriter(src, true, tarWriter, nil)
+		if err == nil {
+			err = tarWriter.Close()
+		}
+
+		w.CloseWithError(err)
+	}()
 	glog.V(3).Infof("Uploading %q to %q ...", src, path)
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	return d.client.CopyToContainer(ctx, container, path, r, dockertypes.CopyToContainerOptions{})
+	err := d.client.CopyToContainer(ctx, container, path, r, dockertypes.CopyToContainerOptions{})
+	if err != nil {
+		glog.V(0).Infof("error: Uploading to container failed: %v", err)
+	}
+	return err
 }
 
 // DownloadFromContainer downloads file (or directory) from the container.

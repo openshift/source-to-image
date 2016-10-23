@@ -1,19 +1,19 @@
 package sti
 
 import (
+	"archive/tar"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	dockerpkg "github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/errors"
-	"github.com/openshift/source-to-image/pkg/tar"
+	s2itar "github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
 	utilstatus "github.com/openshift/source-to-image/pkg/util/status"
 )
@@ -142,7 +142,7 @@ type downloadFilesFromBuilderImageStep struct {
 	builder *STI
 	docker  dockerpkg.Docker
 	fs      util.FileSystem
-	tar     tar.Tar
+	tar     s2itar.Tar
 }
 
 func (step *downloadFilesFromBuilderImageStep) execute(ctx *postExecutorStepContext) error {
@@ -295,37 +295,18 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 	}
 
 	opts.OnStart = func(containerID string) error {
-		setStandardPerms := func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			// chmod does nothing on windows anyway.
-			if runtime.GOOS == "windows" {
-				return nil
-			}
-			// Skip chmod for symlinks
-			if info.Mode()&os.ModeSymlink != 0 {
-				return nil
-			}
-			// file should be writable by owner (u=w) and readable by other users (a=r),
-			// executable bit should be left as is
-			mode := os.FileMode(0644)
-			// syscall.S_IEXEC == 0x40 but we can't reference the constant if we want
-			// to build releases for windows.
-			if info.IsDir() || info.Mode()&0x40 != 0 {
-				mode = 0755
-			}
-			return step.fs.Chmod(path, mode)
+		setStandardPerms := func(writer io.Writer) s2itar.Writer {
+			return s2itar.ChmodAdapter{Writer: tar.NewWriter(writer), NewFileMode: 0644, NewExecFileMode: 0755, NewDirMode: 0755}
 		}
 
 		glog.V(5).Infof("Uploading directory %q -> %q", artifactsDir, workDir)
-		onStartErr := step.docker.UploadToContainerWithCallback(artifactsDir, workDir, containerID, setStandardPerms, true)
+		onStartErr := step.docker.UploadToContainerWithTarWriter(artifactsDir, workDir, containerID, setStandardPerms)
 		if onStartErr != nil {
 			return fmt.Errorf("Couldn't upload directory (%q -> %q) into container %s: %v", artifactsDir, workDir, containerID, err)
 		}
 
 		glog.V(5).Infof("Uploading file %q -> %q", lastFilePath, lastFileDstPath)
-		onStartErr = step.docker.UploadToContainerWithCallback(lastFilePath, lastFileDstPath, containerID, setStandardPerms, true)
+		onStartErr = step.docker.UploadToContainerWithTarWriter(lastFilePath, lastFileDstPath, containerID, setStandardPerms)
 		if onStartErr != nil {
 			return fmt.Errorf("Couldn't upload file (%q -> %q) into container %s: %v", lastFilePath, lastFileDstPath, containerID, err)
 		}

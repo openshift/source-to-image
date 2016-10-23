@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strings"
 	"time"
 
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
@@ -39,16 +40,20 @@ type Tar interface {
 	// The name of the new tar file is returned if successful
 	CreateTarFile(base, dir string) (string, error)
 
-	// CreateTarStreamWithLogging creates a tar from the given directory
+	// CreateTarStreamToTarWriter creates a tar from the given directory
 	// and streams it to the given writer.
 	// An error is returned if an error occurs during streaming.
 	// Archived file names are written to the logger if provided
-	CreateTarStreamWithLogging(dir string, includeDirInPath bool, writer io.Writer, logger io.Writer) error
+	CreateTarStreamToTarWriter(dir string, includeDirInPath bool, writer Writer, logger io.Writer) error
 
 	// CreateTarStream creates a tar from the given directory
 	// and streams it to the given writer.
 	// An error is returned if an error occurs during streaming.
 	CreateTarStream(dir string, includeDirInPath bool, writer io.Writer) error
+
+	// CreateTarStreamReader returns an io.ReadCloser from which a tar stream can be
+	// read.  The tar stream is created using CreateTarStream.
+	CreateTarStreamReader(dir string, includeDirInPath bool) io.ReadCloser
 
 	// ExtractTarStream extracts files from a given tar stream.
 	// Times out if reading from the stream for any given file
@@ -66,33 +71,64 @@ type Tar interface {
 	// exceeds the value of timeout.
 	// Extracted file names are written to the logger if provided.
 	ExtractTarStreamFromTarReader(dir string, tarReader Reader, logger io.Writer) error
-
-	// StreamFileAsTar streams a single file as a TAR archive into specified
-	// writer. The second argument is the file name in archive.
-	// The file permissions in tar archive will change to 0666.
-	StreamFileAsTar(string, string, io.Writer) error
-
-	// StreamFileAsTarWithCallback streams a single file as a TAR archive into specified
-	// writer. By specifying walkFn you can modify file's permissions in arbitrary way.
-	// If modifyInplace is set to false, file will be copied into a temporary directory before changing its permissions.
-	StreamFileAsTarWithCallback(source, name string, writer io.Writer, walkFn filepath.WalkFunc, modifyInplace bool) error
-
-	// StreamDirAsTar streams a directory as a TAR archive into specified writer.
-	// The second argument is the name of the folder in the archive.
-	// All files in the source folder will have permissions changed to 0666 in the
-	// tar archive.
-	StreamDirAsTar(string, string, io.Writer) error
-
-	// StreamDirAsTarWithCallback streams a directory as a TAR archive into specified writer.
-	// By specifying walkFn you can modify files' permissions in arbitrary way.
-	// If modifyInplace is set to false, all the files will be copied into a temporary directory before changing their permissions.
-	StreamDirAsTarWithCallback(source string, writer io.Writer, walkFn filepath.WalkFunc, modifyInplace bool) error
 }
 
 // Reader is an interface which tar.Reader implements.
 type Reader interface {
 	io.Reader
 	Next() (*tar.Header, error)
+}
+
+// Writer is an interface which tar.Writer implements.
+type Writer interface {
+	io.WriteCloser
+	Flush() error
+	WriteHeader(hdr *tar.Header) error
+}
+
+// ChmodAdapter changes the mode of files and directories inline as a tarfile is
+// being written
+type ChmodAdapter struct {
+	Writer
+	NewFileMode     int64
+	NewExecFileMode int64
+	NewDirMode      int64
+}
+
+// WriteHeader changes the mode of files and directories inline as a tarfile is
+// being written
+func (a ChmodAdapter) WriteHeader(hdr *tar.Header) error {
+	if hdr.FileInfo().Mode()&os.ModeSymlink == 0 {
+		hdr.Mode &^= 0777
+		if hdr.FileInfo().IsDir() {
+			hdr.Mode |= a.NewDirMode
+		} else if hdr.FileInfo().Mode()&0010 != 0 { // S_IXUSR
+			hdr.Mode |= a.NewExecFileMode
+		} else {
+			hdr.Mode |= a.NewFileMode
+		}
+	}
+	return a.Writer.WriteHeader(hdr)
+}
+
+// RenameAdapter renames files and directories inline as a tarfile is being
+// written
+type RenameAdapter struct {
+	Writer
+	Old string
+	New string
+}
+
+// WriteHeader renames files and directories inline as a tarfile is being
+// written
+func (a RenameAdapter) WriteHeader(hdr *tar.Header) error {
+	if hdr.Name == a.Old {
+		hdr.Name = a.New
+	} else if strings.HasPrefix(hdr.Name, a.Old+"/") {
+		hdr.Name = a.New + hdr.Name[len(a.Old):]
+	}
+
+	return a.Writer.WriteHeader(hdr)
 }
 
 // New creates a new Tar
@@ -115,106 +151,6 @@ func (t *stiTar) SetExclusionPattern(p *regexp.Regexp) {
 	t.exclude = p
 }
 
-// StreamDirAsTar streams the source directory as a tar archive.
-// The permissions of the file is changed to 0666.
-func (t *stiTar) StreamDirAsTar(source, dest string, writer io.Writer) error {
-	makeFileWorldWritable := func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		// Skip chmod if on windows OS and for symlinks
-		if runtime.GOOS == "windows" || info.Mode()&os.ModeSymlink != 0 {
-			return nil
-		}
-		mode := os.FileMode(0666)
-		if info.IsDir() {
-			mode = 0777
-		}
-		return os.Chmod(path, mode)
-	}
-	return t.StreamDirAsTarWithCallback(source, writer, makeFileWorldWritable, false)
-}
-
-// StreamDirAsTarWithCallback streams the source directory as a tar archive.
-func (t *stiTar) StreamDirAsTarWithCallback(source string, writer io.Writer, walkFn filepath.WalkFunc, modifyInplace bool) error {
-	f, err := os.Open(source)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	info, err := f.Stat()
-	if err != nil {
-		return err
-	}
-	if !info.IsDir() {
-		return fmt.Errorf("the source %q has to be directory, not a file", source)
-	}
-	destDir := source
-	if !modifyInplace {
-		fs := util.NewFileSystem()
-		tmpDir, err := ioutil.TempDir("", "s2i-")
-		if err != nil {
-			return err
-		}
-		defer os.RemoveAll(tmpDir)
-		if err = fs.Copy(source, tmpDir); err != nil {
-			return err
-		}
-		destDir = tmpDir
-	}
-	if err := filepath.Walk(destDir, walkFn); err != nil {
-		return err
-	}
-	return t.CreateTarStream(destDir, false, writer)
-}
-
-// StreamFileAsTar streams the source file as a tar archive.
-// The permissions of all files in archive is changed to 0666.
-func (t *stiTar) StreamFileAsTar(source, name string, writer io.Writer) error {
-	makeFileWorldWritable := func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		// Skip chmod if on windows OS and for symlinks
-		if runtime.GOOS == "windows" || info.Mode()&os.ModeSymlink != 0 {
-			return nil
-		}
-		return os.Chmod(path, 0666)
-	}
-	return t.StreamFileAsTarWithCallback(source, name, writer, makeFileWorldWritable, false)
-}
-
-// StreamFileAsTarWithCallback streams the source file as a tar archive.
-func (t *stiTar) StreamFileAsTarWithCallback(source, name string, writer io.Writer, walkFn filepath.WalkFunc, modifyInplace bool) error {
-	f, err := os.Open(source)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	info, err := f.Stat()
-	if err != nil {
-		return err
-	}
-	if info.IsDir() {
-		return fmt.Errorf("the source %q has to be regular file, not directory", source)
-	}
-	fs := util.NewFileSystem()
-	tmpDir, err := ioutil.TempDir("", "s2i-")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(tmpDir)
-	dst := filepath.Join(tmpDir, name)
-	if err := fs.Copy(source, dst); err != nil {
-		return err
-	}
-	fileInfo, fileErr := os.Stat(dst)
-	if err := walkFn(dst, fileInfo, fileErr); err != nil {
-		return err
-	}
-	return t.CreateTarStream(tmpDir, false, writer)
-}
-
 // CreateTarFile creates a tar file from the given directory
 // while excluding files that match the given exclusion pattern
 // It returns the name of the created file
@@ -234,19 +170,29 @@ func (t *stiTar) shouldExclude(path string) bool {
 	return t.exclude != nil && t.exclude.String() != "" && t.exclude.MatchString(path)
 }
 
-// CreateTarStream calls CreateTarStreamWithLogging with a nil logger
+// CreateTarStream calls CreateTarStreamToTarWriter with a nil logger
 func (t *stiTar) CreateTarStream(dir string, includeDirInPath bool, writer io.Writer) error {
-	return t.CreateTarStreamWithLogging(dir, includeDirInPath, writer, nil)
-}
-
-// CreateTarStreamWithLogging creates a tar stream on the given writer from
-// the given directory while excluding files that match the given
-// exclusion pattern.
-// TODO: this should encapsulate the goroutine that generates the stream.
-func (t *stiTar) CreateTarStreamWithLogging(dir string, includeDirInPath bool, writer io.Writer, logger io.Writer) error {
-	dir = filepath.Clean(dir) // remove relative paths and extraneous slashes
 	tarWriter := tar.NewWriter(writer)
 	defer tarWriter.Close()
+
+	return t.CreateTarStreamToTarWriter(dir, includeDirInPath, tarWriter, nil)
+}
+
+// CreateTarStreamReader returns an io.ReadCloser from which a tar stream can be
+// read.  The tar stream is created using CreateTarStream.
+func (t *stiTar) CreateTarStreamReader(dir string, includeDirInPath bool) io.ReadCloser {
+	r, w := io.Pipe()
+	go func() {
+		w.CloseWithError(t.CreateTarStream(dir, includeDirInPath, w))
+	}()
+	return r
+}
+
+// CreateTarStreamToTarWriter creates a tar stream on the given writer from
+// the given directory while excluding files that match the given
+// exclusion pattern.
+func (t *stiTar) CreateTarStreamToTarWriter(dir string, includeDirInPath bool, tarWriter Writer, logger io.Writer) error {
+	dir = filepath.Clean(dir) // remove relative paths and extraneous slashes
 	glog.V(5).Infof("Adding %q to tar ...", dir)
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -292,7 +238,7 @@ func (t *stiTar) CreateTarStreamWithLogging(dir string, includeDirInPath bool, w
 }
 
 // writeTarHeader writes tar header for given file, returns error if operation fails
-func (t *stiTar) writeTarHeader(tarWriter *tar.Writer, dir string, path string, info os.FileInfo, includeDirInPath bool, logger io.Writer) error {
+func (t *stiTar) writeTarHeader(tarWriter Writer, dir string, path string, info os.FileInfo, includeDirInPath bool, logger io.Writer) error {
 	var (
 		link string
 		err  error
@@ -341,31 +287,26 @@ func (t *stiTar) ExtractTarStreamWithLogging(dir string, reader io.Reader, logge
 // Times out if reading from the stream for any given file
 // exceeds the value of timeout
 func (t *stiTar) ExtractTarStreamFromTarReader(dir string, tarReader Reader, logger io.Writer) error {
-	errorChannel := make(chan error, 1)
-	timeoutTimer := time.NewTimer(t.timeout)
-	go func() {
+	err := util.TimeoutAfter(t.timeout, "", func(timeoutTimer *time.Timer) error {
 		for {
 			header, err := tarReader.Next()
 			if !timeoutTimer.Stop() {
-				break
+				return &util.TimeoutError{}
 			}
 			timeoutTimer.Reset(t.timeout)
 			if err == io.EOF {
-				errorChannel <- nil
-				break
+				return nil
 			}
 			if err != nil {
 				glog.Errorf("Error reading next tar header: %v", err)
-				errorChannel <- err
-				break
+				return err
 			}
 			if header.FileInfo().IsDir() {
 				dirPath := filepath.Join(dir, header.Name)
 				glog.V(3).Infof("Creating directory %s", dirPath)
 				if err = os.MkdirAll(dirPath, 0700); err != nil {
 					glog.Errorf("Error creating dir %q: %v", dirPath, err)
-					errorChannel <- err
-					break
+					return err
 				}
 			} else {
 				fileDir := filepath.Dir(header.Name)
@@ -373,40 +314,35 @@ func (t *stiTar) ExtractTarStreamFromTarReader(dir string, tarReader Reader, log
 				glog.V(3).Infof("Creating directory %s", dirPath)
 				if err = os.MkdirAll(dirPath, 0700); err != nil {
 					glog.Errorf("Error creating dir %q: %v", dirPath, err)
-					errorChannel <- err
-					break
+					return err
 				}
 				if header.Typeflag == tar.TypeSymlink {
 					if err := extractLink(dir, header, tarReader); err != nil {
 						glog.Errorf("Error extracting link %q: %v", header.Name, err)
-						errorChannel <- err
-						break
+						return err
 					}
 					continue
 				}
 				logFile(logger, header.Name)
 				if err := extractFile(dir, header, tarReader); err != nil {
 					glog.Errorf("Error extracting file %q: %v", header.Name, err)
-					errorChannel <- err
-					break
+					return err
 				}
 			}
 		}
-	}()
+	})
 
-	for {
-		select {
-		case err := <-errorChannel:
-			if err != nil {
-				glog.Error("Error extracting tar stream")
-			} else {
-				glog.V(2).Info("Done extracting tar stream")
-			}
-			return err
-		case <-timeoutTimer.C:
-			return errors.NewTarTimeoutError()
-		}
+	if err != nil {
+		glog.Error("Error extracting tar stream")
+	} else {
+		glog.V(2).Info("Done extracting tar stream")
 	}
+
+	if util.IsTimeoutError(err) {
+		err = errors.NewTarTimeoutError()
+	}
+
+	return err
 }
 
 func extractLink(dir string, header *tar.Header, tarReader io.Reader) error {

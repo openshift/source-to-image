@@ -119,6 +119,7 @@ func TestCopyToContainer(t *testing.T) {
 		},
 		"error": {
 			containerID: "test-container-id",
+			src:         "badsource",
 		},
 	}
 
