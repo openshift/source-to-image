@@ -1,8 +1,7 @@
 package templates
 
 // TestRunScript is a simple test script that verifies the S2I image.
-const TestRunScript = `
-#!/bin/bash
+const TestRunScript = `#!/bin/bash
 #
 # The 'run' performs a simple test that verifies the S2I image.
 # The main focus here is to exercise the S2I scripts.
@@ -18,7 +17,7 @@ IMAGE_NAME=${IMAGE_NAME-{{.ImageName}}-candidate}
 # Determining system utility executables (darwin compatibility check)
 READLINK_EXEC="readlink"
 MKTEMP_EXEC="mktemp"
-if (echo "$OSTYPE" | egrep -qs 'darwin'); then
+if [[ "$OSTYPE" =~ 'darwin' ]]; then
   ! type -a "greadlink" &>"/dev/null" || READLINK_EXEC="greadlink"
   ! type -a "gmktemp" &>"/dev/null" || MKTEMP_EXEC="gmktemp"
 fi
@@ -44,7 +43,19 @@ container_exists() {
 }
 
 container_ip() {
-  docker inspect --format="{{"{{"}} .NetworkSettings.IPAddress {{"}}"}}" $(cat $cid_file)
+  if [ ! -z "$DOCKER_HOST" ] && [[ "$OSTYPE" =~ 'darwin' ]]; then
+    docker-machine ip
+  else
+    docker inspect --format="{{"{{"}} .NetworkSettings.IPAddress {{"}}"}}" $(cat $cid_file)
+  fi
+}
+
+container_port() {
+  if [ ! -z "$DOCKER_HOST" ] && [[ "$OSTYPE" =~ 'darwin' ]]; then
+    docker inspect --format="{{"{{"}}(index .NetworkSettings.Ports \"$test_port/tcp\" 0).HostPort{{"}}"}}" "$(cat "${cid_file}")"
+  else
+    echo $test_port
+  fi
 }
 
 run_s2i_build() {
@@ -108,19 +119,14 @@ test_usage() {
 }
 
 test_connection() {
-  echo "Testing HTTP connection..."
+  echo "Testing HTTP connection (http://$(container_ip):$(container_port))"
   local max_attempts=10
   local sleep_time=1
   local attempt=1
   local result=1
   while [ $attempt -le $max_attempts ]; do
-    echo "Sending GET request to http://$(container_ip):${test_port}/"
-    if (echo "$OSTYPE" | egrep -qs 'darwin'); then
-      echo "Warning for OSX users: if you can't access the container's IP $(container_ip) directly (because you use boot2docker for example)"
-      echo "you should run the curl command in a container, for example using:"
-      echo "docker run --rm -it sequenceiq/alpine-curl curl -s -w %{http_code} -o /dev/null http://$(container_ip):${test_port}/"
-    fi
-    response_code=$(curl -s -w %{http_code} -o /dev/null http://$(container_ip):${test_port}/)
+    echo "Sending GET request to http://$(container_ip):$(container_port)/"
+    response_code=$(curl -s -w %{http_code} -o /dev/null http://$(container_ip):$(container_port)/)
     status=$?
     if [ $status -eq 0 ]; then
       if [ $response_code -eq 200 ]; then
