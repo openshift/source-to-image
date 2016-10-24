@@ -1,46 +1,39 @@
 package api
 
-import "testing"
+import (
+	"path/filepath"
+	"reflect"
+	"testing"
+)
 
 func TestVolumeListSet(t *testing.T) {
-	table := map[string][]VolumeSpec{
-		"/test:":             {{Source: "/test", Destination: "."}},
-		"/test:/test":        {{Source: "/test", Destination: "/test"}},
-		"/test/foo:/etc/ssl": {{Source: "/test/foo", Destination: "/etc/ssl"}},
-		":/foo":              {{Source: ".", Destination: "/foo"}},
-		"/foo":               {{Source: "/foo", Destination: "."}},
-		":":                  {{Source: ".", Destination: "."}},
-		"/t est/foo:":        {{Source: "/t est/foo", Destination: "."}},
-		`"/test":"/foo"`:     {{Source: "/test", Destination: "/foo"}},
-		`'/test':"/foo"`:     {{Source: "/test", Destination: "/foo"}},
-		`"/te"st":"/foo"`:    {},
-		"/test/foo:/ss;ss":   {},
-		"/test;foo:/ssss":    {},
+	table := []struct {
+		Input    string
+		Expected VolumeList
+	}{
+		{"/test:", VolumeList{{Source: "/test", Destination: "."}}},
+		{"/test:/test", VolumeList{{Source: "/test", Destination: "/test"}}},
+		{"/test/foo:/etc/ssl", VolumeList{{Source: "/test/foo", Destination: "/etc/ssl"}}},
+		{":/foo", VolumeList{{Source: ".", Destination: "/foo"}}},
+		{"/foo", VolumeList{{Source: "/foo", Destination: "."}}},
+		{":", VolumeList{{Source: ".", Destination: "."}}},
+		{"/t est/foo:", VolumeList{{Source: "/t est/foo", Destination: "."}}},
+		{`"/test":"/foo"`, VolumeList{{Source: "/test", Destination: "/foo"}}},
+		{`'/test':"/foo"`, VolumeList{{Source: "/test", Destination: "/foo"}}},
+		{`C:\test:/bar`, VolumeList{{Source: `C:\test`, Destination: "/bar"}}},
+		{`C:\test:bar`, VolumeList{{Source: `C:\test`, Destination: "bar"}}},
+		{`"/te"st":"/foo"`, VolumeList{}},
+		{"/test/foo:/ss;ss", VolumeList{}},
+		{"/test;foo:/ssss", VolumeList{}},
 	}
-	for v, expected := range table {
+	for _, test := range table {
+		if len(test.Expected) != 0 {
+			test.Expected[0].Source = filepath.FromSlash(test.Expected[0].Source)
+		}
 		got := VolumeList{}
-		err := got.Set(v)
-		if len(expected) == 0 {
-			if err == nil {
-				t.Errorf("Expected error for %q, got %#v", v, got)
-			} else {
-				continue
-			}
-		}
-		if len(got) != len(expected) {
-			t.Errorf("Expected %d injection in the list for %q, got %d", len(expected), v, len(got))
-		}
-		for _, exp := range expected {
-			found := false
-			for _, g := range got {
-				if g.Source == exp.Source && g.Destination == exp.Destination {
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Errorf("Expected %+v injection found in %#v list", exp, got)
-			}
+		got.Set(test.Input)
+		if !reflect.DeepEqual(got, test.Expected) {
+			t.Errorf("On test %s, got %#v, expected %#v", test.Input, got, test.Expected)
 		}
 	}
 }

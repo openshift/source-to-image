@@ -87,10 +87,10 @@ func baseTest(t *testing.T, patterns []string, filesToDel []string, filesToKeep 
 		}
 		t.Logf("Going to create file %q", fbpath)
 		fbfile, fberr := os.Create(fbpath)
-		defer fbfile.Close()
 		if fberr != nil {
 			t.Errorf("Problem creating test file: %v", fberr)
 		}
+		fbfile.Close()
 	}
 
 	// run ignorer algorithm

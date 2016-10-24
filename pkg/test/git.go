@@ -79,6 +79,13 @@ func (f *FakeGit) SubmoduleUpdate(repo string, init, recursive bool) error {
 	return f.SubmoduleUpdateError
 }
 
+// LsTree returns a slice of os.FileInfo objects populated with the paths and
+// file modes of files known to Git.  This is used on Windows systems where the
+// executable mode metadata is lost on git checkout.
+func (f *FakeGit) LsTree(repo, ref string, recursive bool) ([]os.FileInfo, error) {
+	return []os.FileInfo{}, nil
+}
+
 // GetInfo retrieves the information about the source code and commit
 func (f *FakeGit) GetInfo(repo string) *api.SourceInfo {
 	return &api.SourceInfo{
@@ -131,6 +138,14 @@ func CreateLocalGitDirectoryWithSubmodule(t *testing.T) string {
 
 	submodule := CreateLocalGitDirectory(t)
 	defer os.RemoveAll(submodule)
+
+	if util.UsingCygwinGit {
+		var err error
+		submodule, err = util.ToSlashCygwin(submodule)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	dir := CreateEmptyLocalGitDirectory(t)
 	err := cr.RunWithOptions(util.CommandOpts{Dir: dir}, "git", "submodule", "add", submodule, "submodule")

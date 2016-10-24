@@ -158,7 +158,13 @@ s2i::build::create_gopath_tree() {
   rm -f "${go_pkg_dir}"
 
   # TODO: This symlink should be relative.
-  ln -s "${S2I_ROOT}" "${go_pkg_dir}"
+  if [[ "$OSTYPE" == "cygwin" ]]; then
+    S2I_ROOT_cyg=$(cygpath -w ${S2I_ROOT})
+    go_pkg_dir_cyg=$(cygpath -w ${go_pkg_dir})
+    cmd /c "mklink ${go_pkg_dir_cyg} ${S2I_ROOT_cyg}" &>/dev/null
+  else
+    ln -s "${S2I_ROOT}" "${go_pkg_dir}"
+  fi
 }
 
 
@@ -222,6 +228,11 @@ EOF
   if [[ -z ${S2I_NO_GODEPS:-} ]]; then
     GOPATH="${GOPATH}:${S2I_ROOT}/vendor"
   fi
+
+  if [[ "$OSTYPE" == "cygwin" ]]; then
+    GOPATH=$(cygpath -w -p $GOPATH)
+  fi
+
   export GOPATH
 
   # Unset GOBIN in case it already exists in the current session.
@@ -333,7 +344,7 @@ s2i::build::make_binary_symlinks() {
   if [[ -f "${S2I_OUTPUT_BINPATH}/${platform}/s2i" ]]; then
     for linkname in "${S2I_BINARY_SYMLINKS[@]}"; do
       if [[ $platform == "windows/amd64" ]]; then
-        cp s2i "${S2I_OUTPUT_BINPATH}/${platform}/${linkname}.exe"
+        cp "${S2I_OUTPUT_BINPATH}/${platform}/s2i.exe" "${S2I_OUTPUT_BINPATH}/${platform}/${linkname}.exe"
       else
         ln -sf s2i "${S2I_OUTPUT_BINPATH}/${platform}/${linkname}"
       fi

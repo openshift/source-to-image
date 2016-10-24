@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
 	"time"
 
@@ -27,7 +26,7 @@ const defaultTimeout = 30 * time.Second
 
 // DefaultExclusionPattern is the pattern of files that will not be included in a tar
 // file when creating one. By default it is any file inside a .git metadata directory
-var DefaultExclusionPattern = regexp.MustCompile("((^\\.git\\/)|(\\/.git\\/)|(\\/.git$))")
+var DefaultExclusionPattern = regexp.MustCompile(`(^|/)\.git(/|$)`)
 
 // Tar can create and extract tar files used in an STI build
 type Tar interface {
@@ -132,21 +131,25 @@ func (a RenameAdapter) WriteHeader(hdr *tar.Header) error {
 }
 
 // New creates a new Tar
-func New() Tar {
+func New(fs util.FileSystem) Tar {
 	return &stiTar{
-		exclude: DefaultExclusionPattern,
-		timeout: defaultTimeout,
+		FileSystem: fs,
+		exclude:    DefaultExclusionPattern,
+		timeout:    defaultTimeout,
 	}
 }
 
 // stiTar is an implementation of the Tar interface
 type stiTar struct {
+	util.FileSystem
 	timeout          time.Duration
 	exclude          *regexp.Regexp
 	includeDirInPath bool
 }
 
-// SetExclusionPattern sets the exclusion pattern for tar creation
+// SetExclusionPattern sets the exclusion pattern for tar creation.  The
+// exclusion pattern always uses UNIX-style (/) path separators, even on
+// Windows.
 func (t *stiTar) SetExclusionPattern(p *regexp.Regexp) {
 	t.exclude = p
 }
@@ -167,7 +170,7 @@ func (t *stiTar) CreateTarFile(base, dir string) (string, error) {
 }
 
 func (t *stiTar) shouldExclude(path string) bool {
-	return t.exclude != nil && t.exclude.String() != "" && t.exclude.MatchString(path)
+	return t.exclude != nil && t.exclude.String() != "" && t.exclude.MatchString(filepath.ToSlash(path))
 }
 
 // CreateTarStream calls CreateTarStreamToTarWriter with a nil logger
@@ -194,11 +197,13 @@ func (t *stiTar) CreateTarStreamReader(dir string, includeDirInPath bool) io.Rea
 func (t *stiTar) CreateTarStreamToTarWriter(dir string, includeDirInPath bool, tarWriter Writer, logger io.Writer) error {
 	dir = filepath.Clean(dir) // remove relative paths and extraneous slashes
 	glog.V(5).Infof("Adding %q to tar ...", dir)
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	err := t.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() && !t.shouldExclude(path) {
+		// on Windows, directory symlinks report as a directory and as a symlink.
+		// They should be treated as symlinks.
+		if (info.Mode()&os.ModeSymlink != 0 || !info.IsDir()) && !t.shouldExclude(path) {
 			// if file is a link just writing header info is enough
 			if info.Mode()&os.ModeSymlink != 0 {
 				if dir == path {
@@ -206,6 +211,11 @@ func (t *stiTar) CreateTarStreamToTarWriter(dir string, includeDirInPath bool, t
 				}
 				if err = t.writeTarHeader(tarWriter, dir, path, info, includeDirInPath, logger); err != nil {
 					glog.Errorf("Error writing header for %q: %v", info.Name(), err)
+				}
+				// on Windows, filepath.Walk recurses into directory symlinks when it
+				// shouldn't.  https://github.com/golang/go/issues/17540
+				if err == nil && info.Mode()&os.ModeDir != 0 {
+					return filepath.SkipDir
 				}
 				return err
 			}
@@ -253,6 +263,14 @@ func (t *stiTar) writeTarHeader(tarWriter Writer, dir string, path string, info 
 	if err != nil {
 		return err
 	}
+	// on Windows, tar.FileInfoHeader incorrectly interprets directory symlinks
+	// as directories.  https://github.com/golang/go/issues/17541
+	if info.Mode()&os.ModeSymlink != 0 && info.Mode()&os.ModeDir != 0 {
+		header.Typeflag = tar.TypeSymlink
+		header.Mode &^= 040000 // c_ISDIR
+		header.Mode |= 0120000 // c_ISLNK
+		header.Linkname = link
+	}
 	prefix := dir
 	if includeDirInPath {
 		prefix = filepath.Dir(prefix)
@@ -262,6 +280,7 @@ func (t *stiTar) writeTarHeader(tarWriter Writer, dir string, path string, info 
 		fileName = path[1+len(prefix):]
 	}
 	header.Name = filepath.ToSlash(fileName)
+	header.Linkname = filepath.ToSlash(header.Linkname)
 	logFile(logger, header.Name)
 	glog.V(5).Infof("Adding to tar: %s as %s", path, header.Name)
 	if err = tarWriter.WriteHeader(header); err != nil {
@@ -317,14 +336,14 @@ func (t *stiTar) ExtractTarStreamFromTarReader(dir string, tarReader Reader, log
 					return err
 				}
 				if header.Typeflag == tar.TypeSymlink {
-					if err := extractLink(dir, header, tarReader); err != nil {
+					if err := t.extractLink(dir, header, tarReader); err != nil {
 						glog.Errorf("Error extracting link %q: %v", header.Name, err)
 						return err
 					}
 					continue
 				}
 				logFile(logger, header.Name)
-				if err := extractFile(dir, header, tarReader); err != nil {
+				if err := t.extractFile(dir, header, tarReader); err != nil {
 					glog.Errorf("Error extracting file %q: %v", header.Name, err)
 					return err
 				}
@@ -345,7 +364,7 @@ func (t *stiTar) ExtractTarStreamFromTarReader(dir string, tarReader Reader, log
 	return err
 }
 
-func extractLink(dir string, header *tar.Header, tarReader io.Reader) error {
+func (t *stiTar) extractLink(dir string, header *tar.Header, tarReader io.Reader) error {
 	dest := filepath.Join(dir, header.Name)
 	source := header.Linkname
 
@@ -355,7 +374,7 @@ func extractLink(dir string, header *tar.Header, tarReader io.Reader) error {
 	return os.Symlink(source, dest)
 }
 
-func extractFile(dir string, header *tar.Header, tarReader io.Reader) error {
+func (t *stiTar) extractFile(dir string, header *tar.Header, tarReader io.Reader) error {
 	path := filepath.Join(dir, header.Name)
 	glog.V(3).Infof("Creating %s", path)
 
@@ -375,10 +394,7 @@ func extractFile(dir string, header *tar.Header, tarReader io.Reader) error {
 	if written != header.Size {
 		return fmt.Errorf("Wrote %d bytes, expected to write %d", written, header.Size)
 	}
-	if runtime.GOOS != "windows" { // Skip chmod if on windows OS
-		return file.Chmod(header.FileInfo().Mode())
-	}
-	return nil
+	return t.Chmod(path, header.FileInfo().Mode())
 }
 
 func logFile(logger io.Writer, name string) {

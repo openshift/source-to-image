@@ -47,11 +47,11 @@ func TestExpandInjectedFiles(t *testing.T) {
 	list := api.VolumeList{{Source: tmp, Destination: "/foo"}}
 	f1, _ := ioutil.TempFile(tmp, "foo")
 	f2, _ := ioutil.TempFile(tmpNested, "bar")
-	files, err := ExpandInjectedFiles(list)
+	files, err := ExpandInjectedFiles(NewFileSystem(), list)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	expected := []string{"/foo/" + filepath.Base(f1.Name()), filepath.Join("/foo", filepath.Base(tmpNested), filepath.Base(f2.Name()))}
+	expected := []string{"/foo/" + filepath.Base(f1.Name()), "/foo/" + filepath.Base(tmpNested) + "/" + filepath.Base(f2.Name())}
 	for _, exp := range expected {
 		found := false
 		for _, f := range files {

@@ -113,8 +113,8 @@ type Docker interface {
 	GetImageUser(name string) (string, error)
 	GetImageEntrypoint(name string) ([]string, error)
 	GetLabels(name string) (map[string]string, error)
-	UploadToContainer(srcPath, destPath, container string) error
-	UploadToContainerWithTarWriter(srcPath, destPath, container string, makeTarWriter func(io.Writer) s2itar.Writer) error
+	UploadToContainer(fs util.FileSystem, srcPath, destPath, container string) error
+	UploadToContainerWithTarWriter(fs util.FileSystem, srcPath, destPath, container string, makeTarWriter func(io.Writer) s2itar.Writer) error
 	DownloadFromContainer(containerPath string, w io.Writer, container string) error
 	Version() (dockertypes.Version, error)
 }
@@ -360,12 +360,12 @@ func (d *stiDocker) GetImageEntrypoint(name string) ([]string, error) {
 }
 
 // UploadToContainer uploads artifacts to the container.
-func (d *stiDocker) UploadToContainer(src, dest, container string) error {
+func (d *stiDocker) UploadToContainer(fs util.FileSystem, src, dest, container string) error {
 	makeWorldWritable := func(writer io.Writer) s2itar.Writer {
 		return s2itar.ChmodAdapter{Writer: tar.NewWriter(writer), NewFileMode: 0666, NewExecFileMode: 0666, NewDirMode: 0777}
 	}
 
-	return d.UploadToContainerWithTarWriter(src, dest, container, makeWorldWritable)
+	return d.UploadToContainerWithTarWriter(fs, src, dest, container, makeWorldWritable)
 }
 
 // UploadToContainerWithTarWriter uploads artifacts to the container.
@@ -373,14 +373,14 @@ func (d *stiDocker) UploadToContainer(src, dest, container string) error {
 // the destination (which has to be directory as well).
 // If the source is a single file, then the file copied into destination (which
 // has to be full path to a file inside the container).
-func (d *stiDocker) UploadToContainerWithTarWriter(src, dest, container string, makeTarWriter func(io.Writer) s2itar.Writer) error {
+func (d *stiDocker) UploadToContainerWithTarWriter(fs util.FileSystem, src, dest, container string, makeTarWriter func(io.Writer) s2itar.Writer) error {
 	path := filepath.Dir(dest)
 	r, w := io.Pipe()
 	go func() {
 		tarWriter := makeTarWriter(w)
 		tarWriter = s2itar.RenameAdapter{Writer: tarWriter, Old: filepath.Base(src), New: filepath.Base(dest)}
 
-		err := s2itar.New().CreateTarStreamToTarWriter(src, true, tarWriter, nil)
+		err := s2itar.New(fs).CreateTarStreamToTarWriter(src, true, tarWriter, nil)
 		if err == nil {
 			err = tarWriter.Close()
 		}

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/test"
+	"github.com/openshift/source-to-image/pkg/util"
 )
 
 func TestDownloaderForSource(t *testing.T) {
@@ -38,7 +39,7 @@ func TestDownloaderForSource(t *testing.T) {
 	}
 
 	for s, expected := range tc {
-		r, filePathUpdate, err := DownloaderForSource(s, false)
+		r, filePathUpdate, err := DownloaderForSource(util.NewFileSystem(), s, false)
 		if err != nil {
 			if expected != "error" {
 				t.Errorf("Unexpected error %q for %q, expected %q", err, s, expected)
@@ -63,7 +64,7 @@ func TestDownloaderForSourceOnRelativeGit(t *testing.T) {
 	gitLocalDir := test.CreateLocalGitDirectory(t)
 	defer os.RemoveAll(gitLocalDir)
 	os.Chdir(gitLocalDir)
-	r, s, err := DownloaderForSource(".", false)
+	r, s, err := DownloaderForSource(util.NewFileSystem(), ".", false)
 	if err != nil {
 		t.Errorf("Unexpected error %q for %q, expected %q", err, ".", "git.Clone")
 	}
@@ -79,7 +80,7 @@ func TestDownloaderForceCopy(t *testing.T) {
 	gitLocalDir := test.CreateLocalGitDirectory(t)
 	defer os.RemoveAll(gitLocalDir)
 	os.Chdir(gitLocalDir)
-	r, s, err := DownloaderForSource(".", true)
+	r, s, err := DownloaderForSource(util.NewFileSystem(), ".", true)
 	if err != nil {
 		t.Errorf("Unexpected error %q for %q, expected %q", err, ".", "*file.File")
 	}

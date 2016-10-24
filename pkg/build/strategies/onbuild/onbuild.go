@@ -37,19 +37,19 @@ type onBuildSourceHandler struct {
 }
 
 // New returns a new instance of OnBuild builder
-func New(config *api.Config, overrides build.Overrides) (*OnBuild, error) {
+func New(config *api.Config, fs util.FileSystem, overrides build.Overrides) (*OnBuild, error) {
 	dockerHandler, err := docker.New(config.DockerConfig, config.PullAuthentication)
 	if err != nil {
 		return nil, err
 	}
 	builder := &OnBuild{
 		docker: dockerHandler,
-		git:    git.New(),
-		fs:     util.NewFileSystem(),
-		tar:    tar.New(),
+		git:    git.New(fs),
+		fs:     fs,
+		tar:    tar.New(fs),
 	}
 	// Use STI Prepare() and download the 'run' script optionally.
-	s, err := sti.New(config, overrides)
+	s, err := sti.New(config, fs, overrides)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func New(config *api.Config, overrides build.Overrides) (*OnBuild, error) {
 
 	downloader := overrides.Downloader
 	if downloader == nil {
-		d, sourceURL, err := scm.DownloaderForSource(config.Source, config.ForceCopy)
+		d, sourceURL, err := scm.DownloaderForSource(builder.fs, config.Source, config.ForceCopy)
 		if err != nil {
 			return nil, err
 		}

@@ -44,14 +44,25 @@ if [[ -n "${S2I_COVER}" && -n "${OUTPUT_COVERAGE}" ]]; then
   for test_package in "${test_packages[@]}"
   do
     mkdir -p "$OUTPUT_COVERAGE/$test_package"
-    S2I_COVER_PROFILE="-coverprofile=$OUTPUT_COVERAGE/$test_package/profile.out"
+    PROFILEPATH=${OUTPUT_COVERAGE}/${test_package}/profile.out
+    if [[ ${OSTYPE} == "cygwin" ]]; then
+      PROFILEPATH=$(cygpath -w ${PROFILEPATH})
+    fi
+    S2I_COVER_PROFILE="-coverprofile=${PROFILEPATH}"
 
     go test $S2I_RACE $S2I_TIMEOUT $S2I_COVER "$S2I_COVER_PROFILE" "$test_package" "${@:2}"
   done
 
   echo 'mode: atomic' > ${OUTPUT_COVERAGE}/profiles.out
   find $OUTPUT_COVERAGE -name profile.out | xargs sed '/^mode: atomic$/d' >> ${OUTPUT_COVERAGE}/profiles.out
-  go tool cover "-html=${OUTPUT_COVERAGE}/profiles.out" -o "${OUTPUT_COVERAGE}/coverage.html"
+  PROFILES_OUT=${OUTPUT_COVERAGE}/profiles.out
+  COVERAGE_HTML=${OUTPUT_COVERAGE}/coverage.html
+  if [[ ${OSTYPE} == "cygwin" ]]; then
+    PROFILES_OUT=$(cygpath -w ${PROFILES_OUT})
+    COVERAGE_HTML=$(cygpath -w ${COVERAGE_HTML})
+  fi
+
+  go tool cover -html=${PROFILES_OUT} -o ${COVERAGE_HTML}
 
   # remove ${OUTPUT_COVERAGE}/github.com
   rm -rf $OUTPUT_COVERAGE/${S2I_GO_PACKAGE%%/*}

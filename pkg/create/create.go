@@ -2,7 +2,6 @@ package create
 
 import (
 	"os"
-	"runtime"
 	"text/template"
 
 	"github.com/openshift/source-to-image/pkg/create/templates"
@@ -56,11 +55,9 @@ func (b *Bootstrap) process(t string, dst string, perm os.FileMode) {
 		glog.Errorf("Unable to create %s file, skipping: %v", dst, err)
 		return
 	}
-	if runtime.GOOS != "windows" {
-		if err := f.Chmod(perm); err != nil {
-			glog.Errorf("Unable to chmod %s file to %v, skipping: %v", dst, perm, err)
-			return
-		}
+	if err := os.Chmod(b.DestinationDir+"/"+dst, perm); err != nil {
+		glog.Errorf("Unable to chmod %s file to %v, skipping: %v", dst, perm, err)
+		return
 	}
 	defer f.Close()
 	if err := tpl.Execute(f, b); err != nil {

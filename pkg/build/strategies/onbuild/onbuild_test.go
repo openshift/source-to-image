@@ -3,6 +3,7 @@ package onbuild
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/test"
+	"github.com/openshift/source-to-image/pkg/util"
 )
 
 type fakeSourceHandler struct{}
@@ -46,7 +48,7 @@ func checkDockerfile(fs *test.FakeFileSystem, t *testing.T) {
 	if fs.WriteFileError != nil {
 		t.Errorf("%v", fs.WriteFileError)
 	}
-	if fs.WriteFileName != "upload/src/Dockerfile" {
+	if filepath.ToSlash(fs.WriteFileName) != "upload/src/Dockerfile" {
 		t.Errorf("Expected Dockerfile in 'upload/src/Dockerfile', got %q", fs.WriteFileName)
 	}
 	if !strings.Contains(fs.WriteFileContent, `ENTRYPOINT ["./run"]`) {
@@ -71,9 +73,9 @@ func TestCreateDockerfile(t *testing.T) {
 	b := newFakeOnBuild()
 	fakeFs := &test.FakeFileSystem{
 		Files: []os.FileInfo{
-			&test.FakeFile{FileName: "config.ru", FMode: 0600},
-			&test.FakeFile{FileName: "app.rb", FMode: 0600},
-			&test.FakeFile{FileName: "run", FMode: 0777},
+			&util.FileInfo{FileName: "config.ru", FileMode: 0600},
+			&util.FileInfo{FileName: "app.rb", FileMode: 0600},
+			&util.FileInfo{FileName: "run", FileMode: 0777},
 		},
 	}
 	b.fs = fakeFs
@@ -91,10 +93,10 @@ func TestCreateDockerfileWithAssemble(t *testing.T) {
 	b := newFakeOnBuild()
 	fakeFs := &test.FakeFileSystem{
 		Files: []os.FileInfo{
-			&test.FakeFile{FileName: "config.ru", FMode: 0600},
-			&test.FakeFile{FileName: "app.rb", FMode: 0600},
-			&test.FakeFile{FileName: "run", FMode: 0777},
-			&test.FakeFile{FileName: "assemble", FMode: 0777},
+			&util.FileInfo{FileName: "config.ru", FileMode: 0600},
+			&util.FileInfo{FileName: "app.rb", FileMode: 0600},
+			&util.FileInfo{FileName: "run", FileMode: 0777},
+			&util.FileInfo{FileName: "assemble", FileMode: 0777},
 		},
 	}
 	b.fs = fakeFs
@@ -116,9 +118,9 @@ func TestBuild(t *testing.T) {
 	b := newFakeOnBuild()
 	fakeFs := &test.FakeFileSystem{
 		Files: []os.FileInfo{
-			&test.FakeFile{FileName: "config.ru", FMode: 0600},
-			&test.FakeFile{FileName: "app.rb", FMode: 0600},
-			&test.FakeFile{FileName: "run", FMode: 0777},
+			&util.FileInfo{FileName: "config.ru", FileMode: 0600},
+			&util.FileInfo{FileName: "app.rb", FileMode: 0600},
+			&util.FileInfo{FileName: "run", FileMode: 0777},
 		},
 	}
 	b.fs = fakeFs
@@ -142,9 +144,9 @@ func TestBuildOnBuildBlocked(t *testing.T) {
 	b := newFakeOnBuild()
 	fakeFs := &test.FakeFileSystem{
 		Files: []os.FileInfo{
-			&test.FakeFile{FileName: "config.ru", FMode: 0600},
-			&test.FakeFile{FileName: "app.rb", FMode: 0600},
-			&test.FakeFile{FileName: "run", FMode: 0777},
+			&util.FileInfo{FileName: "config.ru", FileMode: 0600},
+			&util.FileInfo{FileName: "app.rb", FileMode: 0600},
+			&util.FileInfo{FileName: "run", FileMode: 0777},
 		},
 	}
 	b.fs = fakeFs

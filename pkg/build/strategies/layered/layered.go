@@ -41,17 +41,17 @@ type Layered struct {
 }
 
 // New creates a Layered builder.
-func New(config *api.Config, scripts build.ScriptsHandler, overrides build.Overrides) (*Layered, error) {
+func New(config *api.Config, fs util.FileSystem, scripts build.ScriptsHandler, overrides build.Overrides) (*Layered, error) {
 	d, err := docker.New(config.DockerConfig, config.PullAuthentication)
 	if err != nil {
 		return nil, err
 	}
-	tarHandler := tar.New()
+	tarHandler := tar.New(fs)
 	tarHandler.SetExclusionPattern(regexp.MustCompile(config.ExcludeRegExp))
 	return &Layered{
 		docker:  d,
 		config:  config,
-		fs:      util.NewFileSystem(),
+		fs:      fs,
 		tar:     tarHandler,
 		scripts: scripts,
 	}, nil
@@ -97,21 +97,21 @@ func (builder *Layered) CreateDockerfile(config *api.Config) error {
 	scriptsIncluded := checkValidDirWithContents(uploadScriptsDir)
 	if scriptsIncluded {
 		glog.V(2).Infof("The scripts are included in %q directory", uploadScriptsDir)
-		buffer.WriteString(fmt.Sprintf("COPY scripts %s\n", scriptsDir))
+		buffer.WriteString(fmt.Sprintf("COPY scripts %s\n", filepath.ToSlash(scriptsDir)))
 	} else {
 		// if an err on reading or opening dir, can't copy it
 		glog.V(2).Infof("Could not gather scripts from the directory %q", uploadScriptsDir)
 	}
-	buffer.WriteString(fmt.Sprintf("COPY src %s\n", sourcesDir))
+	buffer.WriteString(fmt.Sprintf("COPY src %s\n", filepath.ToSlash(sourcesDir)))
 
 	//TODO: We need to account for images that may not have chown. There is a proposal
 	//      to specify the owner for COPY here: https://github.com/docker/docker/pull/9934
 	if len(user) > 0 {
 		buffer.WriteString("USER root\n")
 		if scriptsIncluded {
-			buffer.WriteString(fmt.Sprintf("RUN chown -R %s -- %s %s\n", user, scriptsDir, sourcesDir))
+			buffer.WriteString(fmt.Sprintf("RUN chown -R %s -- %s %s\n", user, filepath.ToSlash(scriptsDir), filepath.ToSlash(sourcesDir)))
 		} else {
-			buffer.WriteString(fmt.Sprintf("RUN chown -R %s -- %s\n", user, sourcesDir))
+			buffer.WriteString(fmt.Sprintf("RUN chown -R %s -- %s\n", user, filepath.ToSlash(sourcesDir)))
 		}
 		buffer.WriteString(fmt.Sprintf("USER %s\n", user))
 	}

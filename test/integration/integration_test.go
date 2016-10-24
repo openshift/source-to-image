@@ -72,9 +72,20 @@ func getDefaultContext() (context.Context, context.CancelFunc) {
 
 // TestInjectionBuild tests the build where we inject files to assemble script.
 func TestInjectionBuild(t *testing.T) {
+	tempdir, err := ioutil.TempDir("", "s2i-test-dir")
+	if err != nil {
+		t.Errorf("Unable to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(tempdir)
+
+	err = ioutil.WriteFile(filepath.Join(tempdir, "secret"), []byte("secret"), 0666)
+	if err != nil {
+		t.Errorf("Unable to write content to temporary injection file: %v", err)
+	}
+
 	integration(t).exerciseInjectionBuild(TagCleanBuild, FakeBuilderImage, []string{
-		"/tmp/s2i-test-dir:/tmp",
-		"/tmp/s2i-test-dir:",
+		tempdir + ":/tmp",
+		tempdir + ":",
 	})
 }
 
@@ -123,7 +134,7 @@ func (i *integrationTest) setup() {
 		// using this file's dirname
 		_, filename, _, _ := runtime.Caller(0)
 		testImagesDir := filepath.Join(filepath.Dir(filename), "scripts")
-		FakeScriptsFileURL = "file://" + filepath.Join(testImagesDir, ".s2i", "bin")
+		FakeScriptsFileURL = "file://" + filepath.ToSlash(filepath.Join(testImagesDir, ".s2i", "bin"))
 
 		for _, image := range []string{TagCleanBuild, TagCleanBuildUser, TagIncrementalBuild, TagIncrementalBuildUser} {
 			ctx, cancel := getDefaultContext()
@@ -377,18 +388,13 @@ func TestIncrementalBuildOnBuild(t *testing.T) {
 
 func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injections []string) {
 	t := i.t
-	err := os.Mkdir("/tmp/s2i-test-dir", 0777)
-	if err != nil {
-		t.Errorf("Unable to create temporary directory: %v", err)
-	}
-	defer os.RemoveAll("/tmp/s2i-test-dir")
-	err = ioutil.WriteFile(filepath.Join("/tmp/s2i-test-dir/secret"), []byte("secret"), 0666)
-	if err != nil {
-		t.Errorf("Unable to write content to temporary injection file: %v", err)
-	}
+
 	injectionList := api.VolumeList{}
 	for _, i := range injections {
-		injectionList.Set(i)
+		err := injectionList.Set(i)
+		if err != nil {
+			t.Errorf("injectionList.Set() failed with error %s\n", err)
+		}
 	}
 	config := &api.Config{
 		DockerConfig:      docker.GetDefaultDockerConfig(),
@@ -419,13 +425,13 @@ func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injectio
 	i.fileExists(containerID, "/sti-fake/relative-secret-delivered")
 
 	// Make sure the injected file does not exists in resulting image
-	files, err := util.ExpandInjectedFiles(injectionList)
+	files, err := util.ExpandInjectedFiles(util.NewFileSystem(), injectionList)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	for _, f := range files {
 		if exitCode := i.runInImage(tag, "test -s "+f); exitCode == 0 {
-			t.Errorf("The file must be empty: %q, we got %q", f, err)
+			t.Errorf("The file %q must be empty", f)
 		}
 	}
 }

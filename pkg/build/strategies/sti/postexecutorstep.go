@@ -295,13 +295,13 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 		}
 
 		glog.V(5).Infof("Uploading directory %q -> %q", artifactsDir, workDir)
-		onStartErr := step.docker.UploadToContainerWithTarWriter(artifactsDir, workDir, containerID, setStandardPerms)
+		onStartErr := step.docker.UploadToContainerWithTarWriter(step.fs, artifactsDir, workDir, containerID, setStandardPerms)
 		if onStartErr != nil {
 			return fmt.Errorf("Couldn't upload directory (%q -> %q) into container %s: %v", artifactsDir, workDir, containerID, err)
 		}
 
 		glog.V(5).Infof("Uploading file %q -> %q", lastFilePath, lastFileDstPath)
-		onStartErr = step.docker.UploadToContainerWithTarWriter(lastFilePath, lastFileDstPath, containerID, setStandardPerms)
+		onStartErr = step.docker.UploadToContainerWithTarWriter(step.fs, lastFilePath, lastFileDstPath, containerID, setStandardPerms)
 		if onStartErr != nil {
 			return fmt.Errorf("Couldn't upload file (%q -> %q) into container %s: %v", lastFilePath, lastFileDstPath, containerID, err)
 		}

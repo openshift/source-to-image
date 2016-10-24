@@ -81,7 +81,7 @@ type STI struct {
 // If the layeredBuilder parameter is specified, then the builder provided will
 // be used for the case that the base Docker image does not have 'tar' or 'bash'
 // installed.
-func New(config *api.Config, overrides build.Overrides) (*STI, error) {
+func New(config *api.Config, fs util.FileSystem, overrides build.Overrides) (*STI, error) {
 	docker, err := dockerpkg.New(config.DockerConfig, config.PullAuthentication)
 	if err != nil {
 		return nil, err
@@ -94,8 +94,8 @@ func New(config *api.Config, overrides build.Overrides) (*STI, error) {
 		}
 	}
 
-	inst := scripts.NewInstaller(config.BuilderImage, config.ScriptsURL, config.ScriptDownloadProxyConfig, docker, config.PullAuthentication)
-	tarHandler := tar.New()
+	inst := scripts.NewInstaller(config.BuilderImage, config.ScriptsURL, config.ScriptDownloadProxyConfig, docker, config.PullAuthentication, fs)
+	tarHandler := tar.New(fs)
 	tarHandler.SetExclusionPattern(regexp.MustCompile(config.ExcludeRegExp))
 
 	builder := &STI{
@@ -103,8 +103,8 @@ func New(config *api.Config, overrides build.Overrides) (*STI, error) {
 		config:                 config,
 		docker:                 docker,
 		incrementalDocker:      incrementalDocker,
-		git:                    git.New(),
-		fs:                     util.NewFileSystem(),
+		git:                    git.New(fs),
+		fs:                     fs,
 		tar:                    tarHandler,
 		callbackInvoker:        util.NewCallbackInvoker(),
 		requiredScripts:        []string{api.Assemble, api.Run},
@@ -127,6 +127,7 @@ func New(config *api.Config, overrides build.Overrides) (*STI, error) {
 			config.ScriptDownloadProxyConfig,
 			builder.runtimeDocker,
 			config.RuntimeAuthentication,
+			builder.fs,
 		)
 	}
 
@@ -139,7 +140,7 @@ func New(config *api.Config, overrides build.Overrides) (*STI, error) {
 	if builder.source == nil && !config.Usage {
 		var downloader build.Downloader
 		var sourceURL string
-		downloader, sourceURL, err = scm.DownloaderForSource(config.Source, config.ForceCopy)
+		downloader, sourceURL, err = scm.DownloaderForSource(builder.fs, config.Source, config.ForceCopy)
 		if err != nil {
 			return nil, err
 		}
@@ -147,7 +148,7 @@ func New(config *api.Config, overrides build.Overrides) (*STI, error) {
 		config.Source = sourceURL
 	}
 	builder.garbage = build.NewDefaultCleaner(builder.fs, builder.docker)
-	builder.layered, err = layered.New(config, builder, overrides)
+	builder.layered, err = layered.New(config, builder.fs, builder, overrides)
 
 	if err != nil {
 		return nil, err
@@ -277,7 +278,7 @@ func (builder *STI) Prepare(config *api.Config) error {
 			var volumeErr error
 
 			switch {
-			case !path.IsAbs(volumeSpec.Source):
+			case !path.IsAbs(filepath.ToSlash(volumeSpec.Source)):
 				volumeErr = fmt.Errorf("Invalid runtime artifacts mapping: %q -> %q: source must be an absolute path", volumeSpec.Source, volumeSpec.Destination)
 			case path.IsAbs(volumeSpec.Destination):
 				volumeErr = fmt.Errorf("Invalid runtime artifacts mapping: %q -> %q: destination must be a relative path", volumeSpec.Source, volumeSpec.Destination)
@@ -523,7 +524,7 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 			return err
 		}
 		config.Injections = util.FixInjectionsWithRelativePath(workdir, config.Injections)
-		injectedFiles, err := util.ExpandInjectedFiles(config.Injections)
+		injectedFiles, err := util.ExpandInjectedFiles(builder.fs, config.Injections)
 		if err != nil {
 			builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonInstallScriptsFailed, utilstatus.ReasonMessageInstallScriptsFailed)
 			return err
@@ -543,12 +544,12 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 			defer close(injectionError)
 			glog.V(2).Info("starting the injections uploading ...")
 			for _, s := range config.Injections {
-				if err := builder.docker.UploadToContainer(s.Source, s.Destination, containerID); err != nil {
+				if err := builder.docker.UploadToContainer(builder.fs, s.Source, s.Destination, containerID); err != nil {
 					injectionError <- util.HandleInjectionError(s, err)
 					return err
 				}
 			}
-			if err := builder.docker.UploadToContainer(rmScript, "/tmp/rm-injections", containerID); err != nil {
+			if err := builder.docker.UploadToContainer(builder.fs, rmScript, "/tmp/rm-injections", containerID); err != nil {
 				injectionError <- util.HandleInjectionError(api.VolumeSpec{Source: rmScript, Destination: "/tmp/rm-injections"}, err)
 				return err
 			}
