@@ -857,8 +857,14 @@ func TestExecuteOK(t *testing.T) {
 	rh.config.BuilderImage = "test/image"
 	rh.config.BuilderPullPolicy = api.PullAlways
 	rh.config.Environment = api.EnvironmentList{
-		api.EnvironmentSpec{"Key1", "Value1"},
-		api.EnvironmentSpec{"Key2", "Value2"},
+		api.EnvironmentSpec{
+			Name:  "Key1",
+			Value: "Value1",
+		},
+		api.EnvironmentSpec{
+			Name:  "Key2",
+			Value: "Value2",
+		},
 	}
 	expectedEnv := []string{"Key1=Value1", "Key2=Value2"}
 	th := rh.tar.(*test.FakeTar)
