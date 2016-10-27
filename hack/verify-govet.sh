@@ -28,6 +28,6 @@ then
   echo "FAILURE: go vet failed!"
   exit 1
 else
-  echo "SUCCESS: go vet succeded!"
+  echo "SUCCESS: go vet succeeded!"
   exit 0
 fi

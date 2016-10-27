@@ -127,7 +127,7 @@ func TestBuild(t *testing.T) {
 		t.Errorf("%v", err)
 	}
 	if !result.Success {
-		t.Errorf("Expected successfull build, got: %v", result)
+		t.Errorf("Expected successful build, got: %v", result)
 	}
 	checkDockerfile(fakeFs, t)
 	t.Logf("result: %v", result)

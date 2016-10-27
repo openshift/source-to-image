@@ -178,34 +178,34 @@ func TestCommitImageStep(t *testing.T) {
 		commitOpts := docker.CommitContainerOpts
 
 		if len(commitOpts.Command) != 1 {
-			t.Errorf("should commit container with Command: %q, but commited with %q", testCase.expectedImageCmd, commitOpts.Command)
+			t.Errorf("should commit container with Command: %q, but committed with %q", testCase.expectedImageCmd, commitOpts.Command)
 
 		} else if commitOpts.Command[0] != testCase.expectedImageCmd {
-			t.Errorf("should commit container with Command: %q, but commited with %q", testCase.expectedImageCmd, commitOpts.Command[0])
+			t.Errorf("should commit container with Command: %q, but committed with %q", testCase.expectedImageCmd, commitOpts.Command[0])
 		}
 
 		if !reflect.DeepEqual(commitOpts.Env, expectedEnv) {
-			t.Errorf("should commit container with Env: %v, but commited with %v", expectedEnv, commitOpts.Env)
+			t.Errorf("should commit container with Env: %v, but committed with %v", expectedEnv, commitOpts.Env)
 		}
 
 		if commitOpts.ContainerID != expectedContainerID {
-			t.Errorf("should commit container with ContainerID: %q, but commited with %q", expectedContainerID, commitOpts.ContainerID)
+			t.Errorf("should commit container with ContainerID: %q, but committed with %q", expectedContainerID, commitOpts.ContainerID)
 		}
 
 		if commitOpts.Repository != expectedImageTag {
-			t.Errorf("should commit container with Repository: %q, but commited with %q", expectedImageTag, commitOpts.Repository)
+			t.Errorf("should commit container with Repository: %q, but committed with %q", expectedImageTag, commitOpts.Repository)
 		}
 
 		if commitOpts.User != expectedImageUser {
-			t.Errorf("should commit container with User: %q, but commited with %q", expectedImageUser, commitOpts.User)
+			t.Errorf("should commit container with User: %q, but committed with %q", expectedImageUser, commitOpts.User)
 		}
 
 		if !reflect.DeepEqual(commitOpts.Entrypoint, expectedEntrypoint) {
-			t.Errorf("should commit container with Entrypoint: %q, but commited with %q", expectedEntrypoint, commitOpts.Entrypoint)
+			t.Errorf("should commit container with Entrypoint: %q, but committed with %q", expectedEntrypoint, commitOpts.Entrypoint)
 		}
 
 		if !reflect.DeepEqual(commitOpts.Labels, expectedLabels) {
-			t.Errorf("should commit container with Labels: %v, but commited with %v", expectedLabels, commitOpts.Labels)
+			t.Errorf("should commit container with Labels: %v, but committed with %v", expectedLabels, commitOpts.Labels)
 		}
 	}
 }
