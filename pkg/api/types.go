@@ -344,14 +344,14 @@ type BuildInfo struct {
 	FailureReason FailureReason
 }
 
-// StepFailureReason holds the type of failure that occured during the build
+// StepFailureReason holds the type of failure that occurred during the build
 // process.
 type StepFailureReason string
 
 // StepFailureMessage holds the detailed message of a failure.
 type StepFailureMessage string
 
-// FailureReason holds the type of failure that occured during the build
+// FailureReason holds the type of failure that occurred during the build
 // process.
 type FailureReason struct {
 	Reason  StepFailureReason

@@ -368,7 +368,7 @@ func TestPostExecute(t *testing.T) {
 			t.Errorf("(%d) Unexpected commit container command: %#v, expected %q", i, dh.CommitContainerOpts.Command, expectedCmd)
 		}
 		if dh.CommitContainerOpts.Repository != tc.tag {
-			t.Errorf("(%d) Unexpected tag commited, expected %q, got %q", i, tc.tag, dh.CommitContainerOpts.Repository)
+			t.Errorf("(%d) Unexpected tag committed, expected %q, got %q", i, tc.tag, dh.CommitContainerOpts.Repository)
 		}
 		// Ensure image removal when incremental and previousImageID present
 		if tc.incremental && tc.previousImageID != "" {

@@ -159,7 +159,7 @@ the builder images using plain filesystem copy if the Git binary is not
 available. In that case the output image will not have the Git specific labels.
 Use this method only for development or local testing.
 
-**NOTE**: All your changes have to be commited by `git` in order to build them with S2I.
+**NOTE**: All your changes have to be committed by `git` in order to build them with S2I.
 
 Build a Java application from a Git source, using the official `openshift/wildfly-100-centos7`
 builder image but overriding the scripts URL from local directory.  The resulting
