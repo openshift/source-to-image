@@ -1,6 +1,7 @@
 package test
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -142,7 +143,7 @@ func (d *FakeDockerClient) ContainerCommit(ctx context.Context, container string
 // ContainerAttach attaches a connection to a container in the server.
 func (d *FakeDockerClient) ContainerAttach(ctx context.Context, container string, options dockertypes.ContainerAttachOptions) (dockertypes.HijackedResponse, error) {
 	d.Calls = append(d.Calls, "attach")
-	return dockertypes.HijackedResponse{Conn: FakeConn{}}, nil
+	return dockertypes.HijackedResponse{Conn: FakeConn{}, Reader: bufio.NewReader(&bytes.Buffer{})}, nil
 }
 
 // ImageBuild sends request to the daemon to build images.

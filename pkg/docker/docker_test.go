@@ -500,8 +500,6 @@ func TestRunContainer(t *testing.T) {
 			t.Errorf("newly created fake client should have empty container map: %+v", fakeDocker.Containers)
 		}
 
-		//NOTE: the combo of the fake k8s client, go 1.6, and using os.Stderr/os.Stdout caused what appeared to be go test crashes
-		// when we tried to call their closers in RunContainer
 		err := dh.RunContainer(RunContainerOptions{
 			Image:           "test/image",
 			PullImage:       true,
@@ -511,8 +509,8 @@ func TestRunContainer(t *testing.T) {
 			Command:         tst.cmd,
 			Env:             []string{"Key1=Value1", "Key2=Value2"},
 			Stdin:           os.Stdin,
-			//Stdout:          os.Stdout,
-			//Stderr:          os.Stdout,
+			Stdout:          os.Stdout,
+			Stderr:          os.Stdout,
 		})
 		if err != nil {
 			t.Errorf("%s: Unexpected error: %v", desc, err)

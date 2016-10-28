@@ -178,8 +178,8 @@ type RunContainerOptions struct {
 	// this value is ignored.
 	Entrypoint       []string
 	Stdin            io.Reader
-	Stdout           io.Writer
-	Stderr           io.Writer
+	Stdout           io.WriteCloser
+	Stderr           io.WriteCloser
 	OnStart          func(containerID string) error
 	PostExec         PostExecutor
 	TargetImage      bool
@@ -805,12 +805,13 @@ func dumpContainerInfo(container dockertypes.ContainerCreateResponse, d *stiDock
 	glog.V(0).Infof("\n\n\n\n\nThe image %s has been started in container %s as a result of the --run=true option.  The container's stdout/stderr will be redirected to this command's glog output to help you validate its behavior.  You can also inspect the container with docker commands if you like.  If the container is set up to stay running, you will have to Ctrl-C to exit this command, which should also stop the container %s.  This particular invocation attempts to run with the port mappings %+v \n\n\n\n\n", image, container.ID, container.ID, liveports)
 }
 
-// begin block copy of two methods from kube_docker_client.go
-// ... essentially, if that code could give us a way to inspect the error from engin-api's ContainerAttach call prior
-// to blocking on the IO, we could just leverage the kube_docker_client.go code entirely ... essentially a "non-blocking" attach like go-dockerclient provided
-
-// redirectResponseToOutputStream redirect the response stream to stdout and stderr. When tty is true, all stream will
-// only be redirected to stdout.
+// redirectResponseToOutputStream handles incoming streamed data from a
+// container on a "hijacked" connection.  If tty is true, expect multiplexed
+// streams.  Rules: 1) if you ask for streamed data from a container, you have
+// to read it, otherwise sooner or later the container will block writing it.
+// 2) if you're receiving multiplexed data, you have to actively read both
+// streams in parallel, otherwise in the case of non-interleaved data, you, and
+// then the container, will block.
 func (d *stiDocker) redirectResponseToOutputStream(tty bool, outputStream, errorStream io.Writer, resp io.Reader) error {
 	if outputStream == nil {
 		outputStream = ioutil.Discard
@@ -827,37 +828,41 @@ func (d *stiDocker) redirectResponseToOutputStream(tty bool, outputStream, error
 	return err
 }
 
-// holdHijackedConnection hold the HijackedResponse, redirect the inputStream to the connection, and redirect the response
-// stream to stdout and stderr. NOTE: If needed, we could also add context in this function.
-func (d *stiDocker) holdHijackedConnection(tty bool, inputStream io.Reader, outputStream, errorStream io.Writer, resp dockertypes.HijackedResponse) error {
+// holdHijackedConnection pumps data up to the container's stdin, and runs a
+// goroutine to pump data down from the container's stdout and stderr.  it holds
+// open the HijackedResponse until all of this is done.  Caller's responsibility
+// to close resp, as well as outputStream and errorStream if appropriate.
+func (d *stiDocker) holdHijackedConnection(tty bool, inputStream io.Reader, outputStream, errorStream io.WriteCloser, resp dockertypes.HijackedResponse) error {
 	receiveStdout := make(chan error)
 	if outputStream != nil || errorStream != nil {
 		go func() {
-			receiveStdout <- d.redirectResponseToOutputStream(tty, outputStream, errorStream, resp.Reader)
+			receiveErr := d.redirectResponseToOutputStream(tty, outputStream, errorStream, resp.Reader)
+			if outputStream != nil {
+				outputStream.Close()
+			}
+			if errorStream != nil {
+				errorStream.Close()
+			}
+			receiveStdout <- receiveErr
 		}()
 	}
 
-	stdinDone := make(chan struct{})
-	go func() {
-		if inputStream != nil {
-			io.Copy(resp.Conn, inputStream)
-		}
-		resp.CloseWrite()
-		close(stdinDone)
-	}()
-
-	select {
-	case err := <-receiveStdout:
-		return err
-	case <-stdinDone:
-		if outputStream != nil || errorStream != nil {
-			return <-receiveStdout
+	var err error
+	if inputStream != nil {
+		_, err = io.Copy(resp.Conn, inputStream)
+		if err != nil {
+			return err
 		}
 	}
-	return nil
-}
+	err = resp.CloseWrite()
+	if err != nil {
+		return err
+	}
 
-// end block copy of two methods from kube_docker_client.go
+	// Hang around until the streaming is over - either when the server closes
+	// the connection, or someone locally closes resp.
+	return <-receiveStdout
+}
 
 // RunContainer creates and starts a container using the image specified in opts
 // with the ability to stream input and/or output.
@@ -941,51 +946,19 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 		os.Exit(2)
 	}
 	return interrupt.New(dumpStack, removeContainer).Run(func() error {
-		// Attach to the container on go thread (different than with go-dockerclient, since it provided a non-blocking attach which we don't seem to have with k8s/engine-api)
-
-		// Attach to  the container on go thread to mimic blocking behavior we had with go-dockerclient (k8s wrapper blocks); then use borrowed code
-		// from k8s to dump logs via return
-		// still preserve the flow of attaching before starting to handle various timing issues encountered in the past, as well as allow for --run option
 		glog.V(2).Infof("Attaching to container %q ...", container.ID)
-		errorChannel := make(chan error)
-		timeoutTimer := time.NewTimer(DefaultDockerTimeout)
-		var attachLoggingError error
-		// unit tests found a DATA RACE on attachLoggingError; at first a simple mutex seemed sufficient, but a race condition in holdHijackedConnection manifested
-		// where <-receiveStdout would block even after the container had exitted, blocking the return with attachLoggingError; rather than trying to discern if the
-		// container exited in holdHijackedConnection, we'll using channel based signaling coupled with a time to avoid blocking forever
-		attachExit := make(chan bool, 1)
-		go func() {
-			ctx, cancel := getDefaultContext()
-			defer cancel()
-			resp, attachErr := d.client.ContainerAttach(ctx, container.ID, opts.asDockerAttachToContainerOptions())
-			errorChannel <- attachErr
-			if attachErr != nil {
-				glog.V(0).Infof("error: Unable to attach to container %q: %v", container.ID, attachErr)
-				return
-			}
-			defer resp.Close()
-			attachLoggingError = d.holdHijackedConnection(false, opts.Stdin, opts.Stdout, opts.Stderr, resp)
-			attachExit <- true
-		}()
-
-		// this error check should handle the result from the d.client.ContainerAttach call ... we progress to start when that occurs
-		select {
-		case err = <-errorChannel:
-			// in non-error scenarios, temporary tracing confirmed that
-			// unless the container starts, then exits, the attach blocks and
-			// never returns either a nil for success or whatever err it might
-			// return if the attach failed
-			if err != nil {
-				return err
-			}
-			break
-		case <-timeoutTimer.C:
-			return fmt.Errorf("timed out waiting to attach to container %s ", container.ID)
+		ctx, cancel := getDefaultContext()
+		defer cancel()
+		resp, err := d.client.ContainerAttach(ctx, container.ID, opts.asDockerAttachToContainerOptions())
+		if err != nil {
+			glog.V(0).Infof("error: Unable to attach to container %q: %v", container.ID, err)
+			return err
 		}
+		defer resp.Close()
 
 		// Start the container
 		glog.V(2).Infof("Starting container %q ...", container.ID)
-		ctx, cancel := getDefaultContext()
+		ctx, cancel = getDefaultContext()
 		defer cancel()
 		err = d.client.ContainerStart(ctx, container.ID)
 		if err != nil {
@@ -1008,6 +981,11 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 			dumpContainerInfo(container, d, image)
 		}
 
+		err = d.holdHijackedConnection(false, opts.Stdin, opts.Stdout, opts.Stderr, resp)
+		if err != nil {
+			return err
+		}
+
 		// Return an error if the exit code of the container is
 		// non-zero.
 		glog.V(4).Infof("Waiting for container %q to stop ...", container.ID)
@@ -1017,18 +995,6 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 		}
 		if exitCode != 0 {
 			return errors.NewContainerError(container.ID, exitCode, "")
-		}
-
-		// FIXME: If Stdout or Stderr can be closed, close it to notify that
-		// there won't be any more writes. This is a hack to close the write
-		// half of a pipe so that the read half sees io.EOF.
-		// In particular, this is needed to eventually terminate code that runs
-		// on OnStart and blocks reading from the pipe.
-		if c, ok := opts.Stdout.(io.Closer); ok {
-			c.Close()
-		}
-		if c, ok := opts.Stderr.(io.Closer); ok {
-			c.Close()
 		}
 
 		// OnStart must be done before we move on.
@@ -1044,15 +1010,8 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 				return err
 			}
 		}
-
-		select {
-		case <-attachExit:
-			return attachLoggingError
-		case <-time.After(DefaultDockerTimeout):
-			return nil
-		}
+		return nil
 	})
-
 }
 
 // GetImageID retrieves the ID of the image identified by name

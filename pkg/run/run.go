@@ -38,11 +38,7 @@ func (b *DockerRunner) Run(config *api.Config) error {
 	glog.V(4).Infof("Attempting to run image %s \n", config.Tag)
 
 	outReader, outWriter := io.Pipe()
-	defer outReader.Close()
-	defer outWriter.Close()
 	errReader, errWriter := io.Pipe()
-	defer errReader.Close()
-	defer errWriter.Close()
 
 	opts := docker.RunContainerOptions{
 		Image:        config.Tag,
@@ -53,13 +49,8 @@ func (b *DockerRunner) Run(config *api.Config) error {
 		CapDrop:      config.DropCapabilities,
 	}
 
-	// NOTE, we've seen some Golang level deadlock issues with the streaming of cmd output to
-	// glog, but part of the deadlock seems to have occurred when stdout was "silent"
-	// and produced no data, such as when we would do a git clone with the --quiet option.
-	// We have not seen the hang when the Cmd produces output to stdout.
-
-	go docker.StreamContainerIO(errReader, nil, func(a ...interface{}) { glog.Error(a...) })
-	go docker.StreamContainerIO(outReader, nil, func(a ...interface{}) { glog.Info(a...) })
+	docker.StreamContainerIO(errReader, nil, func(s string) { glog.Error(s) })
+	docker.StreamContainerIO(outReader, nil, func(s string) { glog.Info(s) })
 
 	err := b.ContainerClient.RunContainer(opts)
 	// If we get a ContainerError, the original message reports the

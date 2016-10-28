@@ -234,12 +234,7 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 	lastFileDstPath := "/tmp/" + filepath.Base(lastFilePath)
 
 	outReader, outWriter := io.Pipe()
-	defer outReader.Close()
-	defer outWriter.Close()
-
 	errReader, errWriter := io.Pipe()
-	defer errReader.Close()
-	defer errWriter.Close()
 
 	artifactsDir := filepath.Join(step.builder.config.WorkingDir, api.RuntimeArtifactsDir)
 
@@ -314,25 +309,22 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 		return onStartErr
 	}
 
-	go dockerpkg.StreamContainerIO(outReader, nil, func(a ...interface{}) { glog.V(0).Info(a...) })
+	dockerpkg.StreamContainerIO(outReader, nil, func(s string) { glog.V(0).Info(s) })
 
 	errOutput := ""
-	go dockerpkg.StreamContainerIO(errReader, &errOutput, func(a ...interface{}) { glog.Info(a...) })
+	c := dockerpkg.StreamContainerIO(errReader, &errOutput, func(s string) { glog.Info(s) })
 
 	// switch to the next stage of post executors steps
 	step.builder.postExecutorStage++
 
 	err = step.docker.RunContainer(opts)
-	// close so we avoid data race condition on errOutput
-	errReader.Close()
 	if e, ok := err.(errors.ContainerError); ok {
-		// even with deferred close above, close errReader now so we avoid data race condition on errOutput;
-		// closing will cause StreamContainerIO to exit, thus releasing the writer in the equation
-		errReader.Close()
-		return errors.NewContainerError(image, e.ErrorCode, errOutput)
+		// Must wait for StreamContainerIO goroutine above to exit before reading errOutput.
+		<-c
+		err = errors.NewContainerError(image, e.ErrorCode, errOutput)
 	}
 
-	return nil
+	return err
 }
 
 func (step *startRuntimeImageAndUploadFilesStep) copyScriptIfNeeded(script, destinationDir string) error {

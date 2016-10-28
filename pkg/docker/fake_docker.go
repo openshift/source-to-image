@@ -104,6 +104,12 @@ func (f *FakeDocker) RunContainer(opts RunContainerOptions) error {
 	if f.RunContainerErrorBeforeStart {
 		return f.RunContainerError
 	}
+	if opts.Stdout != nil {
+		opts.Stdout.Close()
+	}
+	if opts.Stderr != nil {
+		opts.Stderr.Close()
+	}
 	if opts.OnStart != nil {
 		if err := opts.OnStart(""); err != nil {
 			return err

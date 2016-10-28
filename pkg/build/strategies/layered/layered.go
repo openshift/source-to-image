@@ -1,7 +1,6 @@
 package layered
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -152,30 +151,13 @@ func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 	newBuilderImage := fmt.Sprintf("s2i-layered-temp-image-%d", time.Now().UnixNano())
 
 	outReader, outWriter := io.Pipe()
-	defer outReader.Close()
-	defer outWriter.Close()
 	opts := docker.BuildImageOptions{
 		Name:         newBuilderImage,
 		Stdin:        tarStream,
 		Stdout:       outWriter,
 		CGroupLimits: config.CGroupLimits,
 	}
-	// goroutine to stream container's output
-	go func(reader io.Reader) {
-		scanner := bufio.NewReader(reader)
-		for {
-			text, err := scanner.ReadString('\n')
-			if err != nil {
-				// we're ignoring ErrClosedPipe, as this is information
-				// the docker container ended streaming logs
-				if glog.Is(2) && err != io.ErrClosedPipe && err != io.EOF {
-					glog.Errorf("Error reading docker stdout, %v", err)
-				}
-				break
-			}
-			glog.V(2).Info(text)
-		}
-	}(outReader)
+	docker.StreamContainerIO(outReader, nil, func(s string) { glog.V(2).Info(s) })
 
 	glog.V(2).Infof("Building new image %s with scripts and sources already inside", newBuilderImage)
 	if err := builder.docker.BuildImage(opts); err != nil {

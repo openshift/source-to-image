@@ -152,26 +152,35 @@ func authConfigs(confs map[string]dockerConfig) (*AuthConfigurations, error) {
 
 // end block of 3 methods borrowed from go-dockerclient
 
-// StreamContainerIO takes data from the Reader and redirects to the log function (typically we pass in
-// glog.Error for stderr and glog.Info for stdout. The caller should wrap glog functions in a closure
-// to ensure accurate line numbers are reported: https://github.com/openshift/source-to-image/issues/558 .
-func StreamContainerIO(errStream io.Reader, errOutput *string, log func(...interface{})) {
-	scanner := bufio.NewReader(errStream)
-	for {
-		text, err := scanner.ReadString('\n')
-		if err != nil {
-			// we're ignoring ErrClosedPipe, as this is information
-			// the docker container ended streaming logs
-			if glog.Is(2) && err != io.ErrClosedPipe && err != io.EOF {
-				glog.V(0).Infof("error: Error reading docker stderr, %#v", err)
+// StreamContainerIO starts a goroutine to take data from the reader and
+// redirect it to the log function (typically we pass in glog.Error for stderr
+// and glog.Info for stdout. The caller should wrap glog functions in a closure
+// to ensure accurate line numbers are reported:
+// https://github.com/openshift/source-to-image/issues/558 .
+// StreamContainerIO returns a channel which is closed after the reader is
+// closed.
+func StreamContainerIO(r io.Reader, errOutput *string, log func(string)) <-chan struct{} {
+	c := make(chan struct{}, 1)
+	go func() {
+		reader := bufio.NewReader(r)
+		for {
+			text, err := reader.ReadString('\n')
+			if text != "" {
+				log(text)
 			}
-			break
+			if errOutput != nil && len(*errOutput) < maxErrorOutput {
+				*errOutput += text + "\n"
+			}
+			if err != nil {
+				if glog.Is(2) && err != io.EOF {
+					glog.V(0).Infof("error: Error reading docker stdout/stderr: %#v", err)
+				}
+				break
+			}
 		}
-		log(text)
-		if errOutput != nil && len(*errOutput) < maxErrorOutput {
-			*errOutput += text + "\n"
-		}
-	}
+		close(c)
+	}()
+	return c
 }
 
 // TODO remove (base, tag, id)
