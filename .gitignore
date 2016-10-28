@@ -1,4 +1,5 @@
 /_output
-/.vagrant
+/.atom-build.yml
 /.project
+/.vagrant
 *~

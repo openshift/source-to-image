@@ -39,7 +39,8 @@ func TestIsValidGitRepository(t *testing.T) {
 	}
 
 	if err != nil {
-		if e, ok := err.(errors.Error); !ok || e.ErrorCode != errors.EmptyGitRepositoryError {
+		var e errors.Error
+		if e, ok = err.(errors.Error); !ok || e.ErrorCode != errors.EmptyGitRepositoryError {
 			t.Errorf("isValidGitRepository returned an unexpected error: %q, expecting EmptyGitRepositoryError", err.Error())
 		}
 	} else {

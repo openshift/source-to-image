@@ -22,6 +22,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/build/strategies"
 	"github.com/openshift/source-to-image/pkg/docker"
+	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
 	"golang.org/x/net/context"
 )
@@ -252,6 +253,7 @@ func (i *integrationTest) exerciseCleanAllowedUIDsBuild(tag, imageName string, e
 		Tag:               tag,
 		Incremental:       false,
 		ScriptsURL:        "",
+		ExcludeRegExp:     tar.DefaultExclusionPattern.String(),
 	}
 	config.AllowedUIDs.Set("1-")
 	_, _, err := strategies.GetStrategy(config)
@@ -309,7 +311,9 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 		Tag:               buildTag,
 		Incremental:       false,
 		CallbackURL:       callbackURL,
-		ScriptsURL:        scriptsURL}
+		ScriptsURL:        scriptsURL,
+		ExcludeRegExp:     tar.DefaultExclusionPattern.String(),
+	}
 
 	b, _, err := strategies.GetStrategy(config)
 	if err != nil {
@@ -333,8 +337,8 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 	if setTag {
 		i.checkForImage(tag)
 		containerID := i.createContainer(tag)
-		defer i.removeContainer(containerID)
 		i.checkBasicBuildState(containerID, resp.WorkingDir)
+		i.removeContainer(containerID)
 	}
 
 	// Check if we receive back an ImageID when we are expecting to
@@ -393,6 +397,7 @@ func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injectio
 		Source:            TestSource,
 		Tag:               tag,
 		Injections:        injectionList,
+		ExcludeRegExp:     tar.DefaultExclusionPattern.String(),
 	}
 	builder, _, err := strategies.GetStrategy(config)
 	if err != nil {
@@ -435,6 +440,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 		Tag:                 tag,
 		Incremental:         false,
 		RemovePreviousImage: removePreviousImage,
+		ExcludeRegExp:       tar.DefaultExclusionPattern.String(),
 	}
 
 	builder, _, err := strategies.GetStrategy(config)
@@ -459,6 +465,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 		Incremental:             true,
 		RemovePreviousImage:     removePreviousImage,
 		PreviousImagePullPolicy: api.PullIfNotPresent,
+		ExcludeRegExp:           tar.DefaultExclusionPattern.String(),
 	}
 
 	builder, _, err = strategies.GetStrategy(config)
@@ -551,7 +558,13 @@ func (i *integrationTest) runInContainer(image string, command []string) int {
 	defer cancel()
 	exitCode, err := i.engineClient.ContainerWait(ctx, container.ID)
 	if err != nil {
-		i.t.Errorf("Couldn't start container: %s", container.ID)
+		i.t.Errorf("Couldn't wait for container: %s", container.ID)
+	}
+	ctx, cancel = getDefaultContext()
+	defer cancel()
+	err = i.engineClient.ContainerRemove(ctx, container.ID, dockertypes.ContainerRemoveOptions{})
+	if err != nil {
+		i.t.Errorf("Couldn't remove container: %s", container.ID)
 	}
 	return exitCode
 }
@@ -561,10 +574,12 @@ func (i *integrationTest) removeContainer(cID string) {
 	defer cancel()
 	removeOpts := dockertypes.ContainerRemoveOptions{
 		RemoveVolumes: true,
-		RemoveLinks:   true,
 		Force:         true,
 	}
-	i.engineClient.ContainerRemove(ctx, cID, removeOpts)
+	err := i.engineClient.ContainerRemove(ctx, cID, removeOpts)
+	if err != nil {
+		i.t.Errorf("Couldn't remove container %s: %s", cID, err)
+	}
 }
 
 func (i *integrationTest) fileExists(cID string, filePath string) {

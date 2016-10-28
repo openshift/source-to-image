@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sync"
 	"testing"
 	"time"
 
@@ -385,22 +384,12 @@ func TestExtractTarStream(t *testing.T) {
 		t.Fatalf("Cannot create temp directory: %v", err)
 	}
 	defer os.RemoveAll(destDir)
-	wg := sync.WaitGroup{}
-	wg.Add(2)
 	th := New()
 
 	go func() {
-		defer wg.Done()
-		if err := createTestTar(testFiles, writer); err != nil {
-			t.Fatal(err)
-		}
-		writer.Close()
+		writer.CloseWithError(createTestTar(testFiles, writer))
 	}()
-	go func() {
-		defer wg.Done()
-		th.ExtractTarStream(destDir, reader)
-	}()
-	wg.Wait()
+	th.ExtractTarStream(destDir, reader)
 	verifyDirectory(t, destDir, testFiles)
 }
 
@@ -411,22 +400,10 @@ func TestExtractTarStreamTimeout(t *testing.T) {
 		t.Fatalf("Cannot create temp directory: %v", err)
 	}
 	defer os.RemoveAll(destDir)
-	wg := sync.WaitGroup{}
-	wg.Add(2)
 	th := New()
 	th.(*stiTar).timeout = 10 * time.Millisecond
-	go func() {
-		defer wg.Done()
-		time.Sleep(20 * time.Millisecond)
-		writer.Close()
-	}()
-	extractError := make(chan error, 1)
-	go func() {
-		defer wg.Done()
-		extractError <- th.ExtractTarStream(destDir, reader)
-	}()
-	wg.Wait()
-	err = <-extractError
+	time.AfterFunc(20*time.Millisecond, func() { writer.Close() })
+	err = th.ExtractTarStream(destDir, reader)
 	if e, ok := err.(errors.Error); err == nil || (ok && e.ErrorCode != errors.TarTimeoutError) {
 		t.Errorf("Did not get the expected timeout error. err = %v", err)
 	}

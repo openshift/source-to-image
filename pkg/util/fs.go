@@ -46,10 +46,13 @@ type fs struct {
 	runner CommandRunner
 }
 
+// Stat returns a FileInfo describing the named file.
 func (h *fs) Stat(path string) (os.FileInfo, error) {
 	return os.Stat(path)
 }
 
+// ReadDir reads the directory named by dirname and returns a list of directory
+// entries sorted by filename.
 func (h *fs) ReadDir(path string) ([]os.FileInfo, error) {
 	return ioutil.ReadDir(path)
 }
@@ -193,7 +196,8 @@ func (h *fs) Open(filename string) (io.ReadCloser, error) {
 	return os.Open(filename)
 }
 
-// Write opens a file and writes data to it, returning error if such occurred
+// WriteFile opens a file and writes data to it, returning error if such
+// occurred
 func (h *fs) WriteFile(filename string, data []byte) error {
 	return ioutil.WriteFile(filename, data, 0700)
 }

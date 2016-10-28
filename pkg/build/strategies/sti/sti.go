@@ -139,7 +139,9 @@ func New(config *api.Config, overrides build.Overrides) (*STI, error) {
 	// which would lead to replacing this quick short circuit (so this change is tactical)
 	builder.source = overrides.Downloader
 	if builder.source == nil && !config.Usage {
-		downloader, sourceURL, err := scm.DownloaderForSource(config.Source, config.ForceCopy)
+		var downloader build.Downloader
+		var sourceURL string
+		downloader, sourceURL, err = scm.DownloaderForSource(config.Source, config.ForceCopy)
 		if err != nil {
 			return nil, err
 		}
@@ -253,7 +255,8 @@ func (builder *STI) Prepare(config *api.Config) error {
 
 		// user didn't specify mapping, let's take it from the runtime image then
 		if len(builder.config.RuntimeArtifacts) == 0 {
-			mapping, err := builder.docker.GetAssembleInputFiles(config.RuntimeImage)
+			var mapping string
+			mapping, err = builder.docker.GetAssembleInputFiles(config.RuntimeImage)
 			if err != nil {
 				builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonInvalidArtifactsMapping, utilstatus.ReasonMessageInvalidArtifactsMapping)
 				return err

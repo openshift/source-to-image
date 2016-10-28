@@ -152,17 +152,6 @@ func authConfigs(confs map[string]dockerConfig) (*AuthConfigurations, error) {
 
 // end block of 3 methods borrowed from go-dockerclient
 
-// LoadAndGetImageRegistryAuth loads the set of client auth objects from a docker config file
-// and returns the appropriate client auth object for a given image name.
-func LoadAndGetImageRegistryAuth(dockerCfg io.Reader, imageName string) api.AuthConfig {
-	auths, err := NewAuthConfigurations(dockerCfg)
-	if err != nil {
-		glog.V(0).Infof("error: Unable to load docker config: %v", err)
-		return api.AuthConfig{}
-	}
-	return GetImageRegistryAuth(auths, imageName)
-}
-
 // StreamContainerIO takes data from the Reader and redirects to the log function (typically we pass in
 // glog.Error for stderr and glog.Info for stdout. The caller should wrap glog functions in a closure
 // to ensure accurate line numbers are reported: https://github.com/openshift/source-to-image/issues/558 .

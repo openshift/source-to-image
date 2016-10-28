@@ -212,10 +212,14 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 				os.Exit(1)
 			}
 
-			if r, err := os.Open(cfg.DockerCfgPath); err == nil {
+			var auths *docker.AuthConfigurations
+			r, err := os.Open(cfg.DockerCfgPath)
+			if err == nil {
 				defer r.Close()
-				cfg.PullAuthentication = docker.LoadAndGetImageRegistryAuth(r, cfg.Tag)
+				auths = docker.LoadImageRegistryAuth(r)
 			}
+
+			cfg.PullAuthentication = docker.GetImageRegistryAuth(auths, cfg.Tag)
 
 			pr, err := docker.GetRebuildImage(cfg)
 			checkErr(err)
@@ -226,12 +230,7 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 				cfg.Tag = args[1]
 			}
 
-			// Attempt to read the .dockercfg and extract the authentication for
-			// docker pull
-			if r, err := os.Open(cfg.DockerCfgPath); err == nil {
-				defer r.Close()
-				cfg.PullAuthentication = docker.LoadAndGetImageRegistryAuth(r, cfg.BuilderImage)
-			}
+			cfg.PullAuthentication = docker.GetImageRegistryAuth(auths, cfg.BuilderImage)
 
 			if len(cfg.BuilderPullPolicy) == 0 {
 				cfg.BuilderPullPolicy = api.DefaultBuilderPullPolicy

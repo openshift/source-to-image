@@ -141,6 +141,7 @@ type stiDocker struct {
 	pullAuth dockertypes.AuthConfig
 }
 
+// InspectImage returns the image information and its raw representation.
 func (d stiDocker) InspectImage(name string) (*dockertypes.ImageInspect, error) {
 	ctx, cancel := getDefaultContext()
 	defer cancel()

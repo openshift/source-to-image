@@ -2,15 +2,17 @@ package util
 
 import (
 	"io"
+	"os"
 	"os/exec"
 )
 
 // CommandOpts contains options to attach Stdout/err to a command to run
 // or set its initial directory
 type CommandOpts struct {
-	Stdout io.Writer
-	Stderr io.Writer
-	Dir    string
+	Stdout    io.Writer
+	Stderr    io.Writer
+	Dir       string
+	EnvAppend []string
 }
 
 // CommandRunner executes OS commands with the given parameters and options
@@ -38,6 +40,10 @@ func (c *runner) RunWithOptions(opts CommandOpts, name string, arg ...string) er
 	}
 	if opts.Dir != "" {
 		cmd.Dir = opts.Dir
+	}
+	if len(opts.EnvAppend) > 0 {
+		cmd.Env = os.Environ()
+		cmd.Env = append(cmd.Env, opts.EnvAppend...)
 	}
 	return cmd.Run()
 }

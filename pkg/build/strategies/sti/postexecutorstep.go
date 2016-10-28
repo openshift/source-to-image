@@ -247,7 +247,8 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 	for _, script := range []string{api.AssembleRuntime, api.Run} {
 		// scripts must be inside of "scripts" subdir, see createCommandForExecutingRunScript()
 		destinationDir := filepath.Join(artifactsDir, "scripts")
-		if err = step.copyScriptIfNeeded(script, destinationDir); err != nil {
+		err = step.copyScriptIfNeeded(script, destinationDir)
+		if err != nil {
 			return err
 		}
 	}
@@ -262,7 +263,8 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 	useExternalAssembleScript := step.builder.externalScripts[api.AssembleRuntime]
 	if !useExternalAssembleScript {
 		// script already inside of the image
-		scriptsURL, err := step.docker.GetScriptsURL(image)
+		var scriptsURL string
+		scriptsURL, err = step.docker.GetScriptsURL(image)
 		if err != nil {
 			return err
 		}
@@ -317,16 +319,18 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 		}
 
 		glog.V(5).Infof("Uploading directory %q -> %q", artifactsDir, workDir)
-		if err = step.docker.UploadToContainerWithCallback(artifactsDir, workDir, containerID, setStandardPerms, true); err != nil {
+		onStartErr := step.docker.UploadToContainerWithCallback(artifactsDir, workDir, containerID, setStandardPerms, true)
+		if onStartErr != nil {
 			return fmt.Errorf("Couldn't upload directory (%q -> %q) into container %s: %v", artifactsDir, workDir, containerID, err)
 		}
 
 		glog.V(5).Infof("Uploading file %q -> %q", lastFilePath, lastFileDstPath)
-		if err := step.docker.UploadToContainerWithCallback(lastFilePath, lastFileDstPath, containerID, setStandardPerms, true); err != nil {
+		onStartErr = step.docker.UploadToContainerWithCallback(lastFilePath, lastFileDstPath, containerID, setStandardPerms, true)
+		if onStartErr != nil {
 			return fmt.Errorf("Couldn't upload file (%q -> %q) into container %s: %v", lastFilePath, lastFileDstPath, containerID, err)
 		}
 
-		return err
+		return onStartErr
 	}
 
 	go dockerpkg.StreamContainerIO(outReader, nil, func(a ...interface{}) { glog.V(0).Info(a...) })
