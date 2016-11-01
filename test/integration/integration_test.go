@@ -1,4 +1,4 @@
-// +build integration,!no-docker
+// +build integration
 
 package integration
 
