@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/docker"
-	"github.com/openshift/source-to-image/pkg/test"
 )
 
 func TestStorePreviousImageStep(t *testing.T) {
@@ -233,51 +232,5 @@ func TestReportSuccessStep(t *testing.T) {
 
 	if builder.result.ImageID != ctx.imageID {
 		t.Errorf("should set ImageID field to %q but it's %q", ctx.imageID, builder.result.ImageID)
-	}
-}
-
-func TestInvokeCallbackStep(t *testing.T) {
-	expectedMessages := []string{"i'm", "ok"}
-	expectedCallbackURL := "http://ping.me"
-	builder := newFakeBaseSTI()
-	builder.result.Success = true
-	builder.result.Messages = expectedMessages
-	builder.config.CallbackURL = expectedCallbackURL
-
-	expectedResultMessages := []string{"all", "right"}
-	callbackInvoker := &test.FakeCallbackInvoker{}
-	callbackInvoker.Result = expectedResultMessages
-
-	step := &invokeCallbackStep{
-		builder:         builder,
-		callbackInvoker: callbackInvoker,
-	}
-
-	expectedLabels := make(map[string]string)
-	expectedLabels["result"] = "passed"
-	ctx := &postExecutorStepContext{labels: expectedLabels}
-
-	if err := step.execute(ctx); err != nil {
-		t.Fatalf("should exit without error, but it returned %v", err)
-	}
-
-	if !reflect.DeepEqual(builder.result.Messages, expectedResultMessages) {
-		t.Errorf("should set Messages field to %q but it's %q", expectedResultMessages, builder.result.Messages)
-	}
-
-	if callbackInvoker.CallbackURL != expectedCallbackURL {
-		t.Errorf("should invoke ExecuteCallback(CallbackURL=%q) but invoked with %q", expectedCallbackURL, callbackInvoker.CallbackURL)
-	}
-
-	if callbackInvoker.Success != true {
-		t.Errorf("should invoke ExecuteCallback(Success='true') but invoked with %v", callbackInvoker.Success)
-	}
-
-	if !reflect.DeepEqual(callbackInvoker.Messages, expectedMessages) {
-		t.Errorf("should invoke ExecuteCallback(Messages=%v) but invoked with %v", expectedMessages, callbackInvoker.Messages)
-	}
-
-	if !reflect.DeepEqual(callbackInvoker.Labels, expectedLabels) {
-		t.Errorf("should invoke ExecuteCallback(Labels=%v) but invoked with %v", expectedLabels, callbackInvoker.Labels)
 	}
 }

@@ -282,10 +282,11 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 				type CallbackMessage struct {
 					Payload string
 					Success bool
+					Labels  map[string]string
 				}
 				var callbackMessage CallbackMessage
 				err := json.Unmarshal(body, &callbackMessage)
-				callbackHasValidJSON = (err == nil) && (callbackMessage.Success)
+				callbackHasValidJSON = (err == nil) && callbackMessage.Success && len(callbackMessage.Labels) > 0
 			}
 		}
 		ts := httptest.NewServer(http.HandlerFunc(handler))
