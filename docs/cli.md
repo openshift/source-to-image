@@ -71,7 +71,7 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 
 | Name                       | Description                                             |
 |:-------------------------- |:--------------------------------------------------------|
-| `--callback-url`           | URL to be invoked after a successful build (see [Callback URL](#callback-url)) |
+| `--callback-url`           | URL to be invoked after a build (see [Callback URL](#callback-url)) |
 | `-c (--copy)`              | Use local file system copy instead of git cloning the source url (allows for inclusion of empty directories and uncommitted files) |
 | `-d (--destination)`       | Location where the scripts and sources will be placed prior doing build (see [S2I Scripts](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#s2i-scripts)) |
 | `--dockercfg-path`         | The path to the Docker configuration file |
@@ -129,12 +129,18 @@ about the build:
 
 * `success` - flag indicating the result of the build process (`true` or `false`)
 * `payload` - list of messages from the build process
+* `labels`  - labels of the resulting image
 
 Example: data posted will be in the form:
 ```
 {
     "payload": "A string containing all build messages",
-    "success": true
+    "success": true,
+    "labels": {
+        "io.k8s.display-name": "my-app",
+        "io.openshift.s2i.build.image": "builder-image:latest",
+        ...
+    }
 }
 ```
 

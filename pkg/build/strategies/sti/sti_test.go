@@ -342,7 +342,6 @@ func TestPostExecute(t *testing.T) {
 		bh := testBuildHandler()
 		containerID := "test-container-id"
 		bh.result.Messages = []string{"one", "two"}
-		bh.config.CallbackURL = "https://my.callback.org/test"
 		bh.config.Tag = tc.tag
 		bh.config.Incremental = tc.incremental
 		dh := bh.docker.(*docker.FakeDocker)
@@ -351,7 +350,6 @@ func TestPostExecute(t *testing.T) {
 			bh.incremental = tc.incremental
 			bh.docker.(*docker.FakeDocker).GetImageIDResult = tc.previousImageID
 		}
-		ci := bh.callbackInvoker.(*test.FakeCallbackInvoker)
 		if tc.scriptsFromImage {
 			bh.scriptsURL = map[string]string{api.Run: "image:///usr/libexec/s2i/run"}
 		}
@@ -379,10 +377,6 @@ func TestPostExecute(t *testing.T) {
 			if dh.RemoveImageName != "" {
 				t.Errorf("(%d) Unexpected image removed: %s", i, dh.RemoveImageName)
 			}
-		}
-		// Ensure Callback was called
-		if ci.CallbackURL != bh.config.CallbackURL {
-			t.Errorf("(%d) Unexpected callbackURL, expected %q, got %q", i, bh.config.CallbackURL, ci.CallbackURL)
 		}
 	}
 }

@@ -173,6 +173,12 @@ func New(config *api.Config, overrides build.Overrides) (*STI, error) {
 func (builder *STI) Build(config *api.Config) (*api.Result, error) {
 	builder.result = &api.Result{}
 
+	if len(builder.config.CallbackURL) > 0 {
+		defer func() {
+			builder.result.Messages = builder.callbackInvoker.ExecuteCallback(builder.config.CallbackURL,
+				builder.result.Success, builder.postExecutorStepsContext.labels, builder.result.Messages)
+		}()
+	}
 	defer builder.garbage.Cleanup(config)
 
 	glog.V(1).Infof("Preparing to build %s", config.Tag)
@@ -662,10 +668,6 @@ func (builder *STI) initPostExecutorSteps() {
 				builder: builder,
 				docker:  builder.docker,
 			},
-			&invokeCallbackStep{
-				builder:         builder,
-				callbackInvoker: builder.callbackInvoker,
-			},
 		}
 	} else {
 		builder.postExecutorFirstStageSteps = []postExecutorStep{
@@ -689,10 +691,6 @@ func (builder *STI) initPostExecutorSteps() {
 			},
 			&reportSuccessStep{
 				builder: builder,
-			},
-			&invokeCallbackStep{
-				builder:         builder,
-				callbackInvoker: builder.callbackInvoker,
 			},
 		}
 	}
