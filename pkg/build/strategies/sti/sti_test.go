@@ -919,6 +919,17 @@ func TestExecuteOK(t *testing.T) {
 	}
 }
 
+func TestExecuteRunContainerError(t *testing.T) {
+	rh := newFakeSTI(&FakeSTI{})
+	fd := rh.docker.(*docker.FakeDocker)
+	runContainerError := fmt.Errorf("an error")
+	fd.RunContainerError = runContainerError
+	err := rh.Execute("test-command", "", rh.config)
+	if err != runContainerError {
+		t.Errorf("Did not get expected error, got %v", err)
+	}
+}
+
 func TestExecuteErrorCreateTarFile(t *testing.T) {
 	rh := newFakeSTI(&FakeSTI{})
 	rh.tar.(*test.FakeTar).CreateTarError = errors.New("CreateTarError")
