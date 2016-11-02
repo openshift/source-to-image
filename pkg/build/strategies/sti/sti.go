@@ -640,12 +640,14 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 		errReader.Close()
 		return errors.NewContainerError(config.BuilderImage, e.ErrorCode, errOutput)
 	}
-	// Do not wait for source input if the container times out.
+	// Do not wait for source input if there was an error running the container
 	// FIXME: this potentially leaks a goroutine.
-	if !util.IsTimeoutError(err) {
-		wg.Wait()
+	if err != nil {
+		return err
 	}
-	return err
+
+	wg.Wait()
+	return nil
 }
 
 func (builder *STI) initPostExecutorSteps() {
