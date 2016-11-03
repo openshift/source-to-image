@@ -8,7 +8,6 @@ package cancellable
 import (
 	"io"
 	"net/http"
-	"sync"
 
 	"github.com/docker/engine-api/client/transport"
 
@@ -31,7 +30,7 @@ var (
 //
 // This function deviates from the upstream version in golang.org/x/net/context/ctxhttp by
 // taking a Sender interface rather than a *http.Client directly. That allow us to use
-// this function with mocked clients and hijacked connections.
+// this funcion with mocked clients and hijacked connections.
 func Do(ctx context.Context, client transport.Sender, req *http.Request) (*http.Response, error) {
 	if client == nil {
 		client = http.DefaultClient
@@ -83,7 +82,7 @@ func Do(ctx context.Context, client transport.Sender, req *http.Request) (*http.
 			// The response's Body is closed.
 		}
 	}()
-	resp.Body = &notifyingReader{ReadCloser: resp.Body, notify: c}
+	resp.Body = &notifyingReader{resp.Body, c}
 
 	return resp, nil
 }
@@ -92,24 +91,23 @@ func Do(ctx context.Context, client transport.Sender, req *http.Request) (*http.
 // Close is called or a Read fails on the underlying ReadCloser.
 type notifyingReader struct {
 	io.ReadCloser
-	notify     chan<- struct{}
-	notifyOnce sync.Once
+	notify chan<- struct{}
 }
 
 func (r *notifyingReader) Read(p []byte) (int, error) {
 	n, err := r.ReadCloser.Read(p)
-	if err != nil {
-		r.notifyOnce.Do(func() {
-			close(r.notify)
-		})
+	if err != nil && r.notify != nil {
+		close(r.notify)
+		r.notify = nil
 	}
 	return n, err
 }
 
 func (r *notifyingReader) Close() error {
 	err := r.ReadCloser.Close()
-	r.notifyOnce.Do(func() {
+	if r.notify != nil {
 		close(r.notify)
-	})
+		r.notify = nil
+	}
 	return err
 }

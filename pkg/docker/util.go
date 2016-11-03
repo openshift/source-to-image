@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/docker/docker/cliconfig"
@@ -352,6 +353,11 @@ func GetDefaultDockerConfig() *api.DockerConfig {
 
 	if cfg.Endpoint = os.Getenv("DOCKER_HOST"); cfg.Endpoint == "" {
 		cfg.Endpoint = client.DefaultDockerHost
+
+		// TODO: remove this when we bump engine-api to >= cf82c64276ebc2501e72b241f9fdc1e21e421743
+		if runtime.GOOS == "darwin" {
+			cfg.Endpoint = "unix:///var/run/docker.sock"
+		}
 	}
 
 	certPath := os.Getenv("DOCKER_CERT_PATH")

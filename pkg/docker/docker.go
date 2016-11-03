@@ -125,12 +125,12 @@ type Client interface {
 	ContainerCreate(ctx context.Context, config *dockercontainer.Config, hostConfig *dockercontainer.HostConfig, networkingConfig *dockernetwork.NetworkingConfig, containerName string) (dockertypes.ContainerCreateResponse, error)
 	ContainerInspect(ctx context.Context, containerID string) (dockertypes.ContainerJSON, error)
 	ContainerRemove(ctx context.Context, containerID string, options dockertypes.ContainerRemoveOptions) error
-	ContainerStart(ctx context.Context, containerID string, options dockertypes.ContainerStartOptions) error
+	ContainerStart(ctx context.Context, containerID string) error
 	ContainerWait(ctx context.Context, containerID string) (int, error)
 	CopyToContainer(ctx context.Context, container, path string, content io.Reader, opts dockertypes.CopyToContainerOptions) error
 	CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, dockertypes.ContainerPathStat, error)
 	ImageBuild(ctx context.Context, buildContext io.Reader, options dockertypes.ImageBuildOptions) (dockertypes.ImageBuildResponse, error)
-	ImageInspectWithRaw(ctx context.Context, imageID string) (dockertypes.ImageInspect, []byte, error)
+	ImageInspectWithRaw(ctx context.Context, imageID string, getSize bool) (dockertypes.ImageInspect, []byte, error)
 	ImagePull(ctx context.Context, ref string, options dockertypes.ImagePullOptions) (io.ReadCloser, error)
 	ImageRemove(ctx context.Context, imageID string, options dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error)
 	ServerVersion(ctx context.Context) (dockertypes.Version, error)
@@ -144,7 +144,7 @@ type stiDocker struct {
 func (d stiDocker) InspectImage(name string) (*dockertypes.ImageInspect, error) {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	resp, _, err := d.client.ImageInspectWithRaw(ctx, name)
+	resp, _, err := d.client.ImageInspectWithRaw(ctx, name, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1007,7 +1007,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 		glog.V(2).Infof("Starting container %q ...", container.ID)
 		ctx, cancel := getDefaultContext()
 		defer cancel()
-		err = d.client.ContainerStart(ctx, container.ID, dockertypes.ContainerStartOptions{})
+		err = d.client.ContainerStart(ctx, container.ID)
 		if err != nil {
 			return err
 		}
