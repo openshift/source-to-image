@@ -31,6 +31,7 @@ func equalArrayContents(a []string, b []string) bool {
 		for _, f := range b {
 			if f == e {
 				found = true
+				break
 			}
 		}
 		if !found {
