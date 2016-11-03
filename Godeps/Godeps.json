@@ -216,7 +216,7 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
-			"Rev": "5644820622454e71517561946e3d94b9f9db6842"
+			"Rev": "1560c1005499d61b80f865c04d39ca7505bf7f0b"
 		},
 		{
 			"ImportPath": "github.com/stevvooe/resumable",
