@@ -224,12 +224,15 @@ func TestInstallRequiredOrder(t *testing.T) {
 		for _, r := range result {
 			if r.Script == s && r.Script == api.Assemble && r.URL == sourcesRootAbbrev+".s2i/bin/assemble" {
 				found = true
+				break
 			}
 			if r.Script == s && r.Script == api.Run && r.URL == config.url+"/"+api.Run {
 				found = true
+				break
 			}
 			if r.Script == s && r.Script == api.SaveArtifacts && r.URL == defaultDockerURL+"/"+api.SaveArtifacts {
 				found = true
+				break
 			}
 		}
 		if !found {
