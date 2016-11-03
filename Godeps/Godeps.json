@@ -188,14 +188,6 @@
 			"Rev": "23def4e6c14b4da8ac2ed8007337bc5eb5007998"
 		},
 		{
-			"ImportPath": "github.com/golang/protobuf/proto",
-			"Rev": "b982704f8bb716bb608144408cff30e15fbde841"
-		},
-		{
-			"ImportPath": "github.com/golang/protobuf/proto/proto3_proto",
-			"Rev": "b982704f8bb716bb608144408cff30e15fbde841"
-		},
-		{
 			"ImportPath": "github.com/inconshreveable/mousetrap",
 			"Rev": "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75"
 		},
