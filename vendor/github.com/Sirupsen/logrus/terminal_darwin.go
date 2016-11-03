@@ -7,6 +7,6 @@ package logrus
 
 import "syscall"
 
-const ioctlReadTermios = syscall.TCGETS
+const ioctlReadTermios = syscall.TIOCGETA
 
 type Termios syscall.Termios
