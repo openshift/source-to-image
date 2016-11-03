@@ -193,8 +193,8 @@
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/user",
-			"Comment": "v1.0.0-rc1-57-g4eb8c2f",
-			"Rev": "4eb8c2fb1dcb10fa3bf9bd7031f3a25a8ce2fef6"
+			"Comment": "v1.0.0-rc1-100-g142df38",
+			"Rev": "142df3836b740af53dc6da59eed8dbc92f62917c"
 		},
 		{
 			"ImportPath": "github.com/openshift/origin/pkg/image/reference",
