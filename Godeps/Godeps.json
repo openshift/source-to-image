@@ -228,11 +228,11 @@
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",
-			"Rev": "c2528b2dd8352441850638a8bb678c2ad056fd3e"
+			"Rev": "e90d6d0afc4c315a0d87a568ae68577cc15149a0"
 		},
 		{
 			"ImportPath": "golang.org/x/net/proxy",
-			"Rev": "c2528b2dd8352441850638a8bb678c2ad056fd3e"
+			"Rev": "e90d6d0afc4c315a0d87a568ae68577cc15149a0"
 		},
 		{
 			"ImportPath": "golang.org/x/sys/unix",
