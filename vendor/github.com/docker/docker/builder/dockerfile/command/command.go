@@ -1,6 +1,7 @@
-// This package contains the set of Dockerfile commands.
+// Package command contains the set of Dockerfile commands.
 package command
 
+// Define constants for the command strings
 const (
 	Env        = "env"
 	Label      = "label"
@@ -16,6 +17,8 @@ const (
 	Expose     = "expose"
 	Volume     = "volume"
 	User       = "user"
+	StopSignal = "stopsignal"
+	Arg        = "arg"
 )
 
 // Commands is list of all Dockerfile commands
@@ -34,4 +37,6 @@ var Commands = map[string]struct{}{
 	Expose:     {},
 	Volume:     {},
 	User:       {},
+	StopSignal: {},
+	Arg:        {},
 }
