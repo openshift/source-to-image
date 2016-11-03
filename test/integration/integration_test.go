@@ -86,7 +86,7 @@ type integrationTest struct {
 func (i integrationTest) InspectImage(name string) (*dockertypes.ImageInspect, error) {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	resp, _, err := i.engineClient.ImageInspectWithRaw(ctx, name)
+	resp, _, err := i.engineClient.ImageInspectWithRaw(ctx, name, false)
 	if err != nil {
 		if dockerapi.IsErrImageNotFound(err) {
 			return nil, fmt.Errorf("no such image :%q", name)
@@ -514,7 +514,7 @@ func (i *integrationTest) createContainer(image string) string {
 
 	ctx, cancel = getDefaultContext()
 	defer cancel()
-	err = i.engineClient.ContainerStart(ctx, container.ID, dockertypes.ContainerStartOptions{})
+	err = i.engineClient.ContainerStart(ctx, container.ID)
 	if err != nil {
 		i.t.Errorf("Couldn't start container: %s with error %+v", container.ID, err)
 		return ""
@@ -543,7 +543,7 @@ func (i *integrationTest) runInContainer(image string, command []string) int {
 
 	ctx, cancel = getDefaultContext()
 	defer cancel()
-	err = i.engineClient.ContainerStart(ctx, container.ID, dockertypes.ContainerStartOptions{})
+	err = i.engineClient.ContainerStart(ctx, container.ID)
 	if err != nil {
 		i.t.Errorf("Couldn't start container: %s", container.ID)
 	}
