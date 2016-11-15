@@ -1,6 +1,8 @@
 package strategies
 
 import (
+	"time"
+
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/build"
 	"github.com/openshift/source-to-image/pkg/build/strategies/onbuild"
@@ -23,8 +25,9 @@ func Strategy(config *api.Config, overrides build.Overrides) (build.Builder, api
 	var buildInfo api.BuildInfo
 
 	fs := util.NewFileSystem()
-
+	timeStart := time.Now()
 	image, err := docker.GetBuilderImage(config)
+	buildInfo.StepInfo = utilstatus.AddStepInfo(buildInfo.StepInfo, api.PullBuilderImageStep, timeStart)
 	if err != nil {
 		buildInfo.FailureReason = utilstatus.NewFailureReason(
 			utilstatus.ReasonPullBuilderImageFailed,

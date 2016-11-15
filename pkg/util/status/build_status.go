@@ -1,6 +1,8 @@
 package status
 
 import (
+	"time"
+
 	"github.com/openshift/source-to-image/pkg/api"
 )
 
@@ -114,10 +116,36 @@ const (
 )
 
 // NewFailureReason initializes a new failure reason that contains both the
-// reason and a message to be displayed
+// reason and a message to be displayed.
 func NewFailureReason(reason api.StepFailureReason, message api.StepFailureMessage) api.FailureReason {
 	return api.FailureReason{
 		Reason:  reason,
 		Message: message,
 	}
+}
+
+// AddStepInfo appends timing information about specific build stepts to the
+// result object. In case the step was already added, it will update the stop
+// time, this allows timing for substeps to be aggregated under a generic step.
+func AddStepInfo(stepInfo []api.BuildStepInfo, stepName api.StepName, timeStart time.Time) []api.BuildStepInfo {
+	timeStop := time.Now()
+
+	for i, step := range stepInfo {
+		if step.Name != stepName {
+			continue
+		}
+		stepInfo[i] = api.BuildStepInfo{
+			Name:      step.Name,
+			StartTime: timeStart,
+			StopTime:  timeStop,
+		}
+		return stepInfo
+	}
+
+	return append(stepInfo,
+		api.BuildStepInfo{
+			Name:      stepName,
+			StartTime: timeStart,
+			StopTime:  timeStop,
+		})
 }
