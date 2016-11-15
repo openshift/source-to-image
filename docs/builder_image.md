@@ -123,12 +123,14 @@ The `save-artifacts` script is responsible for gathering all the dependencies in
 ```
 #!/bin/bash
 
-pushd ${HOME}
+# Besides the tar command, all other output to standard out must 
+# be surpressed.  Otherwise, the tar stream will be corrupted.
+pushd ${HOME} >/dev/null
 if [ -d deps ]; then
     # all deps contents to tar stream
     tar cf - deps
 fi
-popd
+popd >/dev/null
 
 ```
 
