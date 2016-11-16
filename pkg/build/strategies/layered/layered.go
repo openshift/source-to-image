@@ -3,6 +3,7 @@ package layered
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -15,7 +16,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/build"
 	"github.com/openshift/source-to-image/pkg/docker"
-	"github.com/openshift/source-to-image/pkg/errors"
+	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
@@ -142,12 +143,12 @@ func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 
 	if config.HasOnBuild && config.BlockOnBuild {
 		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonOnBuildForbidden, utilstatus.ReasonMessageOnBuildForbidden)
-		return buildResult, fmt.Errorf("builder image uses ONBUILD instructions but ONBUILD is not allowed")
+		return buildResult, errors.New("builder image uses ONBUILD instructions but ONBUILD is not allowed")
 	}
 
 	if config.BuilderImage == "" {
 		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
-		return buildResult, fmt.Errorf("builder image name cannot be empty")
+		return buildResult, errors.New("builder image name cannot be empty")
 	}
 
 	if err := builder.CreateDockerfile(config); err != nil {
@@ -218,8 +219,8 @@ func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 	if err := builder.scripts.Execute(api.Assemble, config.AssembleUser, builder.config); err != nil {
 		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonAssembleFailed, utilstatus.ReasonMessageAssembleFailed)
 		switch e := err.(type) {
-		case errors.ContainerError:
-			return buildResult, errors.NewAssembleError(builder.config.Tag, e.Output, e)
+		case s2ierr.ContainerError:
+			return buildResult, s2ierr.NewAssembleError(builder.config.Tag, e.Output, e)
 		default:
 			return buildResult, err
 		}

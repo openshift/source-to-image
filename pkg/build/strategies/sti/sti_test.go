@@ -11,7 +11,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/build"
 	"github.com/openshift/source-to-image/pkg/docker"
-	stierr "github.com/openshift/source-to-image/pkg/errors"
+	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/ignore"
 	"github.com/openshift/source-to-image/pkg/scm/empty"
 	"github.com/openshift/source-to-image/pkg/scm/file"
@@ -234,7 +234,7 @@ func TestLayeredBuild(t *testing.T) {
 			BuilderImage: "testimage",
 		},
 		BuildResult:   &api.Result{},
-		ExecuteError:  stierr.NewContainerError("", 1, `/bin/sh: tar: not found`),
+		ExecuteError:  s2ierr.NewContainerError("", 1, `/bin/sh: tar: not found`),
 		ExpectedError: true,
 	}
 	builder := newFakeSTI(fh)
@@ -491,11 +491,11 @@ func TestSaveArtifactsCustomTag(t *testing.T) {
 func TestSaveArtifactsRunError(t *testing.T) {
 	tests := []error{
 		fmt.Errorf("Run error"),
-		stierr.NewContainerError("", -1, ""),
+		s2ierr.NewContainerError("", -1, ""),
 	}
 	expected := []error{
 		tests[0],
-		stierr.NewSaveArtifactsError("", "", tests[1]),
+		s2ierr.NewSaveArtifactsError("", "", tests[1]),
 	}
 	// test with tar extract error or not
 	tarError := []bool{true, false}
@@ -552,7 +552,7 @@ func TestFetchSource(t *testing.T) {
 		expectedError    *error
 	}
 
-	err := stierr.NewSourcePathError("error")
+	err := s2ierr.NewSourcePathError("error")
 	tests := []fetchTest{
 		// 0
 		{
@@ -616,8 +616,8 @@ func TestFetchSource(t *testing.T) {
 				t.Errorf("Did not get expected error [%d]", testNum)
 				continue
 			}
-			if (*ft.expectedError).(stierr.Error).ErrorCode != e.(stierr.Error).ErrorCode {
-				t.Errorf("Expected error code %d, got %d [%d]", (*ft.expectedError).(stierr.Error).ErrorCode, e.(stierr.Error).ErrorCode, testNum)
+			if (*ft.expectedError).(s2ierr.Error).ErrorCode != e.(s2ierr.Error).ErrorCode {
+				t.Errorf("Expected error code %d, got %d [%d]", (*ft.expectedError).(s2ierr.Error).ErrorCode, e.(s2ierr.Error).ErrorCode, testNum)
 			}
 		}
 		if ft.cloneExpected {
