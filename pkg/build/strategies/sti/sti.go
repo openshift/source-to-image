@@ -15,7 +15,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/build"
 	"github.com/openshift/source-to-image/pkg/build/strategies/layered"
 	dockerpkg "github.com/openshift/source-to-image/pkg/docker"
-	"github.com/openshift/source-to-image/pkg/errors"
+	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/ignore"
 	"github.com/openshift/source-to-image/pkg/scm"
 	"github.com/openshift/source-to-image/pkg/scm/git"
@@ -210,7 +210,7 @@ func (builder *STI) Build(config *api.Config) (*api.Result, error) {
 	if err := builder.scripts.Execute(api.Assemble, config.AssembleUser, config); err != nil {
 
 		switch e := err.(type) {
-		case errors.ContainerError:
+		case s2ierr.ContainerError:
 			if !isMissingRequirements(e.Output) {
 				builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonAssembleFailed, utilstatus.ReasonMessageAssembleFailed)
 				return builder.result, err
@@ -406,6 +406,7 @@ func (builder *STI) Exists(config *api.Config) bool {
 
 	result, err := dockerpkg.PullImage(tag, builder.incrementalDocker, policy, false)
 	if err != nil {
+		builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonPullPreviousImageFailed, utilstatus.ReasonMessagePullPreviousImageFailed)
 		glog.V(2).Infof("Unable to pull previously built image %q: %v", tag, err)
 		return false
 	}
@@ -469,13 +470,13 @@ func (builder *STI) Save(config *api.Config) (err error) {
 
 	go dockerpkg.StreamContainerIO(errReader, nil, func(a ...interface{}) { glog.Info(a...) })
 	err = builder.docker.RunContainer(opts)
-	if e, ok := err.(errors.ContainerError); ok {
+	if e, ok := err.(s2ierr.ContainerError); ok {
 		// even with deferred close above, close errReader now so we avoid data
 		// race condition on errOutput;
 		// closing will cause StreamContainerIO to exit, thus releasing the writer in
 		// the equation
 		errReader.Close()
-		err = errors.NewSaveArtifactsError(image, e.Output, err)
+		err = s2ierr.NewSaveArtifactsError(image, e.Output, err)
 	}
 
 	builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
@@ -634,11 +635,11 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 	go dockerpkg.StreamContainerIO(errReader, &errOutput, func(a ...interface{}) { glog.Info(a...) })
 
 	err := builder.docker.RunContainer(opts)
-	if e, ok := err.(errors.ContainerError); ok {
+	if e, ok := err.(s2ierr.ContainerError); ok {
 		// even with deferred close above, close errReader now so we avoid data race condition on errOutput;
 		// closing will cause StreamContainerIO to exit, thus releasing the writer in the equation
 		errReader.Close()
-		return errors.NewContainerError(config.BuilderImage, e.ErrorCode, errOutput)
+		return s2ierr.NewContainerError(config.BuilderImage, e.ErrorCode, errOutput)
 	}
 	// Do not wait for source input if there was an error running the container
 	// FIXME: this potentially leaks a goroutine.

@@ -150,11 +150,13 @@ func (step *downloadFilesFromBuilderImageStep) execute(ctx *postExecutorStepCont
 
 	artifactsDir := filepath.Join(step.builder.config.WorkingDir, api.RuntimeArtifactsDir)
 	if err := step.fs.Mkdir(artifactsDir); err != nil {
+		step.builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonFSOperationFailed, utilstatus.ReasonMessageFSOperationFailed)
 		return fmt.Errorf("Couldn't create directory %q: %v", artifactsDir, err)
 	}
 
 	for _, artifact := range step.builder.config.RuntimeArtifacts {
 		if err := step.downloadAndExtractFile(artifact.Source, artifactsDir, ctx.containerID); err != nil {
+			step.builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
 			return err
 		}
 
@@ -164,6 +166,7 @@ func (step *downloadFilesFromBuilderImageStep) execute(ctx *postExecutorStepCont
 			dstDir := filepath.Join(artifactsDir, dstSubDir)
 			glog.V(5).Infof("Creating directory %q", dstDir)
 			if err := step.fs.MkdirAll(dstDir); err != nil {
+				step.builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonFSOperationFailed, utilstatus.ReasonMessageFSOperationFailed)
 				return fmt.Errorf("Couldn't create directory %q: %v", dstDir, err)
 			}
 
@@ -172,6 +175,7 @@ func (step *downloadFilesFromBuilderImageStep) execute(ctx *postExecutorStepCont
 			new := filepath.Join(artifactsDir, dstSubDir, file)
 			glog.V(5).Infof("Renaming %q to %q", old, new)
 			if err := step.fs.Rename(old, new); err != nil {
+				step.builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonFSOperationFailed, utilstatus.ReasonMessageFSOperationFailed)
 				return fmt.Errorf("Couldn't rename %q -> %q: %v", old, new, err)
 			}
 		}
@@ -243,7 +247,7 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 	for _, script := range []string{api.AssembleRuntime, api.Run} {
 		// scripts must be inside of "scripts" subdir, see createCommandForExecutingRunScript()
 		destinationDir := filepath.Join(artifactsDir, "scripts")
-		if err := step.copyScriptIfNeeded(script, destinationDir); err != nil {
+		if err = step.copyScriptIfNeeded(script, destinationDir); err != nil {
 			return err
 		}
 	}
@@ -313,7 +317,7 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 		}
 
 		glog.V(5).Infof("Uploading directory %q -> %q", artifactsDir, workDir)
-		if err := step.docker.UploadToContainerWithCallback(artifactsDir, workDir, containerID, setStandardPerms, true); err != nil {
+		if err = step.docker.UploadToContainerWithCallback(artifactsDir, workDir, containerID, setStandardPerms, true); err != nil {
 			return fmt.Errorf("Couldn't upload directory (%q -> %q) into container %s: %v", artifactsDir, workDir, containerID, err)
 		}
 

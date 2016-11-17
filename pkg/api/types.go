@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"path/filepath"
@@ -497,7 +498,7 @@ func IsInvalidFilename(name string) bool {
 // working directory in container.
 func (l *VolumeList) Set(value string) error {
 	if len(value) == 0 {
-		return fmt.Errorf("invalid format, must be source:destination")
+		return errors.New("invalid format, must be source:destination")
 	}
 	mount := strings.Split(value, ":")
 	switch len(mount) {
@@ -508,7 +509,7 @@ func (l *VolumeList) Set(value string) error {
 		mount[0] = strings.Trim(mount[0], `"'`)
 		mount[1] = strings.Trim(mount[1], `"'`)
 	default:
-		return fmt.Errorf("invalid source:path definition")
+		return errors.New("invalid source:path definition")
 	}
 	s := VolumeSpec{Source: filepath.Clean(mount[0]), Destination: filepath.Clean(mount[1])}
 	if IsInvalidFilename(s.Source) || IsInvalidFilename(s.Destination) {

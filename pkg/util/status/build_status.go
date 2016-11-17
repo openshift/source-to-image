@@ -8,23 +8,31 @@ const (
 	// ReasonAssembleFailed is the reason associated with the Assemble script
 	// failing.
 	ReasonAssembleFailed api.StepFailureReason = "AssembleFailed"
-	// ReasonMessageAssembleFailed is the message associated with the Assemble script
-	// failing.
+	// ReasonMessageAssembleFailed is the message associated with the Assemble
+	// script failing.
 	ReasonMessageAssembleFailed api.StepFailureMessage = "Assemble script failed"
 
 	// ReasonPullBuilderImageFailed is the reason associated with failing to pull
 	// the builder image.
 	ReasonPullBuilderImageFailed api.StepFailureReason = "PullBuilderImageFailed"
-	// ReasonMessagePullBuilderImageFailed is the message associated with failing to pull
-	// the builder image.
+	// ReasonMessagePullBuilderImageFailed is the message associated with failing
+	// to pull the builder image.
 	ReasonMessagePullBuilderImageFailed api.StepFailureMessage = "Failed to pull builder image"
 
 	// ReasonPullRuntimeImageFailed is the reason associated with failing to pull
 	// the runtime image.
 	ReasonPullRuntimeImageFailed api.StepFailureReason = "PullRuntimeImageFailed"
-	// ReasonMessagePullRuntimeImageFailed is the message associated with failing to pull
-	// the runtime image.
+	// ReasonMessagePullRuntimeImageFailed is the message associated with failing
+	// to pull the runtime image.
 	ReasonMessagePullRuntimeImageFailed api.StepFailureMessage = "Failed to pull runtime image"
+
+	// ReasonPullPreviousImageFailed is the reason associated with failing to
+	// pull the previous image.
+	ReasonPullPreviousImageFailed api.StepFailureReason = "PullPreviousImageFailed"
+
+	// ReasonMessagePullPreviousImageFailed is the message associated with
+	// failing to pull the previous image.
+	ReasonMessagePullPreviousImageFailed api.StepFailureMessage = "Failed to pull the previous image for incremental build"
 
 	// ReasonCommitContainerFailed is the reason associated with failing to
 	// commit the container to the final image.
