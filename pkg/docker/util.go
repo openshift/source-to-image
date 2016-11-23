@@ -52,12 +52,14 @@ const (
 // image name and a given set of client authentication objects.
 func GetImageRegistryAuth(auths *AuthConfigurations, imageName string) api.AuthConfig {
 	glog.V(5).Infof("Getting docker credentials for %s", imageName)
+	if auths == nil {
+		return api.AuthConfig{}
+	}
 	ref, err := reference.ParseNamedDockerImageReference(imageName)
 	if err != nil {
 		glog.V(0).Infof("error: Failed to parse docker reference %s", imageName)
 		return api.AuthConfig{}
 	}
-
 	if ref.Registry != "" {
 		if auth, ok := auths.Configs[ref.Registry]; ok {
 			glog.V(5).Infof("Using %s[%s] credentials for pulling %s", auth.Email, ref.Registry, imageName)
@@ -76,7 +78,7 @@ func GetImageRegistryAuth(auths *AuthConfigurations, imageName string) api.AuthC
 func LoadImageRegistryAuth(dockerCfg io.Reader) *AuthConfigurations {
 	auths, err := NewAuthConfigurations(dockerCfg)
 	if err != nil {
-		glog.V(0).Infof("error: Unable to load docker config")
+		glog.V(0).Infof("error: Unable to load docker config: %v", err)
 		return nil
 	}
 	return auths
@@ -127,6 +129,9 @@ func authConfigs(confs map[string]dockerConfig) (*AuthConfigurations, error) {
 		Configs: make(map[string]api.AuthConfig),
 	}
 	for reg, conf := range confs {
+		if len(conf.Auth) == 0 {
+			continue
+		}
 		data, err := base64.StdEncoding.DecodeString(conf.Auth)
 		if err != nil {
 			return nil, err
@@ -152,7 +157,7 @@ func authConfigs(confs map[string]dockerConfig) (*AuthConfigurations, error) {
 func LoadAndGetImageRegistryAuth(dockerCfg io.Reader, imageName string) api.AuthConfig {
 	auths, err := NewAuthConfigurations(dockerCfg)
 	if err != nil {
-		glog.V(0).Infof("error: Unable to load docker config")
+		glog.V(0).Infof("error: Unable to load docker config: %v", err)
 		return api.AuthConfig{}
 	}
 	return GetImageRegistryAuth(auths, imageName)
