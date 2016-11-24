@@ -25,20 +25,6 @@
 			"Rev": "aaf92c95712104318fc35409745f1533aa5ff327"
 		},
 		{
-			"ImportPath": "github.com/cpuguy83/go-md2man",
-			"Comment": "v1.0.4",
-			"Rev": "71acacd42f85e5e82f70a55327789582a5200a90"
-		},
-		{
-			"ImportPath": "github.com/cpuguy83/go-md2man/md2man",
-			"Comment": "v1.0.4",
-			"Rev": "71acacd42f85e5e82f70a55327789582a5200a90"
-		},
-		{
-			"ImportPath": "github.com/davecgh/go-spew/spew",
-			"Rev": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
-		},
-		{
 			"ImportPath": "github.com/docker/distribution/digest",
 			"Comment": "v2.5.1",
 			"Rev": "12acdf0a6c1e56d965ac6eb395d2bce687bf22fc"
@@ -202,15 +188,6 @@
 			"Rev": "2142bdbbad43d7cd47bd74da5dbcd3d4e7901f0b"
 		},
 		{
-			"ImportPath": "github.com/russross/blackfriday",
-			"Comment": "v1.4-2-g300106c",
-			"Rev": "300106c228d52c8941d4b3de6054a6062a86dda3"
-		},
-		{
-			"ImportPath": "github.com/shurcooL/sanitized_anchor_name",
-			"Rev": "10ef21a441db47d8b13ebcc5fd2310f636973c77"
-		},
-		{
 			"ImportPath": "github.com/spf13/cobra",
 			"Rev": "7c674d9e72017ed25f6d2b5e497a1368086b6a6f"
 		},
@@ -219,24 +196,12 @@
 			"Rev": "1560c1005499d61b80f865c04d39ca7505bf7f0b"
 		},
 		{
-			"ImportPath": "github.com/stevvooe/resumable",
-			"Rev": "f714bdb9b57a7162bc99aaa0b68a338c0da1c392"
-		},
-		{
-			"ImportPath": "github.com/stevvooe/resumable/sha256",
-			"Rev": "f714bdb9b57a7162bc99aaa0b68a338c0da1c392"
-		},
-		{
 			"ImportPath": "golang.org/x/net/context",
 			"Rev": "e90d6d0afc4c315a0d87a568ae68577cc15149a0"
 		},
 		{
 			"ImportPath": "golang.org/x/net/proxy",
 			"Rev": "e90d6d0afc4c315a0d87a568ae68577cc15149a0"
-		},
-		{
-			"ImportPath": "golang.org/x/sys/unix",
-			"Rev": "833a04a10549a95dc34458c195cbad61bbb6cb4d"
 		},
 		{
 			"ImportPath": "golang.org/x/sys/windows",
