@@ -3,6 +3,7 @@ package sti
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -435,7 +436,9 @@ func (builder *STI) Save(config *api.Config) (err error) {
 	errReader, errWriter := io.Pipe()
 	glog.V(1).Infof("Saving build artifacts from image %s to path %s", image, artifactTmpDir)
 	extractFunc := func(string) error {
-		return builder.tar.ExtractTarStream(artifactTmpDir, outReader)
+		extractErr := builder.tar.ExtractTarStream(artifactTmpDir, outReader)
+		io.Copy(ioutil.Discard, outReader) // must ensure reader from container is drained
+		return extractErr
 	}
 
 	user := config.AssembleUser
