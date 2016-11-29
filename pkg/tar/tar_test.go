@@ -8,11 +8,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sync"
+	"runtime"
 	"testing"
 	"time"
 
 	"github.com/openshift/source-to-image/pkg/errors"
+	"github.com/openshift/source-to-image/pkg/util"
 )
 
 type fileDesc struct {
@@ -40,7 +41,7 @@ func createTestFiles(baseDir string, files []fileDesc) error {
 			return err
 		}
 		file.WriteString(fd.content)
-		file.Chmod(fd.mode)
+		os.Chmod(fileName, fd.mode)
 		file.Close()
 		os.Chtimes(fileName, fd.modifiedDate, fd.modifiedDate)
 	}
@@ -61,6 +62,15 @@ func createTestLinks(baseDir string, links []linkDesc) error {
 }
 
 func verifyTarFile(t *testing.T, filename string, files []fileDesc, links []linkDesc) {
+	if runtime.GOOS == "windows" {
+		for i := range files {
+			if files[i].mode&0700 == 0400 {
+				files[i].mode = 0444
+			} else {
+				files[i].mode = 0666
+			}
+		}
+	}
 	filesToVerify := make(map[string]fileDesc)
 	for _, fd := range files {
 		if !fd.shouldSkip {
@@ -140,7 +150,7 @@ func TestCreateTarStreamIncludeParentDir(t *testing.T) {
 	if err = createTestFiles(tempDir, testFiles); err != nil {
 		t.Fatalf("Cannot create test files: %v", err)
 	}
-	th := New()
+	th := New(util.NewFileSystem())
 	tarFile, err := ioutil.TempFile("", "testtarout")
 	if err != nil {
 		t.Fatalf("Unable to create temporary file %v", err)
@@ -152,14 +162,13 @@ func TestCreateTarStreamIncludeParentDir(t *testing.T) {
 	}
 	tarFile.Close()
 	for i := range testFiles {
-		testFiles[i].name = filepath.Join(filepath.Base(tempDir), testFiles[i].name)
+		testFiles[i].name = filepath.ToSlash(filepath.Join(filepath.Base(tempDir), testFiles[i].name))
 	}
 	verifyTarFile(t, tarFile.Name(), testFiles, []linkDesc{})
-
 }
 
 func TestCreateTar(t *testing.T) {
-	th := New()
+	th := New(util.NewFileSystem())
 	tempDir, err := ioutil.TempDir("", "testtar")
 	defer os.RemoveAll(tempDir)
 	if err != nil {
@@ -194,7 +203,7 @@ func TestCreateTar(t *testing.T) {
 }
 
 func TestCreateTarIncludeDotGit(t *testing.T) {
-	th := New()
+	th := New(util.NewFileSystem())
 	th.SetExclusionPattern(regexp.MustCompile("test3.txt"))
 	tempDir, err := ioutil.TempDir("", "testtar")
 	defer os.RemoveAll(tempDir)
@@ -230,7 +239,7 @@ func TestCreateTarIncludeDotGit(t *testing.T) {
 }
 
 func TestCreateTarEmptyRegexp(t *testing.T) {
-	th := New()
+	th := New(util.NewFileSystem())
 	th.SetExclusionPattern(regexp.MustCompile(""))
 	tempDir, err := ioutil.TempDir("", "testtar")
 	defer os.RemoveAll(tempDir)
@@ -322,6 +331,19 @@ func isSymLink(mode os.FileMode) bool {
 }
 
 func verifyDirectory(t *testing.T, dir string, files []fileDesc) {
+	if runtime.GOOS == "windows" {
+		for i := range files {
+			files[i].name = filepath.FromSlash(files[i].name)
+			if files[i].mode&0700 == 0400 {
+				files[i].mode &^= 0777
+				files[i].mode |= 0444
+			} else {
+				files[i].mode &^= 0777
+				files[i].mode |= 0666
+			}
+			files[i].target = filepath.FromSlash(files[i].target)
+		}
+	}
 	filesToVerify := make(map[string]fileDesc)
 	for _, fd := range files {
 		filesToVerify[fd.name] = fd
@@ -385,22 +407,12 @@ func TestExtractTarStream(t *testing.T) {
 		t.Fatalf("Cannot create temp directory: %v", err)
 	}
 	defer os.RemoveAll(destDir)
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-	th := New()
+	th := New(util.NewFileSystem())
 
 	go func() {
-		defer wg.Done()
-		if err := createTestTar(testFiles, writer); err != nil {
-			t.Fatal(err)
-		}
-		writer.Close()
+		writer.CloseWithError(createTestTar(testFiles, writer))
 	}()
-	go func() {
-		defer wg.Done()
-		th.ExtractTarStream(destDir, reader)
-	}()
-	wg.Wait()
+	th.ExtractTarStream(destDir, reader)
 	verifyDirectory(t, destDir, testFiles)
 }
 
@@ -411,22 +423,10 @@ func TestExtractTarStreamTimeout(t *testing.T) {
 		t.Fatalf("Cannot create temp directory: %v", err)
 	}
 	defer os.RemoveAll(destDir)
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-	th := New()
+	th := New(util.NewFileSystem())
 	th.(*stiTar).timeout = 10 * time.Millisecond
-	go func() {
-		defer wg.Done()
-		time.Sleep(20 * time.Millisecond)
-		writer.Close()
-	}()
-	extractError := make(chan error, 1)
-	go func() {
-		defer wg.Done()
-		extractError <- th.ExtractTarStream(destDir, reader)
-	}()
-	wg.Wait()
-	err = <-extractError
+	time.AfterFunc(20*time.Millisecond, func() { writer.Close() })
+	err = th.ExtractTarStream(destDir, reader)
 	if e, ok := err.(errors.Error); err == nil || (ok && e.ErrorCode != errors.TarTimeoutError) {
 		t.Errorf("Did not get the expected timeout error. err = %v", err)
 	}

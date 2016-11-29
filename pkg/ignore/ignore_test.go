@@ -87,10 +87,10 @@ func baseTest(t *testing.T, patterns []string, filesToDel []string, filesToKeep 
 		}
 		t.Logf("Going to create file %q", fbpath)
 		fbfile, fberr := os.Create(fbpath)
-		defer fbfile.Close()
 		if fberr != nil {
 			t.Errorf("Problem creating test file: %v", fberr)
 		}
+		fbfile.Close()
 	}
 
 	// run ignorer algorithm
@@ -180,14 +180,14 @@ func TestBasicDelKeepMix(t *testing.T) {
 /*
 Per the docker user guide, with a docker ignore list of:
 
-    LICENCSE.*
-    !LICENCSE.md
+    LICENSE.*
+    !LICENSE.md
     *.md
 
-LICENSE.MD will NOT be kept, as *.md overrides !LICENCSE.md
+LICENSE.MD will NOT be kept, as *.md overrides !LICENSE.md
 */
 func TestExcludeOverride(t *testing.T) {
-	baseTest(t, []string{"LICENCSE.*\n", "!LICENCSE.md\n", "*.md"}, []string{"LICENCSE.foo", "LICENCSE.md"}, []string{"foo.bar"})
+	baseTest(t, []string{"LICENSE.*\n", "!LICENSE.md\n", "*.md"}, []string{"LICENSE.foo", "LICENSE.md"}, []string{"foo.bar"})
 }
 
 func TestExclusionWithWildcard(t *testing.T) {

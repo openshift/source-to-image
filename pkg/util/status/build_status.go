@@ -97,13 +97,6 @@ const (
 	// range of failures.
 	ReasonMessageGenericS2iBuildFailed api.StepFailureMessage = "Generic S2I Build failure - check S2I logs for details"
 
-	// ReasonTarSourceFailed is the failure reason associated with a failure to
-	// tar the current source.
-	ReasonTarSourceFailed api.StepFailureReason = "TarSourceFailed"
-	// ReasonMessageTarSourceFailed is the message associated with a failure to
-	// tar the current source.
-	ReasonMessageTarSourceFailed api.StepFailureMessage = "Failed to tar source files"
-
 	// ReasonOnBuildForbidden is the failure reason associated with an image that
 	// uses the ONBUILD instruction when it's not allowed.
 	ReasonOnBuildForbidden api.StepFailureReason = "OnBuildForbidden"

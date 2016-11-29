@@ -22,6 +22,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/build/strategies"
 	"github.com/openshift/source-to-image/pkg/docker"
+	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
 	"golang.org/x/net/context"
 )
@@ -71,9 +72,20 @@ func getDefaultContext() (context.Context, context.CancelFunc) {
 
 // TestInjectionBuild tests the build where we inject files to assemble script.
 func TestInjectionBuild(t *testing.T) {
+	tempdir, err := ioutil.TempDir("", "s2i-test-dir")
+	if err != nil {
+		t.Errorf("Unable to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(tempdir)
+
+	err = ioutil.WriteFile(filepath.Join(tempdir, "secret"), []byte("secret"), 0666)
+	if err != nil {
+		t.Errorf("Unable to write content to temporary injection file: %v", err)
+	}
+
 	integration(t).exerciseInjectionBuild(TagCleanBuild, FakeBuilderImage, []string{
-		"/tmp/s2i-test-dir:/tmp",
-		"/tmp/s2i-test-dir:",
+		tempdir + ":/tmp",
+		tempdir + ":",
 	})
 }
 
@@ -122,7 +134,7 @@ func (i *integrationTest) setup() {
 		// using this file's dirname
 		_, filename, _, _ := runtime.Caller(0)
 		testImagesDir := filepath.Join(filepath.Dir(filename), "scripts")
-		FakeScriptsFileURL = "file://" + filepath.Join(testImagesDir, ".s2i", "bin")
+		FakeScriptsFileURL = "file://" + filepath.ToSlash(filepath.Join(testImagesDir, ".s2i", "bin"))
 
 		for _, image := range []string{TagCleanBuild, TagCleanBuildUser, TagIncrementalBuild, TagIncrementalBuildUser} {
 			ctx, cancel := getDefaultContext()
@@ -252,6 +264,7 @@ func (i *integrationTest) exerciseCleanAllowedUIDsBuild(tag, imageName string, e
 		Tag:               tag,
 		Incremental:       false,
 		ScriptsURL:        "",
+		ExcludeRegExp:     tar.DefaultExclusionPattern.String(),
 	}
 	config.AllowedUIDs.Set("1-")
 	_, _, err := strategies.GetStrategy(config)
@@ -309,7 +322,9 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 		Tag:               buildTag,
 		Incremental:       false,
 		CallbackURL:       callbackURL,
-		ScriptsURL:        scriptsURL}
+		ScriptsURL:        scriptsURL,
+		ExcludeRegExp:     tar.DefaultExclusionPattern.String(),
+	}
 
 	b, _, err := strategies.GetStrategy(config)
 	if err != nil {
@@ -333,8 +348,8 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 	if setTag {
 		i.checkForImage(tag)
 		containerID := i.createContainer(tag)
-		defer i.removeContainer(containerID)
 		i.checkBasicBuildState(containerID, resp.WorkingDir)
+		i.removeContainer(containerID)
 	}
 
 	// Check if we receive back an ImageID when we are expecting to
@@ -373,18 +388,13 @@ func TestIncrementalBuildOnBuild(t *testing.T) {
 
 func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injections []string) {
 	t := i.t
-	err := os.Mkdir("/tmp/s2i-test-dir", 0777)
-	if err != nil {
-		t.Errorf("Unable to create temporary directory: %v", err)
-	}
-	defer os.RemoveAll("/tmp/s2i-test-dir")
-	err = ioutil.WriteFile(filepath.Join("/tmp/s2i-test-dir/secret"), []byte("secret"), 0666)
-	if err != nil {
-		t.Errorf("Unable to write content to temporary injection file: %v", err)
-	}
+
 	injectionList := api.VolumeList{}
 	for _, i := range injections {
-		injectionList.Set(i)
+		err := injectionList.Set(i)
+		if err != nil {
+			t.Errorf("injectionList.Set() failed with error %s\n", err)
+		}
 	}
 	config := &api.Config{
 		DockerConfig:      docker.GetDefaultDockerConfig(),
@@ -393,6 +403,7 @@ func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injectio
 		Source:            TestSource,
 		Tag:               tag,
 		Injections:        injectionList,
+		ExcludeRegExp:     tar.DefaultExclusionPattern.String(),
 	}
 	builder, _, err := strategies.GetStrategy(config)
 	if err != nil {
@@ -414,13 +425,13 @@ func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injectio
 	i.fileExists(containerID, "/sti-fake/relative-secret-delivered")
 
 	// Make sure the injected file does not exists in resulting image
-	files, err := util.ExpandInjectedFiles(injectionList)
+	files, err := util.ExpandInjectedFiles(util.NewFileSystem(), injectionList)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	for _, f := range files {
 		if exitCode := i.runInImage(tag, "test -s "+f); exitCode == 0 {
-			t.Errorf("The file must be empty: %q, we got %q", f, err)
+			t.Errorf("The file %q must be empty", f)
 		}
 	}
 }
@@ -435,6 +446,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 		Tag:                 tag,
 		Incremental:         false,
 		RemovePreviousImage: removePreviousImage,
+		ExcludeRegExp:       tar.DefaultExclusionPattern.String(),
 	}
 
 	builder, _, err := strategies.GetStrategy(config)
@@ -459,6 +471,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 		Incremental:             true,
 		RemovePreviousImage:     removePreviousImage,
 		PreviousImagePullPolicy: api.PullIfNotPresent,
+		ExcludeRegExp:           tar.DefaultExclusionPattern.String(),
 	}
 
 	builder, _, err = strategies.GetStrategy(config)
@@ -551,7 +564,13 @@ func (i *integrationTest) runInContainer(image string, command []string) int {
 	defer cancel()
 	exitCode, err := i.engineClient.ContainerWait(ctx, container.ID)
 	if err != nil {
-		i.t.Errorf("Couldn't start container: %s", container.ID)
+		i.t.Errorf("Couldn't wait for container: %s", container.ID)
+	}
+	ctx, cancel = getDefaultContext()
+	defer cancel()
+	err = i.engineClient.ContainerRemove(ctx, container.ID, dockertypes.ContainerRemoveOptions{})
+	if err != nil {
+		i.t.Errorf("Couldn't remove container: %s", container.ID)
 	}
 	return exitCode
 }
@@ -561,10 +580,12 @@ func (i *integrationTest) removeContainer(cID string) {
 	defer cancel()
 	removeOpts := dockertypes.ContainerRemoveOptions{
 		RemoveVolumes: true,
-		RemoveLinks:   true,
 		Force:         true,
 	}
-	i.engineClient.ContainerRemove(ctx, cID, removeOpts)
+	err := i.engineClient.ContainerRemove(ctx, cID, removeOpts)
+	if err != nil {
+		i.t.Errorf("Couldn't remove container %s: %s", cID, err)
+	}
 }
 
 func (i *integrationTest) fileExists(cID string, filePath string) {

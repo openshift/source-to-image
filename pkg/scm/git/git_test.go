@@ -2,7 +2,6 @@ package git
 
 import (
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -11,15 +10,18 @@ import (
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/test"
+	"github.com/openshift/source-to-image/pkg/util"
 )
 
 func TestIsValidGitRepository(t *testing.T) {
+	fs := util.NewFileSystem()
+
 	d := test.CreateLocalGitDirectory(t)
 	defer os.RemoveAll(d)
 
 	// We have a .git that is populated
 	// Should return true with no error
-	ok, err := isValidGitRepository(d)
+	ok, err := isValidGitRepository(fs, d)
 	if !ok {
 		t.Errorf("The %q directory is git repository", d)
 	}
@@ -33,13 +35,14 @@ func TestIsValidGitRepository(t *testing.T) {
 
 	// There are no tracking objects in the .git repository
 	// Should return true with an EmptyGitRepositoryError
-	ok, err = isValidGitRepository(d)
+	ok, err = isValidGitRepository(fs, d)
 	if !ok {
 		t.Errorf("The %q directory is a git repository, but is empty", d)
 	}
 
 	if err != nil {
-		if e, ok := err.(errors.Error); !ok || e.ErrorCode != errors.EmptyGitRepositoryError {
+		var e errors.Error
+		if e, ok = err.(errors.Error); !ok || e.ErrorCode != errors.EmptyGitRepositoryError {
 			t.Errorf("isValidGitRepository returned an unexpected error: %q, expecting EmptyGitRepositoryError", err.Error())
 		}
 	} else {
@@ -50,7 +53,7 @@ func TestIsValidGitRepository(t *testing.T) {
 
 	// There is no .git in the provided directory
 	// Should return false with no error
-	if ok, err = isValidGitRepository(d); ok {
+	if ok, err = isValidGitRepository(fs, d); ok {
 		t.Errorf("The %q directory is not git repository", d)
 	}
 
@@ -61,7 +64,7 @@ func TestIsValidGitRepository(t *testing.T) {
 	d = test.CreateLocalGitDirectoryWithSubmodule(t)
 	defer os.RemoveAll(d)
 
-	ok, err = isValidGitRepository(filepath.Join(d, "submodule"))
+	ok, err = isValidGitRepository(fs, filepath.Join(d, "submodule"))
 	if !ok || err != nil {
 		t.Errorf("Expected isValidGitRepository to return true, nil on submodule; got %v, %v", ok, err)
 	}
@@ -100,7 +103,7 @@ func TestValidCloneSpec(t *testing.T) {
 		"http://github.com/user/repo#%%%%",
 	}
 
-	gh := New()
+	gh := New(util.NewFileSystem())
 
 	for _, scenario := range valid {
 		result, _ := gh.ValidCloneSpec(scenario)
@@ -135,7 +138,7 @@ func TestValidCloneSpecRemoteOnly(t *testing.T) {
 		"/home/user/code/repo.git",
 	}
 
-	gh := New()
+	gh := New(util.NewFileSystem())
 
 	for _, scenario := range valid {
 		result := gh.ValidCloneSpecRemoteOnly(scenario)
@@ -151,144 +154,10 @@ func TestValidCloneSpecRemoteOnly(t *testing.T) {
 	}
 }
 
-func TestMungeNoProtocolURL(t *testing.T) {
-	gitLocalDir := test.CreateLocalGitDirectory(t)
-	defer os.RemoveAll(gitLocalDir)
-
-	gh := New()
-
-	tests := map[string]url.URL{
-		"git@github.com:user/repo.git": {
-			Scheme: "ssh",
-			Host:   "github.com",
-			User:   url.User("git"),
-			Path:   "user/repo.git",
-		},
-		"git://github.com/user/repo.git": {
-			Scheme: "git",
-			Host:   "github.com",
-			Path:   "/user/repo.git",
-		},
-		"git://github.com/user/repo": {
-			Scheme: "git",
-			Host:   "github.com",
-			Path:   "/user/repo",
-		},
-		"http://github.com/user/repo.git": {
-			Scheme: "http",
-			Host:   "github.com",
-			Path:   "/user/repo.git",
-		},
-		"http://github.com/user/repo": {
-			Scheme: "http",
-			Host:   "github.com",
-			Path:   "/user/repo",
-		},
-		"https://github.com/user/repo.git": {
-			Scheme: "https",
-			Host:   "github.com",
-			Path:   "/user/repo.git",
-		},
-		"https://github.com/user/repo": {
-			Scheme: "https",
-			Host:   "github.com",
-			Path:   "/user/repo",
-		},
-		"file://" + gitLocalDir: {
-			Scheme: "file",
-			Path:   gitLocalDir,
-		},
-		gitLocalDir: {
-			Scheme: "file",
-			Path:   gitLocalDir,
-		},
-		"git@192.168.122.1:repositories/authooks": {
-			Scheme: "ssh",
-			Host:   "192.168.122.1",
-			User:   url.User("git"),
-			Path:   "repositories/authooks",
-		},
-		"mbalazs@build.ulx.hu:/var/git/eap-ulx.git": {
-			Scheme: "ssh",
-			Host:   "build.ulx.hu",
-			User:   url.User("mbalazs"),
-			Path:   "/var/git/eap-ulx.git",
-		},
-		"ssh://git@[2001:db8::1]/repository.git": {
-			Scheme: "ssh",
-			Host:   "[2001:db8::1]",
-			User:   url.User("git"),
-			Path:   "/repository.git",
-		},
-		"ssh://git@mydomain.com:8080/foo/bar": {
-			Scheme: "ssh",
-			Host:   "mydomain.com:8080",
-			User:   url.User("git"),
-			Path:   "/foo/bar",
-		},
-		"git@[2001:db8::1]:repository.git": {
-			Scheme: "ssh",
-			Host:   "[2001:db8::1]",
-			User:   url.User("git"),
-			Path:   "repository.git",
-		},
-		"git@[2001:db8::1]:/repository.git": {
-			Scheme: "ssh",
-			Host:   "[2001:db8::1]",
-			User:   url.User("git"),
-			Path:   "/repository.git",
-		},
-	}
-
-	for scenario, test := range tests {
-		uri, err := url.Parse(scenario)
-		if err != nil {
-			t.Errorf("Could not parse url %q", scenario)
-		}
-
-		err = gh.MungeNoProtocolURL(scenario, uri)
-		if err != nil {
-			t.Errorf("MungeNoProtocolURL returned err: %v", err)
-		}
-
-		// reflect.DeepEqual was not dealing with url.URL correctly, have to check each field individually
-		// First, the easy string compares
-		equal := uri.Scheme == test.Scheme && uri.Opaque == test.Opaque && uri.Host == test.Host && uri.Path == test.Path && uri.RawQuery == test.RawQuery && uri.Fragment == test.Fragment
-		if equal {
-			// now deal with User, a Userinfo struct ptr
-			if uri.User == nil && test.User != nil {
-				equal = false
-			} else if uri.User != nil && test.User == nil {
-				equal = false
-			} else if uri.User != nil && test.User != nil {
-				equal = uri.User.String() == test.User.String()
-			}
-		}
-		if !equal {
-			t.Errorf(`URL string %q, field by field check:
-- Scheme: got %v, ok? %v
-- Opaque: got %v, ok? %v
-- Host: got %v, ok? %v
-- Path: got %v, ok? %v
-- RawQuery: got %v, ok? %v
-- Fragment: got %v, ok? %v
-- User: got %v`,
-				scenario,
-				uri.Scheme, uri.Scheme == test.Scheme,
-				uri.Opaque, uri.Opaque == test.Opaque,
-				uri.Host, uri.Host == test.Host,
-				uri.Path, uri.Path == test.Path,
-				uri.RawQuery, uri.RawQuery == test.RawQuery,
-				uri.Fragment, uri.Fragment == test.Fragment,
-				uri.User)
-		}
-	}
-}
-
 func getGit() (*stiGit, *test.FakeCmdRunner) {
-	gh := New().(*stiGit)
+	gh := New(&test.FakeFileSystem{}).(*stiGit)
 	cr := &test.FakeCmdRunner{}
-	gh.runner = cr
+	gh.CommandRunner = cr
 
 	return gh, cr
 }

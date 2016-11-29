@@ -3,7 +3,6 @@ package onbuild
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -38,19 +37,19 @@ type onBuildSourceHandler struct {
 }
 
 // New returns a new instance of OnBuild builder
-func New(config *api.Config, overrides build.Overrides) (*OnBuild, error) {
+func New(config *api.Config, fs util.FileSystem, overrides build.Overrides) (*OnBuild, error) {
 	dockerHandler, err := docker.New(config.DockerConfig, config.PullAuthentication)
 	if err != nil {
 		return nil, err
 	}
 	builder := &OnBuild{
 		docker: dockerHandler,
-		git:    git.New(),
-		fs:     util.NewFileSystem(),
-		tar:    tar.New(),
+		git:    git.New(fs),
+		fs:     fs,
+		tar:    tar.New(fs),
 	}
 	// Use STI Prepare() and download the 'run' script optionally.
-	s, err := sti.New(config, overrides)
+	s, err := sti.New(config, fs, overrides)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +57,7 @@ func New(config *api.Config, overrides build.Overrides) (*OnBuild, error) {
 
 	downloader := overrides.Downloader
 	if downloader == nil {
-		d, sourceURL, err := scm.DownloaderForSource(config.Source, config.ForceCopy)
+		d, sourceURL, err := scm.DownloaderForSource(builder.fs, config.Source, config.ForceCopy)
 		if err != nil {
 			return nil, err
 		}
@@ -74,17 +73,6 @@ func New(config *api.Config, overrides build.Overrides) (*OnBuild, error) {
 
 	builder.garbage = build.NewDefaultCleaner(builder.fs, builder.docker)
 	return builder, nil
-}
-
-// SourceTar produces a tar archive containing application source and streams
-// it
-func (builder *OnBuild) SourceTar(config *api.Config) (io.ReadCloser, error) {
-	uploadDir := filepath.Join(config.WorkingDir, "upload", "src")
-	tarFileName, err := builder.tar.CreateTarFile(config.WorkingDir, uploadDir)
-	if err != nil {
-		return nil, err
-	}
-	return builder.fs.Open(tarFileName)
 }
 
 // Build executes the ONBUILD kind of build
@@ -112,11 +100,7 @@ func (builder *OnBuild) Build(config *api.Config) (*api.Result, error) {
 	}
 
 	glog.V(2).Info("Creating application source code image")
-	tarStream, err := builder.SourceTar(config)
-	if err != nil {
-		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonTarSourceFailed, utilstatus.ReasonMessageTarSourceFailed)
-		return buildResult, err
-	}
+	tarStream := builder.tar.CreateTarStreamReader(filepath.Join(config.WorkingDir, "upload", "src"), false)
 	defer tarStream.Close()
 
 	opts := docker.BuildImageOptions{
@@ -127,7 +111,7 @@ func (builder *OnBuild) Build(config *api.Config) (*api.Result, error) {
 	}
 
 	glog.V(2).Info("Building the application source")
-	if err = builder.docker.BuildImage(opts); err != nil {
+	if err := builder.docker.BuildImage(opts); err != nil {
 		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonDockerImageBuildFailed, utilstatus.ReasonMessageDockerImageBuildFailed)
 		return buildResult, err
 	}
@@ -136,7 +120,7 @@ func (builder *OnBuild) Build(config *api.Config) (*api.Result, error) {
 	builder.garbage.Cleanup(config)
 
 	var imageID string
-
+	var err error
 	if len(opts.Name) > 0 {
 		if imageID, err = builder.docker.GetImageID(opts.Name); err != nil {
 			buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)

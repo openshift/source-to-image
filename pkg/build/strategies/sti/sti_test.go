@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -17,6 +18,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/scm/file"
 	"github.com/openshift/source-to-image/pkg/scm/git"
 	"github.com/openshift/source-to-image/pkg/test"
+	"github.com/openshift/source-to-image/pkg/util"
 )
 
 type FakeSTI struct {
@@ -145,7 +147,7 @@ func TestDefaultSource(t *testing.T) {
 		Source:       "file://.",
 		DockerConfig: &api.DockerConfig{Endpoint: "unix:///var/run/docker.sock"},
 	}
-	sti, err := New(config, build.Overrides{})
+	sti, err := New(config, util.NewFileSystem(), build.Overrides{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +164,7 @@ func TestEmptySource(t *testing.T) {
 		Source:       "",
 		DockerConfig: &api.DockerConfig{Endpoint: "unix:///var/run/docker.sock"},
 	}
-	sti, err := New(config, build.Overrides{})
+	sti, err := New(config, util.NewFileSystem(), build.Overrides{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,6 +182,7 @@ func TestOverrides(t *testing.T) {
 		&api.Config{
 			DockerConfig: &api.DockerConfig{Endpoint: "unix:///var/run/docker.sock"},
 		},
+		util.NewFileSystem(),
 		build.Overrides{
 			Downloader: fd,
 		},
@@ -300,7 +303,7 @@ func testBuildHandler() *STI {
 		incrementalDocker: &docker.FakeDocker{},
 		installer:         &test.FakeInstaller{},
 		git:               &test.FakeGit{},
-		fs:                &test.FakeFileSystem{ExistsResult: map[string]bool{"a-repo-source/.": true}},
+		fs:                &test.FakeFileSystem{ExistsResult: map[string]bool{filepath.FromSlash("a-repo-source"): true}},
 		tar:               &test.FakeTar{},
 		config:            &api.Config{},
 		result:            &api.Result{},
@@ -449,7 +452,7 @@ func TestSaveArtifacts(t *testing.T) {
 		t.Errorf("Unexpected error when saving artifacts: %v", err)
 	}
 	expectedArtifactDir := "/working-dir/upload/artifacts"
-	if fs.MkdirDir != expectedArtifactDir {
+	if filepath.ToSlash(fs.MkdirDir) != expectedArtifactDir {
 		t.Errorf("Mkdir was not called with the expected directory: %s",
 			fs.MkdirDir)
 	}
@@ -457,7 +460,7 @@ func TestSaveArtifacts(t *testing.T) {
 		t.Errorf("Unexpected image sent to RunContainer: %s",
 			fd.RunContainerOpts.Image)
 	}
-	if th.ExtractTarDir != expectedArtifactDir || th.ExtractTarReader == nil {
+	if filepath.ToSlash(th.ExtractTarDir) != expectedArtifactDir || th.ExtractTarReader == nil {
 		t.Errorf("ExtractTar was not called with the expected parameters.")
 	}
 }
@@ -475,7 +478,7 @@ func TestSaveArtifactsCustomTag(t *testing.T) {
 		t.Errorf("Unexpected error when saving artifacts: %v", err)
 	}
 	expectedArtifactDir := "/working-dir/upload/artifacts"
-	if fs.MkdirDir != expectedArtifactDir {
+	if filepath.ToSlash(fs.MkdirDir) != expectedArtifactDir {
 		t.Errorf("Mkdir was not called with the expected directory: %s",
 			fs.MkdirDir)
 	}
@@ -483,7 +486,7 @@ func TestSaveArtifactsCustomTag(t *testing.T) {
 		t.Errorf("Unexpected image sent to RunContainer: %s",
 			fd.RunContainerOpts.Image)
 	}
-	if th.ExtractTarDir != expectedArtifactDir || th.ExtractTarReader == nil {
+	if filepath.ToSlash(th.ExtractTarDir) != expectedArtifactDir || th.ExtractTarReader == nil {
 		t.Errorf("ExtractTar was not called with the expected parameters.")
 	}
 }
@@ -543,105 +546,51 @@ func TestSaveArtifactsExtractError(t *testing.T) {
 
 func TestFetchSource(t *testing.T) {
 	type fetchTest struct {
-		validCloneSpec   bool
 		refSpecified     bool
-		cloneExpected    bool
 		checkoutExpected bool
-		copyExpected     bool
-		sourcePath       string
-		expectedError    *error
 	}
 
-	err := s2ierr.NewSourcePathError("error")
 	tests := []fetchTest{
 		// 0
 		{
-			validCloneSpec:   false,
 			refSpecified:     false,
-			cloneExpected:    false,
 			checkoutExpected: false,
-			copyExpected:     false,
-			sourcePath:       "invalid/path",
-			expectedError:    &err,
 		},
 		// 1
 		{
-			validCloneSpec:   false,
-			refSpecified:     false,
-			cloneExpected:    false,
-			checkoutExpected: false,
-			copyExpected:     true,
-		},
-		// 2
-		{
-			validCloneSpec:   true,
-			refSpecified:     false,
-			cloneExpected:    true,
-			checkoutExpected: false,
-			copyExpected:     false,
-		},
-		// 3
-		{
-			validCloneSpec:   true,
 			refSpecified:     true,
-			cloneExpected:    true,
 			checkoutExpected: true,
-			copyExpected:     false,
 		},
 	}
 
 	for testNum, ft := range tests {
 		bh := testBuildHandler()
 		gh := bh.git.(*test.FakeGit)
-		fh := bh.fs.(*test.FakeFileSystem)
 
 		bh.config.WorkingDir = "/working-dir"
-		gh.ValidCloneSpecResult = ft.validCloneSpec
+		gh.ValidCloneSpecResult = true
 		if ft.refSpecified {
 			bh.config.Ref = "a-branch"
 		}
-		if len(ft.sourcePath) == 0 {
-			bh.config.Source = "a-repo-source"
-		} else {
-			bh.config.Source = ft.sourcePath
-		}
+		bh.config.Source = "a-repo-source"
 
 		expectedTargetDir := "/working-dir/upload/src"
 		_, e := bh.source.Download(bh.config)
-		if ft.expectedError == nil && e != nil {
+		if e != nil {
 			t.Errorf("Unexpected error %v [%d]", e, testNum)
 		}
-		if ft.expectedError != nil {
-			if e == nil {
-				t.Errorf("Did not get expected error [%d]", testNum)
-				continue
-			}
-			if (*ft.expectedError).(s2ierr.Error).ErrorCode != e.(s2ierr.Error).ErrorCode {
-				t.Errorf("Expected error code %d, got %d [%d]", (*ft.expectedError).(s2ierr.Error).ErrorCode, e.(s2ierr.Error).ErrorCode, testNum)
-			}
+		if gh.CloneSource != "a-repo-source" {
+			t.Errorf("Clone was not called with the expected source. Got %s, expected %s [%d]", gh.CloneSource, "a-source-repo-source", testNum)
 		}
-		if ft.cloneExpected {
-			if gh.CloneSource != "a-repo-source" {
-				t.Errorf("Clone was not called with the expected source. Got %s, expected %s [%d]", gh.CloneSource, "a-source-repo-source", testNum)
-			}
-			if gh.CloneTarget != expectedTargetDir {
-				t.Errorf("Unexpected target directory for clone operation. Got %s, expected %s [%d]", gh.CloneTarget, expectedTargetDir, testNum)
-			}
+		if filepath.ToSlash(gh.CloneTarget) != expectedTargetDir {
+			t.Errorf("Unexpected target directory for clone operation. Got %s, expected %s [%d]", gh.CloneTarget, expectedTargetDir, testNum)
 		}
 		if ft.checkoutExpected {
 			if gh.CheckoutRef != "a-branch" {
 				t.Errorf("Checkout was not called with the expected branch. Got %s, expected %s [%d]", gh.CheckoutRef, "a-branch", testNum)
 			}
-			if gh.CheckoutRepo != expectedTargetDir {
+			if filepath.ToSlash(gh.CheckoutRepo) != expectedTargetDir {
 				t.Errorf("Unexpected target repository for checkout operation. Got %s, expected %s [%d]", gh.CheckoutRepo, expectedTargetDir, testNum)
-			}
-		}
-		if ft.copyExpected {
-			if fh.CopySource != "a-repo-source/." {
-				t.Errorf("Copy was not called with the expected source. Got %s, expected %s [%d]", fh.CopySource, "a-repo-source/.", testNum)
-			}
-			if fh.CopyDest != expectedTargetDir {
-				t.Errorf("Unexpected target director for copy operation. Got %s, expected %s [%d]", fh.CopyDest, expectedTargetDir, testNum)
 			}
 		}
 	}
@@ -660,7 +609,7 @@ func TestPrepareOK(t *testing.T) {
 	}
 	var expected []string
 	for _, dir := range workingDirs {
-		expected = append(expected, "/working-dir/"+dir)
+		expected = append(expected, filepath.FromSlash("/working-dir/"+dir))
 	}
 	mkdirs := rh.fs.(*test.FakeFileSystem).MkdirAllDir
 	if !reflect.DeepEqual(mkdirs, expected) {
@@ -713,7 +662,7 @@ func TestPrepareErrorOptionalDownloadAndInstall(t *testing.T) {
 }
 
 func TestPrepareUseCustomRuntimeArtifacts(t *testing.T) {
-	expectedMapping := "/src:dst"
+	expectedMapping := filepath.FromSlash("/src") + ":dst"
 
 	builder := newFakeSTI(&FakeSTI{})
 
@@ -797,8 +746,7 @@ func TestPrepareRuntimeArtifactsValidation(t *testing.T) {
 }
 
 func TestPrepareSetRuntimeArtifacts(t *testing.T) {
-	for _, mapping := range []string{"/src:dst", "/src1:dst1;/src1:dst1"} {
-
+	for _, mapping := range []string{filepath.FromSlash("/src") + ":dst", filepath.FromSlash("/src1") + ":dst1;" + filepath.FromSlash("/src1") + ":dst1"} {
 		expectedMapping := strings.Replace(mapping, ";", ",", -1)
 
 		builder := newFakeSTI(&FakeSTI{})
@@ -875,7 +823,7 @@ func TestExecuteOK(t *testing.T) {
 	if th.CreateTarBase != "" {
 		t.Errorf("Unexpected tar base directory: %s", th.CreateTarBase)
 	}
-	if th.CreateTarDir != "/working-dir/upload" {
+	if filepath.ToSlash(th.CreateTarDir) != "/working-dir/upload" {
 		t.Errorf("Unexpected tar directory: %s", th.CreateTarDir)
 	}
 	fh, ok := rh.fs.(*test.FakeFileSystem)
@@ -934,15 +882,8 @@ func TestExecuteErrorCreateTarFile(t *testing.T) {
 	rh := newFakeSTI(&FakeSTI{})
 	rh.tar.(*test.FakeTar).CreateTarError = errors.New("CreateTarError")
 	err := rh.Execute("test-command", "", rh.config)
-	if err != nil {
-		t.Errorf("An error was expected for CreateTarFile, but got different: %v", err)
-	}
-	ro := rh.docker.(*docker.FakeDocker).RunContainerOpts
-	if ro.Stdin == nil {
-		t.Fatalf("Stream not passed to Docker interface")
-	}
-	if _, err := ro.Stdin.Read(make([]byte, 5)); err == nil || err.Error() != "CreateTarError" {
-		t.Errorf("An error was expected for CreateTarFile, but got different: %#v", ro)
+	if err == nil || err.Error() != "CreateTarError" {
+		t.Errorf("An error was expected for CreateTarFile, but got different: %#v", err)
 	}
 }
 

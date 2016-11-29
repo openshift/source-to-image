@@ -30,7 +30,7 @@ func newFakeLayered() *Layered {
 	}
 }
 
-func newFakeLayeredWithScripts(assemble, workDir string) *Layered {
+func newFakeLayeredWithScripts(workDir string) *Layered {
 	return &Layered{
 		docker:  &docker.FakeDocker{},
 		config:  &api.Config{WorkingDir: workDir},
@@ -51,7 +51,7 @@ func TestBuildOK(t *testing.T) {
 	}
 	defer file.Close()
 	defer os.RemoveAll(workDir)
-	l := newFakeLayeredWithScripts(assemble, workDir)
+	l := newFakeLayeredWithScripts(workDir)
 	l.config.BuilderImage = "test/image"
 	_, err = l.Build(l.config)
 	if err != nil {
@@ -84,7 +84,7 @@ func TestBuildOKWithImageRef(t *testing.T) {
 	}
 	defer file.Close()
 	defer os.RemoveAll(workDir)
-	l := newFakeLayeredWithScripts(assemble, workDir)
+	l := newFakeLayeredWithScripts(workDir)
 	l.config.BuilderImage = "docker.io/uptoknow/ruby-20-centos7@sha256:d6f5718b85126954d98931e654483ee794ac357e0a98f4a680c1e848d78863a1"
 	_, err = l.Build(l.config)
 	if err != nil {
@@ -155,16 +155,6 @@ func TestBuildErrorCreateTarFile(t *testing.T) {
 	_, err := l.Build(l.config)
 	if err == nil || err.Error() != "CreateTarError" {
 		t.Errorf("An error was expected for CreateTar, but got different: %v", err)
-	}
-}
-
-func TestBuildErrorOpenTarFile(t *testing.T) {
-	l := newFakeLayered()
-	l.config.BuilderImage = "test/image"
-	l.fs.(*test.FakeFileSystem).OpenError = errors.New("OpenTarError")
-	_, err := l.Build(l.config)
-	if err == nil || err.Error() != "OpenTarError" {
-		t.Errorf("An error was expected for OpenTarFile, but got different: %v", err)
 	}
 }
 

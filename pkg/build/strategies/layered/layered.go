@@ -1,7 +1,6 @@
 package layered
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -42,17 +41,17 @@ type Layered struct {
 }
 
 // New creates a Layered builder.
-func New(config *api.Config, scripts build.ScriptsHandler, overrides build.Overrides) (*Layered, error) {
+func New(config *api.Config, fs util.FileSystem, scripts build.ScriptsHandler, overrides build.Overrides) (*Layered, error) {
 	d, err := docker.New(config.DockerConfig, config.PullAuthentication)
 	if err != nil {
 		return nil, err
 	}
-	tarHandler := tar.New()
+	tarHandler := tar.New(fs)
 	tarHandler.SetExclusionPattern(regexp.MustCompile(config.ExcludeRegExp))
 	return &Layered{
 		docker:  d,
 		config:  config,
-		fs:      util.NewFileSystem(),
+		fs:      fs,
 		tar:     tarHandler,
 		scripts: scripts,
 	}, nil
@@ -98,21 +97,21 @@ func (builder *Layered) CreateDockerfile(config *api.Config) error {
 	scriptsIncluded := checkValidDirWithContents(uploadScriptsDir)
 	if scriptsIncluded {
 		glog.V(2).Infof("The scripts are included in %q directory", uploadScriptsDir)
-		buffer.WriteString(fmt.Sprintf("COPY scripts %s\n", scriptsDir))
+		buffer.WriteString(fmt.Sprintf("COPY scripts %s\n", filepath.ToSlash(scriptsDir)))
 	} else {
 		// if an err on reading or opening dir, can't copy it
 		glog.V(2).Infof("Could not gather scripts from the directory %q", uploadScriptsDir)
 	}
-	buffer.WriteString(fmt.Sprintf("COPY src %s\n", sourcesDir))
+	buffer.WriteString(fmt.Sprintf("COPY src %s\n", filepath.ToSlash(sourcesDir)))
 
 	//TODO: We need to account for images that may not have chown. There is a proposal
 	//      to specify the owner for COPY here: https://github.com/docker/docker/pull/9934
 	if len(user) > 0 {
 		buffer.WriteString("USER root\n")
 		if scriptsIncluded {
-			buffer.WriteString(fmt.Sprintf("RUN chown -R %s -- %s %s\n", user, scriptsDir, sourcesDir))
+			buffer.WriteString(fmt.Sprintf("RUN chown -R %s -- %s %s\n", user, filepath.ToSlash(scriptsDir), filepath.ToSlash(sourcesDir)))
 		} else {
-			buffer.WriteString(fmt.Sprintf("RUN chown -R %s -- %s\n", user, sourcesDir))
+			buffer.WriteString(fmt.Sprintf("RUN chown -R %s -- %s\n", user, filepath.ToSlash(sourcesDir)))
 		}
 		buffer.WriteString(fmt.Sprintf("USER %s\n", user))
 	}
@@ -123,17 +122,6 @@ func (builder *Layered) CreateDockerfile(config *api.Config) error {
 	}
 	glog.V(2).Infof("Writing custom Dockerfile to %s", uploadDir)
 	return nil
-}
-
-// SourceTar returns a stream to the source tar file.
-// TODO: this should stop generating a file, and instead stream the tar.
-func (builder *Layered) SourceTar(config *api.Config) (io.ReadCloser, error) {
-	uploadDir := filepath.Join(config.WorkingDir, "upload")
-	tarFileName, err := builder.tar.CreateTarFile(builder.config.WorkingDir, uploadDir)
-	if err != nil {
-		return nil, err
-	}
-	return builder.fs.Open(tarFileName)
 }
 
 // Build handles the `docker build` equivalent execution, returning the
@@ -157,43 +145,22 @@ func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 	}
 
 	glog.V(2).Info("Creating application source code image")
-	tarStream, err := builder.SourceTar(config)
-	if err != nil {
-		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonTarSourceFailed, utilstatus.ReasonMessageTarSourceFailed)
-		return buildResult, err
-	}
+	tarStream := builder.tar.CreateTarStreamReader(filepath.Join(config.WorkingDir, "upload"), false)
 	defer tarStream.Close()
 
 	newBuilderImage := fmt.Sprintf("s2i-layered-temp-image-%d", time.Now().UnixNano())
 
 	outReader, outWriter := io.Pipe()
-	defer outReader.Close()
-	defer outWriter.Close()
 	opts := docker.BuildImageOptions{
 		Name:         newBuilderImage,
 		Stdin:        tarStream,
 		Stdout:       outWriter,
 		CGroupLimits: config.CGroupLimits,
 	}
-	// goroutine to stream container's output
-	go func(reader io.Reader) {
-		scanner := bufio.NewReader(reader)
-		for {
-			text, err := scanner.ReadString('\n')
-			if err != nil {
-				// we're ignoring ErrClosedPipe, as this is information
-				// the docker container ended streaming logs
-				if glog.Is(2) && err != io.ErrClosedPipe && err != io.EOF {
-					glog.Errorf("Error reading docker stdout, %v", err)
-				}
-				break
-			}
-			glog.V(2).Info(text)
-		}
-	}(outReader)
+	docker.StreamContainerIO(outReader, nil, func(s string) { glog.V(2).Info(s) })
 
 	glog.V(2).Infof("Building new image %s with scripts and sources already inside", newBuilderImage)
-	if err = builder.docker.BuildImage(opts); err != nil {
+	if err := builder.docker.BuildImage(opts); err != nil {
 		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonDockerImageBuildFailed, utilstatus.ReasonMessageDockerImageBuildFailed)
 		return buildResult, err
 	}
@@ -208,6 +175,7 @@ func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 	if scriptsIncluded {
 		builder.config.ScriptsURL = "image://" + path.Join(getDestination(config), "scripts")
 	} else {
+		var err error
 		builder.config.ScriptsURL, err = builder.docker.GetScriptsURL(newBuilderImage)
 		if err != nil {
 			buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)

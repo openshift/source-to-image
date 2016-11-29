@@ -6,39 +6,40 @@ import (
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/test"
+	"github.com/openshift/source-to-image/pkg/util"
 )
 
 func TestGuessEntrypoint(t *testing.T) {
 
 	testMatrix := map[string][]os.FileInfo{
 		"run": {
-			&test.FakeFile{"config.ru", false, 0600},
-			&test.FakeFile{"app.rb", false, 0600},
-			&test.FakeFile{"run", false, 0777},
+			&util.FileInfo{FileName: "config.ru", FileIsDir: false, FileMode: 0600},
+			&util.FileInfo{FileName: "app.rb", FileIsDir: false, FileMode: 0600},
+			&util.FileInfo{FileName: "run", FileIsDir: false, FileMode: 0777},
 		},
 		"start.sh": {
-			&test.FakeFile{"config.ru", false, 0600},
-			&test.FakeFile{"app.rb", false, 0600},
-			&test.FakeFile{"start.sh", false, 0777},
+			&util.FileInfo{FileName: "config.ru", FileIsDir: false, FileMode: 0600},
+			&util.FileInfo{FileName: "app.rb", FileIsDir: false, FileMode: 0600},
+			&util.FileInfo{FileName: "start.sh", FileIsDir: false, FileMode: 0777},
 		},
 		"execute": {
-			&test.FakeFile{"config.ru", false, 0600},
-			&test.FakeFile{"app.rb", false, 0600},
-			&test.FakeFile{"execute", false, 0777},
+			&util.FileInfo{FileName: "config.ru", FileIsDir: false, FileMode: 0600},
+			&util.FileInfo{FileName: "app.rb", FileIsDir: false, FileMode: 0600},
+			&util.FileInfo{FileName: "execute", FileIsDir: false, FileMode: 0777},
 		},
 		"ERR:run_not_executable": {
-			&test.FakeFile{"config.ru", false, 0600},
-			&test.FakeFile{"app.rb", false, 0600},
-			&test.FakeFile{"run", false, 0600},
+			&util.FileInfo{FileName: "config.ru", FileIsDir: false, FileMode: 0600},
+			&util.FileInfo{FileName: "app.rb", FileIsDir: false, FileMode: 0600},
+			&util.FileInfo{FileName: "run", FileIsDir: false, FileMode: 0600},
 		},
 		"ERR:run_is_dir": {
-			&test.FakeFile{"config.ru", false, 0600},
-			&test.FakeFile{"app.rb", false, 0600},
-			&test.FakeFile{"run", true, 0777},
+			&util.FileInfo{FileName: "config.ru", FileIsDir: false, FileMode: 0600},
+			&util.FileInfo{FileName: "app.rb", FileIsDir: false, FileMode: 0600},
+			&util.FileInfo{FileName: "run", FileIsDir: true, FileMode: 0777},
 		},
 		"ERR:none": {
-			&test.FakeFile{"config.ru", false, 0600},
-			&test.FakeFile{"app.rb", false, 0600},
+			&util.FileInfo{FileName: "config.ru", FileIsDir: false, FileMode: 0600},
+			&util.FileInfo{FileName: "app.rb", FileIsDir: false, FileMode: 0600},
 		},
 	}
 

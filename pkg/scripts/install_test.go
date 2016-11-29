@@ -76,7 +76,7 @@ func TestInstallOptionalFromURL(t *testing.T) {
 		downloaded := false
 		targets := config.download.(*test.FakeDownloader).Target
 		for _, t := range targets {
-			if t == "/output/upload/scripts/"+s {
+			if filepath.ToSlash(t) == "/output/upload/scripts/"+s {
 				downloaded = true
 			}
 		}
@@ -168,20 +168,20 @@ func TestInstallRequiredFromSource(t *testing.T) {
 		validResultURL := false
 		for _, r := range result {
 			// The api.Run use deprecated path, but it should still work.
-			if s == api.Run && r.URL == sourcesRootAbbrev+".sti/bin/"+s {
+			if s == api.Run && r.URL == filepath.FromSlash(sourcesRootAbbrev+"/.sti/bin/"+s) {
 				validResultURL = true
 			}
-			if r.URL == sourcesRootAbbrev+".s2i/bin/"+s {
+			if r.URL == filepath.FromSlash(sourcesRootAbbrev+"/.s2i/bin/"+s) {
 				validResultURL = true
 			}
 		}
 		if !validResultURL {
-			t.Errorf("expected %q has result URL %s.s2i/bin/script, got %#v", s, sourcesRootAbbrev, result)
+			t.Errorf("expected %q has result URL %s, got %#v", s, filepath.FromSlash(sourcesRootAbbrev+"/.s2i/bin/"+s), result)
 		}
 		chmodCalled := false
 		fs := config.fs.(*test.FakeFileSystem)
 		for _, f := range fs.ChmodFile {
-			if f == "/workdir/upload/scripts/"+s {
+			if filepath.ToSlash(f) == "/workdir/upload/scripts/"+s {
 				chmodCalled = true
 			}
 		}
@@ -222,7 +222,7 @@ func TestInstallRequiredOrder(t *testing.T) {
 	for _, s := range scripts {
 		found := false
 		for _, r := range result {
-			if r.Script == s && r.Script == api.Assemble && r.URL == sourcesRootAbbrev+".s2i/bin/assemble" {
+			if r.Script == s && r.Script == api.Assemble && r.URL == filepath.FromSlash(sourcesRootAbbrev+"/.s2i/bin/assemble") {
 				found = true
 				break
 			}
@@ -265,7 +265,7 @@ func TestInstallRequiredFromInvalidURL(t *testing.T) {
 
 func TestNewInstaller(t *testing.T) {
 	docker := &dockerpkg.FakeDocker{DefaultURLResult: "image://docker"}
-	inst := NewInstaller("test-image", "http://foo.bar", nil, docker, api.AuthConfig{})
+	inst := NewInstaller("test-image", "http://foo.bar", nil, docker, api.AuthConfig{}, &test.FakeFileSystem{})
 	sources := inst.(*DefaultScriptSourceManager).sources
 	firstHandler, ok := sources[0].(*URLScriptHandler)
 	if !ok {

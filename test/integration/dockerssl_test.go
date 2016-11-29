@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/api"
@@ -130,6 +131,10 @@ func TestTCP(t *testing.T) {
 }
 
 func TestUNIX(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		return
+	}
+
 	s := serveUNIX(t)
 	defer s.Close()
 

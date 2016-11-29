@@ -1,6 +1,7 @@
 package git
 
 import (
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -9,10 +10,10 @@ import (
 )
 
 func TestCloneWithContext(t *testing.T) {
-	gh := New().(*stiGit)
-	cr := &test.FakeCmdRunner{}
-	gh.runner = cr
 	fs := &test.FakeFileSystem{}
+	gh := New(fs).(*stiGit)
+	cr := &test.FakeCmdRunner{}
+	gh.CommandRunner = cr
 	c := &Clone{gh, fs}
 
 	fakeConfig := &api.Config{
@@ -28,40 +29,16 @@ func TestCloneWithContext(t *testing.T) {
 	if info == nil {
 		t.Fatalf("Expected info to be not nil")
 	}
-	if fs.CopySource != "upload/tmp/subdir/." {
+	if filepath.ToSlash(fs.CopySource) != "upload/tmp/subdir" {
 		t.Errorf("The source directory should be 'upload/tmp/subdir', it is %v", fs.CopySource)
 	}
-	if fs.CopyDest != "upload/src" {
+	if filepath.ToSlash(fs.CopyDest) != "upload/src" {
 		t.Errorf("The target directory should be 'upload/src', it is %v", fs.CopyDest)
 	}
-	if fs.RemoveDirName != "upload/tmp" {
+	if filepath.ToSlash(fs.RemoveDirName) != "upload/tmp" {
 		t.Errorf("Expected to remove the upload/tmp directory")
 	}
 	if !reflect.DeepEqual(cr.Args, []string{"checkout", "ref1"}) {
 		t.Errorf("Unexpected command arguments: %#v", cr.Args)
-	}
-}
-
-func TestCloneLocalWithContext(t *testing.T) {
-	gh := New().(*stiGit)
-	cr := &test.FakeCmdRunner{}
-	gh.runner = cr
-	fs := &test.FakeFileSystem{ExistsResult: map[string]bool{"source/subdir/.": true}}
-	c := &Clone{gh, fs}
-
-	fakeConfig := &api.Config{
-		Source:     "source",
-		ContextDir: "subdir",
-		Ref:        "ref1",
-	}
-	_, err := c.Download(fakeConfig)
-	if err != nil {
-		t.Errorf("%v", err)
-	}
-	if fs.CopySource != "source/subdir/." {
-		t.Errorf("The source directory should be 'source/subdir', it is %v", fs.CopySource)
-	}
-	if fs.CopyDest != "upload/src" {
-		t.Errorf("The target directory should be 'upload/src', it is %v", fs.CopyDest)
 	}
 }

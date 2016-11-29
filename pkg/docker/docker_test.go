@@ -12,7 +12,8 @@ import (
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/api"
-	"github.com/openshift/source-to-image/pkg/docker/test"
+	dockertest "github.com/openshift/source-to-image/pkg/docker/test"
+	"github.com/openshift/source-to-image/pkg/test"
 
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
@@ -36,7 +37,7 @@ func getDocker(client Client) *stiDocker {
 }
 
 func TestRemoveContainer(t *testing.T) {
-	fakeDocker := test.NewFakeDockerClient()
+	fakeDocker := dockertest.NewFakeDockerClient()
 	dh := getDocker(fakeDocker)
 	containerID := "testContainerId"
 	fakeDocker.Containers[containerID] = dockercontainer.Config{}
@@ -83,7 +84,7 @@ func TestCommitContainer(t *testing.T) {
 		resp := dockertypes.ContainerCommitResponse{
 			ID: tst.expectedImageID,
 		}
-		fakeDocker := &test.FakeDockerClient{
+		fakeDocker := &dockertest.FakeDockerClient{
 			ContainerCommitResponse: resp,
 			ContainerCommitErr:      tst.expectedError,
 		}
@@ -119,6 +120,7 @@ func TestCopyToContainer(t *testing.T) {
 		},
 		"error": {
 			containerID: "test-container-id",
+			src:         "badsource",
 		},
 	}
 
@@ -141,12 +143,12 @@ func TestCopyToContainer(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Error creating src test files: %v", err)
 		}
-		fakeDocker := &test.FakeDockerClient{
+		fakeDocker := &dockertest.FakeDockerClient{
 			CopyToContainerContent: file,
 		}
 		dh := getDocker(fakeDocker)
 
-		err = dh.UploadToContainer(fileName, fileName, tst.containerID)
+		err = dh.UploadToContainer(&test.FakeFileSystem{}, fileName, fileName, tst.containerID)
 		// the error we are inducing will prevent call into engine-api
 		if len(tst.src) > 0 {
 			if err != nil {
@@ -195,7 +197,7 @@ func TestCopyFromContainer(t *testing.T) {
 
 	for desc, tst := range tests {
 		buffer := bytes.NewBuffer([]byte(""))
-		fakeDocker := &test.FakeDockerClient{
+		fakeDocker := &dockertest.FakeDockerClient{
 			CopyFromContainerErr: tst.expectedError,
 		}
 		dh := getDocker(fakeDocker)
@@ -230,7 +232,7 @@ func TestImageBuild(t *testing.T) {
 	}
 
 	for desc, tst := range tests {
-		fakeDocker := &test.FakeDockerClient{
+		fakeDocker := &dockertest.FakeDockerClient{
 			BuildImageErr: tst.expectedError,
 		}
 		dh := getDocker(fakeDocker)
@@ -326,7 +328,7 @@ func TestGetScriptsURL(t *testing.T) {
 		},
 	}
 	for desc, tst := range tests {
-		fakeDocker := test.NewFakeDockerClient()
+		fakeDocker := dockertest.NewFakeDockerClient()
 		dh := getDocker(fakeDocker)
 		tst.image.ID = "test/image:latest"
 		if tst.inspectErr != nil {
@@ -491,7 +493,7 @@ func TestRunContainer(t *testing.T) {
 	}
 
 	for desc, tst := range tests {
-		fakeDocker := test.NewFakeDockerClient()
+		fakeDocker := dockertest.NewFakeDockerClient()
 		dh := getDocker(fakeDocker)
 		tst.image.ID = "test/image:latest"
 		fakeDocker.Images = map[string]dockertypes.ImageInspect{tst.image.ID: tst.image}
@@ -499,8 +501,6 @@ func TestRunContainer(t *testing.T) {
 			t.Errorf("newly created fake client should have empty container map: %+v", fakeDocker.Containers)
 		}
 
-		//NOTE: the combo of the fake k8s client, go 1.6, and using os.Stderr/os.Stdout caused what appeared to be go test crashes
-		// when we tried to call their closers in RunContainer
 		err := dh.RunContainer(RunContainerOptions{
 			Image:           "test/image",
 			PullImage:       true,
@@ -510,8 +510,8 @@ func TestRunContainer(t *testing.T) {
 			Command:         tst.cmd,
 			Env:             []string{"Key1=Value1", "Key2=Value2"},
 			Stdin:           os.Stdin,
-			//Stdout:          os.Stdout,
-			//Stderr:          os.Stdout,
+			Stdout:          os.Stdout,
+			Stderr:          os.Stdout,
 		})
 		if err != nil {
 			t.Errorf("%s: Unexpected error: %v", desc, err)
@@ -541,7 +541,7 @@ func TestRunContainer(t *testing.T) {
 }
 
 func TestGetImageID(t *testing.T) {
-	fakeDocker := test.NewFakeDockerClient()
+	fakeDocker := dockertest.NewFakeDockerClient()
 	dh := getDocker(fakeDocker)
 	image := dockertypes.ImageInspect{ID: "test-abcd:latest"}
 	fakeDocker.Images = map[string]dockertypes.ImageInspect{image.ID: image}
@@ -558,7 +558,7 @@ func TestGetImageID(t *testing.T) {
 }
 
 func TestRemoveImage(t *testing.T) {
-	fakeDocker := test.NewFakeDockerClient()
+	fakeDocker := dockertest.NewFakeDockerClient()
 	dh := getDocker(fakeDocker)
 	image := dockertypes.ImageInspect{ID: "test-abcd"}
 	fakeDocker.Images = map[string]dockertypes.ImageInspect{image.ID: image}
