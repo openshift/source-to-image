@@ -179,8 +179,8 @@
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/user",
-			"Comment": "v1.0.0-rc1-100-g142df38",
-			"Rev": "142df3836b740af53dc6da59eed8dbc92f62917c"
+			"Comment": "v1.0.0-rc1-233-g74317ea",
+			"Rev": "74317eaa20cf37eb2c762dc98b01e3e0b4d5e598"
 		},
 		{
 			"ImportPath": "github.com/openshift/origin/pkg/image/reference",
@@ -193,7 +193,7 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
-			"Rev": "1560c1005499d61b80f865c04d39ca7505bf7f0b"
+			"Rev": "5ccb023bc27df288a957c5e994cd44fd19619465"
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",

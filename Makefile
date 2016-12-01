@@ -32,6 +32,7 @@ verify: build
 	hack/verify-gofmt.sh
 	hack/verify-golint.sh
 	hack/verify-govet.sh
+	hack/verify-godeps.sh
 .PHONY: verify
 
 # Install travis dependencies
