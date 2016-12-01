@@ -833,7 +833,7 @@ func (d *stiDocker) redirectResponseToOutputStream(tty bool, outputStream, error
 // open the HijackedResponse until all of this is done.  Caller's responsibility
 // to close resp, as well as outputStream and errorStream if appropriate.
 func (d *stiDocker) holdHijackedConnection(tty bool, inputStream io.Reader, outputStream, errorStream io.WriteCloser, resp dockertypes.HijackedResponse) error {
-	receiveStdout := make(chan error)
+	receiveStdout := make(chan error, 1)
 	if outputStream != nil || errorStream != nil {
 		go func() {
 			receiveErr := d.redirectResponseToOutputStream(tty, outputStream, errorStream, resp.Reader)
