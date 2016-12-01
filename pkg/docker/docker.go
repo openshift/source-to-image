@@ -833,7 +833,7 @@ func (d *stiDocker) redirectResponseToOutputStream(tty bool, outputStream, error
 // open the HijackedResponse until all of this is done.  Caller's responsibility
 // to close resp, as well as outputStream and errorStream if appropriate.
 func (d *stiDocker) holdHijackedConnection(tty bool, inputStream io.Reader, outputStream, errorStream io.WriteCloser, resp dockertypes.HijackedResponse) error {
-	receiveStdout := make(chan error)
+	receiveStdout := make(chan error, 1)
 	if outputStream != nil || errorStream != nil {
 		go func() {
 			receiveErr := d.redirectResponseToOutputStream(tty, outputStream, errorStream, resp.Reader)
@@ -879,7 +879,6 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 			_, err = d.CheckAndPullImage(image)
 		}
 	}
-
 	if err != nil {
 		glog.V(0).Infof("error: Unable to get image metadata for %s: %v", image, err)
 		return err
@@ -916,13 +915,14 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 	}
 	createOpts.Config.Cmd = cmd
 
+	if createOpts.HostConfig != nil && createOpts.HostConfig.ShmSize <= 0 {
+		createOpts.HostConfig.ShmSize = DefaultShmSize
+	}
+
 	// Create a new container.
 	glog.V(2).Infof("Creating container with options {Name:%q Config:%+v HostConfig:%+v} ...", createOpts.Name, createOpts.Config, createOpts.HostConfig)
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	if createOpts.HostConfig != nil && createOpts.HostConfig.ShmSize <= 0 {
-		createOpts.HostConfig.ShmSize = DefaultShmSize
-	}
 	container, err := d.client.ContainerCreate(ctx, createOpts.Config, createOpts.HostConfig, createOpts.NetworkingConfig, createOpts.Name)
 	if err != nil {
 		return err
