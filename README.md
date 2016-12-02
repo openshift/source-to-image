@@ -14,7 +14,7 @@ For a deep dive on S2I you can view [this presentation](https://www.youtube.com/
 
 Want to try it right now?  Download the [latest release](https://github.com/openshift/source-to-image/releases/latest) and run:
 
-	$ s2i build git://github.com/openshift/django-ex centos/python-35-centos7 hello-python
+	$ s2i build https://github.com/openshift/django-ex centos/python-35-centos7 hello-python
 	$ docker run -p 8080:8080 hello-python
 
 Now browse to http://localhost:8080 to see the running application.
@@ -228,12 +228,12 @@ You can start using `s2i` right away (see [releases](https://github.com/openshif
 with the following test sources and publicly available images:
 
 ```
-$ s2i build git://github.com/pmorie/simple-ruby openshift/ruby-20-centos7 test-ruby-app
+$ s2i build https://github.com/pmorie/simple-ruby openshift/ruby-20-centos7 test-ruby-app
 $ docker run --rm -i -p :8080 -t test-ruby-app
 ```
 
 ```
-$ s2i build git://github.com/bparees/openshift-jee-sample openshift/wildfly-100-centos7 test-jee-app
+$ s2i build https://github.com/bparees/openshift-jee-sample openshift/wildfly-100-centos7 test-jee-app
 $ docker run --rm -i -p :8080 -t test-jee-app
 ```
 
