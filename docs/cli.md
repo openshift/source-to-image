@@ -150,7 +150,7 @@ Build a Ruby application from a Git source, using the official `ruby-20-centos7`
 image, the resulting image will be named `ruby-app`:
 
 ```
-$ s2i build git://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos7 ruby-app
+$ s2i build https://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos7 ruby-app
 ```
 
 Build a Node.js application from a local directory, using a local image, the resulting
@@ -172,14 +172,14 @@ builder image but overriding the scripts URL from local directory.  The resultin
 image will be named `java-app`:
 
 ```
-$ s2i build --scripts-url=file://s2iscripts git://github.com/bparees/openshift-jee-sample openshift/wildfly-100-centos7 java-app
+$ s2i build --scripts-url=file://s2iscripts https://github.com/bparees/openshift-jee-sample openshift/wildfly-100-centos7 java-app
 ```
 
 Build a Ruby application from a Git source, specifying `ref`, and using the official
 `ruby-20-centos7` builder image.  The resulting image will be named `ruby-app`:
 
 ```
-$ s2i build --ref=my-branch git://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos7 ruby-app
+$ s2i build --ref=my-branch https://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos7 ruby-app
 ```
 
 ***NOTE:*** If the ref is invalid or not present in the source repository then the build will fail.
@@ -188,7 +188,7 @@ Build a Ruby application from a Git source, overriding the scripts URL from a lo
 and specifying the scripts and sources be placed in `/opt` directory:
 
 ```
-$ s2i build --scripts-url=file://s2iscripts --destination=/opt git://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos7 ruby-app
+$ s2i build --scripts-url=file://s2iscripts --destination=/opt https://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos7 ruby-app
 ```
 
 # s2i rebuild

@@ -73,7 +73,7 @@ pushd ${WORK_DIR}
 
 test_debug "cloning source into working dir"
 
-git clone git://github.com/openshift/cakephp-ex &> "${WORK_DIR}/s2i-git-clone.log"
+git clone https://github.com/openshift/cakephp-ex &> "${WORK_DIR}/s2i-git-clone.log"
 check_result $? "${WORK_DIR}/s2i-git-clone.log"
 
 test_debug "s2i build with relative path without file://"
@@ -124,15 +124,15 @@ check_result $? "${WORK_DIR}/s2i-usage.log"
 
 test_debug "s2i build with git proto"
 
-s2i build git://github.com/openshift/cakephp-ex openshift/php-55-centos7 test --run=true --loglevel=5 &> "${WORK_DIR}/s2i-git-proto.log" &
+s2i build https://github.com/openshift/cakephp-ex openshift/php-55-centos7 test --run=true --loglevel=5 &> "${WORK_DIR}/s2i-git-proto.log" &
 check_result $? "${WORK_DIR}/s2i-git-proto.log"
 
 test_debug "s2i build with --run==true option"
 if [[ "$OSTYPE" == "cygwin" ]]; then
   ( cd hack/windows/sigintwrap && make )
-  hack/windows/sigintwrap/sigintwrap 's2i build git://github.com/bparees/openshift-jee-sample openshift/wildfly-90-centos7 test-jee-app --run=true --loglevel=5' &> "${WORK_DIR}/s2i-run.log" &
+  hack/windows/sigintwrap/sigintwrap 's2i build https://github.com/bparees/openshift-jee-sample openshift/wildfly-90-centos7 test-jee-app --run=true --loglevel=5' &> "${WORK_DIR}/s2i-run.log" &
 else
-  s2i build git://github.com/bparees/openshift-jee-sample openshift/wildfly-90-centos7 test-jee-app --run=true --loglevel=5 &> "${WORK_DIR}/s2i-run.log" &
+  s2i build https://github.com/bparees/openshift-jee-sample openshift/wildfly-90-centos7 test-jee-app --run=true --loglevel=5 &> "${WORK_DIR}/s2i-run.log" &
 fi
 S2I_PID=$!
 TIME_SEC=1000
