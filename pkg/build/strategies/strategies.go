@@ -26,7 +26,10 @@ func Strategy(config *api.Config, overrides build.Overrides) (build.Builder, api
 
 	image, err := docker.GetBuilderImage(config)
 	if err != nil {
-		buildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonPullBuilderImageFailed, utilstatus.ReasonMessagePullBuilderImageFailed)
+		buildInfo.FailureReason = utilstatus.NewFailureReason(
+			utilstatus.ReasonPullBuilderImageFailed,
+			utilstatus.ReasonMessagePullBuilderImageFailed,
+		)
 		return nil, buildInfo, err
 	}
 	config.HasOnBuild = image.OnBuild
@@ -36,7 +39,10 @@ func Strategy(config *api.Config, overrides build.Overrides) (build.Builder, api
 	if image.OnBuild && !config.BlockOnBuild {
 		builder, err = onbuild.New(config, fs, overrides)
 		if err != nil {
-			buildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
+			buildInfo.FailureReason = utilstatus.NewFailureReason(
+				utilstatus.ReasonGenericS2IBuildFailed,
+				utilstatus.ReasonMessageGenericS2iBuildFailed,
+			)
 			return nil, buildInfo, err
 		}
 		return builder, buildInfo, nil
@@ -44,7 +50,10 @@ func Strategy(config *api.Config, overrides build.Overrides) (build.Builder, api
 
 	builder, err = sti.New(config, fs, overrides)
 	if err != nil {
-		buildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
+		buildInfo.FailureReason = utilstatus.NewFailureReason(
+			utilstatus.ReasonGenericS2IBuildFailed,
+			utilstatus.ReasonMessageGenericS2iBuildFailed,
+		)
 		return nil, buildInfo, err
 	}
 	return builder, buildInfo, err
