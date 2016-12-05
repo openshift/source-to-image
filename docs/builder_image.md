@@ -116,7 +116,7 @@ The `run` script is responsible for executing your application.
 
 ## save-artifacts
 
-The `save-artifacts` script is responsible for gathering all the dependencies into a tar file and streaming it to the standard output (eg. for Ruby - gems installed by Bundler, for Java - `.m2` contents, etc.).  The existence of this can speed up the following build processes.
+The `save-artifacts` script is responsible for gathering all the dependencies into a tar file and streaming it to the standard output (eg. for Ruby - gems installed by Bundler, for Java - `.m2` contents, etc.).  The existence of this can speed up the following build processes.  Note: it is critical that the `save-artifacts` script output only include the tar stream output and nothing else.  This is handled by redirecting output to /dev/null in the sample script below.
 
 #### Example `save-artifacts` script:
 
