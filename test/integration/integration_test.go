@@ -438,6 +438,7 @@ func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injectio
 
 func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, removePreviousImage bool, expectClean bool, checkOnBuild bool) {
 	t := i.t
+	start := time.Now()
 	config := &api.Config{
 		DockerConfig:        docker.GetDefaultDockerConfig(),
 		BuilderImage:        imageName,
@@ -504,6 +505,13 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 
 	if checkOnBuild {
 		i.fileExists(containerID, "/sti-fake/src/onbuild")
+	}
+
+	if took := time.Since(start); took > docker.DefaultDockerTimeout {
+		// https://github.com/openshift/source-to-image/issues/301 is a
+		// case where incremental builds would get stuck until the
+		// timeout.
+		t.Errorf("Test took too long (%v), some operation may have gotten stuck waiting for the DefaultDockerTimeout (%v). Inspect the logs to find operations that took long.", took, docker.DefaultDockerTimeout)
 	}
 }
 
