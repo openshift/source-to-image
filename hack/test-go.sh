@@ -26,9 +26,9 @@ find_test_dirs() {
     \) -name '*_test.go' -print0 | xargs -0n1 dirname | sort -u | xargs -n1 printf "${S2I_GO_PACKAGE}/%s\n"
 }
 
-S2I_RACE=${S2I_RACE:--race}
-S2I_COVER=${S2I_COVER:--covermode=atomic}
-S2I_TIMEOUT=${S2I_TIMEOUT:--timeout 60s}
+S2I_RACE=${S2I_RACE--race}
+S2I_COVER=${S2I_COVER--cover}
+S2I_TIMEOUT=${S2I_TIMEOUT--timeout 60s}
 
 if [ "${1-}" != "" ]; then
   test_packages="$S2I_GO_PACKAGE/$1"
@@ -36,9 +36,9 @@ else
   test_packages=`find_test_dirs`
 fi
 
-OUTPUT_COVERAGE=${OUTPUT_COVERAGE:-""}
+OUTPUT_COVERAGE=${OUTPUT_COVERAGE-}
 
-if [[ -n "${S2I_COVER}" && -n "${OUTPUT_COVERAGE}" ]]; then
+if [[ -n "${OUTPUT_COVERAGE}" ]]; then
   # Iterate over packages to run coverage
   test_packages=( $test_packages )
   for test_package in "${test_packages[@]}"
