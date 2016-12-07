@@ -130,17 +130,26 @@ func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 	buildResult := &api.Result{}
 
 	if config.HasOnBuild && config.BlockOnBuild {
-		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonOnBuildForbidden, utilstatus.ReasonMessageOnBuildForbidden)
+		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(
+			utilstatus.ReasonOnBuildForbidden,
+			utilstatus.ReasonMessageOnBuildForbidden,
+		)
 		return buildResult, errors.New("builder image uses ONBUILD instructions but ONBUILD is not allowed")
 	}
 
 	if config.BuilderImage == "" {
-		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
+		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(
+			utilstatus.ReasonGenericS2IBuildFailed,
+			utilstatus.ReasonMessageGenericS2iBuildFailed,
+		)
 		return buildResult, errors.New("builder image name cannot be empty")
 	}
 
 	if err := builder.CreateDockerfile(config); err != nil {
-		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonDockerfileCreateFailed, utilstatus.ReasonMessageDockerfileCreateFailed)
+		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(
+			utilstatus.ReasonDockerfileCreateFailed,
+			utilstatus.ReasonMessageDockerfileCreateFailed,
+		)
 		return buildResult, err
 	}
 
@@ -161,7 +170,10 @@ func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 
 	glog.V(2).Infof("Building new image %s with scripts and sources already inside", newBuilderImage)
 	if err := builder.docker.BuildImage(opts); err != nil {
-		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonDockerImageBuildFailed, utilstatus.ReasonMessageDockerImageBuildFailed)
+		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(
+			utilstatus.ReasonDockerImageBuildFailed,
+			utilstatus.ReasonMessageDockerImageBuildFailed,
+		)
 		return buildResult, err
 	}
 
@@ -178,14 +190,20 @@ func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 		var err error
 		builder.config.ScriptsURL, err = builder.docker.GetScriptsURL(newBuilderImage)
 		if err != nil {
-			buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
+			buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(
+				utilstatus.ReasonGenericS2IBuildFailed,
+				utilstatus.ReasonMessageGenericS2iBuildFailed,
+			)
 			return buildResult, err
 		}
 	}
 
 	glog.V(2).Infof("Building %s using sti-enabled image", builder.config.Tag)
 	if err := builder.scripts.Execute(api.Assemble, config.AssembleUser, builder.config); err != nil {
-		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonAssembleFailed, utilstatus.ReasonMessageAssembleFailed)
+		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(
+			utilstatus.ReasonAssembleFailed,
+			utilstatus.ReasonMessageAssembleFailed,
+		)
 		switch e := err.(type) {
 		case s2ierr.ContainerError:
 			return buildResult, s2ierr.NewAssembleError(builder.config.Tag, e.Output, e)

@@ -80,7 +80,10 @@ func (builder *OnBuild) Build(config *api.Config) (*api.Result, error) {
 	buildResult := &api.Result{}
 
 	if config.BlockOnBuild {
-		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonOnBuildForbidden, utilstatus.ReasonMessageOnBuildForbidden)
+		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(
+			utilstatus.ReasonOnBuildForbidden,
+			utilstatus.ReasonMessageOnBuildForbidden,
+		)
 		return buildResult, fmt.Errorf("builder image uses ONBUILD instructions but ONBUILD is not allowed")
 	}
 	glog.V(2).Info("Preparing the source code for build")
@@ -95,7 +98,10 @@ func (builder *OnBuild) Build(config *api.Config) (*api.Result, error) {
 
 	glog.V(2).Info("Creating application Dockerfile")
 	if err := builder.CreateDockerfile(config); err != nil {
-		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonDockerfileCreateFailed, utilstatus.ReasonMessageDockerfileCreateFailed)
+		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(
+			utilstatus.ReasonDockerfileCreateFailed,
+			utilstatus.ReasonMessageDockerfileCreateFailed,
+		)
 		return buildResult, err
 	}
 
@@ -112,7 +118,10 @@ func (builder *OnBuild) Build(config *api.Config) (*api.Result, error) {
 
 	glog.V(2).Info("Building the application source")
 	if err := builder.docker.BuildImage(opts); err != nil {
-		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonDockerImageBuildFailed, utilstatus.ReasonMessageDockerImageBuildFailed)
+		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(
+			utilstatus.ReasonDockerImageBuildFailed,
+			utilstatus.ReasonMessageDockerImageBuildFailed,
+		)
 		return buildResult, err
 	}
 
@@ -123,7 +132,10 @@ func (builder *OnBuild) Build(config *api.Config) (*api.Result, error) {
 	var err error
 	if len(opts.Name) > 0 {
 		if imageID, err = builder.docker.GetImageID(opts.Name); err != nil {
-			buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(utilstatus.ReasonGenericS2IBuildFailed, utilstatus.ReasonMessageGenericS2iBuildFailed)
+			buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(
+				utilstatus.ReasonGenericS2IBuildFailed,
+				utilstatus.ReasonMessageGenericS2iBuildFailed,
+			)
 			return buildResult, err
 		}
 	}
