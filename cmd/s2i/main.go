@@ -152,9 +152,9 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 			}
 
 			builder, _, err := strategies.GetStrategy(cfg)
-			checkErr(err)
+			errors.CheckError(err)
 			result, err := builder.Build(cfg)
-			checkErr(err)
+			errors.CheckError(err)
 
 			for _, message := range result.Messages {
 				glog.V(1).Infof(message)
@@ -162,9 +162,9 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 
 			if cfg.RunImage {
 				runner, err := run.New(cfg)
-				checkErr(err)
+				errors.CheckError(err)
 				err = runner.Run(cfg)
-				checkErr(err)
+				errors.CheckError(err)
 			}
 
 		},
@@ -222,9 +222,9 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 			cfg.PullAuthentication = docker.GetImageRegistryAuth(auths, cfg.Tag)
 
 			pr, err := docker.GetRebuildImage(cfg)
-			checkErr(err)
+			errors.CheckError(err)
 			err = build.GenerateConfigFromLabels(cfg, pr)
-			checkErr(err)
+			errors.CheckError(err)
 
 			if len(args) >= 2 {
 				cfg.Tag = args[1]
@@ -242,14 +242,13 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 			glog.V(2).Infof("\n%s\n", describe.Config(cfg))
 
 			builder, _, err := strategies.GetStrategy(cfg)
-			checkErr(err)
+			errors.CheckError(err)
 			result, err := builder.Build(cfg)
-			checkErr(err)
+			errors.CheckError(err)
 
 			for _, message := range result.Messages {
 				glog.V(1).Infof(message)
 			}
-
 		},
 	}
 
@@ -323,9 +322,9 @@ func newCmdUsage(cfg *api.Config) *cobra.Command {
 			}
 
 			uh, err := sti.NewUsage(cfg)
-			checkErr(err)
+			errors.CheckError(err)
 			err = uh.Show()
-			checkErr(err)
+			errors.CheckError(err)
 		},
 	}
 	usageCmd.Flags().StringVarP(&(oldDestination), "location", "l", "",
@@ -347,26 +346,6 @@ func setupGlog(flags *pflag.FlagSet) {
 	// FIXME currently glog has only option to redirect output to stderr
 	// the preferred for S2I would be to redirect to stdout
 	flag.CommandLine.Set("logtostderr", "true")
-}
-
-func checkErr(err error) {
-	if err == nil {
-		return
-	}
-	if e, ok := err.(errors.Error); ok {
-		glog.Errorf("An error occurred: %v", e)
-		glog.Errorf("Suggested solution: %v", e.Suggestion)
-		if e.Details != nil {
-			glog.V(1).Infof("Details: %v", e.Details)
-		}
-		glog.Error("If the problem persists consult the docs at https://github.com/openshift/source-to-image/tree/master/docs. " +
-			"Eventually reach us on freenode #openshift or file an issue at https://github.com/openshift/source-to-image/issues " +
-			"providing us with a log from your build using --loglevel=3")
-		os.Exit(e.ErrorCode)
-	} else {
-		glog.Errorf("An error occurred: %v", err)
-		os.Exit(1)
-	}
 }
 
 func main() {
