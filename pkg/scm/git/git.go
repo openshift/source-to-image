@@ -208,14 +208,16 @@ func ParseURL(source string) (*url.URL, error) {
 	return uri, nil
 }
 
-// mimic the path munging (make paths absolute to fix file:// with non-absolute paths) done when scm.go:DownloderForSource valided git file urls
+// makePathAbsolute mimic the path munging (make paths absolute to fix file:// with non-absolute paths) done when scm.go:DownloderForSource valided git file urls
 func makePathAbsolute(source string) string {
 	glog.V(4).Infof("makePathAbsolute %s", source)
 	if !strings.HasPrefix(source, "/") {
-		if absolutePath, err := filepath.Abs(source); err == nil {
-			glog.V(4).Infof("makePathAbsolute new path %s err %v", absolutePath, err)
+		absolutePath, err := filepath.Abs(source)
+		if err == nil {
+			glog.V(4).Infof("makePathAbsolute new path %s success", absolutePath)
 			return absolutePath
 		}
+		glog.V(4).Infof("makePathAbsolute source path %s err %v", source, err)
 	}
 	return source
 }
