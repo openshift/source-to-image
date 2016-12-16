@@ -98,14 +98,15 @@ type ChmodAdapter struct {
 // being written
 func (a ChmodAdapter) WriteHeader(hdr *tar.Header) error {
 	if hdr.FileInfo().Mode()&os.ModeSymlink == 0 {
-		hdr.Mode &^= 0777
+		newMode := hdr.Mode &^ 0777
 		if hdr.FileInfo().IsDir() {
-			hdr.Mode |= a.NewDirMode
+			newMode |= a.NewDirMode
 		} else if hdr.FileInfo().Mode()&0010 != 0 { // S_IXUSR
-			hdr.Mode |= a.NewExecFileMode
+			newMode |= a.NewExecFileMode
 		} else {
-			hdr.Mode |= a.NewFileMode
+			newMode |= a.NewFileMode
 		}
+		hdr.Mode = newMode
 	}
 	return a.Writer.WriteHeader(hdr)
 }
