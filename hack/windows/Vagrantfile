@@ -9,7 +9,7 @@ Vagrant.configure("2") do |config|
   config.vm.define "rhel" do |rhel|
     rhel.vm.provider "aws" do |aws|
       aws.tags = {"Name" => "#{ENV['USER']}-rhel"}
-      aws.ami = "rhel7:deps"
+      aws.ami = "rhel7:inst"
     end
     rhel.vm.provision "configure-docker-server-linux"
   end
