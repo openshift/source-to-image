@@ -109,11 +109,13 @@ func TestMungeNoProtocolURL(t *testing.T) {
 		uri, err := url.Parse(scenario)
 		if err != nil {
 			t.Errorf("Could not parse url %q", scenario)
+			continue
 		}
 
 		err = gh.MungeNoProtocolURL(scenario, uri)
 		if err != nil {
 			t.Errorf("MungeNoProtocolURL returned err: %v", err)
+			continue
 		}
 
 		// reflect.DeepEqual was not dealing with url.URL correctly, have to check each field individually
