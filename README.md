@@ -169,10 +169,9 @@ If a `save-artifacts` script exists, a prior image already exists, and the `--in
 
 ## Dependencies
 
-1. [Docker](http://www.docker.io) >= 1.6
-1. [Go](http://golang.org/) >= 1.4
+1. [docker](https://docker.com) >= 1.6
+1. [Go](https://golang.org/dl/) >= 1.7.1
 1. (optional) [Git](https://git-scm.com/)
-
 
 ## Installation
 
