@@ -8,4 +8,4 @@ S2I_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${S2I_ROOT}/hack/common.sh"
 
 s2i::build::build_binaries tools/godepchecker
-_output/local/go/bin/godepchecker || true # remove this to make godepchecker's warnings actionable
+_output/local/go/bin/godepchecker
