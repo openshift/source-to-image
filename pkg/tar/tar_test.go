@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/source-to-image/pkg/errors"
+	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/util"
 )
 
@@ -427,7 +427,7 @@ func TestExtractTarStreamTimeout(t *testing.T) {
 	th.(*stiTar).timeout = 10 * time.Millisecond
 	time.AfterFunc(20*time.Millisecond, func() { writer.Close() })
 	err = th.ExtractTarStream(destDir, reader)
-	if e, ok := err.(errors.Error); err == nil || (ok && e.ErrorCode != errors.TarTimeoutError) {
+	if e, ok := err.(s2ierr.Error); err == nil || (ok && e.ErrorCode != s2ierr.TarTimeoutError) {
 		t.Errorf("Did not get the expected timeout error. err = %v", err)
 	}
 }

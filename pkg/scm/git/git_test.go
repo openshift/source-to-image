@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/api"
-	"github.com/openshift/source-to-image/pkg/errors"
+	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/test"
 	"github.com/openshift/source-to-image/pkg/util"
 )
@@ -41,8 +41,8 @@ func TestIsValidGitRepository(t *testing.T) {
 	}
 
 	if err != nil {
-		var e errors.Error
-		if e, ok = err.(errors.Error); !ok || e.ErrorCode != errors.EmptyGitRepositoryError {
+		var e s2ierr.Error
+		if e, ok = err.(s2ierr.Error); !ok || e.ErrorCode != s2ierr.EmptyGitRepositoryError {
 			t.Errorf("isValidGitRepository returned an unexpected error: %q, expecting EmptyGitRepositoryError", err.Error())
 		}
 	} else {
