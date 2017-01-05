@@ -696,7 +696,7 @@ func TestPrepareFailForEmptyRuntimeArtifacts(t *testing.T) {
 	if err == nil {
 		t.Errorf("Prepare() should fail but it didn't")
 
-	} else if expectedError := "No runtime artifacts to copy"; !strings.Contains(err.Error(), expectedError) {
+	} else if expectedError := "no runtime artifacts to copy"; !strings.Contains(err.Error(), expectedError) {
 		t.Errorf("Prepare() should fail with error that contains text %q but failed with error: %q", expectedError, err)
 	}
 }

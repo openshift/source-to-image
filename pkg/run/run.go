@@ -7,7 +7,7 @@ import (
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/docker"
-	"github.com/openshift/source-to-image/pkg/errors"
+	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 )
 
@@ -57,8 +57,8 @@ func (b *DockerRunner) Run(config *api.Config) error {
 	// container name. The container is temporary and its name is
 	// meaningless, therefore we make the error message more helpful by
 	// replacing the container name with the image tag.
-	if e, ok := err.(errors.ContainerError); ok {
-		return errors.NewContainerError(config.Tag, e.ErrorCode, e.Output)
+	if e, ok := err.(s2ierr.ContainerError); ok {
+		return s2ierr.NewContainerError(config.Tag, e.ErrorCode, e.Output)
 	}
 	return err
 }

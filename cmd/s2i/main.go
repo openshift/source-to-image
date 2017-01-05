@@ -26,7 +26,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/config"
 	"github.com/openshift/source-to-image/pkg/create"
 	"github.com/openshift/source-to-image/pkg/docker"
-	"github.com/openshift/source-to-image/pkg/errors"
+	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/run"
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
@@ -153,9 +153,9 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 			}
 
 			builder, _, err := strategies.GetStrategy(cfg)
-			errors.CheckError(err)
+			s2ierr.CheckError(err)
 			result, err := builder.Build(cfg)
-			errors.CheckError(err)
+			s2ierr.CheckError(err)
 
 			for _, message := range result.Messages {
 				glog.V(1).Infof(message)
@@ -163,9 +163,9 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 
 			if cfg.RunImage {
 				runner, err := run.New(cfg)
-				errors.CheckError(err)
+				s2ierr.CheckError(err)
 				err = runner.Run(cfg)
-				errors.CheckError(err)
+				s2ierr.CheckError(err)
 			}
 		},
 	}
@@ -222,9 +222,9 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 			cfg.PullAuthentication = docker.GetImageRegistryAuth(auths, cfg.Tag)
 
 			pr, err := docker.GetRebuildImage(cfg)
-			errors.CheckError(err)
+			s2ierr.CheckError(err)
 			err = build.GenerateConfigFromLabels(cfg, pr)
-			errors.CheckError(err)
+			s2ierr.CheckError(err)
 
 			if len(args) >= 2 {
 				cfg.Tag = args[1]
@@ -242,9 +242,9 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 			glog.V(2).Infof("\n%s\n", describe.Config(cfg))
 
 			builder, _, err := strategies.GetStrategy(cfg)
-			errors.CheckError(err)
+			s2ierr.CheckError(err)
 			result, err := builder.Build(cfg)
-			errors.CheckError(err)
+			s2ierr.CheckError(err)
 
 			for _, message := range result.Messages {
 				glog.V(1).Infof(message)
@@ -300,7 +300,7 @@ func newCmdCompletion(root *cobra.Command) *cobra.Command {
 			var out bytes.Buffer
 			err := RunCompletion(&out, cmd, root, args)
 			if err != nil {
-				errors.CheckError(err)
+				s2ierr.CheckError(err)
 			} else {
 				fmt.Print(out.String())
 			}
@@ -317,16 +317,16 @@ func RunCompletion(out io.Writer, cmd *cobra.Command, root *cobra.Command, args 
 	var msg string
 	if len(args) == 0 {
 		msg = fmt.Sprintf("shell not specified.\nSee '%s -h' for help and examples.", cmd.CommandPath())
-		return errors.UsageError(msg)
+		return s2ierr.UsageError(msg)
 	}
 	if len(args) > 1 {
 		msg = fmt.Sprintf("too many arguments. Expected only the shell type.\nSee '%s -h' for help and examples.", cmd.CommandPath())
-		return errors.UsageError(msg)
+		return s2ierr.UsageError(msg)
 	}
 	run, found := completionShells[args[0]]
 	if !found {
 		msg = fmt.Sprintf("unsupported shell type %q.\nSee '%s -h' for help and examples.", args[0], cmd.CommandPath())
-		return errors.UsageError(msg)
+		return s2ierr.UsageError(msg)
 	}
 
 	return run(out, root)
@@ -545,9 +545,9 @@ func newCmdUsage(cfg *api.Config) *cobra.Command {
 			}
 
 			uh, err := sti.NewUsage(cfg)
-			errors.CheckError(err)
+			s2ierr.CheckError(err)
 			err = uh.Show()
-			errors.CheckError(err)
+			s2ierr.CheckError(err)
 		},
 	}
 	usageCmd.Flags().StringVarP(&(oldDestination), "location", "l", "",

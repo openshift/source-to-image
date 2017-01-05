@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/openshift/source-to-image/pkg/errors"
+	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 )
 
 type FakeHTTPGet struct {
@@ -129,7 +129,7 @@ func TestNoDownload(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error with information about scripts inside the image!")
 	}
-	if e, ok := err.(errors.Error); !ok || e.ErrorCode != errors.ScriptsInsideImageError {
+	if e, ok := err.(s2ierr.Error); !ok || e.ErrorCode != s2ierr.ScriptsInsideImageError {
 		t.Errorf("Unexpected error %v", err)
 	}
 }
