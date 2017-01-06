@@ -18,6 +18,7 @@ S2I_ROOT=$(
 S2I_OUTPUT_SUBPATH="${S2I_OUTPUT_SUBPATH:-_output/local}"
 S2I_OUTPUT="${S2I_ROOT}/${S2I_OUTPUT_SUBPATH}"
 S2I_OUTPUT_BINPATH="${S2I_OUTPUT}/bin"
+S2I_OUTPUT_PKGDIR="${S2I_OUTPUT}/pkgdir"
 S2I_LOCAL_BINPATH="${S2I_OUTPUT}/go/bin"
 S2I_LOCAL_RELEASEPATH="${S2I_OUTPUT}/releases"
 
@@ -40,9 +41,6 @@ readonly S2I_ALL_TARGETS=(
 )
 
 readonly S2I_BINARY_SYMLINKS=(
-  sti
-)
-readonly S2I_BINARY_COPY=(
   sti
 )
 readonly S2I_BINARY_RELEASE_WINDOWS=(
@@ -90,6 +88,7 @@ s2i::build::build_binaries() {
       s2i::build::set_platform_envs "${platform}"
       echo "++ Building go targets for ${platform}:" "${targets[@]}"
       go install "${goflags[@]:+${goflags[@]}}" \
+          -pkgdir "${S2I_OUTPUT_PKGDIR}" \
           -ldflags "${version_ldflags}" \
           "${binaries[@]}"
       s2i::build::unset_platform_envs "${platform}"
@@ -312,10 +311,10 @@ s2i::build::place_bins() {
       if [[ $platform == "windows/amd64" ]]; then
         suffix=".exe"
       fi
-      for linkname in "${S2I_BINARY_COPY[@]}"; do
+      for linkname in "${S2I_BINARY_SYMLINKS[@]}"; do
         local src="${release_binpath}/s2i${suffix}"
         if [[ -f "${src}" ]]; then
-          cp "${release_binpath}/s2i${suffix}" "${release_binpath}/${linkname}${suffix}"
+          ln -s "s2i${suffix}" "${release_binpath}/${linkname}${suffix}"
         fi
       done
 

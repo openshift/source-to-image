@@ -5,23 +5,19 @@
 #
 FROM openshift/origin-base
 
-RUN yum install -y zip hg golang golang-pkg-darwin-amd64 golang-pkg-windows-amd64 golang-pkg-linux-386 && yum clean all
+ENV VERSION=1.7.4 \
+    GOARM=5 \
+    GOPATH=/go \
+    GOROOT=/usr/local/go \
+    S2I_VERSION_FILE=/go/src/github.com/openshift/source-to-image/sti-version-defs
+ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
-ENV GOPATH /go
-
-# Get the code coverage tool and godep
-RUN go get golang.org/x/tools/cmd/cover github.com/tools/godep
-
-# Mark this as a sti-build container
-RUN touch /sti-build-image
+RUN yum install -y gcc zip && \
+    yum clean all && \
+    curl https://storage.googleapis.com/golang/go$VERSION.linux-amd64.tar.gz | tar -C /usr/local -xzf - && \
+    touch /sti-build-image
 
 WORKDIR /go/src/github.com/openshift/source-to-image
-
-# (set an explicit GOARM of 5 for maximum compatibility)
-ENV GOARM 5
-ENV PATH $PATH:$GOROOT/bin:$GOPATH/bin
-
-ENV S2I_VERSION_FILE /go/src/github.com/openshift/source-to-image/sti-version-defs
 
 # Expect a tar with the source of STI (and /sti-version-defs in the root)
 CMD tar mxzf - && hack/build-cross.sh
