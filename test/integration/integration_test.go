@@ -29,7 +29,7 @@ import (
 
 const (
 	DefaultDockerSocket = "unix:///var/run/docker.sock"
-	TestSource          = "git://github.com/pmorie/simple-html"
+	TestSource          = "https://github.com/pmorie/simple-html"
 
 	FakeBuilderImage                = "sti_test/sti-fake"
 	FakeUserImage                   = "sti_test/sti-fake-user"

@@ -51,7 +51,7 @@ To use it, install S2I: https://github.com/openshift/source-to-image
 
 Sample invocation:
 
-s2i build git://<source code> {{.ImageName}} <application image>
+s2i build <source code path/URL> {{.ImageName}} <application image>
 
 You can then run the resulting image via:
 docker run <application image>
