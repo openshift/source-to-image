@@ -18,6 +18,7 @@ S2I_ROOT=$(
 S2I_OUTPUT_SUBPATH="${S2I_OUTPUT_SUBPATH:-_output/local}"
 S2I_OUTPUT="${S2I_ROOT}/${S2I_OUTPUT_SUBPATH}"
 S2I_OUTPUT_BINPATH="${S2I_OUTPUT}/bin"
+S2I_OUTPUT_PKGDIR="${S2I_OUTPUT}/pkgdir"
 S2I_LOCAL_BINPATH="${S2I_OUTPUT}/go/bin"
 S2I_LOCAL_RELEASEPATH="${S2I_OUTPUT}/releases"
 
@@ -90,6 +91,7 @@ s2i::build::build_binaries() {
       s2i::build::set_platform_envs "${platform}"
       echo "++ Building go targets for ${platform}:" "${targets[@]}"
       go install "${goflags[@]:+${goflags[@]}}" \
+          -pkgdir "${S2I_OUTPUT_PKGDIR}" \
           -ldflags "${version_ldflags}" \
           "${binaries[@]}"
       s2i::build::unset_platform_envs "${platform}"
