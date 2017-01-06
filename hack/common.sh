@@ -43,9 +43,6 @@ readonly S2I_ALL_TARGETS=(
 readonly S2I_BINARY_SYMLINKS=(
   sti
 )
-readonly S2I_BINARY_COPY=(
-  sti
-)
 readonly S2I_BINARY_RELEASE_WINDOWS=(
   sti.exe
   s2i.exe
@@ -314,10 +311,10 @@ s2i::build::place_bins() {
       if [[ $platform == "windows/amd64" ]]; then
         suffix=".exe"
       fi
-      for linkname in "${S2I_BINARY_COPY[@]}"; do
+      for linkname in "${S2I_BINARY_SYMLINKS[@]}"; do
         local src="${release_binpath}/s2i${suffix}"
         if [[ -f "${src}" ]]; then
-          cp "${release_binpath}/s2i${suffix}" "${release_binpath}/${linkname}${suffix}"
+          ln -s "s2i${suffix}" "${release_binpath}/${linkname}${suffix}"
         fi
       done
 
