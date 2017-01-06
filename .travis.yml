@@ -1,7 +1,8 @@
 language: go
 
 go:
-  - 1.7.4
+  - 1.7.x
+  - master
 
 install:
   - make install-travis
@@ -14,3 +15,8 @@ notifications:
   irc: "chat.freenode.net#openshift-dev"
 
 sudo: false
+
+matrix:
+  allow_failures:
+  - go: master
+  fast_finish: true
