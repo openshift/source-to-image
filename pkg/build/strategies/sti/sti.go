@@ -348,6 +348,9 @@ func (builder *STI) Prepare(config *api.Config) error {
 			)
 			return err
 		}
+		if config.SourceInfo != nil {
+			builder.sourceInfo = config.SourceInfo
+		}
 	}
 
 	// get the scripts
