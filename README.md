@@ -175,9 +175,15 @@ If a `save-artifacts` script exists, a prior image already exists, and the `--in
 
 ## Installation
 
-##### For Linux/Mac
+##### For Mac
 
-Go to the [releases](https://github.com/openshift/source-to-image/releases/latest) page and download the correct distribution for your machine.  If on a Mac, use the darwin-amd64 link.  If on Linux, choose either the linux-386 or the linux-amd64 links for 32 and 64-bit, respectively.
+You can either follow the installation instructions for Linux (and use the darwin-amd64 link) or you can just install source-to-image with Homebrew:
+
+```$ brew install source-to-image```
+
+##### For Linux
+
+Go to the [releases](https://github.com/openshift/source-to-image/releases/latest) page and download the correct distribution for your machine. Choose either the linux-386 or the linux-amd64 links for 32 and 64-bit, respectively.
 
 Unpack the downloaded tar with
 
