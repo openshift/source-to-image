@@ -8,14 +8,14 @@ export PATH="$PWD/_output/local/bin/$(go env GOHOSTOS)/$(go env GOHOSTARCH):$PAT
 
 function time_now()
 {
-  date +%s000
+    date +%s000
 }
 
 mkdir -p /tmp/sti
 WORK_DIR=$(mktemp -d /tmp/sti/test-work.XXXX)
 S2I_WORK_DIR=${WORK_DIR}
 if [[ "$OSTYPE" == "cygwin" ]]; then
-  S2I_WORK_DIR=$(cygpath -w ${WORK_DIR})
+    S2I_WORK_DIR=$(cygpath -w ${WORK_DIR})
 fi
 mkdir -p ${WORK_DIR}
 NEEDKILL="yes"
@@ -25,39 +25,39 @@ function cleanup()
     set +e
     #some failures will exit the shell script before check_result() can dump the logs (ssh seems to be such a case)
     if [ -a "${WORK_DIR}/ran-clean" ]; then
-	echo "Cleaning up working dir ${WORK_DIR}"
+        echo "Cleaning up working dir ${WORK_DIR}"
     else
-	echo "Dumping logs since did not run successfully before cleanup of ${WORK_DIR} ..."
-	cat ${WORK_DIR}/*.log
+        echo "Dumping logs since did not run successfully before cleanup of ${WORK_DIR} ..."
+        cat ${WORK_DIR}/*.log
     fi
     rm -rf ${WORK_DIR}
     # use sigint so that s2i post processing will remove docker container
     if [ -n "${NEEDKILL}" ]; then
-	if [ -n "${S2I_PID}" ]; then
-	    kill -2 "${S2I_PID}"
-	fi
+        if [ -n "${S2I_PID}" ]; then
+            kill -2 "${S2I_PID}"
+        fi
     fi
     echo
     echo "Complete"
 }
 
 function check_result() {
-  local result=$1
-  if [ $result -eq 0 ]; then
-      echo
-      echo "TEST PASSED"
-      echo
-      if [ -n "${2}" ]; then
-	  rm $2
-      fi
-  else
-      echo
-      echo "TEST FAILED ${result}"
-      echo
-      cat $2
-      cleanup
-      exit $result
-  fi
+    local result=$1
+    if [ $result -eq 0 ]; then
+        echo
+        echo "TEST PASSED"
+        echo
+        if [ -n "${2}" ]; then
+            rm $2
+        fi
+    else
+        echo
+        echo "TEST FAILED ${result}"
+        echo
+        cat $2
+        cleanup
+        exit $result
+    fi
 }
 
 function test_debug() {
@@ -69,6 +69,7 @@ function test_debug() {
 trap cleanup EXIT SIGINT
 
 echo "working dir:  ${WORK_DIR}"
+echo "s2i working dir:  ${S2I_WORK_DIR}"
 pushd ${WORK_DIR}
 
 test_debug "cloning source into working dir"
@@ -85,6 +86,10 @@ test_debug "s2i build with relative path with file://"
 
 s2i build file://./cakephp-ex openshift/php-55-centos7 test --loglevel=5 &> "${WORK_DIR}/s2i-rel-proto.log"
 check_result $? "${WORK_DIR}/s2i-rel-proto.log"
+
+test_debug "s2i build with volume options"
+s2i build cakephp-ex openshift/php-55-centos7 test --volume "${WORK_DIR}:/home/:z" --loglevel=5 &> "${WORK_DIR}/s2i-volume-correct.log"
+check_result $? "${WORK_DIR}/s2i-volume-correct.log"
 
 popd
 
@@ -145,23 +150,23 @@ set +e
 while [[ $(time_now) -lt $expire ]]; do
     grep  "as a result of the --run=true option" "${WORK_DIR}/s2i-run.log"
     if [ $? -eq 0 ]; then
-      echo "[INFO] Success running command s2i --run=true"
+        echo "[INFO] Success running command s2i --run=true"
 
-      # use sigint so that s2i post processing will remove docker container
-      kill -2 "${S2I_PID}"
-      NEEDKILL=""
-      sleep 30
-      docker ps -a | grep test-jee-app
+        # use sigint so that s2i post processing will remove docker container
+        kill -2 "${S2I_PID}"
+        NEEDKILL=""
+        sleep 30
+        docker ps -a | grep test-jee-app
 
-      if [ $? -eq 1 ]; then
-	     echo "[INFO] Success terminating associated docker container"
-	     touch "${WORK_DIR}/ran-clean"
-	     exit 0
-      else
-	     echo "[INFO] Associated docker container still found, review docker ps -a output above, and here is the dump of ${WORK_DIR}/s2i-run.log"
-	     cat "${WORK_DIR}/s2i-run.log"
-	     exit 1
-      fi
+        if [ $? -eq 1 ]; then
+            echo "[INFO] Success terminating associated docker container"
+            touch "${WORK_DIR}/ran-clean"
+            exit 0
+        else
+            echo "[INFO] Associated docker container still found, review docker ps -a output above, and here is the dump of ${WORK_DIR}/s2i-run.log"
+            cat "${WORK_DIR}/s2i-run.log"
+            exit 1
+        fi
     fi
     sleep 1
 done
