@@ -128,7 +128,6 @@ func (builder *Layered) CreateDockerfile(config *api.Config) error {
 // success/failure details.
 func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 	buildResult := &api.Result{}
-
 	if config.HasOnBuild && config.BlockOnBuild {
 		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(
 			utilstatus.ReasonOnBuildForbidden,
@@ -136,7 +135,6 @@ func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 		)
 		return buildResult, errors.New("builder image uses ONBUILD instructions but ONBUILD is not allowed")
 	}
-
 	if config.BuilderImage == "" {
 		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(
 			utilstatus.ReasonGenericS2IBuildFailed,
@@ -199,7 +197,14 @@ func (builder *Layered) Build(config *api.Config) (*api.Result, error) {
 	}
 
 	glog.V(2).Infof("Building %s using sti-enabled image", builder.config.Tag)
-	if err := builder.scripts.Execute(api.Assemble, config.AssembleUser, builder.config); err != nil {
+	timeStart := time.Now()
+	err := builder.scripts.Execute(api.Assemble, config.AssembleUser, builder.config)
+	buildResult.BuildInfo.StepInfo = utilstatus.AddStepInfo(
+		buildResult.BuildInfo.StepInfo,
+		api.AssembleScriptStep,
+		timeStart,
+	)
+	if err != nil {
 		buildResult.BuildInfo.FailureReason = utilstatus.NewFailureReason(
 			utilstatus.ReasonAssembleFailed,
 			utilstatus.ReasonMessageAssembleFailed,

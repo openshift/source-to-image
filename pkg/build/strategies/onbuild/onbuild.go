@@ -94,7 +94,7 @@ func (builder *OnBuild) Build(config *api.Config) (*api.Result, error) {
 	}
 
 	// If necessary, copy the STI scripts into application root directory
-	builder.copySTIScripts(config)
+	builder.copyS2IScripts(config)
 
 	glog.V(2).Info("Creating application Dockerfile")
 	if err := builder.CreateDockerfile(config); err != nil {
@@ -173,7 +173,7 @@ func (builder *OnBuild) CreateDockerfile(config *api.Config) error {
 	return builder.fs.WriteFile(filepath.Join(uploadDir, "Dockerfile"), buffer.Bytes())
 }
 
-func (builder *OnBuild) copySTIScripts(config *api.Config) {
+func (builder *OnBuild) copyS2IScripts(config *api.Config) {
 	scriptsPath := filepath.Join(config.WorkingDir, "upload", "scripts")
 	sourcePath := filepath.Join(config.WorkingDir, "upload", "src")
 	if _, err := builder.fs.Stat(filepath.Join(scriptsPath, api.Run)); err == nil {

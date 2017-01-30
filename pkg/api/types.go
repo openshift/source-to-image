@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+	"time"
 
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 
@@ -343,11 +344,55 @@ type Result struct {
 
 // BuildInfo holds information about a particular step in the build process.
 type BuildInfo struct {
+	// StepInfo holds information about build steps.
+	StepInfo []BuildStepInfo
+
 	// FailureReason is a camel case reason that is used by the machine to reply
 	// back to the OpenShift builder with information why any of the steps in the
 	// build, failed.
 	FailureReason FailureReason
 }
+
+// BuildStepInfo holds information about a build step.
+type BuildStepInfo struct {
+	// StepName is the name of the build step.
+	Name StepName
+
+	// StartTime is the start time of the build step in the build process.
+	StartTime time.Time
+	// StopTime is the time the build step has finished (Successfully or not) in
+	// the build process.
+	StopTime time.Time
+}
+
+// StepName is the name of a build step.
+type StepName string
+
+const (
+	// AssembleScriptStep is the build step when the Assemble script is being
+	// run.
+	AssembleScriptStep StepName = "AssembleScriptStep"
+
+	// GatherInputContentStep is the build step when we try to fetch the source for the
+	// build.
+	GatherInputContentStep StepName = "GatherInputContentStep"
+
+	// PullBuilderImageStep is the build step that is associated with pulling the
+	// builder image.
+	PullBuilderImageStep StepName = "PullBuilderImageStep"
+
+	// CommitContainerStep is the build step that is associated with commiting the
+	// container to the builder image.
+	CommitContainerStep StepName = "CommitContainerStep"
+
+	// PullPreviousImageStep is the build step that occurs when we try to pull a
+	// previous image for a incremental build.
+	PullPreviousImageStep StepName = "PullPreviousImageStep"
+
+	// PullRuntimeImageStep is the build step that occurs when we try to pull the
+	// runtime image.
+	PullRuntimeImageStep StepName = "PullRuntimeImageStep"
+)
 
 // StepFailureReason holds the type of failure that occurred during the build
 // process.

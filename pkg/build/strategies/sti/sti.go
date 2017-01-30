@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/build"
@@ -196,7 +197,6 @@ func (builder *STI) Build(config *api.Config) (*api.Result, error) {
 	defer builder.garbage.Cleanup(config)
 
 	glog.V(1).Infof("Preparing to build %s", config.Tag)
-	// The failure reason is updated inside the Prepare function.
 	if err := builder.preparer.Prepare(config); err != nil {
 		return builder.result, err
 	}
@@ -221,8 +221,14 @@ func (builder *STI) Build(config *api.Config) (*api.Result, error) {
 	} else {
 		glog.V(1).Infof("Running %q in %q", api.Assemble, config.Tag)
 	}
-	if err := builder.scripts.Execute(api.Assemble, config.AssembleUser, config); err != nil {
-
+	timeStart := time.Now()
+	err := builder.scripts.Execute(api.Assemble, config.AssembleUser, config)
+	builder.result.BuildInfo.StepInfo = utilstatus.AddStepInfo(
+		builder.result.BuildInfo.StepInfo,
+		api.AssembleScriptStep,
+		timeStart,
+	)
+	if err != nil {
 		switch e := err.(type) {
 		case s2ierr.ContainerError:
 			if !isMissingRequirements(e.Output) {
@@ -233,7 +239,13 @@ func (builder *STI) Build(config *api.Config) (*api.Result, error) {
 				return builder.result, err
 			}
 			glog.V(1).Info("Image is missing basic requirements (sh or tar), layered build will be performed")
-			return builder.layered.Build(config)
+			buildResult, err := builder.layered.Build(config)
+			buildResult.BuildInfo.StepInfo = utilstatus.AddStepInfo(
+				builder.result.BuildInfo.StepInfo,
+				api.AssembleScriptStep,
+				timeStart,
+			)
+			return buildResult, err
 		default:
 			return builder.result, err
 		}
@@ -265,7 +277,14 @@ func (builder *STI) Prepare(config *api.Config) error {
 	builder.result.WorkingDir = config.WorkingDir
 
 	if len(config.RuntimeImage) > 0 {
-		if err = dockerpkg.GetRuntimeImage(config, builder.runtimeDocker); err != nil {
+		timeStart := time.Now()
+		err = dockerpkg.GetRuntimeImage(config, builder.runtimeDocker)
+		builder.result.BuildInfo.StepInfo = utilstatus.AddStepInfo(
+			builder.result.BuildInfo.StepInfo,
+			api.PullRuntimeImageStep,
+			timeStart,
+		)
+		if err != nil {
 			builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(
 				utilstatus.ReasonPullRuntimeImageFailed,
 				utilstatus.ReasonMessagePullRuntimeImageFailed,
@@ -273,7 +292,6 @@ func (builder *STI) Prepare(config *api.Config) error {
 			glog.Errorf("Unable to pull runtime image %q: %v", config.RuntimeImage, err)
 			return err
 		}
-
 		// user didn't specify mapping, let's take it from the runtime image then
 		if len(builder.config.RuntimeArtifacts) == 0 {
 			var mapping string
@@ -341,7 +359,14 @@ func (builder *STI) Prepare(config *api.Config) error {
 
 	// fetch sources, for their .s2i/bin might contain s2i scripts
 	if len(config.Source) > 0 {
-		if builder.sourceInfo, err = builder.source.Download(config); err != nil {
+		timeStart := time.Now()
+		builder.sourceInfo, err = builder.source.Download(config)
+		builder.result.BuildInfo.StepInfo = utilstatus.AddStepInfo(
+			builder.result.BuildInfo.StepInfo,
+			api.GatherInputContentStep,
+			timeStart,
+		)
+		if err != nil {
 			builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(
 				utilstatus.ReasonFetchSourceFailed,
 				utilstatus.ReasonMessageFetchSourceFailed,
@@ -454,8 +479,14 @@ func (builder *STI) Exists(config *api.Config) bool {
 	}
 
 	tag := firstNonEmpty(config.IncrementalFromTag, config.Tag)
-
+	timeStart := time.Now()
 	result, err := dockerpkg.PullImage(tag, builder.incrementalDocker, policy, false)
+	builder.result.BuildInfo.StepInfo = utilstatus.AddStepInfo(
+		builder.result.BuildInfo.StepInfo,
+		api.PullPreviousImageStep,
+		timeStart,
+	)
+
 	if err != nil {
 		builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(
 			utilstatus.ReasonPullPreviousImageFailed,
@@ -468,8 +499,8 @@ func (builder *STI) Exists(config *api.Config) bool {
 	return result.Image != nil && builder.installedScripts[api.SaveArtifacts]
 }
 
-// Save extracts and restores the build artifacts from the previous build to a
-// current build.
+// Save extracts and restores the build artifacts from the previous build to
+// the current build.
 func (builder *STI) Save(config *api.Config) (err error) {
 	artifactTmpDir := filepath.Join(config.WorkingDir, "upload", "artifacts")
 	if builder.result == nil {
@@ -492,6 +523,7 @@ func (builder *STI) Save(config *api.Config) (err error) {
 	extractFunc := func(string) error {
 		extractErr := builder.tar.ExtractTarStream(artifactTmpDir, outReader)
 		io.Copy(ioutil.Discard, outReader) // must ensure reader from container is drained
+
 		return extractErr
 	}
 

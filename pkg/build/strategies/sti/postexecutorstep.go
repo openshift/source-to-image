@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	dockerpkg "github.com/openshift/source-to-image/pkg/docker"
@@ -128,7 +129,7 @@ func (step *commitImageStep) execute(ctx *postExecutorStepContext) error {
 	if entrypoint == nil {
 		entrypoint = []string{}
 	}
-
+	timeStart := time.Now()
 	ctx.imageID, err = commitContainer(
 		step.docker,
 		ctx.containerID,
@@ -139,7 +140,11 @@ func (step *commitImageStep) execute(ctx *postExecutorStepContext) error {
 		entrypoint,
 		ctx.labels,
 	)
-
+	step.builder.result.BuildInfo.StepInfo = utilstatus.AddStepInfo(
+		step.builder.result.BuildInfo.StepInfo,
+		api.CommitContainerStep,
+		timeStart,
+	)
 	if err != nil {
 		step.builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(
 			utilstatus.ReasonCommitContainerFailed,
@@ -210,6 +215,7 @@ func (step *downloadFilesFromBuilderImageStep) execute(ctx *postExecutorStepCont
 }
 
 func (step *downloadFilesFromBuilderImageStep) downloadAndExtractFile(artifactPath, artifactsDir, containerID string) error {
+	timeStart := time.Now()
 	glog.V(5).Infof("Downloading file %q", artifactPath)
 
 	fd, err := ioutil.TempFile(artifactsDir, "s2i-runtime-artifact")
@@ -217,6 +223,11 @@ func (step *downloadFilesFromBuilderImageStep) downloadAndExtractFile(artifactPa
 		step.builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(
 			utilstatus.ReasonFSOperationFailed,
 			utilstatus.ReasonMessageFSOperationFailed,
+		)
+		step.builder.result.BuildInfo.StepInfo = utilstatus.AddStepInfo(
+			step.builder.result.BuildInfo.StepInfo,
+			api.GatherInputContentStep,
+			timeStart,
 		)
 		return fmt.Errorf("could not create temporary file for runtime artifact: %v", err)
 	}
@@ -226,6 +237,15 @@ func (step *downloadFilesFromBuilderImageStep) downloadAndExtractFile(artifactPa
 	}()
 
 	if err := step.docker.DownloadFromContainer(artifactPath, fd, containerID); err != nil {
+		step.builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(
+			utilstatus.ReasonGenericS2IBuildFailed,
+			utilstatus.ReasonMessageGenericS2iBuildFailed,
+		)
+		step.builder.result.BuildInfo.StepInfo = utilstatus.AddStepInfo(
+			step.builder.result.BuildInfo.StepInfo,
+			api.GatherInputContentStep,
+			timeStart,
+		)
 		return fmt.Errorf("could not download file (%q -> %q) from container %s: %v", artifactPath, fd.Name(), containerID, err)
 	}
 
@@ -235,6 +255,11 @@ func (step *downloadFilesFromBuilderImageStep) downloadAndExtractFile(artifactPa
 			utilstatus.ReasonGenericS2IBuildFailed,
 			utilstatus.ReasonMessageGenericS2iBuildFailed,
 		)
+		step.builder.result.BuildInfo.StepInfo = utilstatus.AddStepInfo(
+			step.builder.result.BuildInfo.StepInfo,
+			api.GatherInputContentStep,
+			timeStart,
+		)
 		return fmt.Errorf("could not seek to the beginning of the file %q: %v", fd.Name(), err)
 	}
 
@@ -243,8 +268,18 @@ func (step *downloadFilesFromBuilderImageStep) downloadAndExtractFile(artifactPa
 			utilstatus.ReasonGenericS2IBuildFailed,
 			utilstatus.ReasonMessageGenericS2iBuildFailed,
 		)
+		step.builder.result.BuildInfo.StepInfo = utilstatus.AddStepInfo(
+			step.builder.result.BuildInfo.StepInfo,
+			api.GatherInputContentStep,
+			timeStart,
+		)
 		return fmt.Errorf("could not extract runtime artifact %q into the directory %q: %v", artifactPath, artifactsDir, err)
 	}
+	step.builder.result.BuildInfo.StepInfo = utilstatus.AddStepInfo(
+		step.builder.result.BuildInfo.StepInfo,
+		api.GatherInputContentStep,
+		timeStart,
+	)
 
 	return nil
 }
@@ -256,10 +291,20 @@ type startRuntimeImageAndUploadFilesStep struct {
 }
 
 func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepContext) error {
+	timeStart := time.Now()
 	glog.V(3).Info("Executing step: start runtime image and upload files")
 
 	fd, err := ioutil.TempFile("", "s2i-upload-done")
 	if err != nil {
+		step.builder.result.BuildInfo.StepInfo = utilstatus.AddStepInfo(
+			step.builder.result.BuildInfo.StepInfo,
+			api.GatherInputContentStep,
+			timeStart,
+		)
+		step.builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(
+			utilstatus.ReasonGenericS2IBuildFailed,
+			utilstatus.ReasonMessageGenericS2iBuildFailed,
+		)
 		return err
 	}
 	fd.Close()
@@ -281,6 +326,15 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 		destinationDir := filepath.Join(artifactsDir, "scripts")
 		err = step.copyScriptIfNeeded(script, destinationDir)
 		if err != nil {
+			step.builder.result.BuildInfo.StepInfo = utilstatus.AddStepInfo(
+				step.builder.result.BuildInfo.StepInfo,
+				api.GatherInputContentStep,
+				timeStart,
+			)
+			step.builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(
+				utilstatus.ReasonGenericS2IBuildFailed,
+				utilstatus.ReasonMessageGenericS2iBuildFailed,
+			)
 			return err
 		}
 	}
@@ -288,6 +342,16 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 	image := step.builder.config.RuntimeImage
 	workDir, err := step.docker.GetImageWorkdir(image)
 	if err != nil {
+
+		step.builder.result.BuildInfo.StepInfo = utilstatus.AddStepInfo(
+			step.builder.result.BuildInfo.StepInfo,
+			api.GatherInputContentStep,
+			timeStart,
+		)
+		step.builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(
+			utilstatus.ReasonGenericS2IBuildFailed,
+			utilstatus.ReasonMessageGenericS2iBuildFailed,
+		)
 		return fmt.Errorf("could not get working dir of %q image: %v", image, err)
 	}
 
@@ -298,9 +362,27 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 		var scriptsURL string
 		scriptsURL, err = step.docker.GetScriptsURL(image)
 		if err != nil {
+			step.builder.result.BuildInfo.StepInfo = utilstatus.AddStepInfo(
+				step.builder.result.BuildInfo.StepInfo,
+				api.GatherInputContentStep,
+				timeStart,
+			)
+			step.builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(
+				utilstatus.ReasonGenericS2IBuildFailed,
+				utilstatus.ReasonMessageGenericS2iBuildFailed,
+			)
 			return err
 		}
 		if len(scriptsURL) == 0 {
+			step.builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(
+				utilstatus.ReasonGenericS2IBuildFailed,
+				utilstatus.ReasonMessageGenericS2iBuildFailed,
+			)
+			step.builder.result.BuildInfo.StepInfo = utilstatus.AddStepInfo(
+				step.builder.result.BuildInfo.StepInfo,
+				api.GatherInputContentStep,
+				timeStart,
+			)
 			return fmt.Errorf("could not determine scripts URL for image %q", image)
 		}
 		commandBaseDir = strings.TrimPrefix(scriptsURL, "image://")
@@ -342,7 +424,6 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 		if onStartErr != nil {
 			return fmt.Errorf("could not upload file (%q -> %q) into container %s: %v", lastFilePath, lastFileDstPath, containerID, err)
 		}
-
 		return onStartErr
 	}
 
@@ -361,6 +442,11 @@ func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepCo
 		err = s2ierr.NewContainerError(image, e.ErrorCode, errOutput)
 	}
 
+	step.builder.result.BuildInfo.StepInfo = utilstatus.AddStepInfo(
+		step.builder.result.BuildInfo.StepInfo,
+		api.GatherInputContentStep,
+		timeStart,
+	)
 	return err
 }
 
