@@ -237,7 +237,7 @@ func TestLayeredBuild(t *testing.T) {
 			BuilderImage: "testimage",
 		},
 		BuildResult:   &api.Result{},
-		ExecuteError:  s2ierr.NewContainerError("", 1, `/bin/sh: tar: not found`),
+		ExecuteError:  errMissingRequirements,
 		ExpectedError: true,
 	}
 	builder := newFakeSTI(fh)

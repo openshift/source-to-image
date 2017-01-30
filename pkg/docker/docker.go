@@ -851,11 +851,13 @@ func (d *stiDocker) holdHijackedConnection(tty bool, inputStream io.Reader, outp
 	if inputStream != nil {
 		_, err = io.Copy(resp.Conn, inputStream)
 		if err != nil {
+			<-receiveStdout
 			return err
 		}
 	}
 	err = resp.CloseWrite()
 	if err != nil {
+		<-receiveStdout
 		return err
 	}
 
