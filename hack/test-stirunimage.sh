@@ -130,9 +130,9 @@ check_result $? "${WORK_DIR}/s2i-git-proto.log"
 test_debug "s2i build with --run==true option"
 if [[ "$OSTYPE" == "cygwin" ]]; then
   ( cd hack/windows/sigintwrap && make )
-  hack/windows/sigintwrap/sigintwrap 's2i build https://github.com/bparees/openshift-jee-sample openshift/wildfly-90-centos7 test-jee-app --run=true --loglevel=5' &> "${WORK_DIR}/s2i-run.log" &
+  hack/windows/sigintwrap/sigintwrap 's2i build --ref=10.x --context-dir=helloworld https://github.com/wildfly/quickstart openshift/wildfly-101-centos7 test-jee-app --run=true --loglevel=5' &> "${WORK_DIR}/s2i-run.log" &
 else
-  s2i build https://github.com/bparees/openshift-jee-sample openshift/wildfly-90-centos7 test-jee-app --run=true --loglevel=5 &> "${WORK_DIR}/s2i-run.log" &
+  s2i build --ref=10.x --context-dir=helloworld https://github.com/wildfly/quickstart openshift/wildfly-101-centos7 test-jee-app --run=true --loglevel=5 &> "${WORK_DIR}/s2i-run.log" &
 fi
 S2I_PID=$!
 TIME_SEC=1000

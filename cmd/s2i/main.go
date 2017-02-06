@@ -269,6 +269,7 @@ func newCmdCreate() *cobra.Command {
 			b := create.New(args[0], args[1])
 			b.AddSTIScripts()
 			b.AddDockerfile()
+			b.AddReadme()
 			b.AddTests()
 		},
 	}

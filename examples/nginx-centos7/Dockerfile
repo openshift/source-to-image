@@ -1,12 +1,13 @@
+
 # nginx-centos7
-# Here you can use whatever image base is relevant for your application.
+# Here you can use whatever base image is relevant for your application.
 FROM centos:centos7
 
 # Here you can specify the maintainer for the image that you're building
-MAINTAINER Victor Palade <ipalade@redhat.com>
+MAINTAINER Your Name <your.name@example.com>
 
-# Export the environment variable that provides information about the application.
-# Replace this with the according version for your application.
+# Export an environment variable that provides information about the application version.
+# Replace this with the version for your application.
 ENV NGINX_VERSION=1.6.3
 
 # Set the labels that are used for OpenShift to describe the builder image.
@@ -18,18 +19,30 @@ LABEL io.k8s.description="Nginx Webserver" \
     # (run, assemble, save-artifacts)
     io.openshift.s2i.scripts-url="image:///usr/libexec/s2i"
 
-# Install our Nginx package and clean the yum cache so that we don't have any
-# cached files waste space.
-RUN yum install -y epel-release  && \
+# Install the nginx web server package and clean the yum cache
+RUN yum install -y epel-release && \
     yum install -y --setopt=tsflags=nodocs nginx && \
     yum clean all
 
-# We will change the default port for nginx (It's required if you plan on
-# running images as non-root user).
+# Change the default port for nginx 
+# Required if you plan on running images as a non-root user).
 RUN sed -i 's/80/8080/' /etc/nginx/nginx.conf
+RUN sed -i 's/user nginx;//' /etc/nginx/nginx.conf
 
 # Copy the S2I scripts to /usr/libexec/s2i since we set the label that way
-COPY  ["run", "assemble", "save-artifacts", "usage", "/usr/libexec/s2i/"]
+COPY ./s2i/bin/ /usr/libexec/s2i
+
+RUN chown -R 1001:1001 /opt/app-root
+RUN chown -R 1001:1001 /usr/share/nginx
+RUN chown -R 1001:1001 /var/log/nginx
+RUN chown -R 1001:1001 /var/lib/nginx
+RUN touch /run/nginx.pid
+RUN chown -R 1001:1001 /run/nginx.pid
+
+USER 1001
+
+# Set the default port for applications built using this image
+EXPOSE 8080
 
 # Modify the usage script in your application dir to inform the user how to run
 # this image.

@@ -146,11 +146,11 @@ Example: data posted will be in the form:
 
 #### Example Usage
 
-Build a Ruby application from a Git source, using the official `ruby-20-centos7` builder
+Build a Ruby application from a Git source, using the official `ruby-23-centos7` builder
 image, the resulting image will be named `ruby-app`:
 
 ```
-$ s2i build https://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos7 ruby-app
+$ s2i build https://github.com/openshift/ruby-hello-world openshift/ruby-23-centos7 ruby-app
 ```
 
 Build a Node.js application from a local directory, using a local image, the resulting
@@ -167,19 +167,19 @@ Use this method only for development or local testing.
 
 **NOTE**: All your changes have to be committed by `git` in order to build them with S2I.
 
-Build a Java application from a Git source, using the official `openshift/wildfly-100-centos7`
+Build a Java application from a Git source, using the official `openshift/wildfly-101-centos7`
 builder image but overriding the scripts URL from local directory.  The resulting
 image will be named `java-app`:
 
 ```
-$ s2i build --scripts-url=file://s2iscripts https://github.com/bparees/openshift-jee-sample openshift/wildfly-100-centos7 java-app
+$ s2i build --scripts-url=file://s2iscripts --ref=7.1.x --context-dir=kitchensink https://github.com/jboss-developer/jboss-eap-quickstarts openshift/wildfly-101-centos7 java-app
 ```
 
 Build a Ruby application from a Git source, specifying `ref`, and using the official
-`ruby-20-centos7` builder image.  The resulting image will be named `ruby-app`:
+`ruby-23-centos7` builder image.  The resulting image will be named `ruby-app`:
 
 ```
-$ s2i build --ref=my-branch https://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos7 ruby-app
+$ s2i build --ref=my-branch https://github.com/openshift/ruby-hello-world openshift/ruby-23-centos7 ruby-app
 ```
 
 ***NOTE:*** If the ref is invalid or not present in the source repository then the build will fail.
@@ -188,7 +188,7 @@ Build a Ruby application from a Git source, overriding the scripts URL from a lo
 and specifying the scripts and sources be placed in `/opt` directory:
 
 ```
-$ s2i build --scripts-url=file://s2iscripts --destination=/opt https://github.com/mfojtik/sinatra-app-example openshift/ruby-20-centos7 ruby-app
+$ s2i build --scripts-url=file://s2iscripts --destination=/opt https://github.com/openshift/ruby-hello-world openshift/ruby-23-centos7 ruby-app
 ```
 
 # s2i rebuild
@@ -232,9 +232,9 @@ $ s2i usage <builder image> [flags]
 
 #### Example Usage
 
-Print the official `ruby-20-centos7` builder image usage:
+Print the official `ruby-23-centos7` builder image usage:
 ```
-$ s2i usage openshift/ruby-20-centos7
+$ s2i usage openshift/ruby-23-centos7
 ```
 
 

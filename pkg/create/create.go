@@ -24,11 +24,11 @@ func New(name, dst string) *Bootstrap {
 // AddSTIScripts creates the STI scripts directory structure and process
 // templates for STI scripts
 func (b *Bootstrap) AddSTIScripts() {
-	os.MkdirAll(b.DestinationDir+"/"+".s2i/bin", 0700)
-	b.process(templates.AssembleScript, ".s2i/bin/assemble", 0755)
-	b.process(templates.RunScript, ".s2i/bin/run", 0755)
-	b.process(templates.UsageScript, ".s2i/bin/usage", 0755)
-	b.process(templates.SaveArtifactsScript, ".s2i/bin/save-artifacts", 0755)
+	os.MkdirAll(b.DestinationDir+"/"+"s2i/bin", 0700)
+	b.process(templates.AssembleScript, "s2i/bin/assemble", 0755)
+	b.process(templates.RunScript, "s2i/bin/run", 0755)
+	b.process(templates.UsageScript, "s2i/bin/usage", 0755)
+	b.process(templates.SaveArtifactsScript, "s2i/bin/save-artifacts", 0755)
 }
 
 // AddDockerfile creates an example Dockerfile
@@ -36,12 +36,17 @@ func (b *Bootstrap) AddDockerfile() {
 	b.process(templates.Dockerfile, "Dockerfile", 0600)
 }
 
+// AddReadme creates a README.md
+func (b *Bootstrap) AddReadme() {
+	b.process(templates.Readme, "README.md", 0700)
+}
+
 // AddTests creates an example test for the STI image and the Makefile
 func (b *Bootstrap) AddTests() {
 	os.MkdirAll(b.DestinationDir+"/"+"test/test-app", 0700)
+	b.process(templates.Index, "test/test-app/index.html", 0700)
 	b.process(templates.TestRunScript, "test/run", 0700)
 	b.process(templates.Makefile, "Makefile", 0600)
-	b.process(templates.Gitignore, "test/.gitignore", 0644)
 }
 
 func (b *Bootstrap) process(t string, dst string, perm os.FileMode) {

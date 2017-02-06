@@ -233,12 +233,12 @@ You can start using `s2i` right away (see [releases](https://github.com/openshif
 with the following test sources and publicly available images:
 
 ```
-$ s2i build https://github.com/pmorie/simple-ruby openshift/ruby-20-centos7 test-ruby-app
+$ s2i build https://github.com/openshift/ruby-hello-world openshift/ruby-23-centos7 test-ruby-app
 $ docker run --rm -i -p :8080 -t test-ruby-app
 ```
 
 ```
-$ s2i build https://github.com/bparees/openshift-jee-sample openshift/wildfly-100-centos7 test-jee-app
+$ s2i build --ref=7.1.x --context-dir=helloworld https://github.com/jboss-developer/jboss-eap-quickstarts openshift/wildfly-101-centos7 test-jee-app
 $ docker run --rm -i -p :8080 -t test-jee-app
 ```
 
