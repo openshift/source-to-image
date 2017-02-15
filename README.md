@@ -48,10 +48,10 @@ Allow build environments to be tightly versioned by encapsulating them within a 
 ### Flexibility
 Any existing build system that can run on Linux can be run inside of a container, and each individual builder can also be part of a larger pipeline. In addition, the scripts that process the application source code can be injected into the builder image, allowing authors to adapt existing images to enable source handling.
 
-### Speed   
+### Speed
 Instead of building multiple layers in a single Dockerfile, S2I encourages authors to represent an application in a single image layer. This saves time during creation and deployment, and allows for better control over the output of the final image.
 
-### Security  
+### Security
 Dockerfiles are run without many of the normal operational controls of containers, usually running as root and having access to the container network. S2I can be used to control what permissions and privileges are available to the builder image since the build is launched in a single container. In concert with platforms like OpenShift, source-to-image can enable admins to tightly control what privileges developers have at build time.
 
 
@@ -136,7 +136,7 @@ In this case, the value of `FOO` environment variable will be set to `bar`.
 
 In case you want to use one of the official Docker language stack images for
 your build you don't have do anything extra. S2I is capable of recognizing the
-Docker image with [ONBUILD](https://docs.docker.com/reference/builder/#onbuild) instructions and choosing the OnBuild strategy. This
+Docker image with [ONBUILD](https://docs.docker.com/engine/reference/builder/#/onbuild) instructions and choosing the OnBuild strategy. This
 strategy will trigger all ONBUILD instructions and execute the assemble script
 (if it exists) as the last instruction.
 
