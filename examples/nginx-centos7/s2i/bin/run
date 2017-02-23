@@ -7,5 +7,5 @@
 
 # We will turn off daemonizing for the nginx process so that the container
 # doesn't exit after the process runs.
-# We will also specify the default port on which it should listen.
+
 exec /usr/sbin/nginx -g "daemon off;"

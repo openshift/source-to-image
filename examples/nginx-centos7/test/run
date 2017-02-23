@@ -1,7 +1,4 @@
-package templates
-
-// TestRunScript is a simple test script that verifies the S2I image.
-const TestRunScript = `#!/bin/bash
+#!/bin/bash
 #
 # The 'run' performs a simple test that verifies the S2I image.
 # The main focus here is to exercise the S2I scripts.
@@ -12,7 +9,7 @@ const TestRunScript = `#!/bin/bash
 # IMAGE_NAME specifies a name of the candidate image used for testing.
 # The image has to be available before this script is executed.
 #
-IMAGE_NAME=${IMAGE_NAME-{{.ImageName}}-candidate}
+IMAGE_NAME=${IMAGE_NAME-nginx-centos7-candidate}
 
 # Determining system utility executables (darwin compatibility check)
 READLINK_EXEC="readlink"
@@ -46,13 +43,13 @@ container_ip() {
   if [ ! -z "$DOCKER_HOST" ] && [[ "$OSTYPE" =~ 'darwin' ]]; then
     docker-machine ip
   else
-    docker inspect --format="{{"{{"}} .NetworkSettings.IPAddress {{"}}"}}" $(cat $cid_file)
+    docker inspect --format="{{ .NetworkSettings.IPAddress }}" $(cat $cid_file)
   fi
 }
 
 container_port() {
   if [ ! -z "$DOCKER_HOST" ] && [[ "$OSTYPE" =~ 'darwin' ]]; then
-    docker inspect --format="{{"{{"}}(index .NetworkSettings.Ports \"$test_port/tcp\" 0).HostPort{{"}}"}}" "$(cat "${cid_file}")"
+    docker inspect --format="{{(index .NetworkSettings.Ports \"$test_port/tcp\" 0).HostPort}}" "$(cat "${cid_file}")"
   else
     echo $test_port
   fi
@@ -161,31 +158,3 @@ check_result $?
 
 cleanup
 
-`
-
-// Makefile contains a sample Makefile which can build and test a container.
-const Makefile = `
-IMAGE_NAME = {{.ImageName}}
-
-.PHONY: build
-build:
-	docker build -t $(IMAGE_NAME) .
-
-.PHONY: test
-test:
-	docker build -t $(IMAGE_NAME)-candidate .
-	IMAGE_NAME=$(IMAGE_NAME)-candidate test/run
-`
-
-// Index contains a sample index.html file.
-const Index = `
-<!doctype html>
-<html>
-	<head>
-		<title>Hello World!</title>
-	</head>
-	<body>
-		<h1>Hello World!</h1>
-	</body>
-</html>
- `

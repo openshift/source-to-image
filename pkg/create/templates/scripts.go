@@ -10,9 +10,8 @@ const AssembleScript = `#!/bin/bash -e
 #	https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md
 #
 
+# If the '{{.ImageName}}' assemble script is executed with the '-h' flag, print the usage.
 if [[ "$1" == "-h" ]]; then
-	# If the '{{.ImageName}}' assemble script is executed with '-h' flag,
-	# print the usage.
 	exec /usr/libexec/s2i/usage
 fi
 
@@ -27,7 +26,7 @@ echo "---> Installing application source..."
 cp -Rf /tmp/src/. ./
 
 echo "---> Building application from source..."
-# TODO: Add build steps for your application, eg npm install, bundle install
+# TODO: Add build steps for your application, eg npm install, bundle install, pip install, etc.
 `
 
 // RunScript is a default run script laid down by s2i create
@@ -40,7 +39,7 @@ const RunScript = `#!/bin/bash -e
 #	https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md
 #
 
-exec <start your server here>
+exec asdf -p 8080
 `
 
 // UsageScript is a default usage script laid down by s2i create

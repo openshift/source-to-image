@@ -29,7 +29,7 @@ import (
 
 const (
 	DefaultDockerSocket = "unix:///var/run/docker.sock"
-	TestSource          = "https://github.com/pmorie/simple-html"
+	TestSource          = "https://github.com/openshift/ruby-hello-world"
 
 	FakeBuilderImage                = "sti_test/sti-fake"
 	FakeUserImage                   = "sti_test/sti-fake-user"
@@ -619,7 +619,7 @@ func (i *integrationTest) runInImage(image string, cmd string) int {
 func (i *integrationTest) checkBasicBuildState(cID string, workingDir string) {
 	i.fileExists(cID, "/sti-fake/assemble-invoked")
 	i.fileExists(cID, "/sti-fake/run-invoked")
-	i.fileExists(cID, "/sti-fake/src/index.html")
+	i.fileExists(cID, "/sti-fake/src/Gemfile")
 
 	_, err := os.Stat(workingDir)
 	if !os.IsNotExist(err) {

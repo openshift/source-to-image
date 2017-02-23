@@ -5,9 +5,9 @@ To use it, install S2I: https://github.com/openshift/source-to-image
 
 Sample invocation:
 
-s2i build test/ nginx-centos7 nginx-app
+s2i build test/test-app nginx-centos7 nginx-centos7-app
 
 You can then run the resulting image via:
-docker run -d -p 8080:8080 nginx-app
+docker run -d -p 8080:8080 nginx-centos7-app
 and see the test via http://localhost:8080
 EOF
