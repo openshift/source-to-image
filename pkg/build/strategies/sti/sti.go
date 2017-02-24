@@ -86,6 +86,11 @@ type STI struct {
 // be used for the case that the base Docker image does not have 'tar' or 'bash'
 // installed.
 func New(config *api.Config, fs util.FileSystem, overrides build.Overrides) (*STI, error) {
+	excludePattern, err := regexp.Compile(config.ExcludeRegExp)
+	if err != nil {
+		return nil, err
+	}
+
 	docker, err := dockerpkg.New(config.DockerConfig, config.PullAuthentication)
 	if err != nil {
 		return nil, err
@@ -107,7 +112,7 @@ func New(config *api.Config, fs util.FileSystem, overrides build.Overrides) (*ST
 		fs,
 	)
 	tarHandler := tar.New(fs)
-	tarHandler.SetExclusionPattern(regexp.MustCompile(config.ExcludeRegExp))
+	tarHandler.SetExclusionPattern(excludePattern)
 
 	builder := &STI{
 		installer:              inst,

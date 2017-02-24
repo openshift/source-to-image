@@ -6,6 +6,7 @@ import (
 	"io"
 	"path/filepath"
 	"reflect"
+	"regexp/syntax"
 	"strings"
 	"testing"
 
@@ -903,5 +904,15 @@ func TestCleanup(t *testing.T) {
 		} else if !p && removedDir == "" {
 			t.Errorf("Expected working directory to be removed, but it was preserved.")
 		}
+	}
+}
+
+func TestNewWithInvalidExcludeRegExp(t *testing.T) {
+	_, err := New(&api.Config{
+		DockerConfig:  docker.GetDefaultDockerConfig(),
+		ExcludeRegExp: "(",
+	}, nil, build.Overrides{})
+	if syntaxErr, ok := err.(*syntax.Error); ok && syntaxErr.Code != syntax.ErrMissingParen {
+		t.Errorf("expected regexp compilation error, got %v", err)
 	}
 }
