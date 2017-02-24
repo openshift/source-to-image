@@ -6,10 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"regexp/syntax"
 	"strings"
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/api"
+	"github.com/openshift/source-to-image/pkg/build"
 	"github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/test"
 )
@@ -183,5 +185,15 @@ func TestBuildErrorOnBuildBlocked(t *testing.T) {
 	_, err := l.Build(l.config)
 	if err == nil || !strings.Contains(err.Error(), "builder image uses ONBUILD instructions but ONBUILD is not allowed") {
 		t.Errorf("expected error from onbuild due to blocked ONBUILD, got: %v", err)
+	}
+}
+
+func TestNewWithInvalidExcludeRegExp(t *testing.T) {
+	_, err := New(&api.Config{
+		DockerConfig:  docker.GetDefaultDockerConfig(),
+		ExcludeRegExp: "[",
+	}, nil, nil, build.Overrides{})
+	if syntaxErr, ok := err.(*syntax.Error); ok && syntaxErr.Code != syntax.ErrMissingBracket {
+		t.Errorf("expected regexp compilation error, got %v", err)
 	}
 }
