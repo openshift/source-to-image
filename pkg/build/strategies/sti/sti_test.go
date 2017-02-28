@@ -140,7 +140,7 @@ type FakeDockerBuild struct {
 
 func (f *FakeDockerBuild) Build(*api.Config) (*api.Result, error) {
 	f.LayeredBuildCalled = true
-	return nil, f.LayeredBuildError
+	return &api.Result{}, f.LayeredBuildError
 }
 
 func TestDefaultSource(t *testing.T) {
@@ -237,7 +237,11 @@ func TestLayeredBuild(t *testing.T) {
 		BuildRequest: &api.Config{
 			BuilderImage: "testimage",
 		},
-		BuildResult:   &api.Result{},
+		BuildResult: &api.Result{
+			BuildInfo: api.BuildInfo{
+				Stages: api.Stages{},
+			},
+		},
 		ExecuteError:  errMissingRequirements,
 		ExpectedError: true,
 	}
