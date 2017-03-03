@@ -233,7 +233,7 @@ You can start using `s2i` right away (see [releases](https://github.com/openshif
 with the following test sources and publicly available images:
 
 ```
-$ s2i build https://github.com/openshift/ruby-hello-world openshift/ruby-23-centos7 test-ruby-app
+$ s2i build https://github.com/openshift/ruby-hello-world centos/ruby-23-centos7 test-ruby-app
 $ docker run --rm -i -p :8080 -t test-ruby-app
 ```
 
