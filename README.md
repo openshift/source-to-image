@@ -68,7 +68,7 @@ image:
 Additionally for the best user experience and optimized `s2i` operation we suggest images
 to have `/bin/sh` and `tar` commands available.
 
-See [a practical tutorial on how to create a builder image](examples/README.md) and read [a detailed description of the requirements and scripts along with examples of builder images](docs/builder_image.md).
+See [a practical tutorial on how to create a builder image](examples/nginx-centos7/README.md) and read [a detailed description of the requirements and scripts along with examples of builder images](docs/builder_image.md).
 
 ## Build workflow
 
