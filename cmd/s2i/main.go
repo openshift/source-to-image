@@ -221,6 +221,13 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 
 			cfg.PullAuthentication = docker.GetImageRegistryAuth(auths, cfg.Tag)
 
+			if len(cfg.BuilderPullPolicy) == 0 {
+				cfg.BuilderPullPolicy = api.DefaultBuilderPullPolicy
+			}
+			if len(cfg.PreviousImagePullPolicy) == 0 {
+				cfg.PreviousImagePullPolicy = api.DefaultPreviousImagePullPolicy
+			}
+
 			pr, err := docker.GetRebuildImage(cfg)
 			s2ierr.CheckError(err)
 			err = build.GenerateConfigFromLabels(cfg, pr)
@@ -231,13 +238,6 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 			}
 
 			cfg.PullAuthentication = docker.GetImageRegistryAuth(auths, cfg.BuilderImage)
-
-			if len(cfg.BuilderPullPolicy) == 0 {
-				cfg.BuilderPullPolicy = api.DefaultBuilderPullPolicy
-			}
-			if len(cfg.PreviousImagePullPolicy) == 0 {
-				cfg.PreviousImagePullPolicy = api.DefaultPreviousImagePullPolicy
-			}
 
 			glog.V(2).Infof("\n%s\n", describe.Config(cfg))
 
