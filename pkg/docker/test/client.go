@@ -179,6 +179,11 @@ func (d *FakeDockerClient) ContainerRemove(ctx context.Context, containerID stri
 	return errors.New("container does not exist")
 }
 
+// ContainerKill terminates the container process but does not remove the container from the docker host.
+func (d *FakeDockerClient) ContainerKill(ctx context.Context, containerID, signal string) error {
+	return nil
+}
+
 // ContainerStart sends a request to the docker daemon to start a container.
 func (d *FakeDockerClient) ContainerStart(ctx context.Context, containerID string) error {
 	d.Calls = append(d.Calls, "start")

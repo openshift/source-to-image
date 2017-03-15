@@ -127,6 +127,7 @@ type Client interface {
 	ContainerInspect(ctx context.Context, containerID string) (dockertypes.ContainerJSON, error)
 	ContainerRemove(ctx context.Context, containerID string, options dockertypes.ContainerRemoveOptions) error
 	ContainerStart(ctx context.Context, containerID string) error
+	ContainerKill(ctx context.Context, containerID, signal string) error
 	ContainerWait(ctx context.Context, containerID string) (int, error)
 	CopyToContainer(ctx context.Context, container, path string, content io.Reader, opts dockertypes.CopyToContainerOptions) error
 	CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, dockertypes.ContainerPathStat, error)
@@ -600,9 +601,15 @@ func (d *stiDocker) RemoveContainer(id string) error {
 	defer cancel()
 	opts := dockertypes.ContainerRemoveOptions{
 		RemoveVolumes: true,
-		Force:         true,
 	}
 	return d.client.ContainerRemove(ctx, id, opts)
+}
+
+// KillContainer kills a container.
+func (d *stiDocker) KillContainer(id string) error {
+	ctx, cancel := getDefaultContext()
+	defer cancel()
+	return d.client.ContainerKill(ctx, id, "SIGKILL")
 }
 
 // GetLabels retrieves the labels of the given image.
@@ -932,6 +939,13 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 
 	// Container was created, so we defer its removal, and also remove it if we get a SIGINT/SIGTERM/SIGQUIT/SIGHUP.
 	removeContainer := func() {
+		glog.V(4).Infof("Killing container %q ...", container.ID)
+		if killErr := d.KillContainer(container.ID); killErr != nil {
+			glog.V(0).Infof("warning: Failed to kill container %q: %v", container.ID, killErr)
+		} else {
+			glog.V(4).Infof("Killed container %q", container.ID)
+		}
+
 		glog.V(4).Infof("Removing container %q ...", container.ID)
 		if removeErr := d.RemoveContainer(container.ID); removeErr != nil {
 			glog.V(0).Infof("warning: Failed to remove container %q: %v", container.ID, removeErr)
@@ -1066,7 +1080,6 @@ func (d *stiDocker) BuildImage(opts BuildImageOptions) error {
 		NoCache:        true,
 		SuppressOutput: false,
 		Remove:         true,
-		ForceRemove:    true,
 	}
 	if opts.CGroupLimits != nil {
 		dockerOpts.Memory = opts.CGroupLimits.MemoryLimitBytes

@@ -586,9 +586,9 @@ func (i *integrationTest) runInContainer(image string, command []string) int {
 func (i *integrationTest) removeContainer(cID string) {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
+	i.engineClient.ContainerKill(ctx, cID, "SIGKILL")
 	removeOpts := dockertypes.ContainerRemoveOptions{
 		RemoveVolumes: true,
-		Force:         true,
 	}
 	err := i.engineClient.ContainerRemove(ctx, cID, removeOpts)
 	if err != nil {
