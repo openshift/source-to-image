@@ -612,7 +612,7 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 		}
 		defer os.Remove(rmScript)
 		opts.CommandOverrides = func(cmd string) string {
-			return fmt.Sprintf("while [ ! -f %q ]; do sleep 0.5; done; %s; result=$?; source %[1]s; exit $result",
+			return fmt.Sprintf("while [ ! -f %q ]; do sleep 0.5; done; %s; result=$?; . %[1]s; exit $result",
 				"/tmp/rm-injections", cmd)
 		}
 		originalOnStart := opts.OnStart
