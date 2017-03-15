@@ -603,6 +603,9 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 			return err
 		}
 		rmScript, err := util.CreateInjectedFilesRemovalScript(injectedFiles, "/tmp/rm-injections")
+		if len(rmScript) != 0 {
+			defer os.Remove(rmScript)
+		}
 		if err != nil {
 			builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(
 				utilstatus.ReasonGenericS2IBuildFailed,
@@ -610,7 +613,6 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 			)
 			return err
 		}
-		defer os.Remove(rmScript)
 		opts.CommandOverrides = func(cmd string) string {
 			return fmt.Sprintf("while [ ! -f %q ]; do sleep 0.5; done; %s; result=$?; source %[1]s; exit $result",
 				"/tmp/rm-injections", cmd)
