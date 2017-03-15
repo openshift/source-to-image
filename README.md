@@ -238,8 +238,8 @@ $ docker run --rm -i -p :8080 -t test-ruby-app
 ```
 
 ```
-$ s2i build --ref=7.1.x --context-dir=helloworld https://github.com/jboss-developer/jboss-eap-quickstarts openshift/wildfly-101-centos7 test-jee-app
-$ docker run --rm -i -p :8080 -t test-jee-app
+$ s2i build --ref=10.x --context-dir=helloworld https://github.com/wildfly/quickstart openshift/wildfly-101-centos7 test-jee-app
+$ docker run --rm -i -p 8080:8080 -t test-jee-app
 ```
 
 Want to know more? Read the following resources:
