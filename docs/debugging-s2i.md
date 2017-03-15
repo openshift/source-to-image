@@ -61,7 +61,7 @@ First, a basic reminder:  you should verify your scripts have executable permiss
 
 Then, a few of the trickier obstacles that have arisen for users in the past:
 
-####Interfacing With `tar`
+#### Interfacing With `tar`
 
 As noted [here](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#save-artifacts), if you employ a `save-artifacts` script, that script is responsible for properly receiving tar streams.  Issues with `tar` stream processing could result in messages like:
 
@@ -72,7 +72,7 @@ As noted [here](https://github.com/openshift/source-to-image/blob/master/docs/bu
 Review the example [here](https://github.com/gabemontero/source-to-image/blob/master/docs/builder_image.md#save-artifacts), and perhaps revisit the tar man pages or the bash user manual, to help address any problems.
 
 
-####Dowloading / Finding The Scripts
+#### Dowloading / Finding The Scripts
 
 Per this discussion point  [here](https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md#s2i-scripts), if your s2i related scripts are already placed in the image, but their locations are not indicated by one of the provided means, attempts to download the scripts will fail.
 
@@ -81,7 +81,7 @@ Per this discussion point  [here](https://github.com/openshift/source-to-image/b
 Properly reference the script location with the methods described in the above link.
 
 
-####ONBUILD
+#### ONBUILD
 
 At various points when executing ONBUILD instructions (these are defined in the Dockerfile of the builder image you are using with s2i), if those instructions result in the need for root user access, but your builder image is not configured to run as root,
 then attempts to reference that image in another Dockerfile will result in permission errors.
