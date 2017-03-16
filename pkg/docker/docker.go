@@ -433,10 +433,7 @@ func (d *stiDocker) GetImageUser(name string) (string, error) {
 		glog.V(4).Infof("error inspecting image %s: %v", name, err)
 		return "", s2ierr.NewInspectImageError(name, err)
 	}
-	user := resp.ContainerConfig.User
-	if len(user) == 0 {
-		user = resp.Config.User
-	}
+	user := resp.Config.User
 	return user, nil
 }
 
@@ -640,17 +637,13 @@ func getLabel(image *api.Image, name string) string {
 	if value, ok := image.Config.Labels[name]; ok {
 		return value
 	}
-	if value, ok := image.ContainerConfig.Labels[name]; ok {
-		return value
-	}
 	return ""
 }
 
 // getVariable gets environment variable's value from the image metadata
 func getVariable(image *api.Image, name string) string {
 	envName := name + "="
-	env := append(image.ContainerConfig.Env, image.Config.Env...)
-	for _, v := range env {
+	for _, v := range image.Config.Env {
 		if strings.HasPrefix(v, envName) {
 			return strings.TrimSpace((v[len(envName):]))
 		}
