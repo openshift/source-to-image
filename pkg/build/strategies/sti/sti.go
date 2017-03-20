@@ -577,7 +577,7 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 		NetworkMode:     string(config.DockerNetworkMode),
 		CGroupLimits:    config.CGroupLimits,
 		CapDrop:         config.DropCapabilities,
-		Binds:           config.BuildVolumes.AsBinds(),
+		Binds:           config.BuildVolumes,
 	}
 
 	// If there are injections specified, override the original assemble script

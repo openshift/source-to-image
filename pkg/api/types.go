@@ -232,7 +232,7 @@ type Config struct {
 
 	// BuildVolumes specifies a list of volumes to mount to container running the
 	// build.
-	BuildVolumes VolumeList
+	BuildVolumes []string
 
 	// Labels specify labels and their values to be applied to the resulting image. Label keys
 	// must have non-zero length. The labels defined here override generated labels in case

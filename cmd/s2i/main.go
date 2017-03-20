@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -31,7 +32,6 @@ import (
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
 	"github.com/openshift/source-to-image/pkg/version"
-	"io"
 )
 
 // glog is a placeholder until the builders pass an output stream down
@@ -187,7 +187,7 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 	buildCmd.Flags().StringVarP(&(cfg.Description), "description", "", "", "Specify the description of the application")
 	buildCmd.Flags().VarP(&(cfg.AllowedUIDs), "allowed-uids", "u", "Specify a range of allowed user ids for the builder and runtime images")
 	buildCmd.Flags().VarP(&(cfg.Injections), "inject", "i", "Specify a directory to inject into the assemble container")
-	buildCmd.Flags().VarP(&(cfg.BuildVolumes), "volume", "v", "Specify a volume to mount into the assemble container")
+	buildCmd.Flags().StringArrayVarP(&(cfg.BuildVolumes), "volume", "v", []string{}, "Specify a volume to mount into the assemble container")
 	buildCmd.Flags().StringSliceVar(&(cfg.DropCapabilities), "cap-drop", []string{}, "Specify a comma-separated list of capabilities to drop when running Docker containers")
 	buildCmd.Flags().StringVarP(&(oldDestination), "location", "l", "",
 		"DEPRECATED: Specify a destination location for untar operation")
