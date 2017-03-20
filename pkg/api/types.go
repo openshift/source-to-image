@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+	"time"
 
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 
@@ -341,13 +342,97 @@ type Result struct {
 	BuildInfo BuildInfo
 }
 
-// BuildInfo holds information about a particular step in the build process.
+// BuildInfo contains information about the build process.
 type BuildInfo struct {
+	// Stages contains details about each build stage.
+	Stages Stages
+
 	// FailureReason is a camel case reason that is used by the machine to reply
 	// back to the OpenShift builder with information why any of the steps in the
-	// build, failed.
+	// build failed.
 	FailureReason FailureReason
 }
+
+// Stages is a slice of build stages that have been recorded.
+type Stages []StageInfo
+
+// StageInfo contains details about a build stage.
+type StageInfo struct {
+	// StageName is the identifier for each build stage.
+	StageName StageName
+
+	// StartTime identifies when this stage started.
+	StartTime time.Time
+
+	// Duration identifies how long this stage ran.
+	Duration time.Duration
+
+	// Steps contains details about each build step within a build stage.
+	Steps Steps
+}
+
+// StageName is the identifier for each build stage.
+type StageName string
+
+// Valid StageNames
+const (
+	// StagePullImages pulls the docker images.
+	StagePullImages StageName = "PullImages"
+
+	//StageAssemble runs the assemble steps.
+	StageAssemble StageName = "Assemble"
+
+	// StageBuild builds the source.
+	StageBuild StageName = "Build"
+
+	// StageCommit commits the container.
+	StageCommit StageName = "CommitContainer"
+
+	// StageRetrieve retrieves artifacts.
+	StageRetrieve StageName = "RetrieveArtifacts"
+)
+
+// Steps is a slice of build steps that have been recorded within each build stage.
+type Steps []StepInfo
+
+// StepInfo contains details about a build step.
+type StepInfo struct {
+	// StepName is the identifier for each build step.
+	StepName StepName
+
+	// StartTime identifies when this step started.
+	StartTime time.Time
+
+	// Duration identifies how long this step ran.
+	Duration time.Duration
+}
+
+// StepName is the identifier for each build step.
+type StepName string
+
+// Valid StepNames
+const (
+	// StepPullBuilderImage pulls the builder image.
+	StepPullBuilderImage StepName = "PullBuilderImage"
+
+	// StepPullPreviousImage pulls the previous image for an incremental build.
+	StepPullPreviousImage StepName = "PullPreviousImage"
+
+	// StepPullRuntimeImage pull the runtime image.
+	StepPullRuntimeImage StepName = "PullRuntimeImage"
+
+	// StepAssembleBuildScripts runs the assemble scripts.
+	StepAssembleBuildScripts StepName = "AssembleBuildScripts"
+
+	// StepBuildDockerImage builds the Docker image for layered builds.
+	StepBuildDockerImage StepName = "BuildDockerImage"
+
+	// StepCommitContainer commits the container to the builder image.
+	StepCommitContainer StepName = "CommitContainer"
+
+	// StepRetrievePreviousArtifacts restores archived artifacts from the previous build.
+	StepRetrievePreviousArtifacts StepName = "RetrievePreviousArtifacts"
+)
 
 // StepFailureReason holds the type of failure that occurred during the build
 // process.
