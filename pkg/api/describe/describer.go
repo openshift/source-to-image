@@ -130,12 +130,7 @@ func describeRuntimeImage(config *api.Config, out io.Writer) {
 	}
 
 	fmt.Fprintf(out, "Runtime Image:\t%s\n", config.RuntimeImage)
-
-	pullPolicy := config.RuntimeImagePullPolicy
-	if len(pullPolicy) == 0 {
-		pullPolicy = api.DefaultRuntimeImagePullPolicy
-	}
-	fmt.Fprintf(out, "Runtime Image Pull Policy:\t%s\n", pullPolicy)
+	fmt.Fprintf(out, "Runtime Image Pull Policy:\t%s\n", config.RuntimeImagePullPolicy)
 	if len(config.RuntimeAuthentication.Username) > 0 {
 		fmt.Fprintf(out, "Runtime Image Pull User:\t%s\n", config.RuntimeAuthentication.Username)
 	}

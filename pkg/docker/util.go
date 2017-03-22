@@ -347,12 +347,7 @@ func GetRebuildImage(config *api.Config) (*PullResult, error) {
 // GetRuntimeImage processes the config and performs operations necessary to
 // make the Docker image specified as RuntimeImage available locally.
 func GetRuntimeImage(config *api.Config, docker Docker) error {
-	pullPolicy := config.RuntimeImagePullPolicy
-	if len(pullPolicy) == 0 {
-		pullPolicy = api.DefaultRuntimeImagePullPolicy
-	}
-
-	_, err := pullAndCheck(config.RuntimeImage, docker, pullPolicy, config, false)
+	_, err := pullAndCheck(config.RuntimeImage, docker, config.RuntimeImagePullPolicy, config, false)
 	return err
 }
 

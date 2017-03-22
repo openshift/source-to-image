@@ -89,12 +89,15 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 			if cfg.ForcePull {
 				glog.Warning("DEPRECATED: The '--force-pull' option is deprecated. Use '--pull-policy' instead")
 			}
-
+			//set default image pull policy
 			if len(cfg.BuilderPullPolicy) == 0 {
 				cfg.BuilderPullPolicy = api.DefaultBuilderPullPolicy
 			}
 			if len(cfg.PreviousImagePullPolicy) == 0 {
 				cfg.PreviousImagePullPolicy = api.DefaultPreviousImagePullPolicy
+			}
+			if len(cfg.RuntimeImagePullPolicy) == 0 {
+				cfg.RuntimeImagePullPolicy = api.DefaultRuntimeImagePullPolicy
 			}
 
 			if errs := validation.ValidateConfig(cfg); len(errs) > 0 {
