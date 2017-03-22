@@ -345,7 +345,7 @@ type Result struct {
 // BuildInfo contains information about the build process.
 type BuildInfo struct {
 	// Stages contains details about each build stage.
-	Stages Stages
+	Stages []StageInfo
 
 	// FailureReason is a camel case reason that is used by the machine to reply
 	// back to the OpenShift builder with information why any of the steps in the
@@ -353,22 +353,19 @@ type BuildInfo struct {
 	FailureReason FailureReason
 }
 
-// Stages is a slice of build stages that have been recorded.
-type Stages []StageInfo
-
 // StageInfo contains details about a build stage.
 type StageInfo struct {
-	// StageName is the identifier for each build stage.
-	StageName StageName
+	// Name is the identifier for each build stage.
+	Name StageName
 
 	// StartTime identifies when this stage started.
 	StartTime time.Time
 
-	// Duration identifies how long this stage ran.
-	Duration time.Duration
+	// DurationMilliseconds identifies how long this stage ran.
+	DurationMilliseconds int64
 
 	// Steps contains details about each build step within a build stage.
-	Steps Steps
+	Steps []StepInfo
 }
 
 // StageName is the identifier for each build stage.
@@ -392,19 +389,16 @@ const (
 	StageRetrieve StageName = "RetrieveArtifacts"
 )
 
-// Steps is a slice of build steps that have been recorded within each build stage.
-type Steps []StepInfo
-
 // StepInfo contains details about a build step.
 type StepInfo struct {
-	// StepName is the identifier for each build step.
-	StepName StepName
+	// Name is the identifier for each build step.
+	Name StepName
 
 	// StartTime identifies when this step started.
 	StartTime time.Time
 
-	// Duration identifies how long this step ran.
-	Duration time.Duration
+	// DurationMilliseconds identifies how long this step ran.
+	DurationMilliseconds int64
 }
 
 // StepName is the identifier for each build step.

@@ -239,7 +239,7 @@ func TestLayeredBuild(t *testing.T) {
 		},
 		BuildResult: &api.Result{
 			BuildInfo: api.BuildInfo{
-				Stages: api.Stages{},
+				Stages: []api.StageInfo{},
 			},
 		},
 		ExecuteError:  errMissingRequirements,
