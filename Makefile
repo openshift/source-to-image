@@ -3,7 +3,7 @@
 # Targets (see each target for more information):
 #   all: Build code.
 #   build: Build code.
-#   check: Run tests.
+#   check: Run build, verify and tests.
 #   test: Run tests.
 #   clean: Clean up.
 #   release: Build release.
@@ -33,6 +33,7 @@ verify: build
 	hack/verify-golint.sh
 	hack/verify-govet.sh
 	hack/verify-godeps.sh || true # remove this to make godepchecker's warnings actionable
+	hack/verify-bash-completion.sh
 .PHONY: verify
 
 # Install travis dependencies
@@ -55,11 +56,18 @@ install-travis:
 # Example:
 #   make check
 #   make test
-#   make check WHAT=pkg/build TESTFLAGS=-v
-check:
-	hack/verify-bash-completion.sh
-	hack/test-go.sh $(WHAT) $(TESTS) $(TESTFLAGS)
+#   make check WHAT=pkg/docker TESTFLAGS=-v
+check: verify test	
 .PHONY: check
+
+# Run unit tests
+# Example:
+#   make test
+#   make test WHAT=pkg/docker TESTFLAGS=-v 
+test: 
+	hack/test-go.sh $(WHAT) $(TESTS) $(TESTFLAGS)
+.PHONY: test
+
 
 # Remove all build artifacts.
 #
