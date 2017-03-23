@@ -60,15 +60,18 @@ func TestAddNewStepToStage(t *testing.T) {
 func TestUpdateStageDuration(t *testing.T) {
 	buildInfo := new(api.BuildInfo)
 
-	buildInfo.Stages = api.RecordStageAndStepInfo(buildInfo.Stages, api.StagePullImages, api.StepPullPreviousImage, time.Now(), time.Now())
-	duration := buildInfo.Stages[0].Duration
+	startTime := time.Now()
+
+	buildInfo.Stages = api.RecordStageAndStepInfo(buildInfo.Stages, api.StagePullImages, api.StepPullPreviousImage, startTime, time.Now())
 
 	addDuration, _ := time.ParseDuration("5m")
 
-	buildInfo.Stages = api.RecordStageAndStepInfo(buildInfo.Stages, api.StagePullImages, api.StepPullBuilderImage, time.Now(), time.Now().Add(addDuration))
+	endTime := time.Now().Add(addDuration)
 
-	if !(buildInfo.Stages[0].Duration > duration) {
-		t.Errorf("Stage Duration was not updated, expected %#v, got %#v", buildInfo.Stages[0].StartTime.Add(duration), buildInfo.Stages[0].Duration)
+	buildInfo.Stages = api.RecordStageAndStepInfo(buildInfo.Stages, api.StagePullImages, api.StepPullBuilderImage, time.Now(), endTime)
+
+	if buildInfo.Stages[0].DurationMilliseconds != (endTime.Sub(startTime).Nanoseconds() / int64(time.Millisecond)) {
+		t.Errorf("Stage Duration was not updated, expected %#v, got %#v", (endTime.Sub(startTime).Nanoseconds() / int64(time.Millisecond)), buildInfo.Stages[0].DurationMilliseconds)
 	}
 
 }
