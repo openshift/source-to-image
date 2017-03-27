@@ -24,6 +24,8 @@ func AddCommonFlags(c *cobra.Command, cfg *api.Config) {
 		"Specify when to pull the builder image (always, never or if-not-present)")
 	c.Flags().Var(&(cfg.PreviousImagePullPolicy), "incremental-pull-policy",
 		"Specify when to pull the previous image for incremental builds (always, never or if-not-present)")
+	c.Flags().Var(&(cfg.RuntimeImagePullPolicy), "runtime-pull-policy",
+		"Specify when to pull the runtime image (always, never or if-not-present)")
 	c.Flags().BoolVar(&(cfg.PreserveWorkingDir), "save-temp-dir", false,
 		"Save the temporary directory used by S2I instead of deleting it")
 	c.Flags().StringVarP(&(cfg.DockerCfgPath), "dockercfg-path", "", filepath.Join(os.Getenv("HOME"), ".docker/config.json"),
