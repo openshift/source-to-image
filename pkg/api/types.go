@@ -128,12 +128,6 @@ type Config struct {
 	// when doing incremental build
 	PreviousImagePullPolicy PullPolicy
 
-	// ForcePull defines if the builder image should be always pulled or not.
-	// This is now deprecated by BuilderPullPolicy and will be removed soon.
-	// Setting this to 'true' equals setting BuilderPullPolicy to 'PullAlways'.
-	// Setting this to 'false' equals setting BuilderPullPolicy to 'PullIfNotPresent'
-	ForcePull bool
-
 	// Incremental describes whether to try to perform incremental build.
 	Incremental bool
 

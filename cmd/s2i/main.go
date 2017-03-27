@@ -86,9 +86,6 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 				fmt.Fprintln(os.Stderr, "ERROR: Incremental build with runtime image isn't supported")
 				os.Exit(1)
 			}
-			if cfg.ForcePull {
-				glog.Warning("DEPRECATED: The '--force-pull' option is deprecated. Use '--pull-policy' instead")
-			}
 			//set default image pull policy
 			if len(cfg.BuilderPullPolicy) == 0 {
 				cfg.BuilderPullPolicy = api.DefaultBuilderPullPolicy

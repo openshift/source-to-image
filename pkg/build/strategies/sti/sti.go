@@ -472,7 +472,7 @@ func (builder *STI) Exists(config *api.Config) bool {
 	tag := firstNonEmpty(config.IncrementalFromTag, config.Tag)
 
 	startTime := time.Now()
-	result, err := dockerpkg.PullImage(tag, builder.incrementalDocker, policy, false)
+	result, err := dockerpkg.PullImage(tag, builder.incrementalDocker, policy)
 	builder.result.BuildInfo.Stages = api.RecordStageAndStepInfo(builder.result.BuildInfo.Stages, api.StagePullImages, api.StepPullPreviousImage, startTime, time.Now())
 
 	if err != nil {
