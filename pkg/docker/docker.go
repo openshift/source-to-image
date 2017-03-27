@@ -70,6 +70,21 @@ const (
 
 	// DefaultShmSize is the default shared memory size to use (in bytes) if not specified.
 	DefaultShmSize = int64(1024 * 1024 * 64)
+	// DefaultPullRetryDelay is the default pull image retry interval
+	DefaultPullRetryDelay = 5 * time.Second
+	// DefaultPullRetryCount is the default pull image retry times
+	DefaultPullRetryCount = 6
+)
+
+var (
+	// RetriableErrors is a set of strings that indicate that an retriable error occurred.
+	RetriableErrors = []string{
+		"ping attempt failed with error",
+		"is already in progress",
+		"connection reset by peer",
+		"transport closed before response was received",
+		"connection refused",
+	}
 )
 
 // containerNamePrefix prefixes the name of containers launched by S2I. We
@@ -528,40 +543,58 @@ func (d *stiDocker) PullImage(name string) (*api.Image, error) {
 	if err != nil {
 		return nil, s2ierr.NewPullImageError(name, err)
 	}
+	var retriableError = false
 
-	err = util.TimeoutAfter(DefaultDockerTimeout, fmt.Sprintf("pulling image %q", name), func(timer *time.Timer) error {
-		resp, pullErr := d.client.ImagePull(context.Background(), name, dockertypes.ImagePullOptions{RegistryAuth: base64Auth})
-		if pullErr != nil {
-			return pullErr
-		}
-		defer resp.Close()
-
-		decoder := json.NewDecoder(resp)
-		for {
-			if !timer.Stop() {
-				return &util.TimeoutError{}
-			}
-			timer.Reset(DefaultDockerTimeout)
-
-			var msg dockermessage.JSONMessage
-			pullErr = decoder.Decode(&msg)
-			if pullErr == io.EOF {
-				return nil
-			}
+	for retries := 0; retries <= DefaultPullRetryCount; retries++ {
+		err = util.TimeoutAfter(DefaultDockerTimeout, fmt.Sprintf("pulling image %q", name), func(timer *time.Timer) error {
+			resp, pullErr := d.client.ImagePull(context.Background(), name, dockertypes.ImagePullOptions{RegistryAuth: base64Auth})
 			if pullErr != nil {
 				return pullErr
 			}
+			defer resp.Close()
 
-			if msg.Error != nil {
-				return msg.Error
+			decoder := json.NewDecoder(resp)
+			for {
+				if !timer.Stop() {
+					return &util.TimeoutError{}
+				}
+				timer.Reset(DefaultDockerTimeout)
+
+				var msg dockermessage.JSONMessage
+				pullErr = decoder.Decode(&msg)
+				if pullErr == io.EOF {
+					return nil
+				}
+				if pullErr != nil {
+					return pullErr
+				}
+
+				if msg.Error != nil {
+					return msg.Error
+				}
+				if msg.ProgressMessage != "" {
+					glog.V(4).Infof("pulling image %s: %s", name, msg.ProgressMessage)
+				}
 			}
-			if msg.ProgressMessage != "" {
-				glog.V(4).Infof("pulling image %s: %s", name, msg.ProgressMessage)
+		})
+		if err == nil {
+			break
+		}
+		glog.V(0).Infof("pulling image error : %v", err)
+		errMsg := fmt.Sprintf("%s", err)
+		for _, errorString := range RetriableErrors {
+			if strings.Contains(errMsg, errorString) {
+				retriableError = true
+				break
 			}
 		}
-	})
-	if err != nil {
-		return nil, s2ierr.NewPullImageError(name, err)
+
+		if !retriableError {
+			return nil, s2ierr.NewPullImageError(name, err)
+		}
+
+		glog.V(0).Infof("retrying in %ss ...", DefaultPullRetryDelay)
+		time.Sleep(DefaultPullRetryDelay)
 	}
 
 	inspectResp, err := d.InspectImage(name)
