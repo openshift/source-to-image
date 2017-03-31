@@ -593,7 +593,7 @@ func (d *stiDocker) PullImage(name string) (*api.Image, error) {
 			return nil, s2ierr.NewPullImageError(name, err)
 		}
 
-		glog.V(0).Infof("retrying in %ss ...", DefaultPullRetryDelay)
+		glog.V(0).Infof("retrying in %s ...", DefaultPullRetryDelay)
 		time.Sleep(DefaultPullRetryDelay)
 	}
 
@@ -967,7 +967,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 	removeContainer := func() {
 		glog.V(4).Infof("Killing container %q ...", container.ID)
 		if killErr := d.KillContainer(container.ID); killErr != nil {
-			glog.V(0).Infof("warning: Failed to kill container %q: %v", container.ID, killErr)
+			glog.V(5).Infof("warning: Failed to kill container %q: %v", container.ID, killErr)
 		} else {
 			glog.V(4).Infof("Killed container %q", container.ID)
 		}
