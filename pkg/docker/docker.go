@@ -955,7 +955,14 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 	}
 
 	// Create a new container.
+
+	// First strip any inlined proxy credentials from the *proxy* env variables,
+	// before logging the env variables.
+	origEnv := createOpts.Config.Env
+	strippedEnv := util.StripProxyCredentials(origEnv)
+	createOpts.Config.Env = strippedEnv
 	glog.V(2).Infof("Creating container with options {Name:%q Config:%+v HostConfig:%+v} ...", createOpts.Name, createOpts.Config, createOpts.HostConfig)
+	createOpts.Config.Env = origEnv
 	ctx, cancel := getDefaultContext()
 	defer cancel()
 	container, err := d.client.ContainerCreate(ctx, createOpts.Config, createOpts.HostConfig, createOpts.NetworkingConfig, createOpts.Name)

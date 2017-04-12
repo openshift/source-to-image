@@ -3,6 +3,7 @@ package util
 import (
 	"bufio"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -33,4 +34,19 @@ func ReadEnvironmentFile(path string) (map[string]string, error) {
 	}
 
 	return result, scanner.Err()
+}
+
+// StripProxyCredentials attempts to strip sensitive information from proxy
+// environment variables.
+func StripProxyCredentials(env []string) []string {
+	// case insensitively match all key=value variables containing the word "proxy"
+	// in the key and which appear to contain a user:password@host pattern.  We'll
+	// keep everything before the = sign, and after the @.
+	re := regexp.MustCompile(`(?i)(.*proxy.*=).*@(.*)`)
+	newEnv := make([]string, len(env))
+	copy(newEnv, env)
+	for i, val := range newEnv {
+		newEnv[i] = re.ReplaceAllString(val, "$1$2")
+	}
+	return newEnv
 }
