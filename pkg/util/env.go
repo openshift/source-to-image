@@ -42,9 +42,6 @@ func ReadEnvironmentFile(path string) (map[string]string, error) {
 // environment variables.
 func StripProxyCredentials(env []string) []string {
 	// case insensitively match all key=value variables containing the word "proxy"
-	// in the key and which appear to contain a user:password@host pattern.  We'll
-	// keep everything before the = sign, and after the @.
-
 	proxyRegex := regexp.MustCompile("(?i).*proxy.*")
 	newEnv := make([]string, len(env))
 	copy(newEnv, env)
@@ -57,6 +54,7 @@ func StripProxyCredentials(env []string) []string {
 		if err != nil {
 			continue
 		}
+		// wipe out the user info from the url.
 		u.User = nil
 		newEnv[i] = fmt.Sprintf("%s=%s", parts[0], u.String())
 	}
