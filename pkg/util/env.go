@@ -2,6 +2,8 @@ package util
 
 import (
 	"bufio"
+	"fmt"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -42,11 +44,21 @@ func StripProxyCredentials(env []string) []string {
 	// case insensitively match all key=value variables containing the word "proxy"
 	// in the key and which appear to contain a user:password@host pattern.  We'll
 	// keep everything before the = sign, and after the @.
-	re := regexp.MustCompile(`(?i)(.*proxy.*=).*@(.*)`)
+
+	proxyRegex := regexp.MustCompile("(?i).*proxy.*")
 	newEnv := make([]string, len(env))
 	copy(newEnv, env)
-	for i, val := range newEnv {
-		newEnv[i] = re.ReplaceAllString(val, "$1$2")
+	for i, entry := range newEnv {
+		parts := strings.SplitN(entry, "=", 2)
+		if !proxyRegex.MatchString(parts[0]) {
+			continue
+		}
+		u, err := url.Parse(parts[1])
+		if err != nil {
+			continue
+		}
+		u.User = nil
+		newEnv[i] = fmt.Sprintf("%s=%s", parts[0], u.String())
 	}
 	return newEnv
 }
