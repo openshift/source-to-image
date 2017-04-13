@@ -50,13 +50,21 @@ func StripProxyCredentials(env []string) []string {
 		if !proxyRegex.MatchString(parts[0]) {
 			continue
 		}
-		u, err := url.Parse(parts[1])
-		if err != nil {
-			continue
-		}
-		// wipe out the user info from the url.
-		u.User = nil
-		newEnv[i] = fmt.Sprintf("%s=%s", parts[0], u.String())
+		newVal, _ := StripURLCredentials(parts[1])
+		newEnv[i] = fmt.Sprintf("%s=%s", parts[0], newVal)
 	}
 	return newEnv
+}
+
+// StripURLCredentials removes the user:password section of
+// a url if present.  If not present or the value is unparseable,
+// the value is returned unchanged.
+func StripURLCredentials(input string) (string, error) {
+	u, err := url.Parse(input)
+	if err != nil {
+		return input, err
+	}
+	// wipe out the user info from the url.
+	u.User = nil
+	return u.String(), nil
 }
