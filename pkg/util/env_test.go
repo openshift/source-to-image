@@ -29,6 +29,8 @@ func TestStripProxyCredentials(t *testing.T) {
 		// keys that don't contain "proxy" are untouched
 		"othervalue=http://user:password@hostname.com",
 		"othervalue=user:password@hostname.com",
+		// unparseable url
+		"proxy=https://user:password@foo%$ @bar@blah.com",
 	}
 
 	expected := []string{
@@ -50,6 +52,7 @@ func TestStripProxyCredentials(t *testing.T) {
 		"HTTPS_PROXY=https://hostname.com",
 		"othervalue=http://user:password@hostname.com",
 		"othervalue=user:password@hostname.com",
+		"proxy=https://user:password@foo%$ @bar@blah.com",
 	}
 	result := StripProxyCredentials(inputs)
 	for i := range result {

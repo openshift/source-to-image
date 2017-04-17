@@ -1088,7 +1088,14 @@ func (d *stiDocker) CommitContainer(opts CommitContainerOptions) (string, error)
 			User:       opts.User,
 		}
 		dockerOpts.Config = &config
+
+		// First strip any inlined proxy credentials from the *proxy* env variables,
+		// before logging the env variables.
+		origEnv := dockerOpts.Config.Env
+		strippedEnv := util.StripProxyCredentials(origEnv)
+		dockerOpts.Config.Env = strippedEnv
 		glog.V(2).Infof("Committing container with dockerOpts: %+v, config: %+v", dockerOpts, config)
+		dockerOpts.Config.Env = origEnv
 	}
 
 	resp, err := d.client.ContainerCommit(context.Background(), opts.ContainerID, dockerOpts)
