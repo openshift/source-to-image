@@ -87,7 +87,7 @@ s2i::build::build_binaries() {
     for platform in "${platforms[@]}"; do
       s2i::build::set_platform_envs "${platform}"
       echo "++ Building go targets for ${platform}:" "${targets[@]}"
-      go install "${goflags[@]:+${goflags[@]}}" \
+      CGO_ENABLED=0 go install "${goflags[@]:+${goflags[@]}}" \
           -pkgdir "${S2I_OUTPUT_PKGDIR}" \
           -ldflags "${version_ldflags}" \
           "${binaries[@]}"
