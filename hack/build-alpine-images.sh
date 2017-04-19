@@ -18,4 +18,4 @@ cd "${S2I_ROOT}"
 s2i::build::get_version_vars
 
 # Build the images
-docker build --tag openshift/s2i:${S2I_GIT_VERSION} -f "${S2I_ROOT}/images/alpine/Dockerfile" .
+docker build --tag openshift/s2i:${S2I_GIT_VERSION} --tag openshift/s2i:latest -f "${S2I_ROOT}/images/alpine/Dockerfile" .
