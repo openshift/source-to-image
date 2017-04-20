@@ -25,7 +25,7 @@ RUN gem install asdf
 # TODO (optional): Copy the builder files into /opt/app-root
 # COPY ./<builder_folder>/ /opt/app-root/
 
-# TODO: Copy the S2I scripts to /usr/libexec/s2i, since openshift/base-centos7 image 
+# TODO: Copy the S2I scripts to /usr/libexec/s2i, since openshift/base-centos7 image
 # sets io.openshift.s2i.scripts-url label that way, or update that label
 COPY ./s2i/bin/ /usr/libexec/s2i
 
@@ -39,5 +39,5 @@ USER 1001
 # EXPOSE 8080
 
 # TODO: Set the default CMD for the image
-# CMD ["usage"]
+# CMD ["/usr/libexec/s2i/usage"]
 `
