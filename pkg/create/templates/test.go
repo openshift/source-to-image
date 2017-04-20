@@ -24,7 +24,6 @@ fi
 
 test_dir="$($READLINK_EXEC -zf $(dirname "${BASH_SOURCE[0]}"))"
 image_dir=$($READLINK_EXEC -zf ${test_dir}/..)
-scripts_url="file://${image_dir}/.s2i/bin"
 cid_file=$($MKTEMP_EXEC -u --suffix=.cid)
 
 # Since we built the candidate image locally, we don't want S2I to attempt to pull
