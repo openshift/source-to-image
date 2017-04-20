@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # This script will create a rebase commit in the OpenShift Origin Git repository
 # based on the current HEAD.
@@ -17,7 +17,7 @@ readonly S2I_ROOT=$(
   cd "${root}"
   pwd
 )
-readonly OS_ROOT="${S2I_ROOT/%\/source-to-image/\/origin}"
+readonly OS_ROOT="${S2I_ROOT/%\/source-to-image//origin}"
 
 source "${S2I_ROOT}/hack/util.sh"
 
@@ -32,10 +32,11 @@ readonly exclude_pkgs=(
 )
 
 readonly origin_s2i_vendor_dir="${OS_ROOT}/vendor/github.com/openshift/source-to-image"
+readonly godeps_file="${OS_ROOT}/Godeps/Godeps.json"
 readonly s2i_ref="$(git -C ${S2I_ROOT} rev-parse --verify HEAD)"
 readonly s2i_short_ref="$(git -C ${S2I_ROOT} rev-parse --short HEAD)"
-readonly s2i_godeps_ref="$(grep -m1 -A2 'openshift/source-to-image' ${OS_ROOT}/Godeps/Godeps.json |
-  grep Rev | cut -d ':' -f2 | sed -e 's/"//g' -e 's/^[[:space:]]*//')"
+readonly s2i_godeps_ref="$(grep -m2 -A2 'openshift/source-to-image' ${OS_ROOT}/Godeps/Godeps.json |
+  grep Rev | cut -d ':' -f2 | tr -d \" | tr -d " ")"
 
 pushd "${OS_ROOT}" >/dev/null
   git checkout -B "s2i-${s2i_short_ref}-bump" master
@@ -48,9 +49,8 @@ pushd "${OS_ROOT}" >/dev/null
   for pkg in "${exclude_pkgs[@]}"; do
     rm -rvf "${origin_s2i_vendor_dir}/${pkg}"
   done
-
   # Bump the origin Godeps.json file
-  s2i::util::sed "s/${s2i_godeps_ref}/${s2i_ref}/g" "${OS_ROOT}/Godeps/Godeps.json"
+  s2i::util::sed "s/${s2i_godeps_ref}/${s2i_ref}/g" "${godeps_file}"
 
   # Make a commit with proper message
   git add Godeps vendor && git commit -m "bump(github.com/openshift/source-to-image): ${s2i_ref}"

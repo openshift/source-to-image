@@ -73,6 +73,7 @@ s2i::log::error_exit() {
 
 s2i::util::sed() {
   if [[ "$(go env GOHOSTOS)" == "darwin" ]]; then
+    echo $@
     sed -i '' $@
   else
     sed -i'' $@
