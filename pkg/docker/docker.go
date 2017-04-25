@@ -194,7 +194,7 @@ type RunContainerOptions struct {
 	// for the image if it has one.  If the image has no entrypoint,
 	// this value is ignored.
 	Entrypoint       []string
-	Stdin            io.Reader
+	Stdin            io.ReadCloser
 	Stdout           io.WriteCloser
 	Stderr           io.WriteCloser
 	OnStart          func(containerID string) error
@@ -289,7 +289,7 @@ type CommitContainerOptions struct {
 type BuildImageOptions struct {
 	Name         string
 	Stdin        io.Reader
-	Stdout       io.Writer
+	Stdout       io.WriteCloser
 	CGroupLimits *api.CGroupLimits
 }
 
@@ -862,30 +862,35 @@ func (d *stiDocker) redirectResponseToOutputStream(tty bool, outputStream, error
 // goroutine to pump data down from the container's stdout and stderr.  it holds
 // open the HijackedResponse until all of this is done.  Caller's responsibility
 // to close resp, as well as outputStream and errorStream if appropriate.
-func (d *stiDocker) holdHijackedConnection(tty bool, inputStream io.Reader, outputStream, errorStream io.WriteCloser, resp dockertypes.HijackedResponse) error {
+func (d *stiDocker) holdHijackedConnection(tty bool, opts *RunContainerOptions, resp dockertypes.HijackedResponse) error {
 	receiveStdout := make(chan error, 1)
-	if outputStream != nil || errorStream != nil {
+	if opts.Stdout != nil || opts.Stderr != nil {
 		go func() {
-			receiveErr := d.redirectResponseToOutputStream(tty, outputStream, errorStream, resp.Reader)
-			if outputStream != nil {
-				outputStream.Close()
+			err := d.redirectResponseToOutputStream(tty, opts.Stdout, opts.Stderr, resp.Reader)
+			if opts.Stdout != nil {
+				opts.Stdout.Close()
+				opts.Stdout = nil
 			}
-			if errorStream != nil {
-				errorStream.Close()
+			if opts.Stderr != nil {
+				opts.Stderr.Close()
+				opts.Stderr = nil
 			}
-			receiveStdout <- receiveErr
+			receiveStdout <- err
 		}()
+	} else {
+		receiveStdout <- nil
 	}
 
-	var err error
-	if inputStream != nil {
-		_, err = io.Copy(resp.Conn, inputStream)
+	if opts.Stdin != nil {
+		_, err := io.Copy(resp.Conn, opts.Stdin)
+		opts.Stdin.Close()
+		opts.Stdin = nil
 		if err != nil {
 			<-receiveStdout
 			return err
 		}
 	}
-	err = resp.CloseWrite()
+	err := resp.CloseWrite()
 	if err != nil {
 		<-receiveStdout
 		return err
@@ -897,8 +902,24 @@ func (d *stiDocker) holdHijackedConnection(tty bool, inputStream io.Reader, outp
 }
 
 // RunContainer creates and starts a container using the image specified in opts
-// with the ability to stream input and/or output.
+// with the ability to stream input and/or output.  Any non-nil
+// opts.Std{in,out,err} will be closed upon return.
 func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
+	// Guarantee that Std{in,out,err} are closed upon return, including under
+	// error circumstances.  In normal circumstances, holdHijackedConnection
+	// should do this for us.
+	defer func() {
+		if opts.Stdin != nil {
+			opts.Stdin.Close()
+		}
+		if opts.Stdout != nil {
+			opts.Stdout.Close()
+		}
+		if opts.Stderr != nil {
+			opts.Stderr.Close()
+		}
+	}()
+
 	createOpts := opts.asDockerCreateContainerOptions()
 
 	// get info about the specified image
@@ -1027,7 +1048,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 			dumpContainerInfo(container, d, image)
 		}
 
-		err = d.holdHijackedConnection(false, opts.Stdin, opts.Stdout, opts.Stderr, resp)
+		err = d.holdHijackedConnection(false, &opts, resp)
 		if err != nil {
 			return err
 		}
@@ -1134,5 +1155,8 @@ func (d *stiDocker) BuildImage(opts BuildImageOptions) error {
 	// since can't pass in output stream to engine-api, need to copy contents of
 	// the output stream they create into our output stream
 	_, err = io.Copy(opts.Stdout, resp.Body)
+	if opts.Stdout != nil {
+		opts.Stdout.Close()
+	}
 	return err
 }

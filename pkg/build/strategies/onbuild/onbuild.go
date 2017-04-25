@@ -3,6 +3,7 @@ package onbuild
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -106,10 +107,13 @@ func (builder *OnBuild) Build(config *api.Config) (*api.Result, error) {
 	tarStream := builder.tar.CreateTarStreamReader(filepath.Join(config.WorkingDir, "upload", "src"), false)
 	defer tarStream.Close()
 
+	outReader, outWriter := io.Pipe()
+	go io.Copy(os.Stdout, outReader)
+
 	opts := docker.BuildImageOptions{
 		Name:         config.Tag,
 		Stdin:        tarStream,
-		Stdout:       os.Stdout,
+		Stdout:       outWriter,
 		CGroupLimits: config.CGroupLimits,
 	}
 

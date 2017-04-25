@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -66,6 +67,30 @@ const (
 	FakeScriptsHTTPURL = "http://127.0.0.1:23456/.s2i/bin"
 )
 
+var engineClient docker.Client
+
+func init() {
+	var err error
+	engineClient, err = docker.NewEngineAPIClient(docker.GetDefaultDockerConfig())
+	if err != nil {
+		panic(err)
+	}
+
+	// get the full path to this .go file so we can construct the file url
+	// using this file's dirname
+	_, filename, _, _ := runtime.Caller(0)
+	testImagesDir := filepath.Join(filepath.Dir(filename), "scripts")
+
+	l, err := net.Listen("tcp", ":23456")
+	if err != nil {
+		panic(err)
+	}
+
+	hs := http.Server{Handler: http.FileServer(http.Dir(testImagesDir))}
+	hs.SetKeepAlivesEnabled(false)
+	go hs.Serve(l)
+}
+
 func getDefaultContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), 20*time.Second)
 }
@@ -91,14 +116,13 @@ func TestInjectionBuild(t *testing.T) {
 
 type integrationTest struct {
 	t             *testing.T
-	engineClient  *dockerapi.Client
 	setupComplete bool
 }
 
 func (i integrationTest) InspectImage(name string) (*dockertypes.ImageInspect, error) {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	resp, _, err := i.engineClient.ImageInspectWithRaw(ctx, name, false)
+	resp, _, err := engineClient.ImageInspectWithRaw(ctx, name, false)
 	if err != nil {
 		if dockerapi.IsErrImageNotFound(err) {
 			return nil, fmt.Errorf("no such image :%q", name)
@@ -123,12 +147,6 @@ func getLogLevel() (level int) {
 
 // setup sets up integration tests
 func (i *integrationTest) setup() {
-	var err error
-	i.engineClient, err = docker.NewEngineAPIClient(docker.GetDefaultDockerConfig())
-	if err != nil {
-		i.t.Errorf("%+v", err)
-		return
-	}
 	if !i.setupComplete {
 		// get the full path to this .go file so we can construct the file url
 		// using this file's dirname
@@ -138,14 +156,10 @@ func (i *integrationTest) setup() {
 
 		for _, image := range []string{TagCleanBuild, TagCleanBuildUser, TagIncrementalBuild, TagIncrementalBuildUser} {
 			ctx, cancel := getDefaultContext()
-			i.engineClient.ImageRemove(ctx, image, dockertypes.ImageRemoveOptions{})
+			engineClient.ImageRemove(ctx, image, dockertypes.ImageRemoveOptions{})
 			cancel()
 		}
 
-		go http.ListenAndServe(":23456", http.FileServer(http.Dir(testImagesDir)))
-		if err := waitForHTTPReady(); err != nil {
-			i.t.Fatalf("Unexpected error: %v", err)
-		}
 		i.setupComplete = true
 	}
 
@@ -170,26 +184,6 @@ func integration(t *testing.T) *integrationTest {
 	i := &integrationTest{t: t}
 	i.setup()
 	return i
-}
-
-// Wait for the mock HTTP server to become ready to serve the HTTP requests.
-//
-func waitForHTTPReady() error {
-	retryCount := 50
-	for {
-		if resp, err := http.Get("http://127.0.0.1:23456/"); err != nil {
-			if resp != nil && resp.Body != nil {
-				resp.Body.Close()
-			}
-			if retryCount--; retryCount > 0 {
-				time.Sleep(20 * time.Millisecond)
-			} else {
-				return err
-			}
-		} else {
-			return nil
-		}
-	}
 }
 
 // Test a clean build.  The simplest case.
@@ -527,7 +521,7 @@ func (i *integrationTest) createContainer(image string) string {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
 	opts := dockertypes.ContainerCreateConfig{Name: "", Config: &dockercontainer.Config{Image: image}}
-	container, err := i.engineClient.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, opts.Name)
+	container, err := engineClient.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, opts.Name)
 	if err != nil {
 		i.t.Errorf("Couldn't create container from image %s with error %+v", image, err)
 		return ""
@@ -535,7 +529,7 @@ func (i *integrationTest) createContainer(image string) string {
 
 	ctx, cancel = getDefaultContext()
 	defer cancel()
-	err = i.engineClient.ContainerStart(ctx, container.ID)
+	err = engineClient.ContainerStart(ctx, container.ID)
 	if err != nil {
 		i.t.Errorf("Couldn't start container: %s with error %+v", container.ID, err)
 		return ""
@@ -543,7 +537,7 @@ func (i *integrationTest) createContainer(image string) string {
 
 	ctx, cancel = getDefaultContext()
 	defer cancel()
-	exitCode, _ := i.engineClient.ContainerWait(ctx, container.ID)
+	exitCode, _ := engineClient.ContainerWait(ctx, container.ID)
 	if exitCode != 0 {
 		i.t.Errorf("Bad exit code from container: %d", exitCode)
 		return ""
@@ -556,7 +550,7 @@ func (i *integrationTest) runInContainer(image string, command []string) int {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
 	opts := dockertypes.ContainerCreateConfig{Name: "", Config: &dockercontainer.Config{Image: image, AttachStdout: false, AttachStdin: false, Cmd: command}}
-	container, err := i.engineClient.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, opts.Name)
+	container, err := engineClient.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, opts.Name)
 	if err != nil {
 		i.t.Errorf("Couldn't create container from image %s err %+v", image, err)
 		return -1
@@ -564,19 +558,19 @@ func (i *integrationTest) runInContainer(image string, command []string) int {
 
 	ctx, cancel = getDefaultContext()
 	defer cancel()
-	err = i.engineClient.ContainerStart(ctx, container.ID)
+	err = engineClient.ContainerStart(ctx, container.ID)
 	if err != nil {
 		i.t.Errorf("Couldn't start container: %s", container.ID)
 	}
 	ctx, cancel = getDefaultContext()
 	defer cancel()
-	exitCode, err := i.engineClient.ContainerWait(ctx, container.ID)
+	exitCode, err := engineClient.ContainerWait(ctx, container.ID)
 	if err != nil {
 		i.t.Errorf("Couldn't wait for container: %s", container.ID)
 	}
 	ctx, cancel = getDefaultContext()
 	defer cancel()
-	err = i.engineClient.ContainerRemove(ctx, container.ID, dockertypes.ContainerRemoveOptions{})
+	err = engineClient.ContainerRemove(ctx, container.ID, dockertypes.ContainerRemoveOptions{})
 	if err != nil {
 		i.t.Errorf("Couldn't remove container: %s", container.ID)
 	}
@@ -586,11 +580,11 @@ func (i *integrationTest) runInContainer(image string, command []string) int {
 func (i *integrationTest) removeContainer(cID string) {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	i.engineClient.ContainerKill(ctx, cID, "SIGKILL")
+	engineClient.ContainerKill(ctx, cID, "SIGKILL")
 	removeOpts := dockertypes.ContainerRemoveOptions{
 		RemoveVolumes: true,
 	}
-	err := i.engineClient.ContainerRemove(ctx, cID, removeOpts)
+	err := engineClient.ContainerRemove(ctx, cID, removeOpts)
 	if err != nil {
 		i.t.Errorf("Couldn't remove container %s: %s", cID, err)
 	}
@@ -639,7 +633,7 @@ func (i *integrationTest) checkIncrementalBuildState(cID string, workingDir stri
 func (i *integrationTest) fileExistsInContainer(cID string, filePath string) bool {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	rdr, stats, err := i.engineClient.CopyFromContainer(ctx, cID, filePath)
+	rdr, stats, err := engineClient.CopyFromContainer(ctx, cID, filePath)
 	if err != nil {
 		return false
 	}

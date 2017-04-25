@@ -60,7 +60,12 @@ func (s *Server) serveFakeDockerAPIServer() {
 		w.Header().Add("Content-Type", "application/json")
 		w.Write([]byte("{}"))
 	})
-	http.Serve(s.l, mux)
+	hs := http.Server{Handler: mux}
+	// Disable keepalives in order to prevent an explosion in the number of
+	// goroutines that makes stack traces noisy.  TODO: when using Go 1.8,
+	// http.Server.Shutdown() should do this for us.
+	hs.SetKeepAlivesEnabled(false)
+	hs.Serve(s.l)
 	s.c <- struct{}{}
 }
 
