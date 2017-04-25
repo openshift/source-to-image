@@ -145,14 +145,20 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 				cfg.Destination = oldDestination
 			}
 
-			glog.V(2).Infof("\n%s\n", describe.Config(cfg))
-
-			err := docker.CheckReachable(cfg)
+			client, err := docker.NewEngineAPIClient(cfg.DockerConfig)
 			if err != nil {
 				glog.Fatal(err)
 			}
 
-			builder, _, err := strategies.GetStrategy(cfg)
+			d := docker.New(client, cfg.PullAuthentication)
+			err = d.CheckReachable()
+			if err != nil {
+				glog.Fatal(err)
+			}
+
+			glog.V(2).Infof("\n%s\n", describe.Config(client, cfg))
+
+			builder, _, err := strategies.GetStrategy(client, cfg)
 			s2ierr.CheckError(err)
 			result, err := builder.Build(cfg)
 			if err != nil {
@@ -167,8 +173,7 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 			}
 
 			if cfg.RunImage {
-				runner, err := run.New(cfg)
-				s2ierr.CheckError(err)
+				runner := run.New(client, cfg)
 				err = runner.Run(cfg)
 				s2ierr.CheckError(err)
 			}
@@ -233,7 +238,10 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 				cfg.PreviousImagePullPolicy = api.DefaultPreviousImagePullPolicy
 			}
 
-			pr, err := docker.GetRebuildImage(cfg)
+			client, err := docker.NewEngineAPIClient(cfg.DockerConfig)
+			s2ierr.CheckError(err)
+
+			pr, err := docker.GetRebuildImage(client, cfg)
 			s2ierr.CheckError(err)
 			err = build.GenerateConfigFromLabels(cfg, pr)
 			s2ierr.CheckError(err)
@@ -244,9 +252,9 @@ func newCmdRebuild(cfg *api.Config) *cobra.Command {
 
 			cfg.PullAuthentication = docker.GetImageRegistryAuth(auths, cfg.BuilderImage)
 
-			glog.V(2).Infof("\n%s\n", describe.Config(cfg))
+			glog.V(2).Infof("\n%s\n", describe.Config(client, cfg))
 
-			builder, _, err := strategies.GetStrategy(cfg)
+			builder, _, err := strategies.GetStrategy(client, cfg)
 			s2ierr.CheckError(err)
 			result, err := builder.Build(cfg)
 			s2ierr.CheckError(err)
@@ -550,7 +558,9 @@ func newCmdUsage(cfg *api.Config) *cobra.Command {
 				cfg.PreviousImagePullPolicy = api.DefaultPreviousImagePullPolicy
 			}
 
-			uh, err := sti.NewUsage(cfg)
+			client, err := docker.NewEngineAPIClient(cfg.DockerConfig)
+			s2ierr.CheckError(err)
+			uh, err := sti.NewUsage(client, cfg)
 			s2ierr.CheckError(err)
 			err = uh.Show()
 			s2ierr.CheckError(err)

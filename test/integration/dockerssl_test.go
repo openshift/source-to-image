@@ -104,10 +104,18 @@ func serveUNIX(t *testing.T) *Server {
 	return s
 }
 
-func runTest(t *testing.T, config *api.DockerConfig, expected bool) {
-	err := docker.CheckReachable(&api.Config{DockerConfig: config})
-	if (err == nil) != expected {
-		t.Errorf("with DockerConfig %+v, expected success %v, got error %v", config, expected, err)
+func runTest(t *testing.T, config *api.DockerConfig, expectedSuccess bool) {
+	client, err := docker.NewEngineAPIClient(config)
+	if err != nil {
+		if expectedSuccess {
+			t.Errorf("with DockerConfig %+v, expected success %v, got error %v", config, expectedSuccess, err)
+		}
+		return
+	}
+	d := docker.New(client, api.AuthConfig{})
+	err = d.CheckReachable()
+	if (err == nil) != expectedSuccess {
+		t.Errorf("with DockerConfig %+v, expected success %v, got error %v", config, expectedSuccess, err)
 	}
 }
 

@@ -132,6 +132,7 @@ type Docker interface {
 	UploadToContainerWithTarWriter(fs util.FileSystem, srcPath, destPath, container string, makeTarWriter func(io.Writer) s2itar.Writer) error
 	DownloadFromContainer(containerPath string, w io.Writer, container string) error
 	Version() (dockertypes.Version, error)
+	CheckReachable() error
 }
 
 // Client contains all methods used when interacting directly with docker engine-api
@@ -326,11 +327,7 @@ func NewEngineAPIClient(config *api.DockerConfig) (*dockerapi.Client, error) {
 }
 
 // New creates a new implementation of the STI Docker interface
-func New(config *api.DockerConfig, auth api.AuthConfig) (Docker, error) {
-	client, err := NewEngineAPIClient(config)
-	if err != nil {
-		return nil, err
-	}
+func New(client Client, auth api.AuthConfig) Docker {
 	return &stiDocker{
 		client: client,
 		pullAuth: dockertypes.AuthConfig{
@@ -339,7 +336,7 @@ func New(config *api.DockerConfig, auth api.AuthConfig) (Docker, error) {
 			Email:         auth.Email,
 			ServerAddress: auth.ServerAddress,
 		},
-	}, nil
+	}
 }
 
 func getDefaultContext() (context.Context, context.CancelFunc) {

@@ -189,7 +189,7 @@ func TestBuildErrorOnBuildBlocked(t *testing.T) {
 }
 
 func TestNewWithInvalidExcludeRegExp(t *testing.T) {
-	_, err := New(&api.Config{
+	_, err := New(nil, &api.Config{
 		DockerConfig:  docker.GetDefaultDockerConfig(),
 		ExcludeRegExp: "[",
 	}, nil, nil, build.Overrides{})

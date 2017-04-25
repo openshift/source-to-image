@@ -37,11 +37,8 @@ type onBuildSourceHandler struct {
 }
 
 // New returns a new instance of OnBuild builder
-func New(config *api.Config, fs util.FileSystem, overrides build.Overrides) (*OnBuild, error) {
-	dockerHandler, err := docker.New(config.DockerConfig, config.PullAuthentication)
-	if err != nil {
-		return nil, err
-	}
+func New(client docker.Client, config *api.Config, fs util.FileSystem, overrides build.Overrides) (*OnBuild, error) {
+	dockerHandler := docker.New(client, config.PullAuthentication)
 	builder := &OnBuild{
 		docker: dockerHandler,
 		git:    git.New(fs),
@@ -49,7 +46,7 @@ func New(config *api.Config, fs util.FileSystem, overrides build.Overrides) (*On
 		tar:    tar.New(fs),
 	}
 	// Use STI Prepare() and download the 'run' script optionally.
-	s, err := sti.New(config, fs, overrides)
+	s, err := sti.New(client, config, fs, overrides)
 	if err != nil {
 		return nil, err
 	}
