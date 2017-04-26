@@ -973,14 +973,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 	}
 
 	// Create a new container.
-
-	// First strip any inlined proxy credentials from the *proxy* env variables,
-	// before logging the env variables.
-	origEnv := createOpts.Config.Env
-	strippedEnv := util.StripProxyCredentials(origEnv)
-	createOpts.Config.Env = strippedEnv
-	glog.V(2).Infof("Creating container with options {Name:%q Config:%+v HostConfig:%+v} ...", createOpts.Name, createOpts.Config, createOpts.HostConfig)
-	createOpts.Config.Env = origEnv
+	glog.V(2).Infof("Creating container with options {Name:%q Config:%s HostConfig:%+v} ...", createOpts.Name, util.SafeForLoggingContainerConfig(createOpts.Config), createOpts.HostConfig)
 	ctx, cancel := getDefaultContext()
 	defer cancel()
 	container, err := d.client.ContainerCreate(ctx, createOpts.Config, createOpts.HostConfig, createOpts.NetworkingConfig, createOpts.Name)
@@ -1107,13 +1100,7 @@ func (d *stiDocker) CommitContainer(opts CommitContainerOptions) (string, error)
 		}
 		dockerOpts.Config = &config
 
-		// First strip any inlined proxy credentials from the *proxy* env variables,
-		// before logging the env variables.
-		origEnv := dockerOpts.Config.Env
-		strippedEnv := util.StripProxyCredentials(origEnv)
-		dockerOpts.Config.Env = strippedEnv
-		glog.V(2).Infof("Committing container with dockerOpts: %+v, config: %+v", dockerOpts, config)
-		dockerOpts.Config.Env = origEnv
+		glog.V(2).Infof("Committing container with dockerOpts: %+v, config: %s", dockerOpts, util.SafeForLoggingContainerConfig(&config))
 	}
 
 	resp, err := d.client.ContainerCommit(context.Background(), opts.ContainerID, dockerOpts)

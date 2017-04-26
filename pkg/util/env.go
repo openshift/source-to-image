@@ -39,7 +39,7 @@ func ReadEnvironmentFile(path string) (map[string]string, error) {
 }
 
 // StripProxyCredentials attempts to strip sensitive information from proxy
-// environment variables.
+// environment variable strings in key=value form.
 func StripProxyCredentials(env []string) []string {
 	// case insensitively match all key=value variables containing the word "proxy"
 	proxyRegex := regexp.MustCompile("(?i).*proxy.*")
@@ -65,6 +65,6 @@ func StripURLCredentials(input string) (string, error) {
 		return input, err
 	}
 	// wipe out the user info from the url.
-	u.User = nil
+	u.User = url.User("redacted")
 	return u.String(), nil
 }
