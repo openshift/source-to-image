@@ -23,13 +23,9 @@ type DockerRunner struct {
 
 // New creates a DockerRunner for executing the methods associated with running
 // the produced image in a docker container for verification purposes.
-func New(config *api.Config) (*DockerRunner, error) {
-	client, err := docker.New(config.DockerConfig, config.PullAuthentication)
-	if err != nil {
-		glog.Errorf("Failed to connect to Docker daemon: %v", err)
-		return nil, err
-	}
-	return &DockerRunner{client}, nil
+func New(client docker.Client, config *api.Config) *DockerRunner {
+	d := docker.New(client, config.PullAuthentication)
+	return &DockerRunner{d}
 }
 
 // Run invokes the Docker API to run the image defined in config as a new

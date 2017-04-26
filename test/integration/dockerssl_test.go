@@ -60,7 +60,12 @@ func (s *Server) serveFakeDockerAPIServer() {
 		w.Header().Add("Content-Type", "application/json")
 		w.Write([]byte("{}"))
 	})
-	http.Serve(s.l, mux)
+	hs := http.Server{Handler: mux}
+	// Disable keepalives in order to prevent an explosion in the number of
+	// goroutines that makes stack traces noisy.  TODO: when using Go 1.8,
+	// http.Server.Shutdown() should do this for us.
+	hs.SetKeepAlivesEnabled(false)
+	hs.Serve(s.l)
 	s.c <- struct{}{}
 }
 
@@ -104,10 +109,18 @@ func serveUNIX(t *testing.T) *Server {
 	return s
 }
 
-func runTest(t *testing.T, config *api.DockerConfig, expected bool) {
-	err := docker.CheckReachable(&api.Config{DockerConfig: config})
-	if (err == nil) != expected {
-		t.Errorf("with DockerConfig %+v, expected success %v, got error %v", config, expected, err)
+func runTest(t *testing.T, config *api.DockerConfig, expectedSuccess bool) {
+	client, err := docker.NewEngineAPIClient(config)
+	if err != nil {
+		if expectedSuccess {
+			t.Errorf("with DockerConfig %+v, expected success %v, got error %v", config, expectedSuccess, err)
+		}
+		return
+	}
+	d := docker.New(client, api.AuthConfig{})
+	err = d.CheckReachable()
+	if (err == nil) != expectedSuccess {
+		t.Errorf("with DockerConfig %+v, expected success %v, got error %v", config, expectedSuccess, err)
 	}
 }
 

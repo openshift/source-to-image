@@ -148,7 +148,11 @@ func TestDefaultSource(t *testing.T) {
 		Source:       "file://.",
 		DockerConfig: &api.DockerConfig{Endpoint: "unix:///var/run/docker.sock"},
 	}
-	sti, err := New(config, util.NewFileSystem(), build.Overrides{})
+	client, err := docker.NewEngineAPIClient(config.DockerConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sti, err := New(client, config, util.NewFileSystem(), build.Overrides{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +169,11 @@ func TestEmptySource(t *testing.T) {
 		Source:       "",
 		DockerConfig: &api.DockerConfig{Endpoint: "unix:///var/run/docker.sock"},
 	}
-	sti, err := New(config, util.NewFileSystem(), build.Overrides{})
+	client, err := docker.NewEngineAPIClient(config.DockerConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sti, err := New(client, config, util.NewFileSystem(), build.Overrides{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +187,11 @@ func TestEmptySource(t *testing.T) {
 
 func TestOverrides(t *testing.T) {
 	fd := &FakeSTI{}
-	sti, err := New(
+	client, err := docker.NewEngineAPIClient(&api.DockerConfig{Endpoint: "unix:///var/run/docker.sock"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sti, err := New(client,
 		&api.Config{
 			DockerConfig: &api.DockerConfig{Endpoint: "unix:///var/run/docker.sock"},
 		},
@@ -912,7 +924,7 @@ func TestCleanup(t *testing.T) {
 }
 
 func TestNewWithInvalidExcludeRegExp(t *testing.T) {
-	_, err := New(&api.Config{
+	_, err := New(nil, &api.Config{
 		DockerConfig:  docker.GetDefaultDockerConfig(),
 		ExcludeRegExp: "(",
 	}, nil, build.Overrides{})

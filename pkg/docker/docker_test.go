@@ -509,9 +509,7 @@ func TestRunContainer(t *testing.T) {
 			Destination:     tst.paramDestination,
 			Command:         tst.cmd,
 			Env:             []string{"Key1=Value1", "Key2=Value2"},
-			Stdin:           os.Stdin,
-			Stdout:          os.Stdout,
-			Stderr:          os.Stdout,
+			Stdin:           ioutil.NopCloser(os.Stdin),
 		})
 		if err != nil {
 			t.Errorf("%s: Unexpected error: %v", desc, err)
