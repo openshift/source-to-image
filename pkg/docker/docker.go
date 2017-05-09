@@ -983,15 +983,14 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 
 	// Container was created, so we defer its removal, and also remove it if we get a SIGINT/SIGTERM/SIGQUIT/SIGHUP.
 	removeContainer := func() {
-		glog.V(4).Infof("Killing container %q ...", container.ID)
-		if killErr := d.KillContainer(container.ID); killErr != nil {
-			glog.V(5).Infof("warning: Failed to kill container %q: %v", container.ID, killErr)
-		} else {
-			glog.V(4).Infof("Killed container %q", container.ID)
-		}
-
 		glog.V(4).Infof("Removing container %q ...", container.ID)
+
+		killErr := d.KillContainer(container.ID)
+
 		if removeErr := d.RemoveContainer(container.ID); removeErr != nil {
+			if killErr != nil {
+				glog.V(0).Infof("warning: Failed to kill container %q: %v", container.ID, killErr)
+			}
 			glog.V(0).Infof("warning: Failed to remove container %q: %v", container.ID, removeErr)
 		} else {
 			glog.V(4).Infof("Removed container %q", container.ID)
