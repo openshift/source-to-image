@@ -19,7 +19,7 @@ func TestSafeForLoggingContainerConfig(t *testing.T) {
 	}
 	orig := fmt.Sprintf("%+v", *c)
 
-	s := SafeForLoggingContainerConfig(c)
+	s := fmt.Sprintf("%+v", *SafeForLoggingContainerConfig(c))
 	if strings.Contains(s, "user:password") {
 		t.Errorf("expected %s to not contain credentials", s)
 	}
@@ -31,7 +31,7 @@ func TestSafeForLoggingContainerConfig(t *testing.T) {
 	// make sure the original object was not changed
 	s = fmt.Sprintf("%+v", *c)
 	if !(s == orig) {
-		t.Errorf("expected original %s to be unchaged, got %s", orig, s)
+		t.Errorf("expected original %s to be unchanged, got %s", orig, s)
 	}
 
 }

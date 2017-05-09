@@ -54,7 +54,7 @@ func TestStripProxyCredentials(t *testing.T) {
 		"othervalue=user:password@hostname.com",
 		"proxy=https://user:password@foo%$ @bar@blah.com",
 	}
-	result := StripProxyCredentials(inputs)
+	result := SafeForLoggingEnv(inputs)
 	for i := range result {
 		if result[i] != expected[i] {
 			t.Errorf("expected %s to be stripped to %s, but got %s", inputs[i], expected[i], result[i])
