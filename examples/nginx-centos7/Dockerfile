@@ -32,7 +32,6 @@ RUN sed -i 's/user nginx;//' /etc/nginx/nginx.conf
 # Copy the S2I scripts to /usr/libexec/s2i since we set the label that way
 COPY ./s2i/bin/ /usr/libexec/s2i
 
-RUN chown -R 1001:1001 /opt/app-root
 RUN chown -R 1001:1001 /usr/share/nginx
 RUN chown -R 1001:1001 /var/log/nginx
 RUN chown -R 1001:1001 /var/lib/nginx
