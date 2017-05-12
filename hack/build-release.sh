@@ -41,7 +41,7 @@ tar -rf "${context}/archive.tar" -C "${context}" sti-version-defs
 gzip -f "${context}/archive.tar"
 
 # Perform the build and release in Docker.
-cat "${context}/archive.tar.gz" | docker run -i --cidfile="${context}/cid" openshift/sti-release
+cat "${context}/archive.tar.gz" | docker run -i --cidfile="${context}/cid" -e RELEASE_LDFLAGS="-w -s" openshift/sti-release
 docker cp $(cat ${context}/cid):/go/src/github.com/openshift/source-to-image/_output/local/releases "${S2I_OUTPUT}"
 echo "${S2I_GIT_COMMIT}" > "${S2I_LOCAL_RELEASEPATH}/.commit"
 

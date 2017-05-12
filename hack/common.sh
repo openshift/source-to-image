@@ -21,6 +21,8 @@ S2I_OUTPUT_BINPATH="${S2I_OUTPUT}/bin"
 S2I_OUTPUT_PKGDIR="${S2I_OUTPUT}/pkgdir"
 S2I_LOCAL_BINPATH="${S2I_OUTPUT}/go/bin"
 S2I_LOCAL_RELEASEPATH="${S2I_OUTPUT}/releases"
+RELEASE_LDFLAGS=${RELEASE_LDFLAGS:-""}
+
 
 readonly S2I_GO_PACKAGE=github.com/openshift/source-to-image
 readonly S2I_GOPATH="${S2I_OUTPUT}/go"
@@ -89,7 +91,7 @@ s2i::build::build_binaries() {
       echo "++ Building go targets for ${platform}:" "${targets[@]}"
       CGO_ENABLED=0 go install "${goflags[@]:+${goflags[@]}}" \
           -pkgdir "${S2I_OUTPUT_PKGDIR}" \
-          -ldflags "${version_ldflags}" \
+          -ldflags "${version_ldflags} ${RELEASE_LDFLAGS}" \
           "${binaries[@]}"
       s2i::build::unset_platform_envs "${platform}"
     done
@@ -474,7 +476,6 @@ s2i::build::ldflags() {
     ldflags+=($(s2i::build::ldflag "minorFromGit" "${S2I_GIT_MINOR}"))
     ldflags+=($(s2i::build::ldflag "versionFromGit" "${S2I_GIT_VERSION}"))
     ldflags+=($(s2i::build::ldflag "commitFromGit" "${S2I_GIT_COMMIT}"))
-
     # The -ldflags parameter takes a single string, so join the output.
     echo "${ldflags[*]-}"
   )
