@@ -42,7 +42,7 @@ scripts are already present.
 * optional:
     * [save-artifacts](#save-artifacts)
     * [usage](#usage)
-    * [test/run](#test/run)
+    * [test/run](#testrun)
 
 All of the scripts can be written in any programming language, as long as the scripts
 are executable inside the builder image. The build searches the following locations for
