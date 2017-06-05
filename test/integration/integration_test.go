@@ -23,6 +23,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/build/strategies"
 	"github.com/openshift/source-to-image/pkg/docker"
+	dockerpkg "github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
 	"golang.org/x/net/context"
@@ -188,48 +189,53 @@ func integration(t *testing.T) *integrationTest {
 
 // Test a clean build.  The simplest case.
 func TestCleanBuild(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBuilderImage, "", true, true)
+	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBuilderImage, "", true, true, false)
+}
+
+// Test Labels
+func TestCleanBuildLabel(t *testing.T) {
+	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBuilderImage, "", true, true, true)
 }
 
 func TestCleanBuildUser(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuildUser, false, FakeUserImage, "", true, true)
+	integration(t).exerciseCleanBuild(TagCleanBuildUser, false, FakeUserImage, "", true, true, false)
 }
 
 func TestCleanBuildFileScriptsURL(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBuilderImage, FakeScriptsFileURL, true, true)
+	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBuilderImage, FakeScriptsFileURL, true, true, false)
 }
 
 func TestCleanBuildHttpScriptsURL(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBuilderImage, FakeScriptsHTTPURL, true, true)
+	integration(t).exerciseCleanBuild(TagCleanBuild, false, FakeBuilderImage, FakeScriptsHTTPURL, true, true, false)
 }
 
 func TestCleanBuildScripts(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuildScripts, false, FakeImageScripts, "", true, true)
+	integration(t).exerciseCleanBuild(TagCleanBuildScripts, false, FakeImageScripts, "", true, true, false)
 }
 
 func TestLayeredBuildNoTar(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanLayeredBuildNoTar, false, FakeImageNoTar, FakeScriptsFileURL, false, true)
+	integration(t).exerciseCleanBuild(TagCleanLayeredBuildNoTar, false, FakeImageNoTar, FakeScriptsFileURL, false, true, false)
 }
 
 // Test that a build config with a callbackURL will invoke HTTP endpoint
 func TestCleanBuildCallbackInvoked(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuild, true, FakeBuilderImage, "", true, true)
+	integration(t).exerciseCleanBuild(TagCleanBuild, true, FakeBuilderImage, "", true, true, false)
 }
 
 func TestCleanBuildOnBuild(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuildOnBuild, false, FakeImageOnBuild, "", true, true)
+	integration(t).exerciseCleanBuild(TagCleanBuildOnBuild, false, FakeImageOnBuild, "", true, true, false)
 }
 
 func TestCleanBuildOnBuildNoName(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuildOnBuildNoName, false, FakeImageOnBuild, "", false, false)
+	integration(t).exerciseCleanBuild(TagCleanBuildOnBuildNoName, false, FakeImageOnBuild, "", false, false, false)
 }
 
 func TestCleanBuildNoName(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanBuildNoName, false, FakeBuilderImage, "", true, false)
+	integration(t).exerciseCleanBuild(TagCleanBuildNoName, false, FakeBuilderImage, "", true, false, false)
 }
 
 func TestLayeredBuildNoTarNoName(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanLayeredBuildNoTarNoName, false, FakeImageNoTar, FakeScriptsFileURL, false, false)
+	integration(t).exerciseCleanBuild(TagCleanLayeredBuildNoTarNoName, false, FakeImageNoTar, FakeScriptsFileURL, false, false, false)
 }
 
 func TestAllowedUIDsNamedUser(t *testing.T) {
@@ -270,7 +276,7 @@ func (i *integrationTest) exerciseCleanAllowedUIDsBuild(tag, imageName string, e
 	}
 }
 
-func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, imageName string, scriptsURL string, expectImageName bool, setTag bool) {
+func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, imageName string, scriptsURL string, expectImageName bool, setTag bool, checkLabel bool) {
 	t := i.t
 	callbackURL := ""
 	callbackInvoked := false
@@ -343,6 +349,11 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 		i.checkForImage(tag)
 		containerID := i.createContainer(tag)
 		i.checkBasicBuildState(containerID, resp.WorkingDir)
+
+		if checkLabel {
+			i.checkForLabel(tag)
+		}
+
 		i.removeContainer(containerID)
 	}
 
@@ -639,4 +650,17 @@ func (i *integrationTest) fileExistsInContainer(cID string, filePath string) boo
 	}
 	defer rdr.Close()
 	return "" != stats.Name
+}
+
+func (i *integrationTest) checkForLabel(image string) {
+	docker := dockerpkg.New(engineClient, (&api.Config{}).PullAuthentication)
+
+	labelMap, err := docker.GetLabels(image)
+	if err != nil {
+		i.t.Fatalf("Unable to get labels from image %s: %v", image, err)
+	}
+
+	if labelMap["testLabel"] != "testLabel_value" {
+		i.t.Errorf("Unable to verify 'testLabel' for image '%s'", image)
+	}
 }
