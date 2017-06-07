@@ -57,10 +57,10 @@ func (step *storePreviousImageStep) execute(ctx *postExecutorStepContext) error 
 	if step.builder.incremental && step.builder.config.RemovePreviousImage {
 		glog.V(3).Info("Executing step: store previous image")
 		ctx.previousImageID = step.getPreviousImage()
-		return nil
+	} else {
+		glog.V(3).Info("Skipping step: store previous image")
 	}
 
-	glog.V(3).Info("Skipping step: store previous image")
 	return nil
 }
 
@@ -82,10 +82,10 @@ func (step *removePreviousImageStep) execute(ctx *postExecutorStepContext) error
 	if step.builder.incremental && step.builder.config.RemovePreviousImage {
 		glog.V(3).Info("Executing step: remove previous image")
 		step.removePreviousImage(ctx.previousImageID)
-		return nil
+	} else {
+		glog.V(3).Info("Skipping step: remove previous image")
 	}
 
-	glog.V(3).Info("Skipping step: remove previous image")
 	return nil
 }
 
