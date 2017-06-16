@@ -157,6 +157,10 @@ func baseTest(t *testing.T, patterns []string, filesToDel []string, filesToKeep 
 	}
 }
 
+func TestBlankLine(t *testing.T) {
+	baseTest(t, []string{"foo.bar\n", "\n", "bar.baz\n"}, []string{"foo.bar", "bar.baz"}, []string{"foo.baz"})
+}
+
 func TestSingleIgnore(t *testing.T) {
 	baseTest(t, []string{"foo.bar\n"}, []string{"foo.bar"}, []string{})
 }
