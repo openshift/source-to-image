@@ -14,3 +14,12 @@ fi
 if [ -e /tmp/artifacts/save-artifacts-invoked ]; then
   touch /sti-fake/save-artifacts-invoked
 fi
+
+mkdir -p /tmp/.s2i/
+cat > /tmp/.s2i/image_metadata.json << EOL
+{
+  "labels": [
+    {"testLabel": "testLabel_value"}
+  ]
+}
+EOL
