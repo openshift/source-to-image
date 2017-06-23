@@ -175,6 +175,12 @@ If a `save-artifacts` script exists, a prior image already exists, and the `--in
 
 ## Installation
 
+##### Using `go get`
+
+You can install the s2i binary using `go get` which will download the source-to-image code into your `$GOPATH`, build the s2i binary, and install it into your `$GOPATH/bin`.
+
+```$ go get github.com/openshift/source-to-image/cmd/s2i```
+
 ##### For Mac
 
 You can either follow the installation instructions for Linux (and use the darwin-amd64 link) or you can just install source-to-image with Homebrew:
