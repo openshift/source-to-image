@@ -1,11 +1,15 @@
 package cmd
 
 import (
+	"flag"
 	"os"
 	"path/filepath"
 
+	log "github.com/golang/glog"
+
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // AddCommonFlags adds the common flags for usage, build and rebuild commands
@@ -30,4 +34,19 @@ func AddCommonFlags(c *cobra.Command, cfg *api.Config) {
 		"Specify the path to the Docker configuration file")
 	c.Flags().StringVarP(&(cfg.Destination), "destination", "d", "",
 		"Specify a destination location for untar operation")
+}
+
+// SetupGlog makes --loglevel reflect in glog's -v flag
+func SetupGlog(flags *pflag.FlagSet) {
+
+	from := flag.CommandLine
+	if fflag := from.Lookup("v"); fflag != nil {
+		level := fflag.Value.(*log.Level)
+		loglevelPtr := (*int32)(level)
+		flags.Int32Var(loglevelPtr, "loglevel", 0, "Set the level of log output (0-5)")
+	}
+
+	// FIXME currently glog has only option to redirect output to stderr
+	// the preferred for S2I would be to redirect to stdout
+	flag.CommandLine.Set("logtostderr", "true")
 }
