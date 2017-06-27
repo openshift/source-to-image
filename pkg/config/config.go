@@ -1,9 +1,11 @@
 package config
 
 import (
-	"io/ioutil"
-
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"regexp"
+	"strings"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
@@ -12,6 +14,7 @@ import (
 )
 
 var glog = utilglog.StderrLog
+var savedEnvMatcher = regexp.MustCompile("env-[0-9]+")
 
 // DefaultConfigPath specifies the default location of the S2I config file
 const DefaultConfigPath = ".s2ifile"
@@ -24,7 +27,7 @@ type Config struct {
 	Flags        map[string]string `json:"flags,omitempty" yaml:"flags,omitempty"`
 }
 
-// Save persists the S2I command line arguments into disk.
+// Save persists the S2I command line arguments to disk.
 func Save(config *api.Config, cmd *cobra.Command) {
 	c := Config{
 		BuilderImage: config.BuilderImage,
@@ -32,9 +35,14 @@ func Save(config *api.Config, cmd *cobra.Command) {
 		Tag:          config.Tag,
 		Flags:        make(map[string]string),
 	}
-	// Store only flags that have changed
 	cmd.Flags().Visit(func(f *pflag.Flag) {
-		c.Flags[f.Name] = f.Value.String()
+		if f.Name == "env" {
+			for i, env := range config.Environment {
+				c.Flags[fmt.Sprintf("%s-%d", f.Name, i)] = fmt.Sprintf("%s=%s", env.Name, env.Value)
+			}
+		} else {
+			c.Flags[f.Name] = f.Value.String()
+		}
 	})
 	data, err := json.Marshal(c)
 	if err != nil {
@@ -58,19 +66,41 @@ func Restore(config *api.Config, cmd *cobra.Command) {
 		}
 		glog.Infof("DEPRECATED: Use %s instead of .stifile", DefaultConfigPath)
 	}
+
 	c := Config{}
 	if err := json.Unmarshal(data, &c); err != nil {
 		glog.V(1).Infof("Unable to parse %s: %v", DefaultConfigPath, err)
 		return
 	}
+
 	config.BuilderImage = c.BuilderImage
 	config.Source = c.Source
 	config.Tag = c.Tag
+
+	envOverride := false
+	if cmd.Flag("env").Changed {
+		envOverride = true
+	}
+
 	for name, value := range c.Flags {
 		// Do not change flags that user sets. Allow overriding of stored flags.
-		if cmd.Flag(name).Changed {
-			continue
+		if name == "env" {
+			if envOverride {
+				continue
+			}
+			for _, v := range strings.Split(value, ",") {
+				cmd.Flags().Set(name, v)
+			}
+		} else if savedEnvMatcher.MatchString(name) {
+			if envOverride {
+				continue
+			}
+			cmd.Flags().Set("env", value)
+		} else {
+			if cmd.Flag(name).Changed {
+				continue
+			}
+			cmd.Flags().Set(name, value)
 		}
-		cmd.Flags().Set(name, value)
 	}
 }
