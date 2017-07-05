@@ -115,7 +115,7 @@ grep "Copying sources" "${WORK_DIR}/s2i-non-repo.log"
 check_result $? "${WORK_DIR}/s2i-non-repo.log"
 
 test_debug "s2i rebuild"
-s2i build https://github.com/openshift/sti-php.git --context-dir=5.5/test/test-app registry.access.redhat.com/openshift3/php-55-rhel7 rack-test-app --incremental=true --loglevel=5 &> "${WORK_DIR}/s2i-pre-rebuild.log"
+s2i build https://github.com/sclorg/s2i-php-container.git --context-dir=5.5/test/test-app registry.access.redhat.com/openshift3/php-55-rhel7 rack-test-app --incremental=true --loglevel=5 &> "${WORK_DIR}/s2i-pre-rebuild.log"
 check_result $? "${WORK_DIR}/s2i-pre-rebuild.log"
 s2i rebuild rack-test-app:latest rack-test-app:v1 -p never --loglevel=5 &> "${WORK_DIR}/s2i-rebuild.log"
 check_result $? "${WORK_DIR}/s2i-rebuild.log"
@@ -127,9 +127,16 @@ check_result $? ""
 grep "Sample invocation" "${WORK_DIR}/s2i-usage.log"
 check_result $? "${WORK_DIR}/s2i-usage.log"
 
-test_debug "s2i build with git proto"
+test_debug "s2i build with overriding assemble/run scripts"
+s2i build https://github.com/openshift/source-to-image openshift/php-55-centos7 test --context-dir=test_apprepo >& "${WORK_DIR}/s2i-override-build.log"
+grep "Running custom assemble" "${WORK_DIR}/s2i-override-build.log"
+check_result $? "${WORK_DIR}/s2i-override-build.log"
+docker run test >& "${WORK_DIR}/s2i-override-run.log"
+grep "Running custom run" "${WORK_DIR}/s2i-override-run.log"
+check_result $? "${WORK_DIR}/s2i-override-run.log"
 
-s2i build https://github.com/openshift/cakephp-ex openshift/php-55-centos7 test --run=true --loglevel=5 &> "${WORK_DIR}/s2i-git-proto.log" &
+test_debug "s2i build with remote git repo"
+s2i build https://github.com/openshift/cakephp-ex openshift/php-55-centos7 test --loglevel=5 &> "${WORK_DIR}/s2i-git-proto.log"
 check_result $? "${WORK_DIR}/s2i-git-proto.log"
 
 test_debug "s2i build with --run==true option"
