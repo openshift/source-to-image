@@ -195,7 +195,7 @@ func TestGitCheckout(t *testing.T) {
 	if ch.Name != "git" {
 		t.Errorf("Unexpected command name: %q", ch.Name)
 	}
-	if !reflect.DeepEqual(ch.Args, []string{"checkout", "ref1"}) {
+	if !reflect.DeepEqual(ch.Args, []string{"checkout", "--quiet", "ref1"}) {
 		t.Errorf("Unexpected command arguments: %#v", ch.Args)
 	}
 	if ch.Opts.Dir != "repo1" {
