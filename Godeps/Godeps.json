@@ -1,7 +1,7 @@
 {
 	"ImportPath": "github.com/openshift/source-to-image",
 	"GoVersion": "go1.7",
-	"GodepVersion": "v79",
+	"GodepVersion": "v74",
 	"Packages": [
 		"./..."
 	],
@@ -179,8 +179,8 @@
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/user",
-			"Comment": "v1.0.0-rc2-14-g45c30e7",
-			"Rev": "45c30e75abfd52107b53048004a83165403ad0d1"
+			"Comment": "v1.0.0-rc2-49-gd223e2a",
+			"Rev": "d223e2adae83f62d58448a799a5da05730228089"
 		},
 		{
 			"ImportPath": "github.com/openshift/origin/pkg/image/reference",
