@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 
+	log "github.com/golang/glog"
+
 	"github.com/openshift/source-to-image/pkg/api"
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/util"
@@ -516,7 +518,10 @@ func (h *stiGit) Checkout(repo, ref string) error {
 		Stderr: os.Stderr,
 		Dir:    repo,
 	}
-	return h.RunWithOptions(opts, "git", "checkout", ref)
+	if log.V(1) {
+		return h.RunWithOptions(opts, "git", "checkout", ref)
+	}
+	return h.RunWithOptions(opts, "git", "checkout", "--quiet", ref)
 }
 
 // SubmoduleInit initializes/clones submodules

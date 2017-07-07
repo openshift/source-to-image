@@ -38,7 +38,7 @@ func TestCloneWithContext(t *testing.T) {
 	if filepath.ToSlash(fs.RemoveDirName) != "upload/tmp" {
 		t.Errorf("Expected to remove the upload/tmp directory")
 	}
-	if !reflect.DeepEqual(cr.Args, []string{"checkout", "ref1"}) {
+	if !reflect.DeepEqual(cr.Args, []string{"checkout", "--quiet", "ref1"}) {
 		t.Errorf("Unexpected command arguments: %#v", cr.Args)
 	}
 }
