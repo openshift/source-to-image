@@ -128,13 +128,11 @@ Upon completion (or failure) of a build, `s2i` can execute a HTTP POST to a URL 
 about the build:
 
 * `success` - flag indicating the result of the build process (`true` or `false`)
-* `payload` - list of messages from the build process
 * `labels`  - labels of the resulting image
 
 Example: data posted will be in the form:
 ```
 {
-    "payload": "A string containing all build messages",
     "success": true,
     "labels": {
         "io.k8s.display-name": "my-app",

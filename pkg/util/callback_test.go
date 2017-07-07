@@ -34,14 +34,10 @@ func TestExecuteCallback(t *testing.T) {
 
 	type postBody struct {
 		Labels  map[string]string
-		Payload string
 		Success bool
 	}
 	var pb postBody
 	json.Unmarshal(fp.body, &pb)
-	if pb.Payload != "msg1\nmsg2\n" {
-		t.Errorf("Unexpected payload: %s", pb.Payload)
-	}
 	if len(pb.Labels) == 0 {
 		t.Errorf("Expected labels to be present in payload")
 	}
