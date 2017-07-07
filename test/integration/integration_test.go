@@ -293,7 +293,6 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 				defer r.Body.Close()
 				body, _ := ioutil.ReadAll(r.Body)
 				type CallbackMessage struct {
-					Payload string
 					Success bool
 					Labels  map[string]string
 				}
