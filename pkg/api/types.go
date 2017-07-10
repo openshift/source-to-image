@@ -113,10 +113,7 @@ type Config struct {
 	IgnoreSubmodules bool
 
 	// Source URL describing the location of sources used to build the result image.
-	Source string
-
-	// Ref is a tag/branch to be used for build.
-	Ref string
+	Source *git.URL
 
 	// Tag is a result image tag name.
 	Tag string

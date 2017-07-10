@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/openshift/source-to-image/pkg/scm/git"
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 	"github.com/spf13/cobra"
 
@@ -27,6 +28,7 @@ var glog = utilglog.StderrLog
 
 // NewCmdBuild implements the S2I cli build command.
 func NewCmdBuild(cfg *api.Config) *cobra.Command {
+	var ref string
 	useConfig := false
 	oldScriptsFlag := ""
 	oldDestination := ""
@@ -52,7 +54,12 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 
 			// If user specifies the arguments, then we override the stored ones
 			if len(args) >= 2 {
-				cfg.Source = args[0]
+				source, err := git.Parse(args[0])
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "ERROR: couldn't parse %q: %v\n", args[0], err)
+				}
+				cfg.Source = source
+				cfg.Source.URL.Fragment = ref
 				cfg.BuilderImage = args[1]
 				if len(args) >= 3 {
 					cfg.Tag = args[2]
@@ -162,7 +169,7 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 	buildCmd.Flags().BoolVar(&(cfg.RunImage), "run", false, "Run resulting image as part of invocation of this command")
 	buildCmd.Flags().BoolVar(&(cfg.IgnoreSubmodules), "ignore-submodules", false, "Ignore all git submodules when cloning application repository")
 	buildCmd.Flags().VarP(&(cfg.Environment), "env", "e", "Specify an single environment variable in NAME=VALUE format")
-	buildCmd.Flags().StringVarP(&(cfg.Ref), "ref", "r", "", "Specify a ref to check-out")
+	buildCmd.Flags().StringVarP(&(ref), "ref", "r", "", "Specify a ref to check-out")
 	buildCmd.Flags().StringVarP(&(cfg.AssembleUser), "assemble-user", "", "", "Specify the user to run assemble with")
 	buildCmd.Flags().StringVarP(&(cfg.ContextDir), "context-dir", "", "", "Specify the sub-directory inside the repository with the application sources")
 	buildCmd.Flags().StringVarP(&(cfg.ExcludeRegExp), "exclude", "", tar.DefaultExclusionPattern.String(), "Regular expression for selecting files from the source tree to exclude from the build, where the default excludes the '.git' directory (see https://golang.org/pkg/regexp for syntax, but note that \"\" will be interpreted as allow all files and exclude no files)")

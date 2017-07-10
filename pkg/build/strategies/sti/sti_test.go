@@ -147,7 +147,7 @@ func (f *FakeDockerBuild) Build(*api.Config) (*api.Result, error) {
 
 func TestDefaultSource(t *testing.T) {
 	config := &api.Config{
-		Source:       "file://.",
+		Source:       git.MustParse("."),
 		DockerConfig: &api.DockerConfig{Endpoint: "unix:///var/run/docker.sock"},
 	}
 	client, err := docker.NewEngineAPIClient(config.DockerConfig)
@@ -158,7 +158,7 @@ func TestDefaultSource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.Source == "" {
+	if config.Source == nil {
 		t.Errorf("Config.Source not set: %v", config.Source)
 	}
 	if _, ok := sti.source.(*file.File); !ok || sti.source == nil {
@@ -168,7 +168,7 @@ func TestDefaultSource(t *testing.T) {
 
 func TestEmptySource(t *testing.T) {
 	config := &api.Config{
-		Source:       "",
+		Source:       nil,
 		DockerConfig: &api.DockerConfig{Endpoint: "unix:///var/run/docker.sock"},
 	}
 	client, err := docker.NewEngineAPIClient(config.DockerConfig)
@@ -179,7 +179,7 @@ func TestEmptySource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.Source != "" {
+	if config.Source != nil {
 		t.Errorf("Config.Source unexpectantly changed: %v", config.Source)
 	}
 	if _, ok := sti.source.(*empty.Noop); !ok || sti.source == nil {
@@ -587,18 +587,17 @@ func TestFetchSource(t *testing.T) {
 		gh := bh.git.(*test.FakeGit)
 
 		bh.config.WorkingDir = "/working-dir"
-		gh.ValidCloneSpecResult = true
+		bh.config.Source = git.MustParse("a-repo-source")
 		if ft.refSpecified {
-			bh.config.Ref = "a-branch"
+			bh.config.Source.URL.Fragment = "a-branch"
 		}
-		bh.config.Source = "a-repo-source"
 
 		expectedTargetDir := "/working-dir/upload/src"
 		_, e := bh.source.Download(bh.config)
 		if e != nil {
 			t.Errorf("Unexpected error %v [%d]", e, testNum)
 		}
-		if gh.CloneSource != "a-repo-source" {
+		if gh.CloneSource.StringNoFragment() != "a-repo-source" {
 			t.Errorf("Clone was not called with the expected source. Got %s, expected %s [%d]", gh.CloneSource, "a-source-repo-source", testNum)
 		}
 		if filepath.ToSlash(gh.CloneTarget) != expectedTargetDir {

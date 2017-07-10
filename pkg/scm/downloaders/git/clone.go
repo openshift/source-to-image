@@ -1,16 +1,13 @@
 package git
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"github.com/golang/glog"
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/scm/git"
-	"github.com/openshift/source-to-image/pkg/util/cygpath"
 	"github.com/openshift/source-to-image/pkg/util/fs"
 )
 
@@ -26,32 +23,9 @@ func (c *Clone) Download(config *api.Config) (*git.SourceInfo, error) {
 	targetSourceDir := filepath.Join(config.WorkingDir, api.Source)
 	config.WorkingSourceDir = targetSourceDir
 
-	ok, err := c.ValidCloneSpec(config.Source)
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		glog.Errorf("Clone.Download was passed an invalid source %s", config.Source)
-		return nil, fmt.Errorf("invalid source %s", config.Source)
-	}
-
-	ref := "HEAD"
-	if config.Ref != "" {
-		ref = config.Ref
-	}
-
-	if strings.HasPrefix(config.Source, "file://") {
-		s := strings.TrimPrefix(config.Source, "file://")
-
-		if cygpath.UsingCygwinGit {
-			var err error
-			s, err = cygpath.ToSlashCygwin(s)
-			if err != nil {
-				glog.V(0).Infof("error: Cygwin path conversion failed: %v", err)
-				return nil, err
-			}
-		}
-		config.Source = "file://" + s
+	ref := config.Source.URL.Fragment
+	if ref == "" {
+		ref = "HEAD"
 	}
 
 	if len(config.ContextDir) > 0 {
@@ -68,7 +42,7 @@ func (c *Clone) Download(config *api.Config) (*git.SourceInfo, error) {
 	}
 
 	cloneConfig := git.CloneConfig{Quiet: true}
-	err = c.Clone(config.Source, targetSourceDir, cloneConfig)
+	err := c.Clone(config.Source, targetSourceDir, cloneConfig)
 	if err != nil {
 		glog.V(0).Infof("error: git clone failed: %v", err)
 		return nil, err

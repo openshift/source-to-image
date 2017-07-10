@@ -82,11 +82,6 @@ test_debug "s2i build with relative path without file://"
 s2i build cakephp-ex openshift/php-55-centos7 test --loglevel=5 &> "${WORK_DIR}/s2i-rel-noproto.log"
 check_result $? "${WORK_DIR}/s2i-rel-noproto.log"
 
-test_debug "s2i build with relative path with file://"
-
-s2i build file://./cakephp-ex openshift/php-55-centos7 test --loglevel=5 &> "${WORK_DIR}/s2i-rel-proto.log"
-check_result $? "${WORK_DIR}/s2i-rel-proto.log"
-
 test_debug "s2i build with volume options"
 s2i build cakephp-ex openshift/php-55-centos7 test --volume "${WORK_DIR}:/home/:z" --loglevel=5 &> "${WORK_DIR}/s2i-volume-correct.log"
 check_result $? "${WORK_DIR}/s2i-volume-correct.log"
@@ -95,7 +90,13 @@ popd
 
 test_debug "s2i build with absolute path with file://"
 
-s2i build "file://${S2I_WORK_DIR}/cakephp-ex" openshift/php-55-centos7 test --loglevel=5 &> "${WORK_DIR}/s2i-abs-proto.log"
+if [[ "$OSTYPE" == "cygwin" ]]; then
+  S2I_WORK_DIR_URL="file:///${S2I_WORK_DIR//\\//}/cakephp-ex"
+else
+  S2I_WORK_DIR_URL="file://${S2I_WORK_DIR}/cakephp-ex"
+fi
+
+s2i build "${S2I_WORK_DIR_URL}" openshift/php-55-centos7 test --loglevel=5 &> "${WORK_DIR}/s2i-abs-proto.log"
 check_result $? "${WORK_DIR}/s2i-abs-proto.log"
 
 test_debug "s2i build with absolute path without file://"

@@ -1,7 +1,6 @@
 package test
 
 import (
-	"net/url"
 	"os"
 
 	"github.com/openshift/source-to-image/pkg/scm/git"
@@ -9,10 +8,7 @@ import (
 
 // FakeGit provides a fake Git
 type FakeGit struct {
-	ValidCloneSpecSource string
-	ValidCloneSpecResult bool
-
-	CloneSource string
+	CloneSource *git.URL
 	CloneTarget string
 	CloneError  error
 
@@ -29,26 +25,8 @@ type FakeGit struct {
 	SubmoduleUpdateError     error
 }
 
-// ValidCloneSpec returns a valid Git clone specification
-func (f *FakeGit) ValidCloneSpec(source string) (bool, error) {
-	f.ValidCloneSpecSource = source
-	return f.ValidCloneSpecResult, nil
-}
-
-//ValidCloneSpecRemoteOnly returns a valid Git clone specification
-func (f *FakeGit) ValidCloneSpecRemoteOnly(source string) bool {
-	f.ValidCloneSpecSource = source
-	return f.ValidCloneSpecResult
-}
-
-//MungeNoProtocolURL returns a valid no protocol Git URL
-func (f *FakeGit) MungeNoProtocolURL(source string, url *url.URL) error {
-	f.ValidCloneSpecSource = source
-	return nil
-}
-
 // Clone clones the fake source Git repository to target directory
-func (f *FakeGit) Clone(source, target string, c git.CloneConfig) error {
+func (f *FakeGit) Clone(source *git.URL, target string, c git.CloneConfig) error {
 	f.CloneSource = source
 	f.CloneTarget = target
 	return f.CloneError

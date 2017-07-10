@@ -18,9 +18,8 @@ func TestCloneWithContext(t *testing.T) {
 	c := &Clone{gh, fs}
 
 	fakeConfig := &api.Config{
-		Source:           "https://foo/bar.git",
+		Source:           git.MustParse("https://foo/bar.git#ref1"),
 		ContextDir:       "subdir",
-		Ref:              "ref1",
 		IgnoreSubmodules: true,
 	}
 	info, err := c.Download(fakeConfig)
