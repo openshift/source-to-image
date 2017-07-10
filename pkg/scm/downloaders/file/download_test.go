@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/api"
+	"github.com/openshift/source-to-image/pkg/scm/git"
 	testfs "github.com/openshift/source-to-image/pkg/test/fs"
 )
 
@@ -13,7 +14,7 @@ func TestDownload(t *testing.T) {
 	f := &File{fs}
 
 	config := &api.Config{
-		Source: "file:///foo",
+		Source: git.MustParse("/foo"),
 	}
 	info, err := f.Download(config)
 	if err != nil {
@@ -22,7 +23,7 @@ func TestDownload(t *testing.T) {
 	if fs.CopySource != "/foo" {
 		t.Errorf("Unexpected fs.CopySource %s", fs.CopySource)
 	}
-	if info.Location != config.Source[7:] || info.ContextDir != config.ContextDir {
+	if info.Location != config.Source.URL.Path || info.ContextDir != config.ContextDir {
 		t.Errorf("Unexpected info")
 	}
 }
@@ -32,7 +33,7 @@ func TestDownloadWithContext(t *testing.T) {
 	f := &File{fs}
 
 	config := &api.Config{
-		Source:     "file:///foo",
+		Source:     git.MustParse("/foo"),
 		ContextDir: "bar",
 	}
 	info, err := f.Download(config)
@@ -42,7 +43,7 @@ func TestDownloadWithContext(t *testing.T) {
 	if filepath.ToSlash(fs.CopySource) != "/foo/bar" {
 		t.Errorf("Unexpected fs.CopySource %s", fs.CopySource)
 	}
-	if info.Location != config.Source[7:] || info.ContextDir != config.ContextDir {
+	if info.Location != config.Source.URL.Path || info.ContextDir != config.ContextDir {
 		t.Errorf("Unexpected info")
 	}
 }

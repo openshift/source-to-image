@@ -2,7 +2,6 @@ package file
 
 import (
 	"path/filepath"
-	"strings"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/scm/git"
@@ -18,14 +17,14 @@ type File struct {
 	fs.FileSystem
 }
 
-// Download copies sources from a local directory into the working directory
+// Download copies sources from a local directory into the working directory.
+// Caller guarantees that config.Source.IsLocal() is true.
 func (f *File) Download(config *api.Config) (*git.SourceInfo, error) {
 	config.WorkingSourceDir = filepath.Join(config.WorkingDir, api.Source)
-	source := strings.TrimPrefix(config.Source, "file://")
 
-	copySrc := source
+	copySrc := config.Source.LocalPath()
 	if len(config.ContextDir) > 0 {
-		copySrc = filepath.Join(source, config.ContextDir)
+		copySrc = filepath.Join(copySrc, config.ContextDir)
 	}
 
 	glog.V(1).Infof("Copying sources from %q to %q", copySrc, config.WorkingSourceDir)
@@ -37,7 +36,7 @@ func (f *File) Download(config *api.Config) (*git.SourceInfo, error) {
 	}
 
 	return &git.SourceInfo{
-		Location:   source,
+		Location:   config.Source.LocalPath(),
 		ContextDir: config.ContextDir,
 	}, nil
 }

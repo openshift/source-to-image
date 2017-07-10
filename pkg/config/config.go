@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 
 	"github.com/openshift/source-to-image/pkg/api"
+	"github.com/openshift/source-to-image/pkg/scm/git"
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -28,7 +29,7 @@ type Config struct {
 func Save(config *api.Config, cmd *cobra.Command) {
 	c := Config{
 		BuilderImage: config.BuilderImage,
-		Source:       config.Source,
+		Source:       config.Source.String(),
 		Tag:          config.Tag,
 		Flags:        make(map[string]string),
 	}
@@ -63,8 +64,15 @@ func Restore(config *api.Config, cmd *cobra.Command) {
 		glog.V(1).Infof("Unable to parse %s: %v", DefaultConfigPath, err)
 		return
 	}
+
+	source, err := git.Parse(c.Source)
+	if err != nil {
+		glog.V(1).Infof("Unable to parse %s: %v", c.Source, err)
+		return
+	}
+
 	config.BuilderImage = c.BuilderImage
-	config.Source = c.Source
+	config.Source = source
 	config.Tag = c.Tag
 	for name, value := range c.Flags {
 		// Do not change flags that user sets. Allow overriding of stored flags.

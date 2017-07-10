@@ -56,12 +56,10 @@ func New(client docker.Client, config *api.Config, fs fs.FileSystem, overrides b
 
 	downloader := overrides.Downloader
 	if downloader == nil {
-		d, sourceURL, err := scm.DownloaderForSource(builder.fs, config.Source, config.ForceCopy)
+		downloader, err = scm.DownloaderForSource(builder.fs, config.Source, config.ForceCopy)
 		if err != nil {
 			return nil, err
 		}
-		downloader = d
-		config.Source = sourceURL
 	}
 
 	builder.source = onBuildSourceHandler{

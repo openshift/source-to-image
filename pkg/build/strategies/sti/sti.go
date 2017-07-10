@@ -150,14 +150,11 @@ func New(client dockerpkg.Client, config *api.Config, fs fs.FileSystem, override
 	// which would lead to replacing this quick short circuit (so this change is tactical)
 	builder.source = overrides.Downloader
 	if builder.source == nil && !config.Usage {
-		var downloader build.Downloader
-		var sourceURL string
-		downloader, sourceURL, err = scm.DownloaderForSource(builder.fs, config.Source, config.ForceCopy)
+		downloader, err := scm.DownloaderForSource(builder.fs, config.Source, config.ForceCopy)
 		if err != nil {
 			return nil, err
 		}
 		builder.source = downloader
-		config.Source = sourceURL
 	}
 	builder.garbage = build.NewDefaultCleaner(builder.fs, builder.docker)
 
@@ -351,7 +348,7 @@ func (builder *STI) Prepare(config *api.Config) error {
 	}
 
 	// fetch sources, for their .s2i/bin might contain s2i scripts
-	if len(config.Source) > 0 {
+	if config.Source != nil {
 		if builder.sourceInfo, err = builder.source.Download(config); err != nil {
 			builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(
 				utilstatus.ReasonFetchSourceFailed,
