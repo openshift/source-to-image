@@ -10,11 +10,13 @@ import (
 	"github.com/openshift/source-to-image/pkg/api"
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/test"
-	"github.com/openshift/source-to-image/pkg/util"
+	testcmd "github.com/openshift/source-to-image/pkg/test/cmd"
+	testfs "github.com/openshift/source-to-image/pkg/test/fs"
+	"github.com/openshift/source-to-image/pkg/util/fs"
 )
 
 func TestIsValidGitRepository(t *testing.T) {
-	fs := util.NewFileSystem()
+	fs := fs.NewFileSystem()
 
 	d := test.CreateLocalGitDirectory(t)
 	defer os.RemoveAll(d)
@@ -103,7 +105,7 @@ func TestValidCloneSpec(t *testing.T) {
 		"http://github.com/user/repo#%%%%",
 	}
 
-	gh := New(util.NewFileSystem())
+	gh := New(fs.NewFileSystem())
 
 	for _, scenario := range valid {
 		result, _ := gh.ValidCloneSpec(scenario)
@@ -138,7 +140,7 @@ func TestValidCloneSpecRemoteOnly(t *testing.T) {
 		"/home/user/code/repo.git",
 	}
 
-	gh := New(util.NewFileSystem())
+	gh := New(fs.NewFileSystem())
 
 	for _, scenario := range valid {
 		result := gh.ValidCloneSpecRemoteOnly(scenario)
@@ -154,9 +156,9 @@ func TestValidCloneSpecRemoteOnly(t *testing.T) {
 	}
 }
 
-func getGit() (*stiGit, *test.FakeCmdRunner) {
-	gh := New(&test.FakeFileSystem{}).(*stiGit)
-	cr := &test.FakeCmdRunner{}
+func getGit() (*stiGit, *testcmd.FakeCmdRunner) {
+	gh := New(&testfs.FakeFileSystem{}).(*stiGit)
+	cr := &testcmd.FakeCmdRunner{}
 	gh.CommandRunner = cr
 
 	return gh, cr
