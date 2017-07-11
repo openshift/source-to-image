@@ -12,6 +12,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/test"
 	testcmd "github.com/openshift/source-to-image/pkg/test/cmd"
 	testfs "github.com/openshift/source-to-image/pkg/test/fs"
+	"github.com/openshift/source-to-image/pkg/util/cmd"
 	"github.com/openshift/source-to-image/pkg/util/fs"
 )
 
@@ -105,7 +106,7 @@ func TestValidCloneSpec(t *testing.T) {
 		"http://github.com/user/repo#%%%%",
 	}
 
-	gh := New(fs.NewFileSystem())
+	gh := New(fs.NewFileSystem(), cmd.NewCommandRunner())
 
 	for _, scenario := range valid {
 		result, _ := gh.ValidCloneSpec(scenario)
@@ -140,7 +141,7 @@ func TestValidCloneSpecRemoteOnly(t *testing.T) {
 		"/home/user/code/repo.git",
 	}
 
-	gh := New(fs.NewFileSystem())
+	gh := New(fs.NewFileSystem(), cmd.NewCommandRunner())
 
 	for _, scenario := range valid {
 		result := gh.ValidCloneSpecRemoteOnly(scenario)
@@ -156,10 +157,9 @@ func TestValidCloneSpecRemoteOnly(t *testing.T) {
 	}
 }
 
-func getGit() (*stiGit, *testcmd.FakeCmdRunner) {
-	gh := New(&testfs.FakeFileSystem{}).(*stiGit)
+func getGit() (Git, *testcmd.FakeCmdRunner) {
 	cr := &testcmd.FakeCmdRunner{}
-	gh.CommandRunner = cr
+	gh := New(&testfs.FakeFileSystem{}, cr)
 
 	return gh, cr
 }

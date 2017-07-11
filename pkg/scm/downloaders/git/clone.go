@@ -7,14 +7,16 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/openshift/source-to-image/pkg/api"
+	"github.com/openshift/source-to-image/pkg/scm/git"
 	"github.com/openshift/source-to-image/pkg/util/cygpath"
 	"github.com/openshift/source-to-image/pkg/util/fs"
 )
 
 // Clone knows how to clone a Git repository.
 type Clone struct {
-	Git
+	git.Git
 	fs.FileSystem
 }
 

@@ -39,10 +39,10 @@ type Git interface {
 }
 
 // New returns a new instance of the default implementation of the Git interface
-func New(fs fs.FileSystem) Git {
+func New(fs fs.FileSystem, runner cmd.CommandRunner) Git {
 	return &stiGit{
 		FileSystem:    fs,
-		CommandRunner: cmd.NewCommandRunner(),
+		CommandRunner: runner,
 	}
 }
 

@@ -5,9 +5,11 @@ import (
 
 	"github.com/openshift/source-to-image/pkg/build"
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
-	"github.com/openshift/source-to-image/pkg/scm/empty"
-	"github.com/openshift/source-to-image/pkg/scm/file"
+	"github.com/openshift/source-to-image/pkg/scm/downloaders/empty"
+	"github.com/openshift/source-to-image/pkg/scm/downloaders/file"
+	gitdownloader "github.com/openshift/source-to-image/pkg/scm/downloaders/git"
 	"github.com/openshift/source-to-image/pkg/scm/git"
+	"github.com/openshift/source-to-image/pkg/util/cmd"
 	"github.com/openshift/source-to-image/pkg/util/fs"
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 )
@@ -45,14 +47,14 @@ func DownloaderForSource(fs fs.FileSystem, s string, forceCopy bool) (build.Down
 	}
 
 	// If s is a valid Git clone spec, use git to download the source
-	g := git.New(fs)
+	g := git.New(fs, cmd.NewCommandRunner())
 	ok, err := g.ValidCloneSpec(s)
 	if err != nil {
 		return nil, s, err
 	}
 
 	if ok {
-		return &git.Clone{Git: g, FileSystem: fs}, s, nil
+		return &gitdownloader.Clone{Git: g, FileSystem: fs}, s, nil
 	}
 
 	return nil, s, fmt.Errorf("no downloader defined for location: %q", s)

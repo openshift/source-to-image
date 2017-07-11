@@ -16,6 +16,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/scm/git"
 	"github.com/openshift/source-to-image/pkg/scripts"
 	"github.com/openshift/source-to-image/pkg/tar"
+	"github.com/openshift/source-to-image/pkg/util/cmd"
 	"github.com/openshift/source-to-image/pkg/util/fs"
 	utilstatus "github.com/openshift/source-to-image/pkg/util/status"
 )
@@ -42,7 +43,7 @@ func New(client docker.Client, config *api.Config, fs fs.FileSystem, overrides b
 	dockerHandler := docker.New(client, config.PullAuthentication)
 	builder := &OnBuild{
 		docker: dockerHandler,
-		git:    git.New(fs),
+		git:    git.New(fs, cmd.NewCommandRunner()),
 		fs:     fs,
 		tar:    tar.New(fs),
 	}

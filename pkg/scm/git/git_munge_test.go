@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/test"
+	"github.com/openshift/source-to-image/pkg/util/cmd"
 	"github.com/openshift/source-to-image/pkg/util/fs"
 )
 
@@ -103,7 +104,7 @@ func TestMungeNoProtocolURL(t *testing.T) {
 		},
 	}
 
-	gh := New(fs.NewFileSystem())
+	gh := New(fs.NewFileSystem(), cmd.NewCommandRunner())
 
 	for scenario, test := range tests {
 		uri, err := url.Parse(scenario)
