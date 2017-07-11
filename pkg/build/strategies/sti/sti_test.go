@@ -17,7 +17,8 @@ import (
 	"github.com/openshift/source-to-image/pkg/ignore"
 	"github.com/openshift/source-to-image/pkg/scm/downloaders/empty"
 	"github.com/openshift/source-to-image/pkg/scm/downloaders/file"
-	"github.com/openshift/source-to-image/pkg/scm/downloaders/git"
+	gitdownloader "github.com/openshift/source-to-image/pkg/scm/downloaders/git"
+	"github.com/openshift/source-to-image/pkg/scm/git"
 	"github.com/openshift/source-to-image/pkg/test"
 	testfs "github.com/openshift/source-to-image/pkg/test/fs"
 	"github.com/openshift/source-to-image/pkg/util/fs"
@@ -78,7 +79,7 @@ func newFakeSTI(f *FakeSTI) *STI {
 		garbage:       f,
 		layered:       &FakeDockerBuild{f},
 	}
-	s.source = &git.Clone{Git: s.git, FileSystem: s.fs}
+	s.source = &gitdownloader.Clone{Git: s.git, FileSystem: s.fs}
 	return s
 }
 
@@ -115,7 +116,7 @@ func (f *FakeSTI) fetchSource() error {
 	return f.FetchSourceError
 }
 
-func (f *FakeSTI) Download(*api.Config) (*api.SourceInfo, error) {
+func (f *FakeSTI) Download(*api.Config) (*git.SourceInfo, error) {
 	return nil, f.DownloadError
 }
 
@@ -327,7 +328,7 @@ func testBuildHandler() *STI {
 		result:            &api.Result{},
 		callbackInvoker:   &test.FakeCallbackInvoker{},
 	}
-	s.source = &git.Clone{Git: s.git, FileSystem: s.fs}
+	s.source = &gitdownloader.Clone{Git: s.git, FileSystem: s.fs}
 	s.initPostExecutorSteps()
 	return s
 }

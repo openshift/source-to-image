@@ -7,7 +7,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/openshift/source-to-image/pkg/test"
 	"github.com/openshift/source-to-image/pkg/util/cmd"
 	"github.com/openshift/source-to-image/pkg/util/fs"
 )
@@ -18,7 +17,7 @@ import (
 // Windows builds.
 // TODO: fix this.
 func TestMungeNoProtocolURL(t *testing.T) {
-	gitLocalDir := test.CreateLocalGitDirectory(t)
+	gitLocalDir := CreateLocalGitDirectory(t)
 	defer os.RemoveAll(gitLocalDir)
 
 	tests := map[string]url.URL{
