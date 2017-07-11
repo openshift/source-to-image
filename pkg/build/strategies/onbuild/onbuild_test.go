@@ -11,6 +11,7 @@ import (
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/docker"
+	"github.com/openshift/source-to-image/pkg/scm/git"
 	"github.com/openshift/source-to-image/pkg/test"
 	testfs "github.com/openshift/source-to-image/pkg/test/fs"
 	"github.com/openshift/source-to-image/pkg/util/fs"
@@ -26,8 +27,8 @@ func (*fakeSourceHandler) Ignore(r *api.Config) error {
 	return nil
 }
 
-func (*fakeSourceHandler) Download(r *api.Config) (*api.SourceInfo, error) {
-	return &api.SourceInfo{}, nil
+func (*fakeSourceHandler) Download(r *api.Config) (*git.SourceInfo, error) {
+	return &git.SourceInfo{}, nil
 }
 
 type fakeCleaner struct{}

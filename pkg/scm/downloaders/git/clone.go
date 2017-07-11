@@ -22,7 +22,7 @@ type Clone struct {
 
 // Download downloads the application source code from the Git repository
 // and checkout the Ref specified in the config.
-func (c *Clone) Download(config *api.Config) (*api.SourceInfo, error) {
+func (c *Clone) Download(config *api.Config) (*git.SourceInfo, error) {
 	targetSourceDir := filepath.Join(config.WorkingDir, api.Source)
 	config.WorkingSourceDir = targetSourceDir
 
@@ -67,7 +67,7 @@ func (c *Clone) Download(config *api.Config) (*api.SourceInfo, error) {
 		glog.V(2).Infof("Cloning sources (ignoring submodules) into %q", targetSourceDir)
 	}
 
-	cloneConfig := api.CloneConfig{Quiet: true}
+	cloneConfig := git.CloneConfig{Quiet: true}
 	err = c.Clone(config.Source, targetSourceDir, cloneConfig)
 	if err != nil {
 		glog.V(0).Infof("error: git clone failed: %v", err)

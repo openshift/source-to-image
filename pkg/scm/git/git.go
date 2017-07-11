@@ -13,7 +13,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/openshift/source-to-image/pkg/api"
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/util/cmd"
 	"github.com/openshift/source-to-image/pkg/util/cygpath"
@@ -29,11 +28,11 @@ type Git interface {
 	ValidCloneSpec(source string) (bool, error)
 	ValidCloneSpecRemoteOnly(source string) bool
 	MungeNoProtocolURL(source string, url *url.URL) error
-	Clone(source, target string, opts api.CloneConfig) error
+	Clone(source, target string, opts CloneConfig) error
 	Checkout(repo, ref string) error
 	SubmoduleUpdate(repo string, init, recursive bool) error
 	LsTree(repo, ref string, recursive bool) ([]os.FileInfo, error)
-	GetInfo(string) *api.SourceInfo
+	GetInfo(string) *SourceInfo
 }
 
 // New returns a new instance of the default implementation of the Git interface
@@ -80,7 +79,7 @@ var gitSSHURLPathRef = regexp.MustCompile(`^([\w\.\-_+\/\\]+)$`)
 
 var allowedSchemes = []string{"git", "http", "https", "file", "ssh"}
 
-func cloneConfigToArgs(opts api.CloneConfig) []string {
+func cloneConfigToArgs(opts CloneConfig) []string {
 	result := []string{}
 	if opts.Quiet {
 		result = append(result, "--quiet")
@@ -475,7 +474,7 @@ func hasGitBinary() bool {
 }
 
 // Clone clones a git repository to a specific target directory
-func (h *stiGit) Clone(source, target string, c api.CloneConfig) error {
+func (h *stiGit) Clone(source, target string, c CloneConfig) error {
 	if cygpath.UsingCygwinGit {
 		var err error
 		target, err = cygpath.ToSlashCygwin(target)
@@ -608,7 +607,7 @@ func (h *stiGit) LsTree(repo, ref string, recursive bool) ([]os.FileInfo, error)
 }
 
 // GetInfo retrieves the information about the source code and commit
-func (h *stiGit) GetInfo(repo string) *api.SourceInfo {
+func (h *stiGit) GetInfo(repo string) *SourceInfo {
 	git := func(arg ...string) string {
 		command := exec.Command("git", arg...)
 		command.Dir = repo
@@ -619,7 +618,7 @@ func (h *stiGit) GetInfo(repo string) *api.SourceInfo {
 		}
 		return strings.TrimSpace(string(out))
 	}
-	return &api.SourceInfo{
+	return &SourceInfo{
 		Location:       git("config", "--get", "remote.origin.url"),
 		Ref:            git("rev-parse", "--abbrev-ref", "HEAD"),
 		CommitID:       git("rev-parse", "--verify", "HEAD"),

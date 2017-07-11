@@ -7,9 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/openshift/source-to-image/pkg/api"
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
-	"github.com/openshift/source-to-image/pkg/test"
 	testcmd "github.com/openshift/source-to-image/pkg/test/cmd"
 	testfs "github.com/openshift/source-to-image/pkg/test/fs"
 	"github.com/openshift/source-to-image/pkg/util/cmd"
@@ -19,7 +17,7 @@ import (
 func TestIsValidGitRepository(t *testing.T) {
 	fs := fs.NewFileSystem()
 
-	d := test.CreateLocalGitDirectory(t)
+	d := CreateLocalGitDirectory(t)
 	defer os.RemoveAll(d)
 
 	// We have a .git that is populated
@@ -33,7 +31,7 @@ func TestIsValidGitRepository(t *testing.T) {
 		t.Errorf("isValidGitRepository returned an unexpected error: %q", err.Error())
 	}
 
-	d = test.CreateEmptyLocalGitDirectory(t)
+	d = CreateEmptyLocalGitDirectory(t)
 	defer os.RemoveAll(d)
 
 	// There are no tracking objects in the .git repository
@@ -64,7 +62,7 @@ func TestIsValidGitRepository(t *testing.T) {
 		t.Errorf("isValidGitRepository returned an unexpected error: %q", err.Error())
 	}
 
-	d = test.CreateLocalGitDirectoryWithSubmodule(t)
+	d = CreateLocalGitDirectoryWithSubmodule(t)
 	defer os.RemoveAll(d)
 
 	ok, err = isValidGitRepository(fs, filepath.Join(d, "submodule"))
@@ -74,7 +72,7 @@ func TestIsValidGitRepository(t *testing.T) {
 }
 
 func TestValidCloneSpec(t *testing.T) {
-	gitLocalDir := test.CreateLocalGitDirectory(t)
+	gitLocalDir := CreateLocalGitDirectory(t)
 	defer os.RemoveAll(gitLocalDir)
 
 	valid := []string{"git@github.com:user/repo.git",
@@ -166,7 +164,7 @@ func getGit() (Git, *testcmd.FakeCmdRunner) {
 
 func TestGitClone(t *testing.T) {
 	gh, ch := getGit()
-	err := gh.Clone("source1", "target1", api.CloneConfig{Quiet: true, Recursive: true})
+	err := gh.Clone("source1", "target1", CloneConfig{Quiet: true, Recursive: true})
 	if err != nil {
 		t.Errorf("Unexpected error returned from clone: %v", err)
 	}
@@ -182,7 +180,7 @@ func TestGitCloneError(t *testing.T) {
 	gh, ch := getGit()
 	runErr := fmt.Errorf("Run Error")
 	ch.Err = runErr
-	err := gh.Clone("source1", "target1", api.CloneConfig{})
+	err := gh.Clone("source1", "target1", CloneConfig{})
 	if err != runErr {
 		t.Errorf("Unexpected error returned from clone: %v", err)
 	}

@@ -7,12 +7,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/openshift/source-to-image/pkg/test"
+	"github.com/openshift/source-to-image/pkg/scm/git"
 	"github.com/openshift/source-to-image/pkg/util/fs"
 )
 
 func TestDownloaderForSource(t *testing.T) {
-	gitLocalDir := test.CreateLocalGitDirectory(t)
+	gitLocalDir := git.CreateLocalGitDirectory(t)
 	defer os.RemoveAll(gitLocalDir)
 	localDir, _ := ioutil.TempDir(os.TempDir(), "localdir-s2i-test")
 	defer os.RemoveAll(localDir)
@@ -61,7 +61,7 @@ func TestDownloaderForSource(t *testing.T) {
 }
 
 func TestDownloaderForSourceOnRelativeGit(t *testing.T) {
-	gitLocalDir := test.CreateLocalGitDirectory(t)
+	gitLocalDir := git.CreateLocalGitDirectory(t)
 	defer os.RemoveAll(gitLocalDir)
 	os.Chdir(gitLocalDir)
 	r, s, err := DownloaderForSource(fs.NewFileSystem(), ".", false)
@@ -77,7 +77,7 @@ func TestDownloaderForSourceOnRelativeGit(t *testing.T) {
 }
 
 func TestDownloaderForceCopy(t *testing.T) {
-	gitLocalDir := test.CreateLocalGitDirectory(t)
+	gitLocalDir := git.CreateLocalGitDirectory(t)
 	defer os.RemoveAll(gitLocalDir)
 	os.Chdir(gitLocalDir)
 	r, s, err := DownloaderForSource(fs.NewFileSystem(), ".", true)

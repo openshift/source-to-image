@@ -65,7 +65,7 @@ type STI struct {
 	installedScripts       map[string]bool
 	scriptsURL             map[string]string
 	incremental            bool
-	sourceInfo             *api.SourceInfo
+	sourceInfo             *git.SourceInfo
 	env                    []string
 	newLabels              map[string]string
 
