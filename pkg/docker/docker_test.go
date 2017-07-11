@@ -13,7 +13,7 @@ import (
 
 	"github.com/openshift/source-to-image/pkg/api"
 	dockertest "github.com/openshift/source-to-image/pkg/docker/test"
-	"github.com/openshift/source-to-image/pkg/test"
+	testfs "github.com/openshift/source-to-image/pkg/test/fs"
 
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
@@ -148,7 +148,7 @@ func TestCopyToContainer(t *testing.T) {
 		}
 		dh := getDocker(fakeDocker)
 
-		err = dh.UploadToContainer(&test.FakeFileSystem{}, fileName, fileName, tst.containerID)
+		err = dh.UploadToContainer(&testfs.FakeFileSystem{}, fileName, fileName, tst.containerID)
 		// the error we are inducing will prevent call into engine-api
 		if len(tst.src) > 0 {
 			if err != nil {

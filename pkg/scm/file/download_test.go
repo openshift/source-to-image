@@ -5,11 +5,11 @@ import (
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/api"
-	"github.com/openshift/source-to-image/pkg/test"
+	testfs "github.com/openshift/source-to-image/pkg/test/fs"
 )
 
 func TestDownload(t *testing.T) {
-	fs := &test.FakeFileSystem{}
+	fs := &testfs.FakeFileSystem{}
 	f := &File{fs}
 
 	config := &api.Config{
@@ -28,7 +28,7 @@ func TestDownload(t *testing.T) {
 }
 
 func TestDownloadWithContext(t *testing.T) {
-	fs := &test.FakeFileSystem{}
+	fs := &testfs.FakeFileSystem{}
 	f := &File{fs}
 
 	config := &api.Config{

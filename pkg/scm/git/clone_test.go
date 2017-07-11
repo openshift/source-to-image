@@ -6,13 +6,14 @@ import (
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/api"
-	"github.com/openshift/source-to-image/pkg/test"
+	testcmd "github.com/openshift/source-to-image/pkg/test/cmd"
+	testfs "github.com/openshift/source-to-image/pkg/test/fs"
 )
 
 func TestCloneWithContext(t *testing.T) {
-	fs := &test.FakeFileSystem{}
+	fs := &testfs.FakeFileSystem{}
 	gh := New(fs).(*stiGit)
-	cr := &test.FakeCmdRunner{}
+	cr := &testcmd.FakeCmdRunner{}
 	gh.CommandRunner = cr
 	c := &Clone{gh, fs}
 

@@ -26,6 +26,7 @@ import (
 	dockerpkg "github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
+	"github.com/openshift/source-to-image/pkg/util/fs"
 	"golang.org/x/net/context"
 )
 
@@ -429,7 +430,7 @@ func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injectio
 	i.fileExists(containerID, "/sti-fake/relative-secret-delivered")
 
 	// Make sure the injected file does not exists in resulting image
-	files, err := util.ExpandInjectedFiles(util.NewFileSystem(), injectionList)
+	files, err := util.ExpandInjectedFiles(fs.NewFileSystem(), injectionList)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
