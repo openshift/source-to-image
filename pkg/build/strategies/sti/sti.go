@@ -23,6 +23,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/scripts"
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
+	"github.com/openshift/source-to-image/pkg/util/cmd"
 	"github.com/openshift/source-to-image/pkg/util/fs"
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 	utilstatus "github.com/openshift/source-to-image/pkg/util/status"
@@ -116,7 +117,7 @@ func New(client dockerpkg.Client, config *api.Config, fs fs.FileSystem, override
 		config:                 config,
 		docker:                 docker,
 		incrementalDocker:      incrementalDocker,
-		git:                    git.New(fs),
+		git:                    git.New(fs, cmd.NewCommandRunner()),
 		fs:                     fs,
 		tar:                    tarHandler,
 		callbackInvoker:        util.NewCallbackInvoker(),
