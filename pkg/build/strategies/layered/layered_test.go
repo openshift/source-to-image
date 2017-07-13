@@ -14,6 +14,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/build"
 	"github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/test"
+	testfs "github.com/openshift/source-to-image/pkg/test/fs"
 )
 
 type FakeExecutor struct{}
@@ -26,7 +27,7 @@ func newFakeLayered() *Layered {
 	return &Layered{
 		docker:  &docker.FakeDocker{},
 		config:  &api.Config{},
-		fs:      &test.FakeFileSystem{},
+		fs:      &testfs.FakeFileSystem{},
 		tar:     &test.FakeTar{},
 		scripts: &FakeExecutor{},
 	}
@@ -36,7 +37,7 @@ func newFakeLayeredWithScripts(workDir string) *Layered {
 	return &Layered{
 		docker:  &docker.FakeDocker{},
 		config:  &api.Config{WorkingDir: workDir},
-		fs:      &test.FakeFileSystem{},
+		fs:      &testfs.FakeFileSystem{},
 		tar:     &test.FakeTar{},
 		scripts: &FakeExecutor{},
 	}
@@ -143,7 +144,7 @@ func TestBuildNoScriptsProvided(t *testing.T) {
 func TestBuildErrorWriteDockerfile(t *testing.T) {
 	l := newFakeLayered()
 	l.config.BuilderImage = "test/image"
-	l.fs.(*test.FakeFileSystem).WriteFileError = errors.New("WriteDockerfileError")
+	l.fs.(*testfs.FakeFileSystem).WriteFileError = errors.New("WriteDockerfileError")
 	_, err := l.Build(l.config)
 	if err == nil || err.Error() != "WriteDockerfileError" {
 		t.Errorf("An error was expected for WriteDockerfile, but got different: %v", err)

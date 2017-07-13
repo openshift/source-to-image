@@ -3,54 +3,43 @@ package scm
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 
-	"github.com/openshift/source-to-image/pkg/test"
-	"github.com/openshift/source-to-image/pkg/util"
+	"github.com/openshift/source-to-image/pkg/scm/git"
+	"github.com/openshift/source-to-image/pkg/util/fs"
 )
 
 func TestDownloaderForSource(t *testing.T) {
-	gitLocalDir := test.CreateLocalGitDirectory(t)
+	gitLocalDir, err := git.CreateLocalGitDirectory()
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer os.RemoveAll(gitLocalDir)
 	localDir, _ := ioutil.TempDir(os.TempDir(), "localdir-s2i-test")
 	defer os.RemoveAll(localDir)
 
-	tc := map[string]string{
+	tc := map[*git.URL]string{
 		// Valid Git clone specs
-		"git://github.com/bar":       "git.Clone",
-		"https://github.com/bar":     "git.Clone",
-		"git@github.com:foo/bar.git": "git.Clone",
-		// Non-existing local path (it is not git repository, so it is file
-		// download)
-		"file://foo/bar": "error",
-		"/foo/bar":       "error",
+		git.MustParse("git://github.com/bar"):       "git.Clone",
+		git.MustParse("https://github.com/bar"):     "git.Clone",
+		git.MustParse("git@github.com:foo/bar.git"): "git.Clone",
 		// Local directory with valid Git repository
-		gitLocalDir:             "git.Clone",
-		"file://" + gitLocalDir: "git.Clone",
+		git.MustParse(gitLocalDir):                                "git.Clone",
+		git.MustParse("file:///" + filepath.ToSlash(gitLocalDir)): "git.Clone",
 		// Local directory that exists but it is not Git repository
-		localDir:               "file.File",
-		"file://" + localDir:   "file.File",
-		"foo://github.com/bar": "error",
-		"./foo":                "error",
+		git.MustParse(localDir):                                "file.File",
+		git.MustParse("file:///" + filepath.ToSlash(localDir)): "file.File",
 		// Empty source string
-		"": "empty.Noop",
+		nil: "empty.Noop",
 	}
 
 	for s, expected := range tc {
-		r, filePathUpdate, err := DownloaderForSource(util.NewFileSystem(), s, false)
+		r, err := DownloaderForSource(fs.NewFileSystem(), s, false)
 		if err != nil {
-			if expected != "error" {
-				t.Errorf("Unexpected error %q for %q, expected %q", err, s, expected)
-			}
+			t.Errorf("Unexpected error %q for %q, expected %q", err, s, expected)
 			continue
-		}
-
-		if s == gitLocalDir || s == localDir {
-			if !strings.HasPrefix(filePathUpdate, "file://") {
-				t.Errorf("input %s should have produced a file path update starting with file:// but produced:  %s", s, filePathUpdate)
-			}
 		}
 
 		expected = "*" + expected
@@ -61,15 +50,15 @@ func TestDownloaderForSource(t *testing.T) {
 }
 
 func TestDownloaderForSourceOnRelativeGit(t *testing.T) {
-	gitLocalDir := test.CreateLocalGitDirectory(t)
+	gitLocalDir, err := git.CreateLocalGitDirectory()
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer os.RemoveAll(gitLocalDir)
 	os.Chdir(gitLocalDir)
-	r, s, err := DownloaderForSource(util.NewFileSystem(), ".", false)
+	r, err := DownloaderForSource(fs.NewFileSystem(), git.MustParse("."), false)
 	if err != nil {
 		t.Errorf("Unexpected error %q for %q, expected %q", err, ".", "git.Clone")
-	}
-	if !strings.HasPrefix(s, "file://") {
-		t.Errorf("Expected source to have 'file://' prefix, it is %q", s)
 	}
 	if reflect.TypeOf(r).String() != "*git.Clone" {
 		t.Errorf("Expected %q for %q, got %q", "*git.Clone", ".", reflect.TypeOf(r).String())
@@ -77,15 +66,15 @@ func TestDownloaderForSourceOnRelativeGit(t *testing.T) {
 }
 
 func TestDownloaderForceCopy(t *testing.T) {
-	gitLocalDir := test.CreateLocalGitDirectory(t)
+	gitLocalDir, err := git.CreateLocalGitDirectory()
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer os.RemoveAll(gitLocalDir)
 	os.Chdir(gitLocalDir)
-	r, s, err := DownloaderForSource(util.NewFileSystem(), ".", true)
+	r, err := DownloaderForSource(fs.NewFileSystem(), git.MustParse("."), true)
 	if err != nil {
 		t.Errorf("Unexpected error %q for %q, expected %q", err, ".", "*file.File")
-	}
-	if !strings.HasPrefix(s, "file://") {
-		t.Errorf("Expected source to have 'file://' prefix, it is %q", s)
 	}
 	if reflect.TypeOf(r).String() != "*file.File" {
 		t.Errorf("Expected %q for %q, got %q", "*file.File", ".", reflect.TypeOf(r).String())
