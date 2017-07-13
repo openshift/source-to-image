@@ -31,6 +31,8 @@ func NewCmdBuild(cfg *api.Config) *cobra.Command {
 	oldScriptsFlag := ""
 	oldDestination := ""
 
+	var networkMode string
+
 	buildCmd := &cobra.Command{
 		Use:   "build <source> <image> [<tag>]",
 		Short: "Build a new image",
@@ -122,6 +124,10 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 				cfg.Destination = oldDestination
 			}
 
+			if networkMode != "" {
+				cfg.DockerNetworkMode = api.DockerNetworkMode(networkMode)
+			}
+
 			client, err := docker.NewEngineAPIClient(cfg.DockerConfig)
 			if err != nil {
 				glog.Fatal(err)
@@ -181,6 +187,6 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 	buildCmd.Flags().BoolVarP(&(cfg.ForceCopy), "copy", "c", false, "Use local file system copy instead of git cloning the source url")
 	buildCmd.Flags().StringVar(&(cfg.RuntimeImage), "runtime-image", "", "Image that will be used as the base for the runtime image")
 	buildCmd.Flags().VarP(&(cfg.RuntimeArtifacts), "runtime-artifact", "a", "Specify a file or directory to be copied from the builder to the runtime image")
-
+	buildCmd.Flags().StringVar(&(networkMode), "network", "", "Specify the default Docker Network name to be used in build process")
 	return buildCmd
 }
