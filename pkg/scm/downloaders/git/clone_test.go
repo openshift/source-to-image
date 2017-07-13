@@ -6,20 +6,20 @@ import (
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/api"
-	"github.com/openshift/source-to-image/pkg/test"
+	"github.com/openshift/source-to-image/pkg/scm/git"
+	testcmd "github.com/openshift/source-to-image/pkg/test/cmd"
+	testfs "github.com/openshift/source-to-image/pkg/test/fs"
 )
 
 func TestCloneWithContext(t *testing.T) {
-	fs := &test.FakeFileSystem{}
-	gh := New(fs).(*stiGit)
-	cr := &test.FakeCmdRunner{}
-	gh.CommandRunner = cr
+	fs := &testfs.FakeFileSystem{}
+	cr := &testcmd.FakeCmdRunner{}
+	gh := git.New(fs, cr)
 	c := &Clone{gh, fs}
 
 	fakeConfig := &api.Config{
-		Source:           "https://foo/bar.git",
+		Source:           git.MustParse("https://foo/bar.git#ref1"),
 		ContextDir:       "subdir",
-		Ref:              "ref1",
 		IgnoreSubmodules: true,
 	}
 	info, err := c.Download(fakeConfig)
