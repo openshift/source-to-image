@@ -1,7 +1,7 @@
 {
 	"ImportPath": "github.com/openshift/source-to-image",
 	"GoVersion": "go1.7",
-	"GodepVersion": "v74",
+	"GodepVersion": "v79",
 	"Packages": [
 		"./..."
 	],
@@ -16,8 +16,8 @@
 		},
 		{
 			"ImportPath": "github.com/Microsoft/go-winio",
-			"Comment": "v0.3.7",
-			"Rev": "24a3e3d3fc7451805e09d11e11e95d9a0a4f205e"
+			"Comment": "v0.4.2",
+			"Rev": "f533f7a102197536779ea3a8cb881d639e21ec5a"
 		},
 		{
 			"ImportPath": "github.com/Sirupsen/logrus",
@@ -197,11 +197,11 @@
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",
-			"Rev": "e90d6d0afc4c315a0d87a568ae68577cc15149a0"
+			"Rev": "f2499483f923065a842d38eb4c7f1927e6fc6e6d"
 		},
 		{
 			"ImportPath": "golang.org/x/net/proxy",
-			"Rev": "e90d6d0afc4c315a0d87a568ae68577cc15149a0"
+			"Rev": "f2499483f923065a842d38eb4c7f1927e6fc6e6d"
 		},
 		{
 			"ImportPath": "golang.org/x/sys/windows",
