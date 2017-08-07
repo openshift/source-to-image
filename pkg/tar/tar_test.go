@@ -339,6 +339,13 @@ func createTestTar(files []fileDesc, writer io.Writer) error {
 			}
 			continue
 		}
+		if fd.mode.IsDir() {
+			if err := addDir(tw, &fd); err != nil {
+				msg := "unable to add dir %q to archive: %v"
+				return fmt.Errorf(msg, fd.name, err)
+			}
+			continue
+		}
 		if err := addRegularFile(tw, &fd); err != nil {
 			return fmt.Errorf("unable to add file %q to archive: %v", fd.name, err)
 		}
@@ -362,6 +369,21 @@ func addRegularFile(tw *tar.Writer, fd *fileDesc) error {
 	}
 	_, err := tw.Write(contentBytes)
 	return err
+}
+
+func addDir(tw *tar.Writer, fd *fileDesc) error {
+	hdr := &tar.Header{
+		Name:       fd.name,
+		Mode:       int64(fd.mode & 0777),
+		Typeflag:   tar.TypeDir,
+		AccessTime: time.Now(),
+		ModTime:    fd.modifiedDate,
+		ChangeTime: fd.modifiedDate,
+	}
+	if err := tw.WriteHeader(hdr); err != nil {
+		return err
+	}
+	return nil
 }
 
 func addSymLink(tw *tar.Writer, fd *fileDesc) error {
@@ -388,33 +410,47 @@ func verifyDirectory(t *testing.T, dir string, files []fileDesc) {
 	if runtime.GOOS == "windows" {
 		for i := range files {
 			files[i].name = filepath.FromSlash(files[i].name)
-			if files[i].mode&0700 == 0400 {
-				files[i].mode &^= 0777
-				files[i].mode |= 0444
-			} else {
-				files[i].mode &^= 0777
+			if files[i].mode&0200 == 0200 {
+				// if the file is user writable make it writable for everyone
 				files[i].mode |= 0666
+			} else {
+				// if the file is only readable, make it readable for everyone
+				// first clear the r/w permission bits
+				files[i].mode &^= 0666
+				// then set r permission for all
+				files[i].mode |= 0444
+			}
+			if files[i].mode.IsDir() {
+				// if the file is a directory, make it executable for everyone
+				files[i].mode |= 0111
+			} else {
+				// if it's not a directory, clear the executable bits as they are
+				// irrelevant on windows.
+				files[i].mode &^= 0111
 			}
 			files[i].target = filepath.FromSlash(files[i].target)
 		}
 	}
-	filesToVerify := make(map[string]fileDesc)
+	pathsToVerify := make(map[string]fileDesc)
 	for _, fd := range files {
-		filesToVerify[fd.name] = fd
+		pathsToVerify[fd.name] = fd
 	}
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if !info.IsDir() {
-			relpath := path[len(dir)+1:]
-			if fd, ok := filesToVerify[relpath]; ok {
-				if info.Mode() != fd.mode {
-					t.Errorf("File mode is not equal for %q. Expected: %v, Actual: %v",
-						relpath, fd.mode, info.Mode())
-				}
-				// TODO: check modification time for symlinks when extractLink() will support it
-				if info.ModTime().UTC() != fd.modifiedDate && !isSymLink(fd.mode) {
-					t.Errorf("File modified date is not equal for %q. Expected: %v, Actual: %v",
-						relpath, fd.modifiedDate, info.ModTime())
-				}
+		if path == dir {
+			return nil
+		}
+		relpath := path[len(dir)+1:]
+		if fd, ok := pathsToVerify[relpath]; ok {
+			if info.Mode() != fd.mode {
+				t.Errorf("File mode is not equal for %q. Expected: %v, Actual: %v",
+					relpath, fd.mode, info.Mode())
+			}
+			// TODO: check modification time for symlinks when extractLink() will support it
+			if info.ModTime().UTC() != fd.modifiedDate && !isSymLink(fd.mode) && !fd.mode.IsDir() {
+				t.Errorf("File modified date is not equal for %q. Expected: %v, Actual: %v",
+					relpath, fd.modifiedDate, info.ModTime())
+			}
+			if !info.IsDir() {
 				contentBytes, err := ioutil.ReadFile(path)
 				if err != nil {
 					t.Errorf("Error reading file %q: %v", path, err)
@@ -425,20 +461,20 @@ func verifyDirectory(t *testing.T, dir string, files []fileDesc) {
 					t.Errorf("File content is not equal for %q. Expected: %q, Actual: %q",
 						relpath, fd.content, content)
 				}
-				if isSymLink(fd.mode) {
-					target, err := os.Readlink(path)
-					if err != nil {
-						t.Errorf("Error reading symlink %q: %v", path, err)
-						return err
-					}
-					if target != fd.target {
-						msg := "Symbolic link %q points to wrong path. Expected: %q, Actual: %q"
-						t.Errorf(msg, fd.name, fd.target, target)
-					}
-				}
-			} else {
-				t.Errorf("Unexpected file found: %q", relpath)
 			}
+			if isSymLink(fd.mode) {
+				target, err := os.Readlink(path)
+				if err != nil {
+					t.Errorf("Error reading symlink %q: %v", path, err)
+					return err
+				}
+				if target != fd.target {
+					msg := "Symbolic link %q points to wrong path. Expected: %q, Actual: %q"
+					t.Errorf(msg, fd.name, fd.target, target)
+				}
+			}
+		} else {
+			t.Errorf("Unexpected file found: %q", relpath)
 		}
 		return nil
 	})
@@ -450,6 +486,10 @@ func verifyDirectory(t *testing.T, dir string, files []fileDesc) {
 func TestExtractTarStream(t *testing.T) {
 	modificationDate := time.Date(2011, time.March, 5, 23, 30, 1, 0, time.UTC)
 	testFiles := []fileDesc{
+		{"dir01", modificationDate, 0700 | os.ModeDir, "", false, ""},
+		{"dir01/.git", modificationDate, 0755 | os.ModeDir, "", false, ""},
+		{"dir01/dir02", modificationDate, 0755 | os.ModeDir, "", false, ""},
+		{"dir01/dir03", modificationDate, 0775 | os.ModeDir, "", false, ""},
 		{"dir01/dir02/test1.txt", modificationDate, 0700, "Test1 file content", false, ""},
 		{"dir01/test2.git", modificationDate, 0660, "Test2 file content", false, ""},
 		{"dir01/dir03/test3.txt", modificationDate, 0444, "Test3 file content", false, ""},
@@ -464,7 +504,11 @@ func TestExtractTarStream(t *testing.T) {
 	th := New(fs.NewFileSystem())
 
 	go func() {
-		writer.CloseWithError(createTestTar(testFiles, writer))
+		err := createTestTar(testFiles, writer)
+		if err != nil {
+			t.Fatalf("Error creating tar stream: %v", err)
+		}
+		writer.CloseWithError(err)
 	}()
 	th.ExtractTarStream(destDir, reader)
 	verifyDirectory(t, destDir, testFiles)
