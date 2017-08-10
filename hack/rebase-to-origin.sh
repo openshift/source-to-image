@@ -17,6 +17,7 @@ readonly S2I_ROOT=$(
   cd "${root}"
   pwd
 )
+#readonly OS_ROOT="${S2I_ROOT/%\/source-to-image/\/ose}"
 readonly OS_ROOT="${S2I_ROOT/%\/source-to-image/\/origin}"
 
 source "${S2I_ROOT}/hack/util.sh"
@@ -29,6 +30,7 @@ readonly exclude_pkgs=(
   pkg/docker/test
   pkg/run
   pkg/version
+  pkg/test
 )
 
 readonly origin_s2i_vendor_dir="${OS_ROOT}/vendor/github.com/openshift/source-to-image"
