@@ -15,13 +15,11 @@ import (
 	"github.com/openshift/source-to-image/pkg/docker"
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/ignore"
-	"github.com/openshift/source-to-image/pkg/scm/downloaders/empty"
-	"github.com/openshift/source-to-image/pkg/scm/downloaders/file"
-	gitdownloader "github.com/openshift/source-to-image/pkg/scm/downloaders/git"
+	"github.com/openshift/source-to-image/pkg/scm/empty"
+	"github.com/openshift/source-to-image/pkg/scm/file"
 	"github.com/openshift/source-to-image/pkg/scm/git"
 	"github.com/openshift/source-to-image/pkg/test"
-	testfs "github.com/openshift/source-to-image/pkg/test/fs"
-	"github.com/openshift/source-to-image/pkg/util/fs"
+	"github.com/openshift/source-to-image/pkg/util"
 )
 
 type FakeSTI struct {
@@ -57,7 +55,7 @@ func newFakeBaseSTI() *STI {
 		docker:    &docker.FakeDocker{},
 		installer: &test.FakeInstaller{},
 		git:       &test.FakeGit{},
-		fs:        &testfs.FakeFileSystem{},
+		fs:        &test.FakeFileSystem{},
 		tar:       &test.FakeTar{},
 	}
 }
@@ -70,7 +68,7 @@ func newFakeSTI(f *FakeSTI) *STI {
 		runtimeDocker: &docker.FakeDocker{},
 		installer:     &test.FakeInstaller{},
 		git:           &test.FakeGit{},
-		fs:            &testfs.FakeFileSystem{},
+		fs:            &test.FakeFileSystem{},
 		tar:           &test.FakeTar{},
 		preparer:      f,
 		ignorer:       &ignore.DockerIgnorer{},
@@ -79,7 +77,7 @@ func newFakeSTI(f *FakeSTI) *STI {
 		garbage:       f,
 		layered:       &FakeDockerBuild{f},
 	}
-	s.source = &gitdownloader.Clone{Git: s.git, FileSystem: s.fs}
+	s.source = &git.Clone{Git: s.git, FileSystem: s.fs}
 	return s
 }
 
@@ -116,7 +114,7 @@ func (f *FakeSTI) fetchSource() error {
 	return f.FetchSourceError
 }
 
-func (f *FakeSTI) Download(*api.Config) (*git.SourceInfo, error) {
+func (f *FakeSTI) Download(*api.Config) (*api.SourceInfo, error) {
 	return nil, f.DownloadError
 }
 
@@ -147,18 +145,18 @@ func (f *FakeDockerBuild) Build(*api.Config) (*api.Result, error) {
 
 func TestDefaultSource(t *testing.T) {
 	config := &api.Config{
-		Source:       git.MustParse("."),
+		Source:       "file://.",
 		DockerConfig: &api.DockerConfig{Endpoint: "unix:///var/run/docker.sock"},
 	}
 	client, err := docker.NewEngineAPIClient(config.DockerConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
-	sti, err := New(client, config, fs.NewFileSystem(), build.Overrides{})
+	sti, err := New(client, config, util.NewFileSystem(), build.Overrides{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.Source == nil {
+	if config.Source == "" {
 		t.Errorf("Config.Source not set: %v", config.Source)
 	}
 	if _, ok := sti.source.(*file.File); !ok || sti.source == nil {
@@ -168,18 +166,18 @@ func TestDefaultSource(t *testing.T) {
 
 func TestEmptySource(t *testing.T) {
 	config := &api.Config{
-		Source:       nil,
+		Source:       "",
 		DockerConfig: &api.DockerConfig{Endpoint: "unix:///var/run/docker.sock"},
 	}
 	client, err := docker.NewEngineAPIClient(config.DockerConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
-	sti, err := New(client, config, fs.NewFileSystem(), build.Overrides{})
+	sti, err := New(client, config, util.NewFileSystem(), build.Overrides{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.Source != nil {
+	if config.Source != "" {
 		t.Errorf("Config.Source unexpectantly changed: %v", config.Source)
 	}
 	if _, ok := sti.source.(*empty.Noop); !ok || sti.source == nil {
@@ -197,7 +195,7 @@ func TestOverrides(t *testing.T) {
 		&api.Config{
 			DockerConfig: &api.DockerConfig{Endpoint: "unix:///var/run/docker.sock"},
 		},
-		fs.NewFileSystem(),
+		util.NewFileSystem(),
 		build.Overrides{
 			Downloader: fd,
 		},
@@ -322,13 +320,13 @@ func testBuildHandler() *STI {
 		incrementalDocker: &docker.FakeDocker{},
 		installer:         &test.FakeInstaller{},
 		git:               &test.FakeGit{},
-		fs:                &testfs.FakeFileSystem{ExistsResult: map[string]bool{filepath.FromSlash("a-repo-source"): true}},
+		fs:                &test.FakeFileSystem{ExistsResult: map[string]bool{filepath.FromSlash("a-repo-source"): true}},
 		tar:               &test.FakeTar{},
 		config:            &api.Config{},
 		result:            &api.Result{},
 		callbackInvoker:   &test.FakeCallbackInvoker{},
 	}
-	s.source = &gitdownloader.Clone{Git: s.git, FileSystem: s.fs}
+	s.source = &git.Clone{Git: s.git, FileSystem: s.fs}
 	s.initPostExecutorSteps()
 	return s
 }
@@ -446,10 +444,10 @@ func TestExists(t *testing.T) {
 				i, incremental, ti.expected)
 		}
 		if ti.incremental && ti.previousImage && ti.scriptInstalled {
-			if len(bh.fs.(*testfs.FakeFileSystem).ExistsFile) == 0 {
+			if len(bh.fs.(*test.FakeFileSystem).ExistsFile) == 0 {
 				continue
 			}
-			scriptChecked := bh.fs.(*testfs.FakeFileSystem).ExistsFile[0]
+			scriptChecked := bh.fs.(*test.FakeFileSystem).ExistsFile[0]
 			expectedScript := "/working-dir/upload/scripts/save-artifacts"
 			if scriptChecked != expectedScript {
 				t.Errorf("(%d) Unexpected script checked. Actual: %s. Expected: %s",
@@ -463,7 +461,7 @@ func TestSaveArtifacts(t *testing.T) {
 	bh := testBuildHandler()
 	bh.config.WorkingDir = "/working-dir"
 	bh.config.Tag = "image/tag"
-	fs := bh.fs.(*testfs.FakeFileSystem)
+	fs := bh.fs.(*test.FakeFileSystem)
 	fd := bh.docker.(*docker.FakeDocker)
 	th := bh.tar.(*test.FakeTar)
 	err := bh.Save(bh.config)
@@ -489,7 +487,7 @@ func TestSaveArtifactsCustomTag(t *testing.T) {
 	bh.config.WorkingDir = "/working-dir"
 	bh.config.IncrementalFromTag = "custom/tag"
 	bh.config.Tag = "image/tag"
-	fs := bh.fs.(*testfs.FakeFileSystem)
+	fs := bh.fs.(*test.FakeFileSystem)
 	fd := bh.docker.(*docker.FakeDocker)
 	th := bh.tar.(*test.FakeTar)
 	err := bh.Save(bh.config)
@@ -587,17 +585,18 @@ func TestFetchSource(t *testing.T) {
 		gh := bh.git.(*test.FakeGit)
 
 		bh.config.WorkingDir = "/working-dir"
-		bh.config.Source = git.MustParse("a-repo-source")
+		gh.ValidCloneSpecResult = true
 		if ft.refSpecified {
-			bh.config.Source.URL.Fragment = "a-branch"
+			bh.config.Ref = "a-branch"
 		}
+		bh.config.Source = "a-repo-source"
 
 		expectedTargetDir := "/working-dir/upload/src"
 		_, e := bh.source.Download(bh.config)
 		if e != nil {
 			t.Errorf("Unexpected error %v [%d]", e, testNum)
 		}
-		if gh.CloneSource.StringNoFragment() != "a-repo-source" {
+		if gh.CloneSource != "a-repo-source" {
 			t.Errorf("Clone was not called with the expected source. Got %s, expected %s [%d]", gh.CloneSource, "a-source-repo-source", testNum)
 		}
 		if filepath.ToSlash(gh.CloneTarget) != expectedTargetDir {
@@ -617,19 +616,19 @@ func TestFetchSource(t *testing.T) {
 func TestPrepareOK(t *testing.T) {
 	rh := newFakeSTI(&FakeSTI{})
 	rh.SetScripts([]string{api.Assemble, api.Run}, []string{api.SaveArtifacts})
-	rh.fs.(*testfs.FakeFileSystem).WorkingDirResult = "/working-dir"
+	rh.fs.(*test.FakeFileSystem).WorkingDirResult = "/working-dir"
 	err := rh.Prepare(rh.config)
 	if err != nil {
 		t.Errorf("An error occurred setting up the config handler: %v", err)
 	}
-	if !rh.fs.(*testfs.FakeFileSystem).WorkingDirCalled {
+	if !rh.fs.(*test.FakeFileSystem).WorkingDirCalled {
 		t.Errorf("Working directory was not created.")
 	}
 	var expected []string
 	for _, dir := range workingDirs {
 		expected = append(expected, filepath.FromSlash("/working-dir/"+dir))
 	}
-	mkdirs := rh.fs.(*testfs.FakeFileSystem).MkdirAllDir
+	mkdirs := rh.fs.(*test.FakeFileSystem).MkdirAllDir
 	if !reflect.DeepEqual(mkdirs, expected) {
 		t.Errorf("Unexpected set of MkdirAll calls: %#v", mkdirs)
 	}
@@ -644,7 +643,7 @@ func TestPrepareOK(t *testing.T) {
 
 func TestPrepareErrorCreatingWorkingDir(t *testing.T) {
 	rh := newFakeSTI(&FakeSTI{})
-	rh.fs.(*testfs.FakeFileSystem).WorkingDirError = errors.New("WorkingDirError")
+	rh.fs.(*test.FakeFileSystem).WorkingDirError = errors.New("WorkingDirError")
 	err := rh.Prepare(rh.config)
 	if err == nil || err.Error() != "WorkingDirError" {
 		t.Errorf("An error was expected for WorkingDir, but got different: %v", err)
@@ -653,7 +652,7 @@ func TestPrepareErrorCreatingWorkingDir(t *testing.T) {
 
 func TestPrepareErrorMkdirAll(t *testing.T) {
 	rh := newFakeSTI(&FakeSTI{})
-	rh.fs.(*testfs.FakeFileSystem).MkdirAllError = errors.New("MkdirAllError")
+	rh.fs.(*test.FakeFileSystem).MkdirAllError = errors.New("MkdirAllError")
 	err := rh.Prepare(rh.config)
 	if err == nil || err.Error() != "MkdirAllError" {
 		t.Errorf("An error was expected for MkdirAll, but got different: %v", err)
@@ -844,7 +843,7 @@ func TestExecuteOK(t *testing.T) {
 	if filepath.ToSlash(th.CreateTarDir) != "/working-dir/upload" {
 		t.Errorf("Unexpected tar directory: %s", th.CreateTarDir)
 	}
-	fh, ok := rh.fs.(*testfs.FakeFileSystem)
+	fh, ok := rh.fs.(*test.FakeFileSystem)
 	if !ok {
 		t.Fatalf("Unable to convert %v to FakeFilesystem", rh.fs)
 	}
@@ -912,10 +911,10 @@ func TestCleanup(t *testing.T) {
 	preserve := []bool{false, true}
 	for _, p := range preserve {
 		rh.config.PreserveWorkingDir = p
-		rh.fs = &testfs.FakeFileSystem{}
+		rh.fs = &test.FakeFileSystem{}
 		rh.garbage = build.NewDefaultCleaner(rh.fs, rh.docker)
 		rh.garbage.Cleanup(rh.config)
-		removedDir := rh.fs.(*testfs.FakeFileSystem).RemoveDirName
+		removedDir := rh.fs.(*test.FakeFileSystem).RemoveDirName
 		if p && removedDir != "" {
 			t.Errorf("Expected working directory to be preserved, but it was removed.")
 		} else if !p && removedDir == "" {

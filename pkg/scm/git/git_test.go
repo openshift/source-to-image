@@ -7,81 +7,164 @@ import (
 	"reflect"
 	"testing"
 
-	testcmd "github.com/openshift/source-to-image/pkg/test/cmd"
-	testfs "github.com/openshift/source-to-image/pkg/test/fs"
-	"github.com/openshift/source-to-image/pkg/util/fs"
+	"github.com/openshift/source-to-image/pkg/api"
+	s2ierr "github.com/openshift/source-to-image/pkg/errors"
+	"github.com/openshift/source-to-image/pkg/test"
+	"github.com/openshift/source-to-image/pkg/util"
 )
 
 func TestIsValidGitRepository(t *testing.T) {
-	fs := fs.NewFileSystem()
+	fs := util.NewFileSystem()
 
-	// a local git repo with a commit
-	d, err := CreateLocalGitDirectory()
-	if err != nil {
-		t.Fatal(err)
-	}
+	d := test.CreateLocalGitDirectory(t)
 	defer os.RemoveAll(d)
 
-	ok, err := IsLocalNonBareGitRepository(fs, d)
-	if !ok || err != nil {
-		t.Errorf("IsLocalNonBareGitRepository returned %v, %v", ok, err)
-	}
-	empty, err := LocalNonBareGitRepositoryIsEmpty(fs, d)
-	if empty || err != nil {
-		t.Errorf("LocalNonBareGitRepositoryIsEmpty returned %v, %v", ok, err)
+	// We have a .git that is populated
+	// Should return true with no error
+	ok, err := isValidGitRepository(fs, d)
+	if !ok {
+		t.Errorf("The %q directory is git repository", d)
 	}
 
-	// a local git repo with no commit
-	d, err = CreateEmptyLocalGitDirectory()
 	if err != nil {
-		t.Fatal(err)
+		t.Errorf("isValidGitRepository returned an unexpected error: %q", err.Error())
 	}
+
+	d = test.CreateEmptyLocalGitDirectory(t)
 	defer os.RemoveAll(d)
 
-	ok, err = IsLocalNonBareGitRepository(fs, d)
-	if !ok || err != nil {
-		t.Errorf("IsLocalNonBareGitRepository returned %v, %v", ok, err)
-	}
-	empty, err = LocalNonBareGitRepositoryIsEmpty(fs, d)
-	if !empty || err != nil {
-		t.Errorf("LocalNonBareGitRepositoryIsEmpty returned %v, %v", ok, err)
+	// There are no tracking objects in the .git repository
+	// Should return true with an EmptyGitRepositoryError
+	ok, err = isValidGitRepository(fs, d)
+	if !ok {
+		t.Errorf("The %q directory is a git repository, but is empty", d)
 	}
 
-	// a directory which is not a git repo
+	if err != nil {
+		var e s2ierr.Error
+		if e, ok = err.(s2ierr.Error); !ok || e.ErrorCode != s2ierr.EmptyGitRepositoryError {
+			t.Errorf("isValidGitRepository returned an unexpected error: %q, expecting EmptyGitRepositoryError", err.Error())
+		}
+	} else {
+		t.Errorf("isValidGitRepository returned no error, expecting EmptyGitRepositoryError")
+	}
+
 	d = filepath.Join(d, ".git")
 
-	ok, err = IsLocalNonBareGitRepository(fs, d)
-	if ok || err != nil {
-		t.Errorf("IsLocalNonBareGitRepository returned %v, %v", ok, err)
+	// There is no .git in the provided directory
+	// Should return false with no error
+	if ok, err = isValidGitRepository(fs, d); ok {
+		t.Errorf("The %q directory is not git repository", d)
 	}
 
-	// a submodule git repo with a commit
-	d, err = CreateLocalGitDirectoryWithSubmodule()
 	if err != nil {
-		t.Fatal(err)
+		t.Errorf("isValidGitRepository returned an unexpected error: %q", err.Error())
 	}
+
+	d = test.CreateLocalGitDirectoryWithSubmodule(t)
 	defer os.RemoveAll(d)
 
-	ok, err = IsLocalNonBareGitRepository(fs, filepath.Join(d, "submodule"))
+	ok, err = isValidGitRepository(fs, filepath.Join(d, "submodule"))
 	if !ok || err != nil {
-		t.Errorf("IsLocalNonBareGitRepository returned %v, %v", ok, err)
-	}
-	empty, err = LocalNonBareGitRepositoryIsEmpty(fs, filepath.Join(d, "submodule"))
-	if empty || err != nil {
-		t.Errorf("LocalNonBareGitRepositoryIsEmpty returned %v, %v", ok, err)
+		t.Errorf("Expected isValidGitRepository to return true, nil on submodule; got %v, %v", ok, err)
 	}
 }
 
-func getGit() (Git, *testcmd.FakeCmdRunner) {
-	cr := &testcmd.FakeCmdRunner{}
-	gh := New(&testfs.FakeFileSystem{}, cr)
+func TestValidCloneSpec(t *testing.T) {
+	gitLocalDir := test.CreateLocalGitDirectory(t)
+	defer os.RemoveAll(gitLocalDir)
+
+	valid := []string{"git@github.com:user/repo.git",
+		"git://github.com/user/repo.git",
+		"git://github.com/user/repo",
+		"http://github.com/user/repo.git",
+		"http://github.com/user/repo",
+		"https://github.com/user/repo.git",
+		"https://github.com/user/repo",
+		"file://" + gitLocalDir,
+		"file://" + gitLocalDir + "#master",
+		gitLocalDir,
+		gitLocalDir + "#master",
+		"git@192.168.122.1:repositories/authooks",
+		"mbalazs@build.ulx.hu:/var/git/eap-ulx.git",
+		"ssh://git@[2001:db8::1]/repository.git",
+		"ssh://git@mydomain.com:8080/foo/bar",
+		"git@[2001:db8::1]:repository.git",
+		"git@[2001:db8::1]:/repository.git",
+		"g_m@foo.bar:foo/bar",
+		"g-m@foo.bar:foo/bar",
+		"g.m@foo.bar:foo/bar",
+		"github.com:openshift/origin.git",
+		"http://github.com/user/repo#1234",
+	}
+	invalid := []string{"g&m@foo.bar:foo.bar",
+		"~git@test.server/repo.git",
+		"some/lo:cal/path", // a local path that does not exist, but "some/lo" is not a valid host name
+		"http://github.com/user/repo#%%%%",
+	}
+
+	gh := New(util.NewFileSystem())
+
+	for _, scenario := range valid {
+		result, _ := gh.ValidCloneSpec(scenario)
+		if result == false {
+			t.Error(scenario)
+		}
+	}
+	for _, scenario := range invalid {
+		result, _ := gh.ValidCloneSpec(scenario)
+		if result {
+			t.Error(scenario)
+		}
+	}
+}
+
+func TestValidCloneSpecRemoteOnly(t *testing.T) {
+	valid := []string{"git://github.com/user/repo.git",
+		"git://github.com/user/repo",
+		"http://github.com/user/repo.git",
+		"http://github.com/user/repo",
+		"https://github.com/user/repo.git",
+		"https://github.com/user/repo",
+		"ssh://git@[2001:db8::1]/repository.git",
+		"ssh://git@mydomain.com:8080/foo/bar",
+		"git@github.com:user/repo.git",
+		"git@192.168.122.1:repositories/authooks",
+		"mbalazs@build.ulx.hu:/var/git/eap-ulx.git",
+		"git@[2001:db8::1]:repository.git",
+		"git@[2001:db8::1]:/repository.git",
+	}
+	invalid := []string{"file:///home/user/code/repo.git",
+		"/home/user/code/repo.git",
+	}
+
+	gh := New(util.NewFileSystem())
+
+	for _, scenario := range valid {
+		result := gh.ValidCloneSpecRemoteOnly(scenario)
+		if result == false {
+			t.Error(scenario)
+		}
+	}
+	for _, scenario := range invalid {
+		result := gh.ValidCloneSpecRemoteOnly(scenario)
+		if result {
+			t.Error(scenario)
+		}
+	}
+}
+
+func getGit() (*stiGit, *test.FakeCmdRunner) {
+	gh := New(&test.FakeFileSystem{}).(*stiGit)
+	cr := &test.FakeCmdRunner{}
+	gh.CommandRunner = cr
 
 	return gh, cr
 }
 
 func TestGitClone(t *testing.T) {
 	gh, ch := getGit()
-	err := gh.Clone(MustParse("source1"), "target1", CloneConfig{Quiet: true, Recursive: true})
+	err := gh.Clone("source1", "target1", api.CloneConfig{Quiet: true, Recursive: true})
 	if err != nil {
 		t.Errorf("Unexpected error returned from clone: %v", err)
 	}
@@ -97,7 +180,7 @@ func TestGitCloneError(t *testing.T) {
 	gh, ch := getGit()
 	runErr := fmt.Errorf("Run Error")
 	ch.Err = runErr
-	err := gh.Clone(MustParse("source1"), "target1", CloneConfig{})
+	err := gh.Clone("source1", "target1", api.CloneConfig{})
 	if err != runErr {
 		t.Errorf("Unexpected error returned from clone: %v", err)
 	}

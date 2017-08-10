@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/api"
-	"github.com/openshift/source-to-image/pkg/util/fs"
 )
 
 func TestCreateInjectedFilesRemovalScript(t *testing.T) {
@@ -48,7 +47,7 @@ func TestExpandInjectedFiles(t *testing.T) {
 	list := api.VolumeList{{Source: tmp, Destination: "/foo"}}
 	f1, _ := ioutil.TempFile(tmp, "foo")
 	f2, _ := ioutil.TempFile(tmpNested, "bar")
-	files, err := ExpandInjectedFiles(fs.NewFileSystem(), list)
+	files, err := ExpandInjectedFiles(NewFileSystem(), list)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}

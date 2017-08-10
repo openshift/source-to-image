@@ -23,8 +23,6 @@ import (
 	"github.com/openshift/source-to-image/pkg/scripts"
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
-	"github.com/openshift/source-to-image/pkg/util/cmd"
-	"github.com/openshift/source-to-image/pkg/util/fs"
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 	utilstatus "github.com/openshift/source-to-image/pkg/util/status"
 )
@@ -52,7 +50,7 @@ type STI struct {
 	installer              scripts.Installer
 	runtimeInstaller       scripts.Installer
 	git                    git.Git
-	fs                     fs.FileSystem
+	fs                     util.FileSystem
 	tar                    tar.Tar
 	docker                 dockerpkg.Docker
 	incrementalDocker      dockerpkg.Docker
@@ -65,7 +63,7 @@ type STI struct {
 	installedScripts       map[string]bool
 	scriptsURL             map[string]string
 	incremental            bool
-	sourceInfo             *git.SourceInfo
+	sourceInfo             *api.SourceInfo
 	env                    []string
 	newLabels              map[string]string
 
@@ -89,7 +87,7 @@ type STI struct {
 // If the layeredBuilder parameter is specified, then the builder provided will
 // be used for the case that the base Docker image does not have 'tar' or 'bash'
 // installed.
-func New(client dockerpkg.Client, config *api.Config, fs fs.FileSystem, overrides build.Overrides) (*STI, error) {
+func New(client dockerpkg.Client, config *api.Config, fs util.FileSystem, overrides build.Overrides) (*STI, error) {
 	excludePattern, err := regexp.Compile(config.ExcludeRegExp)
 	if err != nil {
 		return nil, err
@@ -117,7 +115,7 @@ func New(client dockerpkg.Client, config *api.Config, fs fs.FileSystem, override
 		config:                 config,
 		docker:                 docker,
 		incrementalDocker:      incrementalDocker,
-		git:                    git.New(fs, cmd.NewCommandRunner()),
+		git:                    git.New(fs),
 		fs:                     fs,
 		tar:                    tarHandler,
 		callbackInvoker:        util.NewCallbackInvoker(),
@@ -150,11 +148,14 @@ func New(client dockerpkg.Client, config *api.Config, fs fs.FileSystem, override
 	// which would lead to replacing this quick short circuit (so this change is tactical)
 	builder.source = overrides.Downloader
 	if builder.source == nil && !config.Usage {
-		downloader, err := scm.DownloaderForSource(builder.fs, config.Source, config.ForceCopy)
+		var downloader build.Downloader
+		var sourceURL string
+		downloader, sourceURL, err = scm.DownloaderForSource(builder.fs, config.Source, config.ForceCopy)
 		if err != nil {
 			return nil, err
 		}
 		builder.source = downloader
+		config.Source = sourceURL
 	}
 	builder.garbage = build.NewDefaultCleaner(builder.fs, builder.docker)
 
@@ -348,7 +349,7 @@ func (builder *STI) Prepare(config *api.Config) error {
 	}
 
 	// fetch sources, for their .s2i/bin might contain s2i scripts
-	if config.Source != nil {
+	if len(config.Source) > 0 {
 		if builder.sourceInfo, err = builder.source.Download(config); err != nil {
 			builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(
 				utilstatus.ReasonFetchSourceFailed,

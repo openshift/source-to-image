@@ -2,7 +2,6 @@ package empty
 
 import (
 	"github.com/openshift/source-to-image/pkg/api"
-	"github.com/openshift/source-to-image/pkg/scm/git"
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 )
 
@@ -14,8 +13,8 @@ type Noop struct {
 }
 
 // Download is a no-op downloader so that Noop satisfies build.Downloader
-func (n *Noop) Download(config *api.Config) (*git.SourceInfo, error) {
+func (n *Noop) Download(config *api.Config) (*api.SourceInfo, error) {
 	glog.V(1).Info("No source location defined (the assemble script is responsible for obtaining the source)")
 
-	return &git.SourceInfo{}, nil
+	return &api.SourceInfo{}, nil
 }

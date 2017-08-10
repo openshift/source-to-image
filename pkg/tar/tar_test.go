@@ -13,7 +13,7 @@ import (
 	"time"
 
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
-	"github.com/openshift/source-to-image/pkg/util/fs"
+	"github.com/openshift/source-to-image/pkg/util"
 )
 
 type dirDesc struct {
@@ -189,7 +189,7 @@ func TestCreateTarStreamIncludeParentDir(t *testing.T) {
 	if err = createTestFiles(tempDir, testDirs, testFiles, []linkDesc{}); err != nil {
 		t.Fatalf("Cannot create test files: %v", err)
 	}
-	th := New(fs.NewFileSystem())
+	th := New(util.NewFileSystem())
 	tarFile, err := ioutil.TempFile("", "testtarout")
 	if err != nil {
 		t.Fatalf("Unable to create temporary file %v", err)
@@ -210,7 +210,7 @@ func TestCreateTarStreamIncludeParentDir(t *testing.T) {
 }
 
 func TestCreateTar(t *testing.T) {
-	th := New(fs.NewFileSystem())
+	th := New(util.NewFileSystem())
 	tempDir, err := ioutil.TempDir("", "testtar")
 	defer os.RemoveAll(tempDir)
 	if err != nil {
@@ -249,7 +249,7 @@ func TestCreateTar(t *testing.T) {
 }
 
 func TestCreateTarIncludeDotGit(t *testing.T) {
-	th := New(fs.NewFileSystem())
+	th := New(util.NewFileSystem())
 	th.SetExclusionPattern(regexp.MustCompile("test3.txt"))
 	tempDir, err := ioutil.TempDir("", "testtar")
 	defer os.RemoveAll(tempDir)
@@ -289,7 +289,7 @@ func TestCreateTarIncludeDotGit(t *testing.T) {
 }
 
 func TestCreateTarEmptyRegexp(t *testing.T) {
-	th := New(fs.NewFileSystem())
+	th := New(util.NewFileSystem())
 	th.SetExclusionPattern(regexp.MustCompile(""))
 	tempDir, err := ioutil.TempDir("", "testtar")
 	defer os.RemoveAll(tempDir)
@@ -501,7 +501,7 @@ func TestExtractTarStream(t *testing.T) {
 		t.Fatalf("Cannot create temp directory: %v", err)
 	}
 	defer os.RemoveAll(destDir)
-	th := New(fs.NewFileSystem())
+	th := New(util.NewFileSystem())
 
 	go func() {
 		err := createTestTar(testFiles, writer)
@@ -521,7 +521,7 @@ func TestExtractTarStreamTimeout(t *testing.T) {
 		t.Fatalf("Cannot create temp directory: %v", err)
 	}
 	defer os.RemoveAll(destDir)
-	th := New(fs.NewFileSystem())
+	th := New(util.NewFileSystem())
 	th.(*stiTar).timeout = 10 * time.Millisecond
 	time.AfterFunc(20*time.Millisecond, func() { writer.Close() })
 	err = th.ExtractTarStream(destDir, reader)

@@ -17,7 +17,6 @@ import (
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	s2itar "github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
-	"github.com/openshift/source-to-image/pkg/util/fs"
 	utilstatus "github.com/openshift/source-to-image/pkg/util/status"
 )
 
@@ -108,7 +107,7 @@ type commitImageStep struct {
 	image   string
 	builder *STI
 	docker  dockerpkg.Docker
-	fs      fs.FileSystem
+	fs      util.FileSystem
 	tar     s2itar.Tar
 }
 
@@ -169,7 +168,7 @@ func (step *commitImageStep) execute(ctx *postExecutorStepContext) error {
 type downloadFilesFromBuilderImageStep struct {
 	builder *STI
 	docker  dockerpkg.Docker
-	fs      fs.FileSystem
+	fs      util.FileSystem
 	tar     s2itar.Tar
 }
 
@@ -235,7 +234,7 @@ func (step *downloadFilesFromBuilderImageStep) downloadAndExtractFile(artifactPa
 type startRuntimeImageAndUploadFilesStep struct {
 	builder *STI
 	docker  dockerpkg.Docker
-	fs      fs.FileSystem
+	fs      util.FileSystem
 }
 
 func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepContext) error {

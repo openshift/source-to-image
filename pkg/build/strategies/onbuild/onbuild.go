@@ -16,8 +16,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/scm/git"
 	"github.com/openshift/source-to-image/pkg/scripts"
 	"github.com/openshift/source-to-image/pkg/tar"
-	"github.com/openshift/source-to-image/pkg/util/cmd"
-	"github.com/openshift/source-to-image/pkg/util/fs"
+	"github.com/openshift/source-to-image/pkg/util"
 	utilstatus "github.com/openshift/source-to-image/pkg/util/status"
 )
 
@@ -26,7 +25,7 @@ import (
 type OnBuild struct {
 	docker  docker.Docker
 	git     git.Git
-	fs      fs.FileSystem
+	fs      util.FileSystem
 	tar     tar.Tar
 	source  build.SourceHandler
 	garbage build.Cleaner
@@ -39,11 +38,11 @@ type onBuildSourceHandler struct {
 }
 
 // New returns a new instance of OnBuild builder
-func New(client docker.Client, config *api.Config, fs fs.FileSystem, overrides build.Overrides) (*OnBuild, error) {
+func New(client docker.Client, config *api.Config, fs util.FileSystem, overrides build.Overrides) (*OnBuild, error) {
 	dockerHandler := docker.New(client, config.PullAuthentication)
 	builder := &OnBuild{
 		docker: dockerHandler,
-		git:    git.New(fs, cmd.NewCommandRunner()),
+		git:    git.New(fs),
 		fs:     fs,
 		tar:    tar.New(fs),
 	}
@@ -56,10 +55,12 @@ func New(client docker.Client, config *api.Config, fs fs.FileSystem, overrides b
 
 	downloader := overrides.Downloader
 	if downloader == nil {
-		downloader, err = scm.DownloaderForSource(builder.fs, config.Source, config.ForceCopy)
+		d, sourceURL, err := scm.DownloaderForSource(builder.fs, config.Source, config.ForceCopy)
 		if err != nil {
 			return nil, err
 		}
+		downloader = d
+		config.Source = sourceURL
 	}
 
 	builder.source = onBuildSourceHandler{
