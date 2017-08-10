@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/openshift/source-to-image/pkg/util/fs"
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
@@ -133,7 +132,7 @@ func (a RenameAdapter) WriteHeader(hdr *tar.Header) error {
 }
 
 // New creates a new Tar
-func New(fs fs.FileSystem) Tar {
+func New(fs util.FileSystem) Tar {
 	return &stiTar{
 		FileSystem: fs,
 		exclude:    DefaultExclusionPattern,
@@ -143,7 +142,7 @@ func New(fs fs.FileSystem) Tar {
 
 // stiTar is an implementation of the Tar interface
 type stiTar struct {
-	fs.FileSystem
+	util.FileSystem
 	timeout          time.Duration
 	exclude          *regexp.Regexp
 	includeDirInPath bool

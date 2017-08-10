@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/openshift/source-to-image/pkg/api"
-	"github.com/openshift/source-to-image/pkg/util/fs"
 )
 
 // FixInjectionsWithRelativePath fixes the injections that does not specify the
@@ -39,7 +38,7 @@ func FixInjectionsWithRelativePath(workdir string, injections api.VolumeList) ap
 
 // ExpandInjectedFiles returns a flat list of all files that are injected into a
 // container. All files from nested directories are returned in the list.
-func ExpandInjectedFiles(fs fs.FileSystem, injections api.VolumeList) ([]string, error) {
+func ExpandInjectedFiles(fs FileSystem, injections api.VolumeList) ([]string, error) {
 	result := []string{}
 	for _, s := range injections {
 		if _, err := os.Stat(s.Source); err != nil {

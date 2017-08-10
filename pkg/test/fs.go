@@ -1,4 +1,4 @@
-package fs
+package test
 
 import (
 	"bytes"

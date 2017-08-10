@@ -1,14 +1,22 @@
 package test
 
 import (
+	"io/ioutil"
+	"net/url"
 	"os"
+	"path/filepath"
+	"testing"
 
-	"github.com/openshift/source-to-image/pkg/scm/git"
+	"github.com/openshift/source-to-image/pkg/api"
+	"github.com/openshift/source-to-image/pkg/util"
 )
 
 // FakeGit provides a fake Git
 type FakeGit struct {
-	CloneSource *git.URL
+	ValidCloneSpecSource string
+	ValidCloneSpecResult bool
+
+	CloneSource string
 	CloneTarget string
 	CloneError  error
 
@@ -25,8 +33,26 @@ type FakeGit struct {
 	SubmoduleUpdateError     error
 }
 
+// ValidCloneSpec returns a valid Git clone specification
+func (f *FakeGit) ValidCloneSpec(source string) (bool, error) {
+	f.ValidCloneSpecSource = source
+	return f.ValidCloneSpecResult, nil
+}
+
+//ValidCloneSpecRemoteOnly returns a valid Git clone specification
+func (f *FakeGit) ValidCloneSpecRemoteOnly(source string) bool {
+	f.ValidCloneSpecSource = source
+	return f.ValidCloneSpecResult
+}
+
+//MungeNoProtocolURL returns a valid no protocol Git URL
+func (f *FakeGit) MungeNoProtocolURL(source string, url *url.URL) error {
+	f.ValidCloneSpecSource = source
+	return nil
+}
+
 // Clone clones the fake source Git repository to target directory
-func (f *FakeGit) Clone(source *git.URL, target string, c git.CloneConfig) error {
+func (f *FakeGit) Clone(source, target string, c api.CloneConfig) error {
 	f.CloneSource = source
 	f.CloneTarget = target
 	return f.CloneError
@@ -61,10 +87,71 @@ func (f *FakeGit) LsTree(repo, ref string, recursive bool) ([]os.FileInfo, error
 }
 
 // GetInfo retrieves the information about the source code and commit
-func (f *FakeGit) GetInfo(repo string) *git.SourceInfo {
-	return &git.SourceInfo{
+func (f *FakeGit) GetInfo(repo string) *api.SourceInfo {
+	return &api.SourceInfo{
 		Ref:      "master",
 		CommitID: "1bf4f04",
 		Location: "file:///foo",
 	}
+}
+
+// CreateLocalGitDirectory creates a git directory with a commit
+func CreateLocalGitDirectory(t *testing.T) string {
+	cr := util.NewCommandRunner()
+	dir := CreateEmptyLocalGitDirectory(t)
+	f, err := os.Create(filepath.Join(dir, "testfile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	err = cr.RunWithOptions(util.CommandOpts{Dir: dir}, "git", "add", ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cr.RunWithOptions(util.CommandOpts{Dir: dir, EnvAppend: []string{"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@test", "GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@test"}}, "git", "commit", "-m", "testcommit")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return dir
+}
+
+// CreateEmptyLocalGitDirectory creates a git directory with no checkin yet
+func CreateEmptyLocalGitDirectory(t *testing.T) string {
+	cr := util.NewCommandRunner()
+
+	dir, err := ioutil.TempDir(os.TempDir(), "gitdir-s2i-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cr.RunWithOptions(util.CommandOpts{Dir: dir}, "git", "init")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return dir
+}
+
+// CreateLocalGitDirectoryWithSubmodule creates a git directory with a submodule
+func CreateLocalGitDirectoryWithSubmodule(t *testing.T) string {
+	cr := util.NewCommandRunner()
+
+	submodule := CreateLocalGitDirectory(t)
+	defer os.RemoveAll(submodule)
+
+	if util.UsingCygwinGit {
+		var err error
+		submodule, err = util.ToSlashCygwin(submodule)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	dir := CreateEmptyLocalGitDirectory(t)
+	err := cr.RunWithOptions(util.CommandOpts{Dir: dir}, "git", "submodule", "add", submodule, "submodule")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return dir
 }

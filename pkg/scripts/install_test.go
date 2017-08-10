@@ -10,14 +10,13 @@ import (
 	"github.com/openshift/source-to-image/pkg/api"
 	dockerpkg "github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/test"
-	testfs "github.com/openshift/source-to-image/pkg/test/fs"
-	"github.com/openshift/source-to-image/pkg/util/fs"
+	"github.com/openshift/source-to-image/pkg/util"
 )
 
 type fakeScriptManagerConfig struct {
 	download Downloader
 	docker   dockerpkg.Docker
-	fs       fs.FileSystem
+	fs       util.FileSystem
 	url      string
 }
 
@@ -25,7 +24,7 @@ func newFakeConfig() *fakeScriptManagerConfig {
 	return &fakeScriptManagerConfig{
 		docker:   &dockerpkg.FakeDocker{},
 		download: &test.FakeDownloader{},
-		fs:       &testfs.FakeFileSystem{},
+		fs:       &test.FakeFileSystem{},
 		url:      "http://the.scripts.url/s2i/bin",
 	}
 }
@@ -152,7 +151,7 @@ func TestInstallRequiredFromSource(t *testing.T) {
 	// There is no other script source than the source code
 	config.url = ""
 	deprecatedSourceScripts := strings.Replace(api.SourceScripts, ".s2i", ".sti", -1)
-	config.fs.(*testfs.FakeFileSystem).ExistsResult = map[string]bool{
+	config.fs.(*test.FakeFileSystem).ExistsResult = map[string]bool{
 		filepath.Join("/workdir", api.SourceScripts, api.Assemble):  true,
 		filepath.Join("/workdir", deprecatedSourceScripts, api.Run): true,
 	}
@@ -180,7 +179,7 @@ func TestInstallRequiredFromSource(t *testing.T) {
 			t.Errorf("expected %q has result URL %s, got %#v", s, filepath.FromSlash(sourcesRootAbbrev+"/.s2i/bin/"+s), result)
 		}
 		chmodCalled := false
-		fs := config.fs.(*testfs.FakeFileSystem)
+		fs := config.fs.(*test.FakeFileSystem)
 		for _, f := range fs.ChmodFile {
 			if filepath.ToSlash(f) == "/workdir/upload/scripts/"+s {
 				chmodCalled = true
@@ -204,7 +203,7 @@ func TestInstallRequiredOrder(t *testing.T) {
 		config.url + "/" + api.Assemble:      fmt.Errorf("not available"),
 		config.url + "/" + api.SaveArtifacts: fmt.Errorf("not available"),
 	}
-	config.fs.(*testfs.FakeFileSystem).ExistsResult = map[string]bool{
+	config.fs.(*test.FakeFileSystem).ExistsResult = map[string]bool{
 		filepath.Join("/workdir", api.SourceScripts, api.Assemble):      true,
 		filepath.Join("/workdir", api.SourceScripts, api.Run):           false,
 		filepath.Join("/workdir", api.SourceScripts, api.SaveArtifacts): false,
@@ -266,7 +265,7 @@ func TestInstallRequiredFromInvalidURL(t *testing.T) {
 
 func TestNewInstaller(t *testing.T) {
 	docker := &dockerpkg.FakeDocker{DefaultURLResult: "image://docker"}
-	inst := NewInstaller("test-image", "http://foo.bar", nil, docker, api.AuthConfig{}, &testfs.FakeFileSystem{})
+	inst := NewInstaller("test-image", "http://foo.bar", nil, docker, api.AuthConfig{}, &test.FakeFileSystem{})
 	sources := inst.(*DefaultScriptSourceManager).sources
 	firstHandler, ok := sources[0].(*URLScriptHandler)
 	if !ok {

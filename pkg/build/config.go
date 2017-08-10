@@ -6,7 +6,6 @@ import (
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/docker"
-	"github.com/openshift/source-to-image/pkg/scm/git"
 )
 
 // GenerateConfigFromLabels generates the S2I Config struct from the Docker
@@ -42,17 +41,13 @@ func GenerateConfigFromLabels(config *api.Config, metadata *docker.PullResult) e
 	}
 
 	if repo, ok := labels[api.DefaultNamespace+"build.source-location"]; ok {
-		source, err := git.Parse(repo)
-		if err != nil {
-			return fmt.Errorf("couldn't parse label %q value %s: %v", api.DefaultNamespace+"build.source-location", repo, err)
-		}
-		config.Source = source
+		config.Source = repo
 	} else {
-		return fmt.Errorf("required label %q not found in image", api.DefaultNamespace+"build.source-location")
+		return fmt.Errorf("required label %q not found in image", api.DefaultNamespace+"source-location")
 	}
 
 	config.ContextDir = labels[api.DefaultNamespace+"build.source-context-dir"]
-	config.Source.URL.Fragment = labels[api.DefaultNamespace+"build.commit.ref"]
+	config.Ref = labels[api.DefaultNamespace+"build.commit.ref"]
 
 	return nil
 }

@@ -24,10 +24,8 @@ import (
 	"github.com/openshift/source-to-image/pkg/build/strategies"
 	"github.com/openshift/source-to-image/pkg/docker"
 	dockerpkg "github.com/openshift/source-to-image/pkg/docker"
-	"github.com/openshift/source-to-image/pkg/scm/git"
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
-	"github.com/openshift/source-to-image/pkg/util/fs"
 	"golang.org/x/net/context"
 )
 
@@ -262,7 +260,7 @@ func (i *integrationTest) exerciseCleanAllowedUIDsBuild(tag, imageName string, e
 		DockerConfig:      docker.GetDefaultDockerConfig(),
 		BuilderImage:      imageName,
 		BuilderPullPolicy: api.DefaultBuilderPullPolicy,
-		Source:            git.MustParse(TestSource),
+		Source:            TestSource,
 		Tag:               tag,
 		Incremental:       false,
 		ScriptsURL:        "",
@@ -320,7 +318,7 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 		DockerConfig:      docker.GetDefaultDockerConfig(),
 		BuilderImage:      imageName,
 		BuilderPullPolicy: api.DefaultBuilderPullPolicy,
-		Source:            git.MustParse(TestSource),
+		Source:            TestSource,
 		Tag:               buildTag,
 		Incremental:       false,
 		CallbackURL:       callbackURL,
@@ -407,7 +405,7 @@ func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injectio
 		DockerConfig:      docker.GetDefaultDockerConfig(),
 		BuilderImage:      imageName,
 		BuilderPullPolicy: api.DefaultBuilderPullPolicy,
-		Source:            git.MustParse(TestSource),
+		Source:            TestSource,
 		Tag:               tag,
 		Injections:        injectionList,
 		ExcludeRegExp:     tar.DefaultExclusionPattern.String(),
@@ -432,7 +430,7 @@ func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injectio
 	i.fileExists(containerID, "/sti-fake/relative-secret-delivered")
 
 	// Make sure the injected file does not exists in resulting image
-	files, err := util.ExpandInjectedFiles(fs.NewFileSystem(), injectionList)
+	files, err := util.ExpandInjectedFiles(util.NewFileSystem(), injectionList)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -450,7 +448,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 		DockerConfig:        docker.GetDefaultDockerConfig(),
 		BuilderImage:        imageName,
 		BuilderPullPolicy:   api.DefaultBuilderPullPolicy,
-		Source:              git.MustParse(TestSource),
+		Source:              TestSource,
 		Tag:                 tag,
 		Incremental:         false,
 		RemovePreviousImage: removePreviousImage,
@@ -474,7 +472,7 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 		DockerConfig:            docker.GetDefaultDockerConfig(),
 		BuilderImage:            imageName,
 		BuilderPullPolicy:       api.DefaultBuilderPullPolicy,
-		Source:                  git.MustParse(TestSource),
+		Source:                  TestSource,
 		Tag:                     tag,
 		Incremental:             true,
 		RemovePreviousImage:     removePreviousImage,

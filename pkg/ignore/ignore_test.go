@@ -7,12 +7,12 @@ import (
 	"testing"
 
 	"github.com/openshift/source-to-image/pkg/api"
-	"github.com/openshift/source-to-image/pkg/util/fs"
+	"github.com/openshift/source-to-image/pkg/util"
 )
 
 func baseTest(t *testing.T, patterns []string, filesToDel []string, filesToKeep []string) {
 	// create working dir
-	workingDir, werr := fs.NewFileSystem().CreateWorkingDirectory()
+	workingDir, werr := util.NewFileSystem().CreateWorkingDirectory()
 	if werr != nil {
 		t.Errorf("problem allocating working dir: %v", werr)
 	} else {

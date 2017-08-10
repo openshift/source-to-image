@@ -1,4 +1,4 @@
-package cygpath
+package util
 
 import (
 	"os/exec"

@@ -1,9 +1,6 @@
 package build
 
-import (
-	"github.com/openshift/source-to-image/pkg/api"
-	"github.com/openshift/source-to-image/pkg/scm/git"
-)
+import "github.com/openshift/source-to-image/pkg/api"
 
 // Builder is the interface that provides basic methods all implementation
 // should have.
@@ -41,7 +38,7 @@ type ScriptsHandler interface {
 
 // Downloader provides methods for downloading the application source code
 type Downloader interface {
-	Download(*api.Config) (*git.SourceInfo, error)
+	Download(*api.Config) (*api.SourceInfo, error)
 }
 
 // Ignorer provides ignore file processing on source tree
