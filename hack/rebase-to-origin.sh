@@ -36,8 +36,11 @@ readonly exclude_pkgs=(
 readonly origin_s2i_vendor_dir="${OS_ROOT}/vendor/github.com/openshift/source-to-image"
 readonly s2i_ref="$(git -C ${S2I_ROOT} rev-parse --verify HEAD)"
 readonly s2i_short_ref="$(git -C ${S2I_ROOT} rev-parse --short HEAD)"
+readonly s2i_describe_tags="$(git -C ${S2I_ROOT} describe --tags HEAD)"
 readonly s2i_godeps_ref="$(grep -m1 -A2 'openshift/source-to-image' ${OS_ROOT}/Godeps/Godeps.json |
   grep Rev | cut -d ':' -f2 | sed -e 's/"//g' -e 's/^[[:space:]]*//')"
+readonly s2i_godeps_comment="$(grep -m1 -A2 'openshift/source-to-image' ${OS_ROOT}/Godeps/Godeps.json |
+  grep Comment | cut -d ':' -f2 | sed -e 's/[",]//g' -e 's/^[[:space:]]*//')"
 
 pushd "${OS_ROOT}" >/dev/null
   git checkout -B "s2i-${s2i_short_ref}-bump" master
@@ -53,6 +56,7 @@ pushd "${OS_ROOT}" >/dev/null
 
   # Bump the origin Godeps.json file
   s2i::util::sed "s/${s2i_godeps_ref}/${s2i_ref}/g" "${OS_ROOT}/Godeps/Godeps.json"
+  s2i::util::sed "s/${s2i_godeps_comment}/${s2i_describe_tags}/g" "${OS_ROOT}/Godeps/Godeps.json"
 
   # Make a commit with proper message
   git add Godeps vendor && git commit -m "bump(github.com/openshift/source-to-image): ${s2i_ref}"
