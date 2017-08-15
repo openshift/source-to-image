@@ -8,7 +8,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "rhel" do |rhel|
     rhel.vm.provider "aws" do |aws|
-      aws.tags = {"Name" => "#{ENV['USER']}-rhel"}
+      aws.tags = {"Name" => "#{ENV['USER']}"}
       aws.ami = "rhel7:inst"
     end
     rhel.vm.provision "configure-docker-server-linux"
@@ -16,7 +16,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "windows" do |windows|
     windows.vm.provider "aws" do |aws|
-      aws.tags = {"Name" => "#{ENV['USER']}-windows"}
+      aws.tags = {"Name" => "#{ENV['USER']}"}
       aws.ami = "windows2012r2:deps"
     end
     windows.vm.provision "configure-docker-client-windows"
