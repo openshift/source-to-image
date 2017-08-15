@@ -1,4 +1,10 @@
 Vagrant.configure("2") do |config|
+  rhel_vm_name = "#{ENV['USER']}-rhel"
+  windows_vm_name = "#{ENV['USER']}-windows"
+  if ENV['USER'] =~ /^(.*)[_-](\d+)$/
+    rhel_vm_name = "#{$1}-rhel-#{$2}"
+    windows_vm_name = "#{$1}-windows-#{$2}"
+  end
   config.openshift.autoconfigure_aws = true
 
   config.vm.provider "aws" do |aws|
@@ -8,7 +14,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "rhel" do |rhel|
     rhel.vm.provider "aws" do |aws|
-      aws.tags = {"Name" => "#{ENV['USER']}-rhel"}
+      aws.tags = {"Name" => rhel_vm_name}
       aws.ami = "rhel7:inst"
     end
     rhel.vm.provision "configure-docker-server-linux"
@@ -16,7 +22,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "windows" do |windows|
     windows.vm.provider "aws" do |aws|
-      aws.tags = {"Name" => "#{ENV['USER']}-windows"}
+      aws.tags = {"Name" => windows_vm_name}
       aws.ami = "windows2012r2:deps"
     end
     windows.vm.provision "configure-docker-client-windows"
