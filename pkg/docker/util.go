@@ -363,3 +363,19 @@ func GetDefaultDockerConfig() *api.DockerConfig {
 
 	return cfg
 }
+
+// GetAssembleUser finds an assemble user on the given image.
+// This functions receives the config to check if the AssembleUser was defined in command line
+// If the cmd is blank, it tries to fetch the value from the Builder Image defined Label (assemble-user)
+// Otherwise it follows the common flow, using the USER defined in Dockerfile
+func GetAssembleUser(client Client, config *api.Config) (string, error) {
+	if len(config.AssembleUser) > 0 {
+		return config.AssembleUser, nil
+	}
+	d := New(client, config.PullAuthentication)
+	imageData, err := d.GetLabels(config.BuilderImage)
+	if err != nil {
+		return "", err
+	}
+	return imageData[AssembleUserLabel], nil
+}
