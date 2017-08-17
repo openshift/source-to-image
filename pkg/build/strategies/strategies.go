@@ -23,10 +23,20 @@ func GetStrategy(client docker.Client, config *api.Config) (build.Builder, api.B
 func Strategy(client docker.Client, config *api.Config, overrides build.Overrides) (build.Builder, api.BuildInfo, error) {
 	var builder build.Builder
 	var buildInfo api.BuildInfo
+	var err error
 
 	fs := fs.NewFileSystem()
 
 	startTime := time.Now()
+
+	if config.AssembleUser, err = docker.GetAssembleUser(client, config); err != nil {
+		buildInfo.FailureReason = utilstatus.NewFailureReason(
+			utilstatus.ReasonPullBuilderImageFailed,
+			utilstatus.ReasonMessagePullBuilderImageFailed,
+		)
+		return nil, buildInfo, err
+	}
+
 	image, err := docker.GetBuilderImage(client, config)
 	buildInfo.Stages = api.RecordStageAndStepInfo(buildInfo.Stages, api.StagePullImages, api.StepPullBuilderImage, startTime, time.Now())
 	if err != nil {

@@ -76,6 +76,13 @@ and placing them into the appropriate directories inside the image. The workflow
 1. Build any application artifacts.
 1. Install the artifacts into locations appropriate for running.
 
+In the case you need to assemble the Image using a different user than the runtime user defined 
+in ``USER`` directive of Dockerfile, you can achive this by the following ways:
+
+1. use the `--assemble-user` in cmd line
+1. use the label `io.openshift.s2i.assemble-user`
+
+
 #### Example `assemble` script:
 
 **NOTE**: All the examples are written in [Bash](http://www.gnu.org/software/bash/)
