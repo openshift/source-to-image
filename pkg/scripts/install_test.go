@@ -38,11 +38,11 @@ func newFakeInstaller(config *fakeScriptManagerConfig) Installer {
 		fs:         config.fs,
 		download:   config.download,
 	}
-	m.Add(&URLScriptHandler{URL: m.ScriptsURL, download: m.download, fs: m.fs, name: ScriptURLHandler})
+	m.Add(&URLScriptHandler{URL: m.ScriptsURL, Download: m.download, FS: m.fs, Name: ScriptURLHandler})
 	m.Add(&SourceScriptHandler{fs: m.fs})
 	defaultURL, err := m.docker.GetScriptsURL(m.Image)
 	if err == nil && defaultURL != "" {
-		m.Add(&URLScriptHandler{URL: defaultURL, download: m.download, fs: m.fs, name: ImageURLHandler})
+		m.Add(&URLScriptHandler{URL: defaultURL, Download: m.download, FS: m.fs, Name: ImageURLHandler})
 	}
 	return &m
 }
