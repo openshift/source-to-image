@@ -26,13 +26,13 @@
 		},
 		{
 			"ImportPath": "github.com/docker/distribution/digest",
-			"Comment": "v2.5.1",
-			"Rev": "12acdf0a6c1e56d965ac6eb395d2bce687bf22fc"
+			"Comment": "v2.6.2",
+			"Rev": "48294d928ced5dd9b378f7fd7c6f5da3ff3f2c89"
 		},
 		{
 			"ImportPath": "github.com/docker/distribution/reference",
-			"Comment": "v2.5.1",
-			"Rev": "12acdf0a6c1e56d965ac6eb395d2bce687bf22fc"
+			"Comment": "v2.6.2",
+			"Rev": "48294d928ced5dd9b378f7fd7c6f5da3ff3f2c89"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/builder/dockerfile/command",
