@@ -468,6 +468,8 @@ const (
 	DockerNetworkModeBridge DockerNetworkMode = "bridge"
 	// DockerNetworkModeContainerPrefix is the string prefix used by NewDockerNetworkModeContainer.
 	DockerNetworkModeContainerPrefix string = "container:"
+	// DockerNetworkModeContainerPrefix is the string prefix used by NewDockerNetworkModeContainer.
+	DockerNetworkModeNetworkNamespacePrefix string = "netns:"
 )
 
 // NewDockerNetworkModeContainer creates a DockerNetworkMode value which instructs docker to place the container in the network namespace of an existing container.
