@@ -380,10 +380,7 @@ func addDir(tw *tar.Writer, fd *fileDesc) error {
 		ModTime:    fd.modifiedDate,
 		ChangeTime: fd.modifiedDate,
 	}
-	if err := tw.WriteHeader(hdr); err != nil {
-		return err
-	}
-	return nil
+	return tw.WriteHeader(hdr)
 }
 
 func addSymLink(tw *tar.Writer, fd *fileDesc) error {
