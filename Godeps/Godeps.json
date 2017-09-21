@@ -183,11 +183,6 @@
 			"Rev": "d223e2adae83f62d58448a799a5da05730228089"
 		},
 		{
-			"ImportPath": "github.com/openshift/origin/pkg/image/reference",
-			"Comment": "v1.4.0-alpha.0-490-g2142bdb",
-			"Rev": "2142bdbbad43d7cd47bd74da5dbcd3d4e7901f0b"
-		},
-		{
 			"ImportPath": "github.com/spf13/cobra",
 			"Rev": "7c674d9e72017ed25f6d2b5e497a1368086b6a6f"
 		},
