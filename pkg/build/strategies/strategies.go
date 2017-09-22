@@ -29,14 +29,6 @@ func Strategy(client docker.Client, config *api.Config, overrides build.Override
 
 	startTime := time.Now()
 
-	if config.AssembleUser, err = docker.GetAssembleUser(client, config); err != nil {
-		buildInfo.FailureReason = utilstatus.NewFailureReason(
-			utilstatus.ReasonPullBuilderImageFailed,
-			utilstatus.ReasonMessagePullBuilderImageFailed,
-		)
-		return nil, buildInfo, err
-	}
-
 	image, err := docker.GetBuilderImage(client, config)
 	buildInfo.Stages = api.RecordStageAndStepInfo(buildInfo.Stages, api.StagePullImages, api.StepPullBuilderImage, startTime, time.Now())
 	if err != nil {
@@ -47,6 +39,14 @@ func Strategy(client docker.Client, config *api.Config, overrides build.Override
 		return nil, buildInfo, err
 	}
 	config.HasOnBuild = image.OnBuild
+
+	if config.AssembleUser, err = docker.GetAssembleUser(client, config); err != nil {
+		buildInfo.FailureReason = utilstatus.NewFailureReason(
+			utilstatus.ReasonPullBuilderImageFailed,
+			utilstatus.ReasonMessagePullBuilderImageFailed,
+		)
+		return nil, buildInfo, err
+	}
 
 	// if we're blocking onbuild, just do a normal s2i build flow
 	// which won't do a docker build and invoke the onbuild commands
