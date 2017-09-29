@@ -214,7 +214,7 @@ func regexpMatch(pattern, path string) (bool, error) {
 	if err != nil {
 		err = filepath.ErrBadPattern
 	}
-	fmt.Printf("checking %s against pattern %s, result=%v\n", pattern, path, res)
+	fmt.Printf("checking %s against pattern %s, result=%v\n", path, pattern, res)
 	return res, err
 }
 

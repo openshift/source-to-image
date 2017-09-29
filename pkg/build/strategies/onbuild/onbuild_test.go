@@ -58,7 +58,9 @@ func checkDockerfile(fs *testfs.FakeFileSystem, t *testing.T) {
 	}
 
 	buf := bytes.NewBuffer([]byte(fs.WriteFileContent))
-	if _, err := parser.Parse(buf); err != nil {
+	d := &parser.Directive{}
+	parser.SetEscapeToken(parser.DefaultEscapeToken, d)
+	if _, err := parser.Parse(buf, d); err != nil {
 		t.Errorf("cannot parse new Dockerfile: %v", err)
 	}
 

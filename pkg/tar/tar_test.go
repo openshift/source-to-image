@@ -335,6 +335,12 @@ func TestCreateExcludes(t *testing.T) {
 	th := New(fs.NewFileSystem())
 	th.SetExclusionPattern(regexp.MustCompile(""))
 	th.SetExcludes([]string{"**/test1.txt", "**/tmp/testtar*/dir01/dir03"})
+	/*
+		if runtime.GOOS == "windows" {
+			th.SetExcludes([]string{"**\\test1.txt", "**\\tmp\\testtar*\\dir01\\dir03"})
+		}
+	*/
+
 	tempDir, err := ioutil.TempDir("", "testtar")
 	defer os.RemoveAll(tempDir)
 	if err != nil {
