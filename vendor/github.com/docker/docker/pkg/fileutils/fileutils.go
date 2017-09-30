@@ -103,7 +103,7 @@ func OptimizedMatches(file string, patterns []string, patDirs [][]string) (bool,
 		if !match && parentPath != "." {
 			// Check to see if the pattern matches one of our parent dirs.
 			if len(patDirs[i]) <= len(parentPathDirs) {
-				fmt.Println("parentPathDirs: %#v, patternDirs: %#v\n", parentPathDirs, patDirs[i])
+				fmt.Printf("parentPathDirs: %#v, patternDirs: %#v\n", parentPathDirs, patDirs[i])
 				match, _ = regexpMatch(strings.Join(patDirs[i], string(os.PathSeparator)),
 					strings.Join(parentPathDirs[:len(patDirs[i])], string(os.PathSeparator)))
 			}
