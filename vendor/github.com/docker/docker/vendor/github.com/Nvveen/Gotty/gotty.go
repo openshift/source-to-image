@@ -13,7 +13,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"reflect"
 	"strings"
 	"sync"
@@ -23,30 +22,33 @@ import (
 // If something went wrong reading the terminfo database file, an error is
 // returned.
 func OpenTermInfo(termName string) (*TermInfo, error) {
-	if len(termName) == 0 {
-		return nil, errors.New("No termname given")
-	}
+	var term *TermInfo
+	var err error
 	// Find the environment variables
-	if termloc := os.Getenv("TERMINFO"); len(termloc) > 0 {
-		return readTermInfo(path.Join(termloc, string(termName[0]), termName))
-	} else {
+	termloc := os.Getenv("TERMINFO")
+	if len(termloc) == 0 {
 		// Search like ncurses
-		locations := []string{}
-		if h := os.Getenv("HOME"); len(h) > 0 {
-			locations = append(locations, path.Join(h, ".terminfo"))
-		}
-		locations = append(locations,
-			"/etc/terminfo/",
-			"/lib/terminfo/",
-			"/usr/share/terminfo/")
+		locations := []string{os.Getenv("HOME") + "/.terminfo/", "/etc/terminfo/",
+			"/lib/terminfo/", "/usr/share/terminfo/"}
+		var path string
 		for _, str := range locations {
-			term, err := readTermInfo(path.Join(str, string(termName[0]), termName))
-			if err == nil {
-				return term, nil
+			// Construct path
+			path = str + string(termName[0]) + "/" + termName
+			// Check if path can be opened
+			file, _ := os.Open(path)
+			if file != nil {
+				// Path can open, fall out and use current path
+				file.Close()
+				break
 			}
 		}
-		return nil, errors.New("No terminfo file(-location) found")
+		if len(path) > 0 {
+			term, err = readTermInfo(path)
+		} else {
+			err = errors.New(fmt.Sprintf("No terminfo file(-location) found"))
+		}
 	}
+	return term, err
 }
 
 // Open a terminfo file from the environment variable containing the current

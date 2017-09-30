@@ -6,10 +6,10 @@ import "time"
 type Service struct {
 	ID string
 	Meta
-	Spec         ServiceSpec  `json:",omitempty"`
-	PreviousSpec *ServiceSpec `json:",omitempty"`
-	Endpoint     Endpoint     `json:",omitempty"`
-	UpdateStatus UpdateStatus `json:",omitempty"`
+	Spec         ServiceSpec   `json:",omitempty"`
+	PreviousSpec *ServiceSpec  `json:",omitempty"`
+	Endpoint     Endpoint      `json:",omitempty"`
+	UpdateStatus *UpdateStatus `json:",omitempty"`
 }
 
 // ServiceSpec represents the spec of a service.
@@ -18,9 +18,10 @@ type ServiceSpec struct {
 
 	// TaskTemplate defines how the service should construct new tasks when
 	// orchestrating this service.
-	TaskTemplate TaskSpec      `json:",omitempty"`
-	Mode         ServiceMode   `json:",omitempty"`
-	UpdateConfig *UpdateConfig `json:",omitempty"`
+	TaskTemplate   TaskSpec      `json:",omitempty"`
+	Mode           ServiceMode   `json:",omitempty"`
+	UpdateConfig   *UpdateConfig `json:",omitempty"`
+	RollbackConfig *UpdateConfig `json:",omitempty"`
 
 	// Networks field in ServiceSpec is deprecated. The
 	// same field in TaskSpec should be used instead.
@@ -45,13 +46,19 @@ const (
 	UpdateStatePaused UpdateState = "paused"
 	// UpdateStateCompleted is the completed state.
 	UpdateStateCompleted UpdateState = "completed"
+	// UpdateStateRollbackStarted is the state with a rollback in progress.
+	UpdateStateRollbackStarted UpdateState = "rollback_started"
+	// UpdateStateRollbackPaused is the state with a rollback in progress.
+	UpdateStateRollbackPaused UpdateState = "rollback_paused"
+	// UpdateStateRollbackCompleted is the state with a rollback in progress.
+	UpdateStateRollbackCompleted UpdateState = "rollback_completed"
 )
 
 // UpdateStatus reports the status of a service update.
 type UpdateStatus struct {
 	State       UpdateState `json:",omitempty"`
-	StartedAt   time.Time   `json:",omitempty"`
-	CompletedAt time.Time   `json:",omitempty"`
+	StartedAt   *time.Time  `json:",omitempty"`
+	CompletedAt *time.Time  `json:",omitempty"`
 	Message     string      `json:",omitempty"`
 }
 
@@ -68,6 +75,8 @@ const (
 	UpdateFailureActionPause = "pause"
 	// UpdateFailureActionContinue CONTINUE
 	UpdateFailureActionContinue = "continue"
+	// UpdateFailureActionRollback ROLLBACK
+	UpdateFailureActionRollback = "rollback"
 )
 
 // UpdateConfig represents the update configuration.
