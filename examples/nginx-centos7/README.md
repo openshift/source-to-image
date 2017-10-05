@@ -80,3 +80,15 @@ s2i build --incremental=true test/test-app nginx-centos7 nginx-app
 ---> Building and installing application from source...
 ```
 This will run the *save-artifacts* script which includes the custom code to backup the currently running application source, rebuild the application image, and then re-deploy the previously saved source using the *assemble* script.
+
+#### Configuring nginx
+It is possible to configure nginx server itself via this s2i builder image. To do so, simply provide an `nginx.conf` file in the root directory of your application. The `s2i/bin/assemble` will find this configuration file and make nginx use it. See the example configuration file in [test/test-app-redirect/](test/test-app-redirect/) directory. You can build and run it by using these commands:
+
+```
+s2i build test/test-app-redirect nginx-centos7 nginx-centos7-redirect
+docker run -d -p 8080:8080 nginx-centos7-redirect
+```
+
+Going to [http://localhost:8080](http://localhost:8080) should now redirect you to [https://openshift.com](https://openshift.com).
+
+More generally, it is possible to configure any kind of service using s2i, assuming that the provided `assemble` and/or `run` scripts support this and can recognize and use provided configuration files. It's also possible, assuming the s2i image supports it, to provide scripts that get executed by the s2i `run` script to further customize the functionality. Some more advanced examples of this can be found at https://github.com/sclorg/mongodb-container and https://github.com/sclorg/mariadb-container/.
