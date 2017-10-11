@@ -13,6 +13,7 @@ import (
 
 	"github.com/openshift/source-to-image/pkg/api"
 	dockertest "github.com/openshift/source-to-image/pkg/docker/test"
+	"github.com/openshift/source-to-image/pkg/errors"
 	testfs "github.com/openshift/source-to-image/pkg/test/fs"
 
 	dockertypes "github.com/docker/engine-api/types"
@@ -360,6 +361,9 @@ func TestRunContainer(t *testing.T) {
 		paramScriptsURL  string
 		paramDestination string
 		cmdExpected      []string
+		errResult        int
+		errJSON          dockertypes.ContainerJSON
+		errMsg           string
 	}
 
 	tests := map[string]runtest{
@@ -372,6 +376,27 @@ func TestRunContainer(t *testing.T) {
 			cmd:             api.Assemble,
 			externalScripts: true,
 			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /tmp -xf - && /tmp/scripts/%s", api.Assemble)},
+		},
+		"runerror": {
+			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
+			image: dockertypes.ImageInspect{
+				ContainerConfig: &dockercontainer.Config{},
+				Config:          &dockercontainer.Config{},
+			},
+			cmd:             api.Assemble,
+			externalScripts: true,
+			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /tmp -xf - && /tmp/scripts/%s", api.Assemble)},
+			errResult:       302,
+			errJSON: dockertypes.ContainerJSON{
+				ContainerJSONBase: &dockertypes.ContainerJSONBase{
+					State: &dockertypes.ContainerState{
+						Status:    "Failed",
+						Error:     "Process was terminated",
+						OOMKilled: true,
+					},
+				},
+			},
+			errMsg: "Error: Process was terminated, OOMKilled: true",
 		},
 		"paramDestination": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
@@ -500,6 +525,10 @@ func TestRunContainer(t *testing.T) {
 		if len(fakeDocker.Containers) > 0 {
 			t.Errorf("newly created fake client should have empty container map: %+v", fakeDocker.Containers)
 		}
+		if tst.errResult > 0 {
+			fakeDocker.WaitContainerResult = tst.errResult
+			fakeDocker.WaitContainerErrInspectJSON = tst.errJSON
+		}
 
 		err := dh.RunContainer(RunContainerOptions{
 			Image:           "test/image",
@@ -511,6 +540,20 @@ func TestRunContainer(t *testing.T) {
 			Env:             []string{"Key1=Value1", "Key2=Value2"},
 			Stdin:           ioutil.NopCloser(os.Stdin),
 		})
+
+		if tst.errResult > 0 {
+			if err == nil {
+				t.Errorf("did not get error for %s when expected", desc)
+			}
+			cerr, ok := err.(errors.ContainerError)
+			if !ok {
+				t.Errorf("got unexpected error %#v for %s", err, desc)
+			}
+			if !strings.Contains(cerr.Output, tst.errMsg) {
+				t.Errorf("got unexpected error msg %s which did not contain %s", err.Error(), tst.errMsg)
+			}
+			continue
+		}
 		if err != nil {
 			t.Errorf("%s: Unexpected error: %v", desc, err)
 		}

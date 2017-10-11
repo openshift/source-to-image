@@ -72,9 +72,10 @@ type FakeDockerClient struct {
 	CopyFromContainerPath string
 	CopyFromContainerErr  error
 
-	WaitContainerID     string
-	WaitContainerResult int
-	WaitContainerErr    error
+	WaitContainerID             string
+	WaitContainerResult         int
+	WaitContainerErr            error
+	WaitContainerErrInspectJSON dockertypes.ContainerJSON
 
 	ContainerCommitID       string
 	ContainerCommitOptions  dockertypes.ContainerCommitOptions
@@ -165,7 +166,7 @@ func (d *FakeDockerClient) ContainerCreate(ctx context.Context, config *dockerco
 // ContainerInspect returns the container information.
 func (d *FakeDockerClient) ContainerInspect(ctx context.Context, containerID string) (dockertypes.ContainerJSON, error) {
 	d.Calls = append(d.Calls, "inspect_container")
-	return dockertypes.ContainerJSON{}, nil
+	return d.WaitContainerErrInspectJSON, nil
 }
 
 // ContainerRemove kills and removes a container from the docker host.
