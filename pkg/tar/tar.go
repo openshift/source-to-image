@@ -11,11 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/openshift/source-to-image/pkg/util/fs"
-	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
+	"github.com/docker/docker/pkg/fileutils"
 
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/util"
+	"github.com/openshift/source-to-image/pkg/util/fs"
+	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 )
 
 var glog = utilglog.StderrLog
@@ -34,6 +35,9 @@ type Tar interface {
 	// SetExclusionPattern sets the exclusion pattern for tar
 	// creation
 	SetExclusionPattern(*regexp.Regexp)
+
+	// SetExcludes sets a list of paths to be excluded during the tar
+	SetExcludes(e []string)
 
 	// CreateTarFile creates a tar file in the base directory
 	// using the contents of dir directory
@@ -146,6 +150,7 @@ type stiTar struct {
 	fs.FileSystem
 	timeout          time.Duration
 	exclude          *regexp.Regexp
+	excludes         []string
 	includeDirInPath bool
 }
 
@@ -154,6 +159,11 @@ type stiTar struct {
 // Windows.
 func (t *stiTar) SetExclusionPattern(p *regexp.Regexp) {
 	t.exclude = p
+}
+
+// SetExcludes sets a list of paths to be excluded during the tar
+func (t *stiTar) SetExcludes(e []string) {
+	t.excludes = e
 }
 
 // CreateTarFile creates a tar file from the given directory
@@ -171,8 +181,19 @@ func (t *stiTar) CreateTarFile(base, dir string) (string, error) {
 	return tarFile.Name(), nil
 }
 
-func (t *stiTar) shouldExclude(path string) bool {
-	return t.exclude != nil && t.exclude.String() != "" && t.exclude.MatchString(filepath.ToSlash(path))
+func (t *stiTar) shouldExclude(path string) (bool, error) {
+	if t.exclude != nil && t.exclude.String() != "" && t.exclude.MatchString(filepath.ToSlash(path)) {
+		return true, nil
+	}
+	m, err := fileutils.Matches(path, t.excludes)
+	fmt.Printf("path %s vs excludes %v resulted in %v\n", path, t.excludes, m)
+	if err != nil {
+		return false, err
+	}
+	if m {
+		return true, nil
+	}
+	return false, nil
 }
 
 // CreateTarStream calls CreateTarStreamToTarWriter with a nil logger
@@ -205,7 +226,11 @@ func (t *stiTar) CreateTarStreamToTarWriter(dir string, includeDirInPath bool, t
 		}
 		// on Windows, directory symlinks report as a directory and as a symlink.
 		// They should be treated as symlinks.
-		if !t.shouldExclude(path) {
+		exclude, err := t.shouldExclude(path)
+		if err != nil {
+			return err
+		}
+		if !exclude {
 			// if file is a link just writing header info is enough
 			if info.Mode()&os.ModeSymlink != 0 {
 				if dir == path {

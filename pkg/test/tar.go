@@ -72,6 +72,9 @@ func (f *FakeTar) ExtractTarStream(dir string, reader io.Reader) error {
 func (f *FakeTar) SetExclusionPattern(*regexp.Regexp) {
 }
 
+func (f *FakeTar) SetExcludes([]string) {
+}
+
 // CreateTarStreamToTarWriter creates a tar from the given directory and streams
 // it to the given writer.
 func (f *FakeTar) CreateTarStreamToTarWriter(dir string, includeDirInPath bool, writer tar.Writer, logger io.Writer) error {

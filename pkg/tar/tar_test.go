@@ -20,6 +20,7 @@ type dirDesc struct {
 	name         string
 	modifiedDate time.Time
 	mode         os.FileMode
+	shouldSkip   bool
 }
 
 type fileDesc struct {
@@ -89,7 +90,9 @@ func verifyTarFile(t *testing.T, filename string, dirs []dirDesc, files []fileDe
 	}
 	dirsToVerify := make(map[string]dirDesc)
 	for _, dd := range dirs {
-		dirsToVerify[dd.name] = dd
+		if !dd.shouldSkip {
+			dirsToVerify[dd.name] = dd
+		}
 	}
 	filesToVerify := make(map[string]fileDesc)
 	for _, fd := range files {
@@ -162,8 +165,8 @@ func verifyTarFile(t *testing.T, filename string, dirs []dirDesc, files []fileDe
 		}
 	}
 
-	if len(filesToVerify) > 0 || len(linksToVerify) > 0 {
-		t.Errorf("Did not find all expected files in tar: fileToVerify %v, linksToVerify %v", filesToVerify, linksToVerify)
+	if len(filesToVerify) > 0 || len(linksToVerify) > 0 || len(dirsToVerify) > 0 {
+		t.Errorf("Did not find all expected files in tar: fileToVerify %v, linksToVerify %v, dirsToVerify %v", filesToVerify, linksToVerify, dirsToVerify)
 	}
 }
 
@@ -175,10 +178,10 @@ func TestCreateTarStreamIncludeParentDir(t *testing.T) {
 	}
 	modificationDate := time.Date(2011, time.March, 5, 23, 30, 1, 0, time.UTC)
 	testDirs := []dirDesc{
-		{"dir01", modificationDate, 0700},
-		{"dir01/.git", modificationDate, 0755},
-		{"dir01/dir02", modificationDate, 0755},
-		{"dir01/dir03", modificationDate, 0775},
+		{"dir01", modificationDate, 0700, false},
+		{"dir01/.git", modificationDate, 0755, true},
+		{"dir01/dir02", modificationDate, 0755, false},
+		{"dir01/dir03", modificationDate, 0775, false},
 	}
 	testFiles := []fileDesc{
 		{"dir01/dir02/test1.txt", modificationDate, 0700, "Test1 file content", false, ""},
@@ -218,11 +221,11 @@ func TestCreateTar(t *testing.T) {
 	}
 	modificationDate := time.Date(2011, time.March, 5, 23, 30, 1, 0, time.UTC)
 	testDirs := []dirDesc{
-		{"dir01", modificationDate, 0700},
-		{"dir01/.git", modificationDate, 0755},
-		{"dir01/dir02", modificationDate, 0755},
-		{"dir01/dir03", modificationDate, 0775},
-		{"link", modificationDate, 0775},
+		{"dir01", modificationDate, 0700, false},
+		{"dir01/.git", modificationDate, 0755, true},
+		{"dir01/dir02", modificationDate, 0755, false},
+		{"dir01/dir03", modificationDate, 0775, false},
+		{"link", modificationDate, 0775, false},
 	}
 	testFiles := []fileDesc{
 		{"dir01/dir02/test1.txt", modificationDate, 0700, "Test1 file content", false, ""},
@@ -258,11 +261,11 @@ func TestCreateTarIncludeDotGit(t *testing.T) {
 	}
 	modificationDate := time.Date(2011, time.March, 5, 23, 30, 1, 0, time.UTC)
 	testDirs := []dirDesc{
-		{"dir01", modificationDate, 0700},
-		{"dir01/.git", modificationDate, 0755},
-		{"dir01/dir02", modificationDate, 0755},
-		{"dir01/dir03", modificationDate, 0775},
-		{"link", modificationDate, 0775},
+		{"dir01", modificationDate, 0700, false},
+		{"dir01/.git", modificationDate, 0755, false},
+		{"dir01/dir02", modificationDate, 0755, false},
+		{"dir01/dir03", modificationDate, 0775, false},
+		{"link", modificationDate, 0775, false},
 	}
 	testFiles := []fileDesc{
 		{"dir01/dir02/test1.txt", modificationDate, 0700, "Test1 file content", false, ""},
@@ -298,11 +301,11 @@ func TestCreateTarEmptyRegexp(t *testing.T) {
 	}
 	modificationDate := time.Date(2011, time.March, 5, 23, 30, 1, 0, time.UTC)
 	testDirs := []dirDesc{
-		{"dir01", modificationDate, 0700},
-		{"dir01/.git", modificationDate, 0755},
-		{"dir01/dir02", modificationDate, 0755},
-		{"dir01/dir03", modificationDate, 0775},
-		{"link", modificationDate, 0775},
+		{"dir01", modificationDate, 0700, false},
+		{"dir01/.git", modificationDate, 0755, false},
+		{"dir01/dir02", modificationDate, 0755, false},
+		{"dir01/dir03", modificationDate, 0775, false},
+		{"link", modificationDate, 0775, false},
 	}
 	testFiles := []fileDesc{
 		{"dir01/dir02/test1.txt", modificationDate, 0700, "Test1 file content", false, ""},
@@ -320,6 +323,52 @@ func TestCreateTarEmptyRegexp(t *testing.T) {
 		t.Fatalf("Cannot create test files: %v", err)
 	}
 
+	tarFile, err := th.CreateTarFile("", tempDir)
+	defer os.Remove(tarFile)
+	if err != nil {
+		t.Fatalf("Unable to create new tar upload file: %v", err)
+	}
+	verifyTarFile(t, tarFile, testDirs, testFiles, testLinks)
+}
+
+func TestCreateExcludes(t *testing.T) {
+	th := New(fs.NewFileSystem())
+	th.SetExclusionPattern(regexp.MustCompile(""))
+	th.SetExcludes([]string{"**/test1.txt", "**/testtar*/dir01/dir03"})
+	/*
+		if runtime.GOOS == "windows" {
+			th.SetExcludes([]string{"**\\test1.txt", "**\\tmp\\testtar*\\dir01\\dir03"})
+		}
+	*/
+
+	tempDir, err := ioutil.TempDir("", "testtar")
+	defer os.RemoveAll(tempDir)
+	if err != nil {
+		t.Fatalf("Cannot create temp directory for test: %v", err)
+	}
+	modificationDate := time.Date(2011, time.March, 5, 23, 30, 1, 0, time.UTC)
+	testDirs := []dirDesc{
+		{"dir01", modificationDate, 0700, false},
+		{"dir01/.git", modificationDate, 0755, false},
+		{"dir01/dir02", modificationDate, 0755, false},
+		{"dir01/dir03", modificationDate, 0775, true},
+		{"link", modificationDate, 0775, false},
+	}
+	testFiles := []fileDesc{
+		{"dir01/dir02/test1.txt", modificationDate, 0700, "Test1 file content", true, ""},
+		{"dir01/test2.git", modificationDate, 0660, "Test2 file content", false, ""},
+		{"dir01/dir03/test3.txt", modificationDate, 0444, "Test3 file content", true, ""},
+		{"dir01/.git/hello.txt", modificationDate, 0600, "Ignore file content", false, ""},
+	}
+	testLinks := []linkDesc{
+		{"link/okfilelink", "../dir01/dir02/test1.txt"},
+		{"link/errfilelink", "../dir01/missing.target"},
+		{"link/okdirlink", "../dir01/dir02"},
+		{"link/errdirlink", "../dir01/.git"},
+	}
+	if err = createTestFiles(tempDir, testDirs, testFiles, testLinks); err != nil {
+		t.Fatalf("Cannot create test files: %v", err)
+	}
 	tarFile, err := th.CreateTarFile("", tempDir)
 	defer os.Remove(tarFile)
 	if err != nil {
