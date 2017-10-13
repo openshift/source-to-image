@@ -204,8 +204,8 @@
 		},
 		{
 			"ImportPath": "github.com/pkg/errors",
-			"Comment": "v0.8.0-4-gff09b13",
-			"Rev": "ff09b135c25aae272398c51a07235b90a75aa4f0"
+			"Comment": "v0.7.0-13-ga221380",
+			"Rev": "a22138067af1c4942683050411a841ade67fe1eb"
 		}
 	]
 }
