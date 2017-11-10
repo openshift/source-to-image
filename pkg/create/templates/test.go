@@ -163,8 +163,7 @@ cleanup
 `
 
 // Makefile contains a sample Makefile which can build and test a container.
-const Makefile = `
-IMAGE_NAME = {{.ImageName}}
+const Makefile = `IMAGE_NAME = {{.ImageName}}
 
 .PHONY: build
 build:
@@ -177,8 +176,7 @@ test:
 `
 
 // Index contains a sample index.html file.
-const Index = `
-<!doctype html>
+const Index = `<!doctype html>
 <html>
 	<head>
 		<title>Hello World!</title>
