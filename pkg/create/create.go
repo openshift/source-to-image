@@ -38,13 +38,13 @@ func (b *Bootstrap) AddDockerfile() {
 
 // AddReadme creates a README.md
 func (b *Bootstrap) AddReadme() {
-	b.process(templates.Readme, "README.md", 0700)
+	b.process(templates.Readme, "README.md", 0600)
 }
 
 // AddTests creates an example test for the STI image and the Makefile
 func (b *Bootstrap) AddTests() {
 	os.MkdirAll(b.DestinationDir+"/"+"test/test-app", 0700)
-	b.process(templates.Index, "test/test-app/index.html", 0700)
+	b.process(templates.Index, "test/test-app/index.html", 0600)
 	b.process(templates.TestRunScript, "test/run", 0700)
 	b.process(templates.Makefile, "Makefile", 0600)
 }
