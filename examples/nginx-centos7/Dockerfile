@@ -4,7 +4,7 @@
 FROM centos:centos7
 
 # Here you can specify the maintainer for the image that you're building
-MAINTAINER Your Name <your.name@example.com>
+LABEL maintainer="Your Name <your.name@example.com>"
 
 # Export an environment variable that provides information about the application version.
 # Replace this with the version for your application.
