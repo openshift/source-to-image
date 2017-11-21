@@ -16,7 +16,8 @@ import (
 
 	"github.com/docker/distribution/reference"
 	cliconfig "github.com/docker/docker/cli/config"
-	"github.com/docker/engine-api/client"
+	"github.com/docker/docker/client"
+
 	"github.com/openshift/source-to-image/pkg/api"
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
