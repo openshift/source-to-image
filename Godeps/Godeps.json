@@ -16,22 +16,17 @@
 		},
 		{
 			"ImportPath": "github.com/Microsoft/go-winio",
-			"Comment": "v0.4.2",
-			"Rev": "f533f7a102197536779ea3a8cb881d639e21ec5a"
+			"Comment": "v0.4.4-7-g7843996",
+			"Rev": "78439966b38d69bf38227fbf57ac8a6fee70f69a"
 		},
 		{
 			"ImportPath": "github.com/Nvveen/Gotty",
 			"Rev": "cd527374f1e5bff4938207604a14f2e38a9cf512"
 		},
 		{
-			"ImportPath": "github.com/docker/distribution/digest",
-			"Comment": "v2.6.2-6-g1e2bbed",
-			"Rev": "1e2bbed6e09c6c8047f52af965a6e301f346d04e"
-		},
-		{
 			"ImportPath": "github.com/docker/distribution/reference",
-			"Comment": "v2.6.2-6-g1e2bbed",
-			"Rev": "1e2bbed6e09c6c8047f52af965a6e301f346d04e"
+			"Comment": "v2.6.0-rc.1-209-gedc3ab29",
+			"Rev": "edc3ab29cdff8694dd6feb85cfeb4b5f1b38ed9c"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/builder/dockerfile/command",
@@ -175,8 +170,8 @@
 		},
 		{
 			"ImportPath": "github.com/docker/go-units",
-			"Comment": "v0.3.1-10-ge30f1e7",
-			"Rev": "e30f1e79f3cd72542f2026ceec18d3bd67ab859c"
+			"Comment": "v0.3.1-11-g9e638d3",
+			"Rev": "9e638d38cf6977a37a8ea0078f3ee75a7cdb2dd1"
 		},
 		{
 			"ImportPath": "github.com/golang/glog",
@@ -189,8 +184,8 @@
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/user",
-			"Comment": "v1.0.0-rc2-49-gd223e2a",
-			"Rev": "d223e2adae83f62d58448a799a5da05730228089"
+			"Comment": "v1.0.0-rc4-50-g4d6e6720",
+			"Rev": "4d6e6720a7c885c37b4cb083c0d372dda3425120"
 		},
 		{
 			"ImportPath": "github.com/pkg/errors",
@@ -288,11 +283,11 @@
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",
-			"Rev": "f2499483f923065a842d38eb4c7f1927e6fc6e6d"
+			"Rev": "1c05540f6879653db88113bc4a2b70aec4bd491f"
 		},
 		{
 			"ImportPath": "golang.org/x/net/proxy",
-			"Rev": "f2499483f923065a842d38eb4c7f1927e6fc6e6d"
+			"Rev": "1c05540f6879653db88113bc4a2b70aec4bd491f"
 		},
 		{
 			"ImportPath": "golang.org/x/sys/unix",
@@ -301,6 +296,15 @@
 		{
 			"ImportPath": "golang.org/x/sys/windows",
 			"Rev": "7ddbeae9ae08c6a06a59597f0c9edbc5ff2444ce"
+		},
+		{
+			"ImportPath": "github.com/docker/distribution/digestset",
+			"Comment": "v2.6.0-rc.1-209-gedc3ab29",
+			"Rev": "edc3ab29cdff8694dd6feb85cfeb4b5f1b38ed9c"
+		},
+		{
+			"ImportPath": "github.com/opencontainers/go-digest",
+			"Rev": "a6d0ee40d4207ea02364bd3b9e8e77b9159ba1eb"
 		}
 	]
 }
