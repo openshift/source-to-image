@@ -24,14 +24,9 @@
 			"Rev": "cd527374f1e5bff4938207604a14f2e38a9cf512"
 		},
 		{
-			"ImportPath": "github.com/docker/distribution/digest",
-			"Comment": "v2.6.2-6-g1e2bbed",
-			"Rev": "1e2bbed6e09c6c8047f52af965a6e301f346d04e"
-		},
-		{
 			"ImportPath": "github.com/docker/distribution/reference",
-			"Comment": "v2.6.2-6-g1e2bbed",
-			"Rev": "1e2bbed6e09c6c8047f52af965a6e301f346d04e"
+			"Comment": "v2.6.0-rc.1-209-gedc3ab29",
+			"Rev": "edc3ab29cdff8694dd6feb85cfeb4b5f1b38ed9c"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/builder/dockerfile/command",
@@ -301,6 +296,15 @@
 		{
 			"ImportPath": "golang.org/x/sys/windows",
 			"Rev": "7ddbeae9ae08c6a06a59597f0c9edbc5ff2444ce"
+		},
+		{
+			"ImportPath": "github.com/docker/distribution/digestset",
+			"Comment": "v2.6.0-rc.1-209-gedc3ab29",
+			"Rev": "edc3ab29cdff8694dd6feb85cfeb4b5f1b38ed9c"
+		},
+		{
+			"ImportPath": "github.com/opencontainers/go-digest",
+			"Rev": "a6d0ee40d4207ea02364bd3b9e8e77b9159ba1eb"
 		}
 	]
 }
