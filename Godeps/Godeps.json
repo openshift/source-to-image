@@ -189,8 +189,8 @@
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/user",
-			"Comment": "v1.0.0-rc2-49-gd223e2a",
-			"Rev": "d223e2adae83f62d58448a799a5da05730228089"
+			"Comment": "v1.0.0-rc4-50-g4d6e6720",
+			"Rev": "4d6e6720a7c885c37b4cb083c0d372dda3425120"
 		},
 		{
 			"ImportPath": "github.com/pkg/errors",
