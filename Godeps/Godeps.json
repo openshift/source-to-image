@@ -170,8 +170,8 @@
 		},
 		{
 			"ImportPath": "github.com/docker/go-units",
-			"Comment": "v0.3.1-10-ge30f1e7",
-			"Rev": "e30f1e79f3cd72542f2026ceec18d3bd67ab859c"
+			"Comment": "v0.3.1-11-g9e638d3",
+			"Rev": "9e638d38cf6977a37a8ea0078f3ee75a7cdb2dd1"
 		},
 		{
 			"ImportPath": "github.com/golang/glog",
