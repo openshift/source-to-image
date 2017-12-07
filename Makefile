@@ -84,4 +84,5 @@ clean:
 release: clean
 	hack/build-release.sh
 	hack/extract-release.sh
+	hack/build-alpine-images.sh
 .PHONY: release
