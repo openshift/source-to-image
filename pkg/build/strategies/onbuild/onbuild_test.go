@@ -12,7 +12,8 @@ import (
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/test"
-	"github.com/openshift/source-to-image/pkg/util"
+	testfs "github.com/openshift/source-to-image/pkg/test/fs"
+	"github.com/openshift/source-to-image/pkg/util/fs"
 )
 
 type fakeSourceHandler struct{}
@@ -37,14 +38,14 @@ func newFakeOnBuild() *OnBuild {
 	return &OnBuild{
 		docker:  &docker.FakeDocker{},
 		git:     &test.FakeGit{},
-		fs:      &test.FakeFileSystem{},
+		fs:      &testfs.FakeFileSystem{},
 		tar:     &test.FakeTar{},
 		source:  &fakeSourceHandler{},
 		garbage: &fakeCleaner{},
 	}
 }
 
-func checkDockerfile(fs *test.FakeFileSystem, t *testing.T) {
+func checkDockerfile(fs *testfs.FakeFileSystem, t *testing.T) {
 	if fs.WriteFileError != nil {
 		t.Errorf("%v", fs.WriteFileError)
 	}
@@ -71,11 +72,11 @@ func TestCreateDockerfile(t *testing.T) {
 		},
 	}
 	b := newFakeOnBuild()
-	fakeFs := &test.FakeFileSystem{
+	fakeFs := &testfs.FakeFileSystem{
 		Files: []os.FileInfo{
-			&util.FileInfo{FileName: "config.ru", FileMode: 0600},
-			&util.FileInfo{FileName: "app.rb", FileMode: 0600},
-			&util.FileInfo{FileName: "run", FileMode: 0777},
+			&fs.FileInfo{FileName: "config.ru", FileMode: 0600},
+			&fs.FileInfo{FileName: "app.rb", FileMode: 0600},
+			&fs.FileInfo{FileName: "run", FileMode: 0777},
 		},
 	}
 	b.fs = fakeFs
@@ -91,12 +92,12 @@ func TestCreateDockerfileWithAssemble(t *testing.T) {
 		BuilderImage: "fake:onbuild",
 	}
 	b := newFakeOnBuild()
-	fakeFs := &test.FakeFileSystem{
+	fakeFs := &testfs.FakeFileSystem{
 		Files: []os.FileInfo{
-			&util.FileInfo{FileName: "config.ru", FileMode: 0600},
-			&util.FileInfo{FileName: "app.rb", FileMode: 0600},
-			&util.FileInfo{FileName: "run", FileMode: 0777},
-			&util.FileInfo{FileName: "assemble", FileMode: 0777},
+			&fs.FileInfo{FileName: "config.ru", FileMode: 0600},
+			&fs.FileInfo{FileName: "app.rb", FileMode: 0600},
+			&fs.FileInfo{FileName: "run", FileMode: 0777},
+			&fs.FileInfo{FileName: "assemble", FileMode: 0777},
 		},
 	}
 	b.fs = fakeFs
@@ -116,11 +117,11 @@ func TestBuild(t *testing.T) {
 		Tag:          "fakeapp",
 	}
 	b := newFakeOnBuild()
-	fakeFs := &test.FakeFileSystem{
+	fakeFs := &testfs.FakeFileSystem{
 		Files: []os.FileInfo{
-			&util.FileInfo{FileName: "config.ru", FileMode: 0600},
-			&util.FileInfo{FileName: "app.rb", FileMode: 0600},
-			&util.FileInfo{FileName: "run", FileMode: 0777},
+			&fs.FileInfo{FileName: "config.ru", FileMode: 0600},
+			&fs.FileInfo{FileName: "app.rb", FileMode: 0600},
+			&fs.FileInfo{FileName: "run", FileMode: 0777},
 		},
 	}
 	b.fs = fakeFs
@@ -142,11 +143,11 @@ func TestBuildOnBuildBlocked(t *testing.T) {
 		BlockOnBuild: true,
 	}
 	b := newFakeOnBuild()
-	fakeFs := &test.FakeFileSystem{
+	fakeFs := &testfs.FakeFileSystem{
 		Files: []os.FileInfo{
-			&util.FileInfo{FileName: "config.ru", FileMode: 0600},
-			&util.FileInfo{FileName: "app.rb", FileMode: 0600},
-			&util.FileInfo{FileName: "run", FileMode: 0777},
+			&fs.FileInfo{FileName: "config.ru", FileMode: 0600},
+			&fs.FileInfo{FileName: "app.rb", FileMode: 0600},
+			&fs.FileInfo{FileName: "run", FileMode: 0777},
 		},
 	}
 	b.fs = fakeFs
