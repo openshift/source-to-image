@@ -325,12 +325,11 @@ func isOnbuildAllowed(directives []string, allowed *user.RangeList) bool {
 }
 
 func extractUser(userSpec string) string {
-	user := userSpec
-	if strings.Contains(user, ":") {
+	if strings.Contains(userSpec, ":") {
 		parts := strings.SplitN(userSpec, ":", 2)
-		user = parts[0]
+		return strings.TrimSpace(parts[0])
 	}
-	return strings.TrimSpace(user)
+	return strings.TrimSpace(userSpec)
 }
 
 // CheckReachable returns if the Docker daemon is reachable from s2i
