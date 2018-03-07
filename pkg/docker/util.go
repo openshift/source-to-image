@@ -90,7 +90,7 @@ type namedDockerImageReference struct {
 func parseNamedDockerImageReference(spec string) (namedDockerImageReference, error) {
 	var ref namedDockerImageReference
 
-	namedRef, err := reference.ParseNormalizedNamed(spec)
+	namedRef, err := reference.ParseNamed(spec)
 	if err != nil {
 		return ref, err
 	}
