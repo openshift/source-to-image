@@ -13,7 +13,7 @@ import (
 )
 
 func TestIsValidGitRepository(t *testing.T) {
-	fileSystem := fs.NewFileSystem()
+	fs := fs.NewFileSystem()
 
 	// a local git repo with a commit
 	d, err := CreateLocalGitDirectory()
@@ -22,11 +22,11 @@ func TestIsValidGitRepository(t *testing.T) {
 	}
 	defer os.RemoveAll(d)
 
-	ok, err := IsLocalNonBareGitRepository(fileSystem, d)
+	ok, err := IsLocalNonBareGitRepository(fs, d)
 	if !ok || err != nil {
 		t.Errorf("IsLocalNonBareGitRepository returned %v, %v", ok, err)
 	}
-	empty, err := LocalNonBareGitRepositoryIsEmpty(fileSystem, d)
+	empty, err := LocalNonBareGitRepositoryIsEmpty(fs, d)
 	if empty || err != nil {
 		t.Errorf("LocalNonBareGitRepositoryIsEmpty returned %v, %v", ok, err)
 	}
@@ -38,11 +38,11 @@ func TestIsValidGitRepository(t *testing.T) {
 	}
 	defer os.RemoveAll(d)
 
-	ok, err = IsLocalNonBareGitRepository(fileSystem, d)
+	ok, err = IsLocalNonBareGitRepository(fs, d)
 	if !ok || err != nil {
 		t.Errorf("IsLocalNonBareGitRepository returned %v, %v", ok, err)
 	}
-	empty, err = LocalNonBareGitRepositoryIsEmpty(fileSystem, d)
+	empty, err = LocalNonBareGitRepositoryIsEmpty(fs, d)
 	if !empty || err != nil {
 		t.Errorf("LocalNonBareGitRepositoryIsEmpty returned %v, %v", ok, err)
 	}
@@ -50,7 +50,7 @@ func TestIsValidGitRepository(t *testing.T) {
 	// a directory which is not a git repo
 	d = filepath.Join(d, ".git")
 
-	ok, err = IsLocalNonBareGitRepository(fileSystem, d)
+	ok, err = IsLocalNonBareGitRepository(fs, d)
 	if ok || err != nil {
 		t.Errorf("IsLocalNonBareGitRepository returned %v, %v", ok, err)
 	}
@@ -62,11 +62,11 @@ func TestIsValidGitRepository(t *testing.T) {
 	}
 	defer os.RemoveAll(d)
 
-	ok, err = IsLocalNonBareGitRepository(fileSystem, filepath.Join(d, "submodule"))
+	ok, err = IsLocalNonBareGitRepository(fs, filepath.Join(d, "submodule"))
 	if !ok || err != nil {
 		t.Errorf("IsLocalNonBareGitRepository returned %v, %v", ok, err)
 	}
-	empty, err = LocalNonBareGitRepositoryIsEmpty(fileSystem, filepath.Join(d, "submodule"))
+	empty, err = LocalNonBareGitRepositoryIsEmpty(fs, filepath.Join(d, "submodule"))
 	if empty || err != nil {
 		t.Errorf("LocalNonBareGitRepositoryIsEmpty returned %v, %v", ok, err)
 	}

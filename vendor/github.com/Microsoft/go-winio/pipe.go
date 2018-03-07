@@ -265,9 +265,9 @@ func (l *win32PipeListener) listenerRoutine() {
 			if err == nil {
 				// Wait for the client to connect.
 				ch := make(chan error)
-				go func(p *win32File) {
+				go func() {
 					ch <- connectPipe(p)
-				}(p)
+				}()
 				select {
 				case err = <-ch:
 					if err != nil {

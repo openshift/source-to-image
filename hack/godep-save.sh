@@ -7,13 +7,6 @@ pin-godep() {
   popd > /dev/null
 }
 
-# Some things we want in godeps are windows code dependencies, so ./...
-# won't pick them up.
-REQUIRED_BINS=(
-  "golang.org/x/crypto/ssh/terminal"
-  "./..."
-)
-
 # build the godep tool
 # Again go get stinks, hence || true
 go get -u github.com/tools/godep 2>/dev/null || true
@@ -33,4 +26,4 @@ missing-test-deps () {
   go list -f $'{{range .Imports}}{{.}}\n{{end}}{{range .TestImports}}{{.}}\n{{end}}{{range .XTestImports}}{{.}}\n{{end}}' ./vendor/k8s.io/kubernetes/... | grep '\.' | grep -v github.com/openshift/origin | sort -u || true
 }
 
-godep-save -t "${REQUIRED_BINS[@]}"
+godep-save -t ./...

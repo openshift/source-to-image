@@ -15,8 +15,7 @@ import (
 
 	"github.com/docker/distribution/reference"
 	cliconfig "github.com/docker/docker/cli/config"
-	"github.com/docker/docker/client"
-
+	"github.com/docker/engine-api/client"
 	"github.com/openshift/source-to-image/pkg/api"
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
@@ -90,7 +89,7 @@ type namedDockerImageReference struct {
 func parseNamedDockerImageReference(spec string) (namedDockerImageReference, error) {
 	var ref namedDockerImageReference
 
-	namedRef, err := reference.ParseNormalizedNamed(spec)
+	namedRef, err := reference.ParseNamed(spec)
 	if err != nil {
 		return ref, err
 	}
@@ -325,11 +324,12 @@ func isOnbuildAllowed(directives []string, allowed *user.RangeList) bool {
 }
 
 func extractUser(userSpec string) string {
-	if strings.Contains(userSpec, ":") {
+	user := userSpec
+	if strings.Contains(user, ":") {
 		parts := strings.SplitN(userSpec, ":", 2)
-		return strings.TrimSpace(parts[0])
+		user = parts[0]
 	}
-	return strings.TrimSpace(userSpec)
+	return strings.TrimSpace(user)
 }
 
 // CheckReachable returns if the Docker daemon is reachable from s2i

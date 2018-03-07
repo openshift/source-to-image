@@ -5,8 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 
-	dockertypes "github.com/docker/docker/api/types"
-
+	dockertypes "github.com/docker/engine-api/types"
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util/fs"
