@@ -14,7 +14,7 @@ import:
   - digestset
   - reference
 - package: github.com/docker/docker
-#  repo: git@github.com:openshift/moby-moby
+  repo: git@github.com:openshift/moby-moby
   version: 4f3616fb1c112e206b88cb7a9922bf49067a7756
   subpackages:
   - api

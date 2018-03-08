@@ -1,5 +1,5 @@
-hash: 8df490ca0b2e48d9e56a17c407d20051c4532139ddaf545e41cf8e68d7dd76f0
-updated: 2018-03-08T14:53:04.619323268-05:00
+hash: edca5c32b67b93cfc6992dfbd7b429f7e3e5c99929d0f7b156a7777132e19eb0
+updated: 2018-03-08T15:16:10.063277504-05:00
 imports:
 - name: github.com/Azure/go-ansiterm
   version: 19f72df4d05d31cbe1c56bfc8045c96babff6c7e
@@ -12,6 +12,7 @@ imports:
   - reference
 - name: github.com/docker/docker
   version: 4f3616fb1c112e206b88cb7a9922bf49067a7756
+  repo: git@github.com:openshift/moby-moby
   subpackages:
   - api
   - api/types
