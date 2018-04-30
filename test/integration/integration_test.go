@@ -114,6 +114,7 @@ func TestInjectionBuild(t *testing.T) {
 	integration(t).exerciseInjectionBuild(TagCleanBuild, FakeBuilderImage, []string{
 		tempdir + ":/tmp",
 		tempdir + ":",
+		tempdir + ":test;" + tempdir + ":test2",
 	})
 }
 
