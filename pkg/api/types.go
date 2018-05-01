@@ -266,8 +266,12 @@ type CGroupLimits struct {
 
 // VolumeSpec represents a single volume mount point.
 type VolumeSpec struct {
-	Source      string
+	// Source is a reference to the volume source.
+	Source string
+	// Destination is the path to mount the volume to - absolute or relative.
 	Destination string
+	// Keep indicates if the mounted data should be kept in the final image.
+	Keep bool
 }
 
 // VolumeList contains list of VolumeSpec.
