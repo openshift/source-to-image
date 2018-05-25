@@ -223,10 +223,10 @@ func TestBuild(t *testing.T) {
 
 		// Verify the right scripts were configed
 		if !reflect.DeepEqual(fh.SetupRequired, []string{api.Assemble, api.Run}) {
-			t.Errorf("Unexpected required scripts configed: %#v", fh.SetupRequired)
+			t.Errorf("Unexpected required scripts configured: %#v", fh.SetupRequired)
 		}
 		if !reflect.DeepEqual(fh.SetupOptional, []string{api.SaveArtifacts}) {
-			t.Errorf("Unexpected optional scripts configed: %#v", fh.SetupOptional)
+			t.Errorf("Unexpected optional scripts configured: %#v", fh.SetupOptional)
 		}
 
 		// Verify that Exists was called

@@ -31,9 +31,9 @@ type ScriptHandler interface {
 type URLScriptHandler struct {
 	URL            string
 	DestinationDir string
-	download       Downloader
-	fs             fs.FileSystem
-	name           string
+	Download       Downloader
+	FS             fs.FileSystem
+	Name           string
 }
 
 const (
@@ -49,6 +49,14 @@ const (
 	SourceHandler = "source handler"
 )
 
+var (
+	// RequiredScripts must be present to do an s2i build
+	RequiredScripts = []string{api.Assemble, api.Run}
+
+	// OptionalScripts may be provided when doing an s2i build
+	OptionalScripts = []string{api.SaveArtifacts}
+)
+
 // SetDestinationDir sets the destination where the scripts should be
 // downloaded.
 func (s *URLScriptHandler) SetDestinationDir(baseDir string) {
@@ -57,7 +65,7 @@ func (s *URLScriptHandler) SetDestinationDir(baseDir string) {
 
 // String implements the String() function.
 func (s *URLScriptHandler) String() string {
-	return s.name
+	return s.Name
 }
 
 // Get parses the provided URL and the script name.
@@ -83,7 +91,7 @@ func (s *URLScriptHandler) Install(r *api.InstallResult) error {
 		return err
 	}
 	dst := filepath.Join(s.DestinationDir, api.UploadScripts, r.Script)
-	if _, err := s.download.Download(downloadURL, dst); err != nil {
+	if _, err := s.Download.Download(downloadURL, dst); err != nil {
 		if e, ok := err.(s2ierr.Error); ok {
 			if e.ErrorCode == s2ierr.ScriptsInsideImageError {
 				r.Installed = true
@@ -92,7 +100,7 @@ func (s *URLScriptHandler) Install(r *api.InstallResult) error {
 		}
 		return err
 	}
-	if err := s.fs.Chmod(dst, 0755); err != nil {
+	if err := s.FS.Chmod(dst, 0755); err != nil {
 		return err
 	}
 	r.Installed = true
@@ -194,16 +202,18 @@ func NewInstaller(image string, scriptsURL string, proxyConfig *api.ProxyConfig,
 	// Order is important here, first we try to get the scripts from provided URL,
 	// then we look into sources and check for .s2i/bin scripts.
 	if len(m.ScriptsURL) > 0 {
-		m.Add(&URLScriptHandler{URL: m.ScriptsURL, download: m.download, fs: m.fs, name: ScriptURLHandler})
+		m.Add(&URLScriptHandler{URL: m.ScriptsURL, Download: m.download, FS: m.fs, Name: ScriptURLHandler})
 	}
 
 	m.Add(&SourceScriptHandler{fs: m.fs})
 
-	// If the detection handlers above fail, try to get the script url from the
-	// docker image itself.
-	defaultURL, err := m.docker.GetScriptsURL(m.Image)
-	if err == nil && defaultURL != "" {
-		m.Add(&URLScriptHandler{URL: defaultURL, download: m.download, fs: m.fs, name: ImageURLHandler})
+	if m.docker != nil {
+		// If the detection handlers above fail, try to get the script url from the
+		// docker image itself.
+		defaultURL, err := m.docker.GetScriptsURL(m.Image)
+		if err == nil && defaultURL != "" {
+			m.Add(&URLScriptHandler{URL: defaultURL, Download: m.download, FS: m.fs, Name: ImageURLHandler})
+		}
 	}
 	return &m
 }
@@ -240,7 +250,8 @@ func (m *DefaultScriptSourceManager) InstallOptional(scripts []string, dstDir st
 			if r := h.Get(script); r != nil {
 				if err := h.Install(r); err != nil {
 					failedSources = append(failedSources, h.String())
-					glog.Errorf("script %q found by the %s, but failed to install: %v", script, h, err)
+					// all this means is this source didn't have this particular script
+					glog.V(4).Infof("script %q found by the %s, but failed to install: %v", script, h, err)
 				} else {
 					r.FailedSources = failedSources
 					result = append(result, *r)

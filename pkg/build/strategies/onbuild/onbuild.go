@@ -156,7 +156,7 @@ func (builder *OnBuild) CreateDockerfile(config *api.Config) error {
 	if err != nil {
 		return err
 	}
-	env, err := scripts.GetEnvironment(config)
+	env, err := scripts.GetEnvironment(filepath.Join(config.WorkingDir, api.Source))
 	if err != nil {
 		glog.V(1).Infof("Environment: %v", err)
 	} else {

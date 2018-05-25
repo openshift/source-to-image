@@ -29,7 +29,7 @@ func GenerateLabelsFromConfig(labels map[string]string, config *api.Config, name
 
 	if len(config.DisplayName) > 0 {
 		labels[api.KubernetesNamespace+"display-name"] = config.DisplayName
-	} else {
+	} else if len(config.Tag) > 0 {
 		labels[api.KubernetesNamespace+"display-name"] = config.Tag
 	}
 
@@ -41,7 +41,7 @@ func GenerateLabelsFromConfig(labels map[string]string, config *api.Config, name
 // informations.
 func GenerateLabelsFromSourceInfo(labels map[string]string, info *git.SourceInfo, namespace string) map[string]string {
 	if info == nil {
-		glog.V(3).Info("Unable to fetch source informations, the output image labels will not be set")
+		glog.V(3).Info("Unable to fetch source information, the output image labels will not be set")
 		return labels
 	}
 

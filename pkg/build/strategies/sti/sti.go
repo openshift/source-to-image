@@ -121,8 +121,8 @@ func New(client dockerpkg.Client, config *api.Config, fs fs.FileSystem, override
 		fs:                     fs,
 		tar:                    tarHandler,
 		callbackInvoker:        util.NewCallbackInvoker(),
-		requiredScripts:        []string{api.Assemble, api.Run},
-		optionalScripts:        []string{api.SaveArtifacts},
+		requiredScripts:        scripts.RequiredScripts,
+		optionalScripts:        scripts.OptionalScripts,
 		optionalRuntimeScripts: []string{api.AssembleRuntime},
 		externalScripts:        map[string]bool{},
 		installedScripts:       map[string]bool{},
@@ -439,13 +439,13 @@ func (builder *STI) PostExecute(containerID, destination string) error {
 	return nil
 }
 
-func createBuildEnvironment(config *api.Config) []string {
-	env, err := scripts.GetEnvironment(config)
+func CreateBuildEnvironment(sourcePath string, cfgEnv api.EnvironmentList) []string {
+	s2iEnv, err := scripts.GetEnvironment(filepath.Join(sourcePath, api.Source))
 	if err != nil {
 		glog.V(3).Infof("No user environment provided (%v)", err)
 	}
 
-	return append(scripts.ConvertEnvironmentList(env), scripts.ConvertEnvironmentList(config.Environment)...)
+	return append(scripts.ConvertEnvironmentList(s2iEnv), scripts.ConvertEnvironmentList(cfgEnv)...)
 }
 
 // Exists determines if the current build supports incremental workflow.
@@ -567,7 +567,7 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 
 	// we can't invoke this method before (for example in New() method)
 	// because of later initialization of config.WorkingDir
-	builder.env = createBuildEnvironment(config)
+	builder.env = CreateBuildEnvironment(config.WorkingDir, config.Environment)
 
 	errOutput := ""
 	outReader, outWriter := io.Pipe()

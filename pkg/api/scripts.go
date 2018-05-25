@@ -33,6 +33,8 @@ const (
 	UploadScripts = "upload" + string(os.PathSeparator) + "scripts"
 	// Source is the location of application sources.
 	Source = "upload" + string(os.PathSeparator) + "src"
+	// Injections is the location of injection content (configmaps+secrets).
+	Injections = "upload" + string(os.PathSeparator) + "injections"
 
 	// ContextTmp is the location of applications sources off of a supplied context dir
 	ContextTmp = "upload" + string(os.PathSeparator) + "tmp"
