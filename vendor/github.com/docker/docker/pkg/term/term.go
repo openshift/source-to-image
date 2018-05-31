@@ -1,17 +1,16 @@
 // +build !windows
 
-// Package term provides structures and helper functions to work with
+// Package term provides provides structures and helper functions to work with
 // terminal (state, sizes).
 package term
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"os/signal"
-
-	"golang.org/x/sys/unix"
+	"syscall"
+	"unsafe"
 )
 
 var (
@@ -32,7 +31,7 @@ type Winsize struct {
 	y      uint16
 }
 
-// StdStreams returns the standard streams (stdin, stdout, stderr).
+// StdStreams returns the standard streams (stdin, stdout, stedrr).
 func StdStreams() (stdIn io.ReadCloser, stdOut, stdErr io.Writer) {
 	return os.Stdin, os.Stdout, os.Stderr
 }
@@ -46,6 +45,27 @@ func GetFdInfo(in interface{}) (uintptr, bool) {
 		isTerminalIn = IsTerminal(inFd)
 	}
 	return inFd, isTerminalIn
+}
+
+// GetWinsize returns the window size based on the specified file descriptor.
+func GetWinsize(fd uintptr) (*Winsize, error) {
+	ws := &Winsize{}
+	_, _, err := syscall.Syscall(syscall.SYS_IOCTL, fd, uintptr(syscall.TIOCGWINSZ), uintptr(unsafe.Pointer(ws)))
+	// Skip errno = 0
+	if err == 0 {
+		return ws, nil
+	}
+	return ws, err
+}
+
+// SetWinsize tries to set the specified window size for the specified file descriptor.
+func SetWinsize(fd uintptr, ws *Winsize) error {
+	_, _, err := syscall.Syscall(syscall.SYS_IOCTL, fd, uintptr(syscall.TIOCSWINSZ), uintptr(unsafe.Pointer(ws)))
+	// Skip errno = 0
+	if err == 0 {
+		return nil
+	}
+	return err
 }
 
 // IsTerminal returns true if the given file descriptor is a terminal.
@@ -80,7 +100,7 @@ func SaveState(fd uintptr) (*State, error) {
 // descriptor, with echo disabled.
 func DisableEcho(fd uintptr, state *State) error {
 	newState := state.termios
-	newState.Lflag &^= unix.ECHO
+	newState.Lflag &^= syscall.ECHO
 
 	if err := tcset(fd, &newState); err != 0 {
 		return err
@@ -90,8 +110,7 @@ func DisableEcho(fd uintptr, state *State) error {
 }
 
 // SetRawTerminal puts the terminal connected to the given file descriptor into
-// raw mode and returns the previous state. On UNIX, this puts both the input
-// and output into raw mode. On Windows, it only puts the input into raw mode.
+// raw mode and returns the previous state.
 func SetRawTerminal(fd uintptr) (*State, error) {
 	oldState, err := MakeRaw(fd)
 	if err != nil {
@@ -101,24 +120,12 @@ func SetRawTerminal(fd uintptr) (*State, error) {
 	return oldState, err
 }
 
-// SetRawTerminalOutput puts the output of terminal connected to the given file
-// descriptor into raw mode. On UNIX, this does nothing and returns nil for the
-// state. On Windows, it disables LF -> CRLF translation.
-func SetRawTerminalOutput(fd uintptr) (*State, error) {
-	return nil, nil
-}
-
 func handleInterrupt(fd uintptr, state *State) {
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, os.Interrupt)
+
 	go func() {
-		for range sigchan {
-			// quit cleanly and the new terminal item is on a new line
-			fmt.Println()
-			signal.Stop(sigchan)
-			close(sigchan)
-			RestoreTerminal(fd, state)
-			os.Exit(1)
-		}
+		_ = <-sigchan
+		RestoreTerminal(fd, state)
 	}()
 }
