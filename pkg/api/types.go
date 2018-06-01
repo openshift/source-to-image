@@ -234,9 +234,6 @@ type Config struct {
 	// SourceInfo provides the info about the source to be built rather than relying
 	// on the Downloader to retrieve it.
 	SourceInfo *git.SourceInfo
-
-	// SecurityOpt are passed as options to the docker containers launched by s2i.
-	SecurityOpt []string
 }
 
 // EnvironmentSpec specifies a single environment variable.
