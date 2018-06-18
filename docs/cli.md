@@ -159,7 +159,7 @@ Build a Ruby application from a Git source, using the official `ruby-23-centos7`
 image, the resulting image will be named `ruby-app`:
 
 ```
-$ s2i build https://github.com/openshift/ruby-hello-world openshift/ruby-23-centos7 ruby-app
+$ s2i build https://github.com/openshift/ruby-hello-world centos/ruby-23-centos7 ruby-app
 ```
 
 Build a Node.js application from a local directory, using a local image, the resulting
@@ -188,7 +188,7 @@ Build a Ruby application from a Git source, specifying `ref`, and using the offi
 `ruby-23-centos7` builder image.  The resulting image will be named `ruby-app`:
 
 ```
-$ s2i build --ref=my-branch https://github.com/openshift/ruby-hello-world openshift/ruby-23-centos7 ruby-app
+$ s2i build --ref=my-branch https://github.com/openshift/ruby-hello-world centos/ruby-23-centos7 ruby-app
 ```
 
 ***NOTE:*** If the ref is invalid or not present in the source repository then the build will fail.
@@ -197,7 +197,7 @@ Build a Ruby application from a Git source, overriding the scripts URL from a lo
 and specifying the scripts and sources be placed in `/opt` directory:
 
 ```
-$ s2i build --scripts-url=file://s2iscripts --destination=/opt https://github.com/openshift/ruby-hello-world openshift/ruby-23-centos7 ruby-app
+$ s2i build --scripts-url=file://s2iscripts --destination=/opt https://github.com/openshift/ruby-hello-world centos/ruby-23-centos7 ruby-app
 ```
 
 # s2i rebuild
@@ -243,7 +243,7 @@ $ s2i usage <builder image> [flags]
 
 Print the official `ruby-23-centos7` builder image usage:
 ```
-$ s2i usage openshift/ruby-23-centos7
+$ s2i usage centos/ruby-23-centos7
 ```
 
 
