@@ -439,6 +439,8 @@ func (builder *STI) PostExecute(containerID, destination string) error {
 	return nil
 }
 
+// CreateBuildEnvironment constructs the environment variables to be provided to the assemble
+// script and committed in the new image.
 func CreateBuildEnvironment(sourcePath string, cfgEnv api.EnvironmentList) []string {
 	s2iEnv, err := scripts.GetEnvironment(filepath.Join(sourcePath, api.Source))
 	if err != nil {
