@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/openshift/source-to-image/pkg/api/constants"
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
 )
 
@@ -246,9 +247,8 @@ func NewAssembleUserNotAllowedError(image string, usesConfig bool) error {
 		msg = "assemble user must be numeric and within the range of allowed users"
 		suggestion = "build without the allowed-uids or assemble-user configurations set"
 	} else {
-		assembleLabel := "io.openshift.s2i.assemble-user"
-		msg = fmt.Sprintf("image %q includes the %q label whose value is not within the allowed range", image, assembleLabel)
-		suggestion = fmt.Sprintf("modify the %q label in image %q to use a numeric user within the allowed range, or build without the allowed-uids configuration set", assembleLabel, image)
+		msg = fmt.Sprintf("image %q includes the %q label whose value is not within the allowed range", image, constants.AssembleUserLabel)
+		suggestion = fmt.Sprintf("modify the %q label in image %q to use a numeric user within the allowed range, or build without the allowed-uids configuration set", constants.AssembleUserLabel, image)
 	}
 	return Error{
 		Message:    msg,

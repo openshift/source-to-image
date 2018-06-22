@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/openshift/source-to-image/pkg/api"
+	"github.com/openshift/source-to-image/pkg/api/constants"
 	"github.com/openshift/source-to-image/pkg/scm/git"
 	"github.com/openshift/source-to-image/pkg/util/fs"
 	utilglog "github.com/openshift/source-to-image/pkg/util/glog"
@@ -20,7 +21,7 @@ type File struct {
 // Download copies sources from a local directory into the working directory.
 // Caller guarantees that config.Source.IsLocal() is true.
 func (f *File) Download(config *api.Config) (*git.SourceInfo, error) {
-	config.WorkingSourceDir = filepath.Join(config.WorkingDir, api.Source)
+	config.WorkingSourceDir = filepath.Join(config.WorkingDir, constants.Source)
 
 	copySrc := config.Source.LocalPath()
 	if len(config.ContextDir) > 0 {

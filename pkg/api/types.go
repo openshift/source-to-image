@@ -15,12 +15,6 @@ import (
 
 var glog = utilglog.StderrLog
 
-// Image label namespace constants
-const (
-	DefaultNamespace    = "io.openshift.s2i."
-	KubernetesNamespace = "io.k8s."
-)
-
 // invalidFilenameCharacters contains a list of character we consider malicious
 // when injecting the directories into containers.
 const invalidFilenameCharacters = `;*?"<>|%#$!+{}&[],"'` + "`"

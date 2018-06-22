@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/openshift/source-to-image/pkg/api"
+	"github.com/openshift/source-to-image/pkg/api/constants"
 	"github.com/openshift/source-to-image/pkg/build"
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/ignore"
@@ -30,10 +31,10 @@ var (
 
 	// List of directories that needs to be present inside working dir
 	workingDirs = []string{
-		api.UploadScripts,
-		api.Source,
-		api.DefaultScripts,
-		api.UserScripts,
+		constants.UploadScripts,
+		constants.Source,
+		constants.DefaultScripts,
+		constants.UserScripts,
 	}
 )
 
@@ -55,8 +56,8 @@ func New(config *api.Config, fs fs.FileSystem) (*Dockerfile, error) {
 		fs: fs,
 		// where we will get the assemble/run scripts from on the host machine,
 		// if any are provided.
-		uploadScriptsDir: api.UploadScripts,
-		uploadSrcDir:     api.Source,
+		uploadScriptsDir: constants.UploadScripts,
+		uploadSrcDir:     constants.Source,
 		result:           &api.Result{},
 		ignorer:          &ignore.DockerIgnorer{},
 	}, nil
@@ -188,7 +189,7 @@ func (builder *Dockerfile) CreateDockerfile(config *api.Config) error {
 		buffer.WriteString("# Copying in injected content\n")
 	}
 	for _, injection := range config.Injections {
-		src := filepath.Join(api.Injections, injection.Source)
+		src := filepath.Join(constants.Injections, injection.Source)
 		buffer.WriteString(fmt.Sprintf("COPY --chown=%s:0 %s %s\n", sanitize(imageUser), sanitize(filepath.ToSlash(src)), sanitize(filepath.ToSlash(injection.Destination))))
 	}
 
@@ -300,7 +301,7 @@ func (builder *Dockerfile) Prepare(config *api.Config) error {
 		// strip the C: from windows paths because it's not valid in the middle of a path
 		// like upload/injections/C:/tempdir/injection1
 		trimmedSrc := strings.TrimPrefix(injection.Source, filepath.VolumeName(injection.Source))
-		dst := filepath.Join(config.WorkingDir, api.Injections, trimmedSrc)
+		dst := filepath.Join(config.WorkingDir, constants.Injections, trimmedSrc)
 		glog.V(4).Infof("Copying injection content from %s to %s", injection.Source, dst)
 		if err := builder.fs.CopyContents(injection.Source, dst); err != nil {
 			return err
@@ -346,7 +347,7 @@ func sanitize(s string) string {
 }
 
 func createBuildEnvironment(sourcePath string, cfgEnv api.EnvironmentList) string {
-	s2iEnv, err := scripts.GetEnvironment(filepath.Join(sourcePath, api.Source))
+	s2iEnv, err := scripts.GetEnvironment(filepath.Join(sourcePath, constants.Source))
 	if err != nil {
 		glog.V(3).Infof("No user environment provided (%v)", err)
 	}
