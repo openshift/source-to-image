@@ -171,7 +171,12 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 				glog.V(0).Infof("Build failed")
 				s2ierr.CheckError(err)
 			} else {
-				glog.V(0).Infof("Build completed successfully")
+				if len(cfg.AsDockerfile) > 0 {
+					glog.V(0).Infof("Application dockerfile generated in %s", cfg.AsDockerfile)
+				} else {
+					glog.V(0).Infof("Build completed successfully")
+
+				}
 			}
 
 			for _, message := range result.Messages {
