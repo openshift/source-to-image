@@ -79,6 +79,9 @@ func (builder *Dockerfile) Build(config *api.Config) (*api.Result, error) {
 	}
 
 	dir, _ := filepath.Split(config.AsDockerfile)
+	if len(dir) == 0 {
+		dir = "."
+	}
 	config.PreserveWorkingDir = true
 	config.WorkingDir = dir
 
