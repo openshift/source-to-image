@@ -962,6 +962,223 @@ func TestDockerfileBuildSourceScriptsRun(t *testing.T) {
 	}
 	runDockerfileTest(t, config, expected, nil, expectedFiles)
 }
+
+func TestDockerfileIncrementalBuild(t *testing.T) {
+	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	if err != nil {
+		t.Errorf("Unable to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(tempdir)
+
+	config := &api.Config{
+		BuilderImage:    "docker.io/centos/nodejs-8-centos7",
+		AssembleUser:    "",
+		ImageWorkDir:    "",
+		ImageScriptsDir: "/usr/libexec/s2i",
+		Incremental:     true,
+		Source:          git.MustParse("https://github.com/sclorg/nodejs-ex"),
+		ScriptsURL:      "",
+		Tag:             "test:tag",
+		Injections:      api.VolumeList{},
+		Destination:     "",
+
+		Environment: api.EnvironmentList{},
+		Labels:      map[string]string{},
+
+		AsDockerfile: filepath.Join(tempdir, "Dockerfile"),
+	}
+
+	expected := []string{
+		"FROM test:tag as cached",
+		"RUN if [ -s /usr/libexec/s2i/save-artifacts ]; then /usr/libexec/s2i/save-artifacts > /tmp/artifacts.tar; else touch /tmp/artifacts.tar; fi",
+		"FROM docker.io/centos/nodejs-8-centos7",
+		"COPY --from=cached --chown=1001:0 /tmp/artifacts.tar /tmp/artifacts.tar",
+		"RUN if [ -s /tmp/artifacts.tar ]; then mkdir -p /tmp/artifacts; tar -xf /tmp/artifacts.tar -C /tmp/artifacts; fi",
+		"rm /tmp/artifacts.tar",
+		"COPY --chown=1001:0 upload/src /tmp/src",
+		"RUN /usr/libexec/s2i/assemble",
+		"CMD /usr/libexec/s2i/run",
+	}
+
+	runDockerfileTest(t, config, expected, nil, nil)
+}
+
+func TestDockerfileIncrementalSourceSave(t *testing.T) {
+	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	if err != nil {
+		t.Errorf("Unable to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(tempdir)
+
+	sourcecode := filepath.Join(tempdir, "sourcecode")
+	sourcescripts := filepath.Join(sourcecode, ".s2i", "bin")
+	err = os.MkdirAll(sourcescripts, 0777)
+	if err != nil {
+		t.Errorf("Unable to create injection dir: %v", err)
+	}
+
+	saveArtifacts := filepath.Join(sourcescripts, "save-artifacts")
+	_, err = os.OpenFile(saveArtifacts, os.O_RDONLY|os.O_CREATE, 0666)
+	if err != nil {
+		t.Errorf("Unable to create save-artifacts file: %v", err)
+	}
+
+	config := &api.Config{
+		BuilderImage:    "docker.io/centos/nodejs-8-centos7",
+		AssembleUser:    "",
+		ImageWorkDir:    "",
+		ImageScriptsDir: "/usr/libexec/s2i",
+		Incremental:     true,
+		Source:          git.MustParse("file:///" + filepath.ToSlash(sourcecode)),
+		ScriptsURL:      "",
+		Tag:             "test:tag",
+		Injections:      api.VolumeList{},
+		Destination:     "/destination",
+
+		Environment: api.EnvironmentList{},
+		Labels:      map[string]string{},
+
+		AsDockerfile: filepath.Join(tempdir, "Dockerfile"),
+	}
+
+	expected := []string{
+		"FROM test:tag as cached",
+		"COPY --chown=1001:0 upload/scripts/save-artifacts /destination/scripts/save-artifacts",
+		"RUN if [ -s /destination/scripts/save-artifacts ]; then /destination/scripts/save-artifacts > /tmp/artifacts.tar;",
+		"FROM docker.io/centos/nodejs-8-centos7",
+		"mkdir -p /destination/artifacts",
+		"tar -xf /tmp/artifacts.tar -C /destination/artifacts",
+		"RUN /usr/libexec/s2i/assemble",
+		"CMD /usr/libexec/s2i/run",
+	}
+	expectedFiles := []string{
+		filepath.Join(tempdir, "upload/scripts/save-artifacts"),
+	}
+
+	runDockerfileTest(t, config, expected, nil, expectedFiles)
+}
+
+func TestDockerfileIncrementalSaveURL(t *testing.T) {
+	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	if err != nil {
+		t.Errorf("Unable to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(tempdir)
+
+	saveArtifacts := filepath.Join(tempdir, "save-artifacts")
+	_, err = os.OpenFile(saveArtifacts, os.O_RDONLY|os.O_CREATE, 0666)
+	if err != nil {
+		t.Errorf("Unable to create save-artifacts file: %v", err)
+	}
+
+	config := &api.Config{
+		BuilderImage:    "docker.io/centos/nodejs-8-centos7",
+		AssembleUser:    "",
+		ImageWorkDir:    "",
+		ImageScriptsDir: "/usr/libexec/s2i",
+		Incremental:     true,
+		Source:          git.MustParse("https://github.com/sclorg/nodejs-ex"),
+		ScriptsURL:      "file://" + filepath.ToSlash(tempdir),
+		Tag:             "test:tag",
+		Injections:      api.VolumeList{},
+		Destination:     "/destination",
+
+		Environment: api.EnvironmentList{},
+		Labels:      map[string]string{},
+
+		AsDockerfile: filepath.Join(tempdir, "Dockerfile"),
+	}
+
+	expected := []string{
+		"FROM test:tag as cached",
+		"COPY --chown=1001:0 upload/scripts/save-artifacts /destination/scripts/save-artifacts",
+		"RUN if [ -s /destination/scripts/save-artifacts ]; then /destination/scripts/save-artifacts > /tmp/artifacts.tar;",
+		"FROM docker.io/centos/nodejs-8-centos7",
+		"mkdir -p /destination/artifacts",
+		"tar -xf /tmp/artifacts.tar -C /destination/artifacts",
+		"RUN /usr/libexec/s2i/assemble",
+		"CMD /usr/libexec/s2i/run",
+	}
+	expectedFiles := []string{
+		filepath.Join(tempdir, "upload/scripts/save-artifacts"),
+	}
+
+	runDockerfileTest(t, config, expected, nil, expectedFiles)
+}
+
+func TestDockerfileIncrementalTag(t *testing.T) {
+	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	if err != nil {
+		t.Errorf("Unable to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(tempdir)
+
+	config := &api.Config{
+		BuilderImage:       "docker.io/centos/nodejs-8-centos7",
+		AssembleUser:       "",
+		ImageWorkDir:       "",
+		ImageScriptsDir:    "/usr/libexec/s2i",
+		Incremental:        true,
+		Source:             git.MustParse("https://github.com/sclorg/nodejs-ex"),
+		Tag:                "test:tag",
+		IncrementalFromTag: "incremental:tag",
+
+		Environment: api.EnvironmentList{},
+		Labels:      map[string]string{},
+
+		AsDockerfile: filepath.Join(tempdir, "Dockerfile"),
+	}
+
+	expected := []string{
+		"FROM incremental:tag as cached",
+		"/usr/libexec/s2i/save-artifacts > /tmp/artifacts.tar",
+		"FROM docker.io/centos/nodejs-8-centos7",
+		"mkdir -p /tmp/artifacts",
+		"tar -xf /tmp/artifacts.tar -C /tmp/artifacts",
+		"rm /tmp/artifacts.tar",
+		"RUN /usr/libexec/s2i/assemble",
+		"CMD /usr/libexec/s2i/run",
+	}
+
+	runDockerfileTest(t, config, expected, nil, nil)
+}
+
+func TestDockerfileIncrementalAssembleUser(t *testing.T) {
+	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	if err != nil {
+		t.Errorf("Unable to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(tempdir)
+
+	config := &api.Config{
+		BuilderImage:    "docker.io/centos/nodejs-8-centos7",
+		AssembleUser:    "2250",
+		ImageWorkDir:    "",
+		ImageScriptsDir: "/usr/libexec/s2i",
+		Incremental:     true,
+		Source:          git.MustParse("https://github.com/sclorg/nodejs-ex"),
+		Tag:             "test:tag",
+		Environment:     api.EnvironmentList{},
+		Labels:          map[string]string{},
+
+		AsDockerfile: filepath.Join(tempdir, "Dockerfile"),
+	}
+
+	expected := []string{
+		"FROM test:tag as cached\nUSER 2250",
+		"/usr/libexec/s2i/save-artifacts > /tmp/artifacts.tar",
+		"FROM docker.io/centos/nodejs-8-centos7",
+		"COPY --from=cached --chown=2250:0 /tmp/artifacts.tar /tmp/artifacts.tar",
+		"mkdir -p /tmp/artifacts",
+		"tar -xf /tmp/artifacts.tar -C /tmp/artifacts",
+		"rm /tmp/artifacts.tar",
+		"RUN /usr/libexec/s2i/assemble",
+		"CMD /usr/libexec/s2i/run",
+	}
+
+	runDockerfileTest(t, config, expected, nil, nil)
+}
+
 func runDockerfileTest(t *testing.T, config *api.Config, expected []string, notExpected []string, expectedFiles []string) {
 
 	b, _, err := strategies.GetStrategy(nil, config)

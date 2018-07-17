@@ -202,7 +202,7 @@ func (builder *STI) Build(config *api.Config) (*api.Result, error) {
 	}
 
 	if builder.incremental = builder.artifacts.Exists(config); builder.incremental {
-		tag := firstNonEmpty(config.IncrementalFromTag, config.Tag)
+		tag := util.FirstNonEmpty(config.IncrementalFromTag, config.Tag)
 		glog.V(1).Infof("Existing image for tag %s detected for incremental build", tag)
 	} else {
 		glog.V(1).Info("Clean build will be performed")
@@ -384,7 +384,7 @@ func (builder *STI) Prepare(config *api.Config) error {
 	if len(config.ScriptsURL) > 0 {
 		failedCount := 0
 		for _, result := range requiredAndOptional {
-			if includes(result.FailedSources, scripts.ScriptURLHandler) {
+			if util.Includes(result.FailedSources, scripts.ScriptURLHandler) {
 				failedCount++
 			}
 		}
@@ -464,7 +464,7 @@ func (builder *STI) Exists(config *api.Config) bool {
 		policy = api.DefaultPreviousImagePullPolicy
 	}
 
-	tag := firstNonEmpty(config.IncrementalFromTag, config.Tag)
+	tag := util.FirstNonEmpty(config.IncrementalFromTag, config.Tag)
 
 	startTime := time.Now()
 	result, err := dockerpkg.PullImage(tag, builder.incrementalDocker, policy)
@@ -498,7 +498,7 @@ func (builder *STI) Save(config *api.Config) (err error) {
 		return err
 	}
 
-	image := firstNonEmpty(config.IncrementalFromTag, config.Tag)
+	image := util.FirstNonEmpty(config.IncrementalFromTag, config.Tag)
 
 	outReader, outWriter := io.Pipe()
 	errReader, errWriter := io.Pipe()
@@ -757,22 +757,4 @@ func isMissingRequirements(text string) bool {
 	tarCommand, _ := regexp.MatchString(`.*tar.*not found`, text)
 	shCommand, _ := regexp.MatchString(`.*/bin/sh.*no such file or directory`, text)
 	return tarCommand || shCommand
-}
-
-func includes(arr []string, str string) bool {
-	for _, s := range arr {
-		if s == str {
-			return true
-		}
-	}
-	return false
-}
-
-func firstNonEmpty(args ...string) string {
-	for _, value := range args {
-		if len(value) > 0 {
-			return value
-		}
-	}
-	return ""
 }
