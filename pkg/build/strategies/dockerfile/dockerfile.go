@@ -282,7 +282,7 @@ func (builder *Dockerfile) Prepare(config *api.Config) error {
 			)
 			switch err.(type) {
 			case file.RecursiveCopyError:
-				return fmt.Errorf("input source directory contains the target directory for the build, check that your --as-dockerfile path does not reside within your input source path: %v", err)
+				return fmt.Errorf("input source directory contains the target directory for the build, check that your Dockerfile output path does not reside within your input source path: %v", err)
 			}
 			return err
 		}
