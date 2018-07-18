@@ -14,6 +14,7 @@ import (
 
 var glog = utilglog.StderrLog
 
+// RecursiveCopyError indicates a copy operation failed because the destination is within the copy's source tree.
 type RecursiveCopyError struct {
 	error
 }
