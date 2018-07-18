@@ -43,7 +43,7 @@ func NewCmdBuild(cfg *api.Config) *cobra.Command {
 # Build a Docker image from a remote Git repository
 $ s2i build https://github.com/openshift/ruby-hello-world centos/ruby-22-centos7 hello-world-app
 
-# Build from a local directory
+# Build from a local directory.  If this directory is a git repo then the current commit will be built.
 $ s2i build . centos/ruby-22-centos7 hello-world-app
 `,
 		Run: func(cmd *cobra.Command, args []string) {
