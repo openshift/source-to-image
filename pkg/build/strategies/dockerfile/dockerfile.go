@@ -15,6 +15,7 @@ import (
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/ignore"
 	"github.com/openshift/source-to-image/pkg/scm"
+	"github.com/openshift/source-to-image/pkg/scm/downloaders/file"
 	"github.com/openshift/source-to-image/pkg/scm/git"
 	"github.com/openshift/source-to-image/pkg/scripts"
 	"github.com/openshift/source-to-image/pkg/util"
@@ -279,6 +280,10 @@ func (builder *Dockerfile) Prepare(config *api.Config) error {
 				utilstatus.ReasonFetchSourceFailed,
 				utilstatus.ReasonMessageFetchSourceFailed,
 			)
+			switch err.(type) {
+			case file.RecursiveCopyError:
+				return fmt.Errorf("input source directory contains the target directory for the build, check that your --as-dockerfile path does not reside within your input source path: %v", err)
+			}
 			return err
 		}
 		if config.SourceInfo != nil {
