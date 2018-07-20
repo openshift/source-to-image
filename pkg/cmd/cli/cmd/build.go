@@ -70,10 +70,6 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 			}
 
 			if len(cfg.AsDockerfile) > 0 {
-				if cfg.Incremental {
-					fmt.Fprintln(os.Stderr, "ERROR: --incremental cannot be used with --as-dockerfile")
-					return
-				}
 				if cfg.RunImage {
 					fmt.Fprintln(os.Stderr, "ERROR: --run cannot be used with --as-dockerfile")
 					return

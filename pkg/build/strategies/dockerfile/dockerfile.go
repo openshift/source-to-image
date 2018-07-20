@@ -126,11 +126,62 @@ func (builder *Dockerfile) CreateDockerfile(config *api.Config) error {
 	// where files will land inside the new image.
 	scriptsDestDir := filepath.Join(getDestination(config), "scripts")
 	sourceDestDir := filepath.Join(getDestination(config), "src")
+	artifactsDestDir := filepath.Join(getDestination(config), "artifacts")
+	artifactsTar := sanitize(filepath.ToSlash(filepath.Join(defaultDestination, "artifacts.tar")))
+
+	// only COPY scripts dir if required scripts are present, i.e. the dir is not empty;
+	// even if the "scripts" dir exists, the COPY would fail if it was empty
+	scriptsProvided, fileNames := checkValidDirWithContents(filepath.Join(config.WorkingDir, builder.uploadScriptsDir))
+	assembleProvided := false
+	runProvided := false
+	saveArtifactsProvided := false
+	for _, f := range fileNames {
+		glog.V(2).Infof("found override script file %s", f.Name())
+		if f.Name() == "run" {
+			runProvided = true
+		} else if f.Name() == "assemble" {
+			assembleProvided = true
+		} else if f.Name() == "save-artifacts" {
+			saveArtifactsProvided = true
+		}
+		if runProvided && assembleProvided && saveArtifactsProvided {
+			break
+		}
+	}
+
+	if config.Incremental {
+		imageTag := util.FirstNonEmpty(config.IncrementalFromTag, config.Tag)
+		if len(imageTag) == 0 {
+			return errors.New("Image tag is missing for incremental build")
+		}
+		buffer.WriteString(fmt.Sprintf("FROM %s as cached\n", imageTag))
+		if len(config.AssembleUser) > 0 {
+			buffer.WriteString(fmt.Sprintf("USER %s\n", imageUser))
+		}
+		var artifactsScript string
+		if saveArtifactsProvided {
+			glog.V(2).Infof("Override save-artifacts script is included in directory %q", builder.uploadScriptsDir)
+			buffer.WriteString("# Copying in override save-artifacts script\n")
+			artifactsScript = sanitize(filepath.ToSlash(filepath.Join(scriptsDestDir, "save-artifacts")))
+			uploadScript := sanitize(filepath.ToSlash(filepath.Join(builder.uploadScriptsDir, "save-artifacts")))
+			buffer.WriteString(fmt.Sprintf("COPY --chown=%s:0 %s %s\n", sanitize(imageUser), uploadScript, artifactsScript))
+		} else {
+			buffer.WriteString(fmt.Sprintf("# Save-artifacts script sourced from builder image based on user input or image metadata.\n"))
+			artifactsScript = sanitize(filepath.ToSlash(filepath.Join(config.ImageScriptsDir, "save-artifacts")))
+		}
+		buffer.WriteString(fmt.Sprintf("RUN if [ -s %[1]s ]; then %[1]s > %[2]s; else touch %[2]s; fi\n", artifactsScript, artifactsTar))
+	}
 
 	buffer.WriteString(fmt.Sprintf("FROM %s\n", config.BuilderImage))
 
 	if len(config.AssembleUser) > 0 {
 		buffer.WriteString(fmt.Sprintf("USER %s\n", imageUser))
+	}
+
+	if config.Incremental {
+		buffer.WriteString(fmt.Sprintf("COPY --from=cached --chown=%[1]s:0 %[2]s %[2]s\n", sanitize(imageUser), artifactsTar))
+		buffer.WriteString(fmt.Sprintf("RUN if [ -s %[1]s ]; then mkdir -p %[2]s; tar -xf %[1]s -C %[2]s; fi && \\\n", artifactsTar, sanitize(filepath.ToSlash(artifactsDestDir))))
+		buffer.WriteString(fmt.Sprintf("    rm %s\n", artifactsTar))
 	}
 
 	generatedLabels := util.GenerateOutputImageLabels(builder.sourceInfo, config)
@@ -157,23 +208,6 @@ func (builder *Dockerfile) CreateDockerfile(config *api.Config) error {
 
 	env := createBuildEnvironment(config.WorkingDir, config.Environment)
 	buffer.WriteString(fmt.Sprintf("%s", env))
-
-	// only COPY scripts dir if required scripts are present, i.e. the dir is not empty;
-	// even if the "scripts" dir exists, the COPY would fail if it was empty
-	scriptsProvided, fileNames := checkValidDirWithContents(filepath.Join(config.WorkingDir, builder.uploadScriptsDir))
-	assembleProvided := false
-	runProvided := false
-	for _, f := range fileNames {
-		glog.V(2).Infof("found override script file %s", f.Name())
-		if f.Name() == "run" {
-			runProvided = true
-		} else if f.Name() == "assemble" {
-			assembleProvided = true
-		}
-		if runProvided && assembleProvided {
-			break
-		}
-	}
 
 	if scriptsProvided {
 		glog.V(2).Infof("Override scripts are included in directory %q", builder.uploadScriptsDir)
