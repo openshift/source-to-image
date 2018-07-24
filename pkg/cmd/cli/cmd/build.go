@@ -214,5 +214,6 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 	buildCmd.Flags().VarP(&(cfg.RuntimeArtifacts), "runtime-artifact", "a", "Specify a file or directory to be copied from the builder to the runtime image")
 	buildCmd.Flags().StringVar(&(networkMode), "network", "", "Specify the default Docker Network name to be used in build process")
 	buildCmd.Flags().StringVarP(&(cfg.AsDockerfile), "as-dockerfile", "", "", "EXPERIMENTAL: Output a Dockerfile to this path instead of building a new image")
+	buildCmd.Flags().BoolVarP(&(cfg.KeepSymlinks), "keep-symlinks", "", false, "When using '--copy', copy symlinks as symlinks. Default behavior is to follow symlinks and copy files by content")
 	return buildCmd
 }
