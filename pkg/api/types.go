@@ -233,6 +233,10 @@ type Config struct {
 	// SecurityOpt are passed as options to the docker containers launched by s2i.
 	SecurityOpt []string
 
+	// KeepSymlinks indicates to copy symlinks as symlinks. Default behavior is to follow
+	// symlinks and copy files by content.
+	KeepSymlinks bool
+
 	// AsDockerfile indicates the path where the Dockerfile should be written instead of building
 	// a new image.
 	AsDockerfile string
