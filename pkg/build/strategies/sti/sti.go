@@ -30,6 +30,11 @@ import (
 	utilstatus "github.com/openshift/source-to-image/pkg/util/status"
 )
 
+const (
+	injectionResultFile = "/tmp/injection-result"
+	rmInjectionsScript  = "/tmp/rm-injections"
+)
+
 var (
 	glog = utilglog.StderrLog
 
@@ -624,7 +629,7 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 			)
 			return err
 		}
-		rmScript, err := util.CreateTruncateFilesScript(truncatedFiles, "/tmp/rm-injections")
+		rmScript, err := util.CreateTruncateFilesScript(truncatedFiles, rmInjectionsScript)
 		if len(rmScript) != 0 {
 			defer os.Remove(rmScript)
 		}
@@ -636,21 +641,24 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 			return err
 		}
 		opts.CommandOverrides = func(cmd string) string {
-			return fmt.Sprintf("while [ ! -f %q ]; do sleep 0.5; done; %s; result=$?; . %[1]s; exit $result",
-				"/tmp/rm-injections", cmd)
+			// If an s2i build has injections, the s2i container's main command must be altered to
+			// do the following:
+			//     1) Wait for the injections to be uploaded
+			//     2) Check if there were any errors uploading the injections
+			//     3) Run the injection removal script after `assemble` completes
+			//
+			// The injectionResultFile should always be uploaded to the s2i container after the
+			// injected volumes are added. If this file is non-empty, it indicates that an error
+			// occurred during the injection process and the s2i build should fail.
+			return fmt.Sprintf("while [ ! -f %[1]q ]; do sleep 0.5; done; if [ -s %[1]q ]; then exit 1; fi; %[2]s; result=$?; . %[3]s; exit $result",
+				injectionResultFile, cmd, rmInjectionsScript)
 		}
 		originalOnStart := opts.OnStart
 		opts.OnStart = func(containerID string) error {
 			defer close(injectionError)
-			glog.V(2).Info("starting the injections uploading ...")
-			for _, s := range config.Injections {
-				if err := builder.docker.UploadToContainer(builder.fs, s.Source, s.Destination, containerID); err != nil {
-					injectionError <- util.HandleInjectionError(s, err)
-					return err
-				}
-			}
-			if err := builder.docker.UploadToContainer(builder.fs, rmScript, "/tmp/rm-injections", containerID); err != nil {
-				injectionError <- util.HandleInjectionError(api.VolumeSpec{Source: rmScript, Destination: "/tmp/rm-injections"}, err)
+			injectErr := builder.uploadInjections(config, rmScript, containerID)
+			if err := builder.uploadInjectionResult(injectErr, containerID); err != nil {
+				injectionError <- err
 				return err
 			}
 			if originalOnStart != nil {
@@ -702,6 +710,21 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 	return err
 }
 
+// uploadInjections uploads the injected volumes to the s2i container, along with the source
+// removal script to truncate volumes that should not be kept.
+func (builder *STI) uploadInjections(config *api.Config, rmScript, containerID string) error {
+	glog.V(2).Info("starting the injections uploading ...")
+	for _, s := range config.Injections {
+		if err := builder.docker.UploadToContainer(builder.fs, s.Source, s.Destination, containerID); err != nil {
+			return util.HandleInjectionError(s, err)
+		}
+	}
+	if err := builder.docker.UploadToContainer(builder.fs, rmScript, rmInjectionsScript, containerID); err != nil {
+		return util.HandleInjectionError(api.VolumeSpec{Source: rmScript, Destination: rmInjectionsScript}, err)
+	}
+	return nil
+}
+
 func (builder *STI) initPostExecutorSteps() {
 	builder.postExecutorStepsContext = &postExecutorStepContext{}
 	if len(builder.config.RuntimeImage) == 0 {
@@ -751,6 +774,24 @@ func (builder *STI) initPostExecutorSteps() {
 			},
 		}
 	}
+}
+
+// uploadInjectionResult uploads a result file to the s2i container, indicating
+// that the injections have completed. If a non-nil error is passed in, it is returned
+// to ensure the error status of the injection upload is reported.
+func (builder *STI) uploadInjectionResult(startErr error, containerID string) error {
+	resultFile, err := util.CreateInjectionResultFile(startErr)
+	if len(resultFile) > 0 {
+		defer os.Remove(resultFile)
+	}
+	if err != nil {
+		return err
+	}
+	err = builder.docker.UploadToContainer(builder.fs, resultFile, injectionResultFile, containerID)
+	if err != nil {
+		return util.HandleInjectionError(api.VolumeSpec{Source: resultFile, Destination: injectionResultFile}, err)
+	}
+	return startErr
 }
 
 func isMissingRequirements(text string) bool {
