@@ -122,7 +122,22 @@ func TestInjectionBuild(t *testing.T) {
 		tempdir + ":/tmp",
 		tempdir + ":",
 		tempdir + ":test;" + tempdir + ":test2",
-	})
+	}, true)
+}
+
+func TestInjectionBuildBadDestination(t *testing.T) {
+	tempdir, err := ioutil.TempDir("", "s2i-test-dir")
+	if err != nil {
+		t.Errorf("Unable to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(tempdir)
+
+	err = ioutil.WriteFile(filepath.Join(tempdir, "secret"), []byte("secret"), 0666)
+	if err != nil {
+		t.Errorf("Unable to write content to temporary injection file: %v", err)
+	}
+
+	integration(t).exerciseInjectionBuild(TagCleanBuild, FakeBuilderImage, []string{tempdir + ":/bad/dir"}, false)
 }
 
 type integrationTest struct {
@@ -408,7 +423,7 @@ func TestIncrementalBuildOnBuild(t *testing.T) {
 	integration(t).exerciseIncrementalBuild(TagIncrementalBuildOnBuild, FakeImageOnBuild, false, true, true)
 }
 
-func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injections []string) {
+func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injections []string, expectSuccess bool) {
 	t := i.t
 
 	injectionList := api.VolumeList{}
@@ -438,6 +453,12 @@ func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injectio
 		t.Fatalf("Unable to create builder: %v", err)
 	}
 	resp, err := builder.Build(config)
+	if !expectSuccess {
+		if resp.Success {
+			t.Fatal("Success was returned, but should have failed")
+		}
+		return
+	}
 	if err != nil {
 		t.Fatalf("Unexpected error occurred during build: %v", err)
 	}
