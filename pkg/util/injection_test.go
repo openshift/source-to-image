@@ -31,9 +31,12 @@ func TestCreateTruncateFilesScript(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unable to read %q: %v", name, err)
 	}
-	if !strings.Contains(string(data), fmt.Sprintf("truncate -s0 %q", "/foo")) {
-		t.Errorf("Expected script to contain truncate -s0 \"/foo\", got: %q", string(data))
+	for _, f := range files {
+		if !strings.Contains(string(data), fmt.Sprintf("truncate -s0 %q", f)) {
+			t.Errorf("Expected script to contain truncate -s0 %q, got: %q", f, string(data))
+		}
 	}
+
 	if !strings.Contains(string(data), fmt.Sprintf("truncate -s0 %q", "/tmp/rm-foo")) {
 		t.Errorf("Expected script to truncate itself, got: %q", string(data))
 	}
@@ -109,4 +112,34 @@ func TestCreateInjectionResultFile(t *testing.T) {
 			t.Errorf("Expected test file to contain %s, got %s", tc.Error.Error(), string(data))
 		}
 	}
+}
+
+func TestCreateDeleteFilesScript(t *testing.T) {
+	files := []string{
+		"/foo",
+		"/bar/bar",
+	}
+	dir, err := ioutil.TempDir("", "s2i-delete-files-script")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(dir)
+	name, err := CreateDeleteFilesScript(files, dir)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", name)
+	}
+	_, err = os.Stat(name)
+	if err != nil {
+		t.Errorf("Expected file %q to exists, got: %v", name, err)
+	}
+	data, err := ioutil.ReadFile(name)
+	if err != nil {
+		t.Errorf("Unable to read %q: %v", name, err)
+	}
+	for _, f := range files {
+		if !strings.Contains(string(data), fmt.Sprintf("rm %q", f)) {
+			t.Errorf("Expected script to contain rm %q, got: %q", f, string(data))
+		}
+	}
+
 }
