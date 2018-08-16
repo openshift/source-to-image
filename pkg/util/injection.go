@@ -1,7 +1,6 @@
 package util
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -9,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/openshift/source-to-image/pkg/api"
-	"github.com/openshift/source-to-image/pkg/api/constants"
 	"github.com/openshift/source-to-image/pkg/util/fs"
 )
 
@@ -127,20 +125,6 @@ func CreateTruncateFilesScript(files []string, scriptName string) (string, error
 	rmScript += "set +e\n"
 	err = ioutil.WriteFile(f.Name(), []byte(rmScript), 0700)
 	return f.Name(), err
-}
-
-// CreateDeleteFilesScript creates a shell script that contains removal
-// of the provided files injected into the container. The path to the script is returned.
-func CreateDeleteFilesScript(files []string, dir string) (string, error) {
-	rmScript := &bytes.Buffer{}
-	rmScript.WriteString("set -e\n")
-	for _, s := range files {
-		rmScript.WriteString(fmt.Sprintf("rm %q\n", s))
-	}
-	rmScript.WriteString("set +e\n")
-	scriptName := filepath.Join(dir, constants.ClearInjections)
-	err := ioutil.WriteFile(scriptName, rmScript.Bytes(), 0700)
-	return scriptName, err
 }
 
 // CreateInjectionResultFile creates a result file with the message from the provided injection

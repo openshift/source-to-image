@@ -230,14 +230,18 @@ func (builder *Dockerfile) CreateDockerfile(config *api.Config) error {
 		return err
 	}
 	if len(filesToDelete) > 0 {
-		_, err := util.CreateDeleteFilesScript(filesToDelete, filepath.Join(config.WorkingDir, builder.uploadScriptsDir))
-		if err != nil {
-			return err
-		}
+		wroteRun := false
 		buffer.WriteString("# Cleaning up injected secret content\n")
-		rmDestination := filepath.Join(scriptsDestDir, constants.ClearInjections)
-		buffer.WriteString(fmt.Sprintf("COPY --chown=%s:0 %s %s\n", sanitize(imageUser), sanitize(filepath.ToSlash(filepath.Join(constants.UploadScripts, constants.ClearInjections))), filepath.ToSlash(rmDestination)))
-		buffer.WriteString(fmt.Sprintf("RUN %[1]s && rm %[1]s\n", filepath.ToSlash(rmDestination)))
+		for _, file := range(filesToDelete) {
+			if !wroteRun {
+				buffer.WriteString(fmt.Sprintf("RUN rm %s", file))
+				wroteRun = true
+				continue
+			}
+			buffer.WriteString(fmt.Sprintf(" && \\\n"))
+			buffer.WriteString(fmt.Sprintf("    rm %s", file))
+		}
+		buffer.WriteString("\n")
 	}
 
 	if _, provided := providedScripts[constants.Run]; provided {

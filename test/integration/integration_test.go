@@ -751,9 +751,12 @@ func TestDockerfileBuildInjections(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unable to create injection dir: %v", err)
 	}
-	_, err = ioutil.TempFile(injection1, "injectfile-1")
-	if err != nil {
-		t.Errorf("Unable to create injection file: %v", err)
+
+	for i := 0; i < 3; i++ {
+		_, err = ioutil.TempFile(injection1, "injectfile-")
+		if err != nil {
+			t.Errorf("Unable to create injection file: %v", err)
+		}
 	}
 
 	injection2 := filepath.Join(tempdir, "injection2")
@@ -800,8 +803,8 @@ func TestDockerfileBuildInjections(t *testing.T) {
 	expected := []string{
 		"COPY --chown=1001:0 upload/injections" + trimmedInjection1 + " /workdir/injection1",
 		"COPY --chown=1001:0 upload/injections" + trimmedInjection2 + " /destination/injection2",
-		"COPY --chown=1001:0 upload/scripts/clear-injections /tmp/scripts/clear-injections",
-		"RUN /tmp/scripts/clear-injections && rm /tmp/scripts/clear-injections",
+		"RUN rm /workdir/injection1/injectfile-",
+		"    rm /workdir/injection1/injectfile-",
 	}
 	notExpected := []string{
 		"rm -rf /destination/injection2",
@@ -810,7 +813,6 @@ func TestDockerfileBuildInjections(t *testing.T) {
 		filepath.Join(tempdir, "upload/src/server.js"),
 		filepath.Join(tempdir, "upload/injections"+trimmedInjection1),
 		filepath.Join(tempdir, "upload/injections"+trimmedInjection2),
-		filepath.Join(tempdir, "upload/scripts/clear-injections"),
 	}
 	runDockerfileTest(t, config, expected, notExpected, expectedFiles)
 }

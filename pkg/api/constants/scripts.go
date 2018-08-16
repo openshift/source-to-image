@@ -50,7 +50,4 @@ const (
 
 	// IgnoreFile is the s2i version for ignore files like we see with .gitignore or .dockerignore .. initial impl mirrors documented .dockerignore capabilities
 	IgnoreFile = ".s2iignore"
-
-	// ClearInjections is the s2i script which removes injected content
-	ClearInjections = "clear-injections"
 )
