@@ -367,7 +367,7 @@ func (d *stiDocker) UploadToContainer(fs fs.FileSystem, src, dest, container str
 // If the source is a single file, then the file copied into destination (which
 // has to be full path to a file inside the container).
 func (d *stiDocker) UploadToContainerWithTarWriter(fs fs.FileSystem, src, dest, container string, makeTarWriter func(io.Writer) s2itar.Writer) error {
-	destPath := filepath.Dir(dest)
+	destPath := filepath.Dir(strings.TrimRight(dest, "/"))
 	r, w := io.Pipe()
 	go func() {
 		tarWriter := makeTarWriter(w)
