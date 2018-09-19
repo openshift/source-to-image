@@ -169,6 +169,7 @@ type RunContainerOptions struct {
 	ScriptsURL      string
 	Destination     string
 	Env             []string
+	AddHost         []string
 	// Entrypoint will be used to override the default entrypoint
 	// for the image if it has one.  If the image has no entrypoint,
 	// this value is ignored.
@@ -221,6 +222,7 @@ func (rco RunContainerOptions) asDockerHostConfig() dockercontainer.HostConfig {
 		PublishAllPorts: rco.TargetImage,
 		NetworkMode:     dockercontainer.NetworkMode(rco.NetworkMode),
 		Binds:           rco.Binds,
+		ExtraHosts:      rco.AddHost,
 		SecurityOpt:     rco.SecurityOpt,
 	}
 	if rco.CGroupLimits != nil {
