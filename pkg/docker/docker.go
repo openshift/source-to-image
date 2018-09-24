@@ -412,7 +412,7 @@ func (d *stiDocker) IsImageInLocalRegistry(name string) (bool, error) {
 	if resp != nil {
 		return true, nil
 	}
-	if err != nil && !dockerapi.IsErrImageNotFound(err) {
+	if err != nil && !dockerapi.IsErrNotFound(err) {
 		return false, s2ierr.NewInspectImageError(name, err)
 	}
 	return false, nil
