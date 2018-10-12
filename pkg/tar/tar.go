@@ -395,7 +395,7 @@ func (t *stiTar) ExtractTarStreamFromTarReader(dir string, tarReader Reader, log
 	})
 
 	if err != nil {
-		glog.Error("Error extracting tar stream: %v", err)
+		glog.Errorf("Error extracting tar stream: %v", err)
 	} else {
 		glog.V(2).Info("Done extracting tar stream")
 	}
