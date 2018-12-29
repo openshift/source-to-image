@@ -7,7 +7,7 @@
 [![Travis](https://travis-ci.org/openshift/source-to-image.svg?branch=master)](https://travis-ci.org/openshift/source-to-image)
 [![License](https://img.shields.io/github/license/openshift/source-to-image.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
 
-Source-to-Image (S2I) is a toolkit and workflow for building reproducible Docker images from source code. S2I produces
+Source-to-Image (S2I) is a toolkit and workflow for building reproducible Docker images from source code. One big advantage of this is that it is much faster than `docker build` if all you are needing is getting your source code into the image. S2I produces
 ready-to-run images by injecting source code into a Docker container and letting the container prepare that source code for execution. By creating self-assembling **builder images**, you can version and control your build environments exactly like you use Docker images to version your runtime environments.
 
 For a deep dive on S2I you can view [this presentation](https://www.youtube.com/watch?v=flI6zx9wH6M).
