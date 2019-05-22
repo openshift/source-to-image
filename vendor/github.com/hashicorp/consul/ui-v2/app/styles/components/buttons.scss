@@ -1,0 +1,17 @@
+@import './buttons/index';
+button[type='submit'],
+a.type-create {
+  @extend %primary-button;
+}
+// the :not(li)'s here avoid styling action-group buttons
+button[type='reset'],
+:not(li) > button[type='button']:not(.copy-btn):not(.type-delete),
+html.template-error div > a {
+  @extend %secondary-button;
+}
+:not(li) > button.type-delete {
+  @extend %dangerous-button;
+}
+button.copy-btn {
+  @extend %copy-button;
+}

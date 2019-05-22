@@ -1,0 +1,7 @@
+@import './tabs/index';
+.tab-nav {
+  @extend %tab-nav;
+}
+.tab-section {
+  @extend %tab-section;
+}
