@@ -1,0 +1,8 @@
+services:
+  - docker
+
+install:
+  - docker build -t opengcs .
+
+script:
+  - docker run --privileged opengcs make -f /go/src/github.com/Microsoft/opengcs/Makefile all test

@@ -1,0 +1,13 @@
+Dockerfile
+client
+docs
+kernel
+.travis.yml
+*.ps1
+LICENSE
+*.md
+*.exe
+*.vhd*
+bin/*
+out/*
+rootfs/*

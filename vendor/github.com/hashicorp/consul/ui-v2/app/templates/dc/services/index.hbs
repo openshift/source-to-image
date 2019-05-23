@@ -1,0 +1,64 @@
+{{#app-view class="service list"}}
+    {{#block-slot 'notification' as |status type|}}
+      {{partial 'dc/services/notifications'}}
+    {{/block-slot}}
+    {{#block-slot 'header'}}
+        <h1>
+            Services <em>{{format-number items.length}} total</em>
+        </h1>
+        <label for="toolbar-toggle"></label>
+    {{/block-slot}}
+    {{#block-slot 'toolbar'}}
+{{#if (gt items.length 0) }}
+    {{#phrase-editor placeholder=(if (eq terms.length 0) 'service:name tag:name status:critical search-term' '') items=terms searchable=searchable}}{{/phrase-editor}}
+{{/if}}
+    {{/block-slot}}
+    {{#block-slot 'content'}}
+        {{#changeable-set dispatcher=searchable}}
+          {{#block-slot 'set' as |filtered|}}
+            {{#tabular-collection
+                route='dc.services.show'
+                key='Name'
+                items=filtered as |item index|
+            }}
+                {{#block-slot 'header'}}
+                    <th style={{remainingWidth}}>Service</th>
+                    <th>Type</th>
+                    <th style={{totalWidth}}>Health Checks<span><em>The number of health checks for the service on all nodes</em></span></th>
+                    <th style={{remainingWidth}}>Tags</th>
+                {{/block-slot}}
+                {{#block-slot 'row'}}
+                    <td data-test-service="{{item.Name}}" style={{remainingWidth}}>
+                      <a href={{href-to 'dc.services.show' item.Name}}>
+                        <span data-test-external-source="{{service/external-source item}}" style={{{ concat 'background-image: ' (css-var (concat '--' (service/external-source item) '-color-svg') 'none')}}}></span>
+                        {{item.Name}}
+                      </a>
+                    </td>
+                    <td>
+{{#if (eq item.Kind 'connect-proxy')}}
+                        <span class="kind-proxy">Proxy</span>
+{{else}}
+                        &nbsp;
+{{/if}}
+                    </td>
+                    <td style={{totalWidth}}>
+                      {{healthcheck-info
+                        passing=item.ChecksPassing warning=item.ChecksWarning critical=item.ChecksCritical
+                        passingWidth=passingWidth warningWidth=warningWidth criticalWidth=criticalWidth
+                      }}
+                    </td>
+                    <td style={{remainingWidth}}>
+                      {{tag-list items=item.Tags}}
+                    </td>
+                {{/block-slot}}
+            {{/tabular-collection}}
+          {{/block-slot}}
+          {{#block-slot 'empty'}}
+            <p>
+              There are no services.
+            </p>
+          {{/block-slot}}
+        {{/changeable-set}}
+    {{/block-slot}}
+{{/app-view}}
+

@@ -1,0 +1,5 @@
+/gcs
+/runtime/runc/testbundle/rootfs/
+/runtime/runc/testbundle/.ip
+gcs.log
+

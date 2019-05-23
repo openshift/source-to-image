@@ -1,0 +1,133 @@
+%button {
+  font-family: $typo-family-sans;
+}
+main p:not(:last-child),
+%modal-window p:not(:last-child) {
+  margin-bottom: 1em;
+}
+%button,
+%form-element textarea,
+%form-element [type='text'],
+%form-element [type='password'] {
+  line-height: 1.5;
+}
+h3,
+%radio-group label {
+  line-height: 1.25;
+}
+%filter-bar [role='radiogroup'] label {
+  line-height: 1.7;
+}
+%header-nav,
+%tab-nav {
+  letter-spacing: 0.03em;
+}
+%footer {
+  letter-spacing: -0.05em;
+}
+
+%button {
+  font-family: $typo-family-sans;
+}
+/* Weighting */
+h1,
+%app-content div > dt,
+%header-drop-nav .is-active {
+  font-weight: $typo-weight-bold;
+}
+h2,
+h3,
+fieldset > header,
+caption,
+%header-nav,
+%healthchecked-resource header span,
+%healthcheck-output dt,
+%copy-button,
+%app-content div > dl > dt,
+%tbody-th,
+%form-element > span,
+%toggle label span {
+  font-weight: $typo-weight-semibold;
+}
+%button {
+  font-weight: $typo-weight-semibold !important;
+}
+main label a[rel*='help'],
+%pill,
+%tbody-th em,
+%form-element > strong,
+%healthchecked-resource strong,
+%app-view h1 em {
+  font-weight: $typo-weight-normal;
+}
+th,
+td strong,
+%breadcrumbs li > *,
+%action-group-action,
+%tab-nav,
+%tooltip-bubble,
+%type-icon {
+  font-weight: $typo-weight-medium;
+}
+
+/* Styling */
+%form-element > em,
+%tbody-th em,
+%healthchecked-resource header em,
+%app-view h1 em {
+  font-style: normal;
+}
+
+/* Sizing */
+%footer > * {
+  font-size: inherit;
+}
+
+h1 {
+  font-size: $typo-header-100;
+}
+h2 {
+  font-size: $typo-header-200;
+}
+h3 {
+  font-size: $typo-header-300;
+}
+%healthcheck-info dt,
+%header-drop-nav .is-active,
+%app-view h1 em {
+  font-size: $typo-size-500;
+}
+body,
+pre code,
+input,
+textarea,
+%action-group-action,
+%tbody-th {
+  font-size: $typo-size-600;
+}
+th,
+td,
+caption,
+.type-dialog,
+%form-element > span,
+%tooltip-bubble,
+%healthchecked-resource strong,
+%footer,
+%type-icon {
+  font-size: $typo-size-700;
+}
+%toggle label span {
+  font-size: $typo-size-700 !important;
+}
+fieldset > p,
+.template-error > div,
+[role='tabpanel'] > p:only-child,
+.with-confirmation p,
+%app-content > p:only-child,
+%app-view > div.disabled > div,
+%button,
+%form-element > em,
+%form-element > strong,
+%feedback-dialog-inline p {
+  font-size: $typo-size-800;
+}

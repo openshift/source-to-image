@@ -1,0 +1,4 @@
+@import './action-group/index';
+.action-group {
+  @extend %action-group;
+}
