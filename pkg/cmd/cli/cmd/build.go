@@ -162,7 +162,7 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 
 			glog.V(2).Infof("\n%s\n", describe.Config(client, cfg))
 
-			builder, _, err := strategies.GetStrategy(client, cfg)
+			builder, _, err := strategies.Strategy(client, cfg)
 			s2ierr.CheckError(err)
 			result, err := builder.Build(cfg)
 			if err != nil {

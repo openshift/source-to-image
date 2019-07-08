@@ -1033,7 +1033,7 @@ func TestDockerfileLocalSource(t *testing.T) {
 
 func runDockerfileTest(t *testing.T, config *api.Config, expected []string, notExpected []string, expectedFiles []string, expectFailure bool) {
 
-	b, _, err := strategies.GetStrategy(nil, config)
+	b, _, err := strategies.Strategy(nil, config)
 	if err != nil {
 		t.Fatalf("Cannot create a new builder.")
 	}
