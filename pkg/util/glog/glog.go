@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	log "github.com/golang/glog"
+	log "k8s.io/klog"
 )
 
 // Logger is a simple interface that is roughly equivalent to glog.
