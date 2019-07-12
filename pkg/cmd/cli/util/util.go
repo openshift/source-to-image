@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	log "github.com/golang/glog"
+	log "k8s.io/klog"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/spf13/cobra"
@@ -46,7 +46,7 @@ func SetupGlog(flags *pflag.FlagSet) {
 		flags.Int32Var(loglevelPtr, "loglevel", 0, "Set the level of log output (0-5)")
 	}
 
-	// FIXME currently glog has only option to redirect output to stderr
-	// the preferred for S2I would be to redirect to stdout
+	// FIXME glog had only option to redirect output to stderr
+	// the preferred for S2I would be to redirect to stdout - klog can support via `klog.SetOutput()`
 	flag.CommandLine.Set("logtostderr", "true")
 }
