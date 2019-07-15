@@ -4,16 +4,15 @@ package hcsv2
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 	"sync"
 	"syscall"
 
-	"github.com/Microsoft/opengcs/internal/network"
+	"github.com/Microsoft/opengcs/internal/oc"
 	"github.com/Microsoft/opengcs/internal/storage"
 	"github.com/Microsoft/opengcs/internal/storage/overlay"
 	"github.com/Microsoft/opengcs/internal/storage/plan9"
@@ -23,10 +22,8 @@ import (
 	"github.com/Microsoft/opengcs/service/gcs/prot"
 	"github.com/Microsoft/opengcs/service/gcs/runtime"
 	"github.com/Microsoft/opengcs/service/gcs/transport"
-	"github.com/opencontainers/runc/libcontainer/devices"
-	oci "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	"go.opencensus.io/trace"
 )
 
 // UVMContainerID is the ContainerID that will be sent on any prot.MessageBase
@@ -42,21 +39,13 @@ type Host struct {
 	// Rtime is the Runtime interface used by the GCS core.
 	rtime runtime.Runtime
 	vsock transport.Transport
-
-	// netNamespaces maps `NamespaceID` to the namespace opts
-	netNamespaces map[string]*netNSOpts
-	// networkNSToContainer is a map from `NamespaceID` to sandbox
-	// `ContainerID`. If the map entry does not exist then the adapter is cached
-	// in `netNamespaces` for addition when the sandbox is eventually created.
-	networkNSToContainer sync.Map
 }
 
 func NewHost(rtime runtime.Runtime, vsock transport.Transport) *Host {
 	return &Host{
-		containers:    make(map[string]*Container),
-		rtime:         rtime,
-		vsock:         vsock,
-		netNamespaces: make(map[string]*netNSOpts),
+		containers: make(map[string]*Container),
+		rtime:      rtime,
+		vsock:      vsock,
 	}
 }
 
@@ -75,12 +64,12 @@ func (h *Host) GetContainer(id string) (*Container, error) {
 	return h.getContainerLocked(id)
 }
 
-type netNSOpts struct {
-	Adapters   []*prot.NetworkAdapterV2
-	ResolvPath string
-}
+func (h *Host) CreateContainer(ctx context.Context, id string, settings *prot.VMHostedContainerSettingsV2) (_ *Container, err error) {
+	ctx, span := trace.StartSpan(ctx, "opengcs::Host::CreateContainer")
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
+	span.AddAttributes(trace.StringAttribute("cid", id))
 
-func (h *Host) CreateContainer(id string, settings *prot.VMHostedContainerSettingsV2) (*Container, error) {
 	h.containersMutex.Lock()
 	defer h.containersMutex.Unlock()
 
@@ -88,124 +77,47 @@ func (h *Host) CreateContainer(id string, settings *prot.VMHostedContainerSettin
 		return nil, gcserr.NewHresultError(gcserr.HrVmcomputeSystemAlreadyExists)
 	}
 
-	isSandboxOrStandalone := false
-	if criType, ok := settings.OCISpecification.Annotations["io.kubernetes.cri.container-type"]; ok {
-		// If the annotation is present it must be "sandbox"
-		isSandboxOrStandalone = criType == "sandbox"
+	var namespaceID string
+	criType, isCRI := settings.OCISpecification.Annotations["io.kubernetes.cri.container-type"]
+	if isCRI {
+		switch criType {
+		case "sandbox":
+			// Capture namespaceID if any because setupSandboxContainerSpec clears the Windows section.
+			namespaceID = getNetworkNamespaceID(settings.OCISpecification)
+			err = setupSandboxContainerSpec(ctx, id, settings.OCISpecification)
+			defer func() {
+				if err != nil {
+					defer os.RemoveAll(getSandboxRootDir(id))
+				}
+			}()
+		case "container":
+			sid, ok := settings.OCISpecification.Annotations["io.kubernetes.cri.sandbox-id"]
+			if !ok || sid == "" {
+				return nil, errors.Errorf("unsupported 'io.kubernetes.cri.sandbox-id': '%s'", sid)
+			}
+			err = setupWorkloadContainerSpec(ctx, sid, id, settings.OCISpecification)
+			defer func() {
+				if err != nil {
+					defer os.RemoveAll(getWorkloadRootDir(sid, id))
+				}
+			}()
+		default:
+			err = errors.Errorf("unsupported 'io.kubernetes.cri.container-type': '%s'", criType)
+		}
 	} else {
-		// No annotation declares a standalone LCOW
-		isSandboxOrStandalone = true
+		// Capture namespaceID if any because setupStandaloneContainerSpec clears the Windows section.
+		namespaceID = getNetworkNamespaceID(settings.OCISpecification)
+		err = setupStandaloneContainerSpec(ctx, id, settings.OCISpecification)
+		defer func() {
+			if err != nil {
+				os.RemoveAll(getStandaloneRootDir(id))
+			}
+		}()
+	}
+	if err != nil {
+		return nil, err
 	}
 
-	// Check if we have a network namespace and if so generate the resolv.conf
-	// so we can bindmount it into the container
-	var networkNamespace string
-	if settings.OCISpecification.Windows != nil &&
-		settings.OCISpecification.Windows.Network != nil &&
-		settings.OCISpecification.Windows.Network.NetworkNamespace != "" {
-		networkNamespace = strings.ToLower(settings.OCISpecification.Windows.Network.NetworkNamespace)
-	}
-	if networkNamespace != "" {
-		if isSandboxOrStandalone {
-			// We have a network namespace. Generate the resolv.conf and add the bind mount.
-			netopts := h.netNamespaces[networkNamespace]
-			if netopts == nil || len(netopts.Adapters) == 0 {
-				logrus.WithFields(logrus.Fields{
-					"cid":   id,
-					"netNS": networkNamespace,
-				}).Warn("opengcs::CreateContainer - No adapters in namespace for sandbox")
-			} else {
-				logrus.WithFields(logrus.Fields{
-					"cid":   id,
-					"netNS": networkNamespace,
-				}).Info("opengcs::CreateContainer - Generate sandbox resolv.conf")
-
-				// TODO: Can we ever have more than one nic here at start?
-				td, err := ioutil.TempDir("", "")
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to create tmp directory")
-				}
-				resolvPath := filepath.Join(td, "resolv.conf")
-				adp := netopts.Adapters[0]
-				err = network.GenerateResolvConfFile(resolvPath, adp.DNSServerList, adp.DNSSuffix)
-				if err != nil {
-					return nil, err
-				}
-				// Store the resolve path for all workload containers
-				netopts.ResolvPath = resolvPath
-			}
-		}
-		if netopts, ok := h.netNamespaces[networkNamespace]; ok && netopts.ResolvPath != "" {
-			logrus.WithFields(logrus.Fields{
-				"cid":        id,
-				"netNS":      networkNamespace,
-				"resolvPath": netopts.ResolvPath,
-			}).Info("opengcs::CreateContainer - Adding /etc/resolv.conf mount")
-
-			settings.OCISpecification.Mounts = append(settings.OCISpecification.Mounts, oci.Mount{
-				Destination: "/etc/resolv.conf",
-				Type:        "bind",
-				Source:      netopts.ResolvPath,
-				Options:     []string{"bind", "ro"},
-			})
-		}
-	}
-
-	// Clear the windows section of the config
-	settings.OCISpecification.Windows = nil
-
-	// Check if we need to do any capability/device mappings
-	if settings.OCISpecification.Annotations["io.microsoft.virtualmachine.lcow.privileged"] == "true" {
-		logrus.WithFields(logrus.Fields{
-			"cid": id,
-		}).Debugf("opengcs::CreateContainer - 'io.microsoft.virtualmachine.lcow.privileged' set for privileged container")
-
-		// Add all host devices
-		hostDevices, err := devices.HostDevices()
-		if err != nil {
-			return nil, err
-		}
-		for _, hostDevice := range hostDevices {
-			rd := oci.LinuxDevice{
-				Path:  hostDevice.Path,
-				Type:  string(hostDevice.Type),
-				Major: hostDevice.Major,
-				Minor: hostDevice.Minor,
-				UID:   &hostDevice.Uid,
-				GID:   &hostDevice.Gid,
-			}
-			if hostDevice.Major == 0 && hostDevice.Minor == 0 {
-				// Invalid device, most likely a symbolic link, skip it.
-				continue
-			}
-			found := false
-			for i, dev := range settings.OCISpecification.Linux.Devices {
-				if dev.Path == rd.Path {
-					found = true
-					settings.OCISpecification.Linux.Devices[i] = rd
-					break
-				}
-				if dev.Type == rd.Type && dev.Major == rd.Major && dev.Minor == rd.Minor {
-					logrus.WithFields(logrus.Fields{
-						"cid": id,
-					}).Warnf("opengcs::CreateContainer - The same type '%s', major '%d' and minor '%d', should not be used for multiple devices.", dev.Type, dev.Major, dev.Minor)
-				}
-			}
-			if !found {
-				settings.OCISpecification.Linux.Devices = append(settings.OCISpecification.Linux.Devices, rd)
-			}
-		}
-
-		// Set the cgroup access
-		settings.OCISpecification.Linux.Resources.Devices = []oci.LinuxDeviceCgroup{
-			{
-				Allow:  true,
-				Access: "rwm",
-			},
-		}
-	}
-
-	// Container doesnt exit. Create it here
 	// Create the BundlePath
 	if err := os.MkdirAll(settings.OCIBundlePath, 0700); err != nil {
 		return nil, errors.Wrapf(err, "failed to create OCIBundlePath: '%s'", settings.OCIBundlePath)
@@ -241,25 +153,32 @@ func (h *Host) CreateContainer(id string, settings *prot.VMHostedContainerSettin
 	c.processesWg.Add(1)
 	c.initProcess = newProcess(c, settings.OCISpecification.Process, con.(runtime.Process), uint32(c.container.Pid()), true)
 
-	// For the sandbox move all adapters into the network namespace
-	if isSandboxOrStandalone && networkNamespace != "" {
-		if netopts, ok := h.netNamespaces[networkNamespace]; ok {
-			for _, a := range netopts.Adapters {
-				err = c.AddNetworkAdapter(a)
-				if err != nil {
-					return nil, err
-				}
+	// Sandbox or standalone, move the networks to the container namespace
+	if criType == "sandbox" || !isCRI {
+		ns, err := getNetworkNamespace(namespaceID)
+		if isCRI && err != nil {
+			return nil, err
+		}
+		// standalone is not required to have a networking namespace setup
+		if ns != nil {
+			if err := ns.AssignContainerPid(ctx, c.container.Pid()); err != nil {
+				return nil, err
+			}
+			if err := ns.Sync(ctx); err != nil {
+				return nil, err
 			}
 		}
-		// Add a link for all HotAdd/Remove from NS id to this container.
-		h.networkNSToContainer.Store(networkNamespace, id)
 	}
 
 	h.containers[id] = c
 	return c, nil
 }
 
-func (h *Host) ModifyHostSettings(settings *prot.ModifySettingRequest) error {
+func (h *Host) ModifyHostSettings(ctx context.Context, settings *prot.ModifySettingRequest) (err error) {
+	ctx, span := trace.StartSpan(ctx, "opengcs::Host::ModifyHostSettings")
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
+
 	type modifyFunc func(interface{}) error
 
 	requestTypeFn := func(req prot.ModifyRequestType, setting interface{}, add, remove, update modifyFunc) error {
@@ -293,36 +212,36 @@ func (h *Host) ModifyHostSettings(settings *prot.ModifySettingRequest) error {
 		add = func(setting interface{}) error {
 			mvd := setting.(*prot.MappedVirtualDiskV2)
 			if mvd.MountPath != "" {
-				return scsi.Mount(mvd.Controller, mvd.Lun, mvd.MountPath, mvd.ReadOnly)
+				return scsi.Mount(ctx, mvd.Controller, mvd.Lun, mvd.MountPath, mvd.ReadOnly)
 			}
 			return nil
 		}
 		remove = func(setting interface{}) error {
 			mvd := setting.(*prot.MappedVirtualDiskV2)
 			if mvd.MountPath != "" {
-				if err := storage.UnmountPath(mvd.MountPath, true); err != nil {
+				if err := storage.UnmountPath(ctx, mvd.MountPath, true); err != nil {
 					return errors.Wrapf(err, "failed to hot remove MappedVirtualDiskV2 path: '%s'", mvd.MountPath)
 				}
 			}
-			return scsi.UnplugDevice(mvd.Controller, mvd.Lun)
+			return scsi.UnplugDevice(ctx, mvd.Controller, mvd.Lun)
 		}
 	case prot.MrtMappedDirectory:
 		add = func(setting interface{}) error {
 			md := setting.(*prot.MappedDirectoryV2)
-			return plan9.Mount(h.vsock, md.MountPath, md.ShareName, md.Port, md.ReadOnly)
+			return plan9.Mount(ctx, h.vsock, md.MountPath, md.ShareName, md.Port, md.ReadOnly)
 		}
 		remove = func(setting interface{}) error {
 			md := setting.(*prot.MappedDirectoryV2)
-			return storage.UnmountPath(md.MountPath, true)
+			return storage.UnmountPath(ctx, md.MountPath, true)
 		}
 	case prot.MrtVPMemDevice:
 		add = func(setting interface{}) error {
 			vpd := setting.(*prot.MappedVPMemDeviceV2)
-			return pmem.Mount(vpd.DeviceNumber, vpd.MountPath)
+			return pmem.Mount(ctx, vpd.DeviceNumber, vpd.MountPath)
 		}
 		remove = func(setting interface{}) error {
 			vpd := setting.(*prot.MappedVPMemDeviceV2)
-			return storage.UnmountPath(vpd.MountPath, true)
+			return storage.UnmountPath(ctx, vpd.MountPath, true)
 		}
 	case prot.MrtCombinedLayers:
 		add = func(setting interface{}) error {
@@ -343,58 +262,28 @@ func (h *Host) ModifyHostSettings(settings *prot.ModifySettingRequest) error {
 				workdirPath = filepath.Join(cl.ScratchPath, "work")
 			}
 
-			return overlay.Mount(layerPaths, upperdirPath, workdirPath, cl.ContainerRootPath, readonly)
+			return overlay.Mount(ctx, layerPaths, upperdirPath, workdirPath, cl.ContainerRootPath, readonly)
 		}
 		remove = func(setting interface{}) error {
 			cl := setting.(*prot.CombinedLayersV2)
-			return storage.UnmountPath(cl.ContainerRootPath, true)
+			return storage.UnmountPath(ctx, cl.ContainerRootPath, true)
 		}
 	case prot.MrtNetwork:
 		add = func(setting interface{}) error {
 			na := setting.(*prot.NetworkAdapterV2)
-			na.ID = strings.ToLower(na.ID)
-			na.NamespaceID = strings.ToLower(na.NamespaceID)
-			if cidraw, ok := h.networkNSToContainer.Load(na.NamespaceID); ok {
-				// The container has already been created. Get it and add this
-				// adapter in real time.
-				c, err := h.GetContainer(cidraw.(string))
-				if err != nil {
-					return err
-				}
-				return c.AddNetworkAdapter(na)
+			ns := getOrAddNetworkNamespace(na.NamespaceID)
+			if err := ns.AddAdapter(ctx, na); err != nil {
+				return err
 			}
-			netopts, ok := h.netNamespaces[na.NamespaceID]
-			if !ok {
-				netopts = &netNSOpts{}
-				h.netNamespaces[na.NamespaceID] = netopts
-			}
-			netopts.Adapters = append(netopts.Adapters, na)
-			return nil
+			// This code doesnt know if the namespace was already added to the
+			// container or not so it must always call `Sync`.
+			return ns.Sync(ctx)
 		}
 		remove = func(setting interface{}) error {
 			na := setting.(*prot.NetworkAdapterV2)
-			na.ID = strings.ToLower(na.ID)
-			na.NamespaceID = strings.ToLower(na.NamespaceID)
-			if cidraw, ok := h.networkNSToContainer.Load(na.NamespaceID); ok {
-				// The container was previously created or is still. Remove the
-				// network. If the container is not found we just remove the
-				// namespace reference.
-				if c, err := h.GetContainer(cidraw.(string)); err == nil {
-					return c.RemoveNetworkAdapter(na.ID)
-				}
-			} else {
-				if netopts, ok := h.netNamespaces[na.NamespaceID]; ok {
-					var i int
-					var a *prot.NetworkAdapterV2
-					for i, a = range netopts.Adapters {
-						if na.ID == a.ID {
-							break
-						}
-					}
-					if a != nil {
-						netopts.Adapters = append(netopts.Adapters[:i], netopts.Adapters[i+1:]...)
-					}
-				}
+			ns := getOrAddNetworkNamespace(na.ID)
+			if err := ns.RemoveAdapter(ctx, na.ID); err != nil {
+				return err
 			}
 			return nil
 		}

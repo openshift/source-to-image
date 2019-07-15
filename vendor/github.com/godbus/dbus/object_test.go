@@ -91,7 +91,13 @@ func TestObjectSignalHandling(t *testing.T) {
 	}
 
 	obj := bus.Object(name, path)
-	obj.AddMatchSignal(iface, "Heartbeat", WithMatchObjectPath(obj.Path()))
+	if err := bus.AddMatchSignal(
+		WithMatchInterface(iface),
+		WithMatchMember("Heartbeat"),
+		WithMatchObjectPath(path),
+	); err != nil {
+		t.Fatal(err)
+	}
 
 	ch := make(chan *Signal, 5)
 	bus.Signal(ch)

@@ -269,7 +269,7 @@ type MessageBase struct {
 // NegotiateProtocol is the message from the HCS used to determine the protocol
 // version that will be used for future communication.
 type NegotiateProtocol struct {
-	*MessageBase
+	MessageBase
 	MinimumVersion uint32
 	MaximumVersion uint32
 }
@@ -279,7 +279,7 @@ type NegotiateProtocol struct {
 // inside the utility VM, but will set up the infrustructure needed to start one
 // once the container's initial process is executed.
 type ContainerCreate struct {
-	*MessageBase
+	MessageBase
 	ContainerConfig   string
 	SupportedVersions ProtocolSupport `json:",omitempty"`
 }
@@ -337,7 +337,7 @@ const (
 // some kind of event. At the moment, it is only used for container exit
 // notifications.
 type ContainerNotification struct {
-	*MessageBase
+	MessageBase
 	Type       NotificationType
 	Operation  ActiveOperation
 	Result     int32
@@ -362,14 +362,14 @@ type ExecuteProcessSettings struct {
 // ContainerExecuteProcess is the message from the HCS specifying to execute a
 // process either inside or outside the container namespace.
 type ContainerExecuteProcess struct {
-	*MessageBase
+	MessageBase
 	Settings ExecuteProcessSettings
 }
 
 // ContainerResizeConsole is the message from the HCS specifying to change the
 // console size for the given process.
 type ContainerResizeConsole struct {
-	*MessageBase
+	MessageBase
 	ProcessID uint32 `json:"ProcessId"`
 	Height    uint16
 	Width     uint16
@@ -379,7 +379,7 @@ type ContainerResizeConsole struct {
 // the given process exits. After receiving this message, the corresponding
 // response should not be sent until the process has exited.
 type ContainerWaitForProcess struct {
-	*MessageBase
+	MessageBase
 	ProcessID uint32 `json:"ProcessId"`
 	// TimeoutInMs is currently ignored, since timeouts are handled on the host
 	// side.
@@ -389,7 +389,7 @@ type ContainerWaitForProcess struct {
 // ContainerSignalProcess is the message from the HCS specifying to send a
 // signal to the given process.
 type ContainerSignalProcess struct {
-	*MessageBase
+	MessageBase
 	ProcessID uint32               `json:"ProcessId"`
 	Options   SignalProcessOptions `json:",omitempty"`
 }
@@ -397,7 +397,7 @@ type ContainerSignalProcess struct {
 // ContainerGetProperties is the message from the HCS requesting certain
 // properties of the container, such as a list of its processes.
 type ContainerGetProperties struct {
-	*MessageBase
+	MessageBase
 	Query string
 }
 
@@ -496,7 +496,7 @@ type ModifySettingRequest struct {
 // ContainerModifySettings is the message from the HCS specifying how a certain
 // container resource should be modified.
 type ContainerModifySettings struct {
-	*MessageBase
+	MessageBase
 	// For V1 (RS3) Request will contain a ResourceModificationRequestResponse.
 	// For V2 (RS4) V2Request will be set and Request will be nil. For V2 (RS5)
 	// Request will contain a ModifySettingRequest and V2Request is deprecated.
@@ -641,16 +641,21 @@ type ErrorRecord struct {
 // GCS to the HCS except for ContainerNotification.
 type MessageResponseBase struct {
 	Result       int32
-	ActivityID   string        `json:"ActivityId"`
+	ActivityID   string        `json:"ActivityId,omitempty"`
 	ErrorMessage string        `json:",omitempty"` // Only used by hcsshim external bridge
 	ErrorRecords []ErrorRecord `json:",omitempty"`
+}
+
+// Base returns the response base by reference.
+func (mrp *MessageResponseBase) Base() *MessageResponseBase {
+	return mrp
 }
 
 // NegotiateProtocolResponse is the message to the HCS responding to a
 // NegotiateProtocol message. It specifies the prefered protocol version and
 // available capabilities of the GCS.
 type NegotiateProtocolResponse struct {
-	*MessageResponseBase
+	MessageResponseBase
 	Version      uint32
 	Capabilities GcsCapabilities
 }
@@ -660,7 +665,7 @@ type NegotiateProtocolResponse struct {
 // for protocol versions 3 and lower, returning protocol version information to
 // the HCS.
 type ContainerCreateResponse struct {
-	*MessageResponseBase
+	MessageResponseBase
 	SelectedVersion         string `json:",omitempty"`
 	SelectedProtocolVersion uint32
 }
@@ -668,14 +673,14 @@ type ContainerCreateResponse struct {
 // ContainerExecuteProcessResponse is the message to the HCS responding to a
 // ContainerExecuteProcess message. It provides back the process's pid.
 type ContainerExecuteProcessResponse struct {
-	*MessageResponseBase
+	MessageResponseBase
 	ProcessID uint32 `json:"ProcessId"`
 }
 
 // ContainerWaitForProcessResponse is the message to the HCS responding to a
 // ContainerWaitForProcess message. It is only sent when the process has exited.
 type ContainerWaitForProcessResponse struct {
-	*MessageResponseBase
+	MessageResponseBase
 	ExitCode uint32
 }
 
@@ -683,7 +688,7 @@ type ContainerWaitForProcessResponse struct {
 // ContainerGetProperties message. It contains a string representing the
 // properties requested.
 type ContainerGetPropertiesResponse struct {
-	*MessageResponseBase
+	MessageResponseBase
 	Properties string
 }
 

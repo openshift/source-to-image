@@ -11,12 +11,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Microsoft/opengcs/internal/oc"
 	"github.com/Microsoft/opengcs/internal/runtime/hcsv2"
 	"github.com/Microsoft/opengcs/service/gcs/bridge"
 	"github.com/Microsoft/opengcs/service/gcs/core/gcs"
 	"github.com/Microsoft/opengcs/service/gcs/runtime/runc"
 	"github.com/Microsoft/opengcs/service/gcs/transport"
 	"github.com/sirupsen/logrus"
+	"go.opencensus.io/trace"
 	"golang.org/x/sys/unix"
 )
 
@@ -36,6 +38,12 @@ func main() {
 	}
 
 	flag.Parse()
+
+	// If v4 enable opencensus
+	if *v4 {
+		trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
+		trace.RegisterExporter(&oc.LogrusExporter{})
+	}
 
 	// Use a file instead of stdout
 	if *logFile != "" {

@@ -2,6 +2,7 @@ package gcs
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -146,7 +147,7 @@ func (c *gcsCore) getMappedVirtualDiskMounts(disks []prot.MappedVirtualDisk) ([]
 // scsiLunToName finds the SCSI device with the given LUN. This assumes
 // only one SCSI controller.
 func (c *gcsCore) scsiLunToName(lun uint8) (string, error) {
-	return scsi.ControllerLunToName(0, lun)
+	return scsi.ControllerLunToName(context.Background(), 0, lun)
 }
 
 // deviceIDToName converts a device ID (scsi:<lun> or pmem:<device#> to a
@@ -251,7 +252,7 @@ func (c *gcsCore) mountLayers(index uint32, scratchMount *mountSpec, layers []*m
 		// accident" always getting a writable overlay. Do nothing here if the
 		// call does not have a scratch path.
 	}
-	return overlay.Mount(layerPaths, upperdirPath, workdirPath, rootfsPath, false)
+	return overlay.Mount(context.Background(), layerPaths, upperdirPath, workdirPath, rootfsPath, false)
 }
 
 // unmountLayers unmounts the union filesystem for the container with the given
@@ -260,12 +261,12 @@ func (c *gcsCore) unmountLayers(index uint32) error {
 	layerPrefix, scratchPath, _, _, rootfsPath := c.getUnioningPaths(index)
 
 	// clean up rootfsPath operations
-	if err := storage.UnmountPath(rootfsPath, false); err != nil {
+	if err := storage.UnmountPath(context.Background(), rootfsPath, false); err != nil {
 		return errors.Wrap(err, "failed to unmount root filesytem")
 	}
 
 	// clean up scratchPath operations
-	if err := storage.UnmountPath(scratchPath, false); err != nil {
+	if err := storage.UnmountPath(context.Background(), scratchPath, false); err != nil {
 		return errors.Wrap(err, "failed to unmount scratch")
 	}
 
@@ -275,7 +276,7 @@ func (c *gcsCore) unmountLayers(index uint32) error {
 		return errors.Wrap(err, "failed to get layer paths using Glob")
 	}
 	for _, layerPath := range layerPaths {
-		if err := storage.UnmountPath(layerPath, false); err != nil {
+		if err := storage.UnmountPath(context.Background(), layerPath, false); err != nil {
 			return errors.Wrap(err, "failed to unmount layer")
 		}
 	}

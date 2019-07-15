@@ -59,6 +59,16 @@ func TestSocketLabel(t *testing.T) {
 	}
 }
 
+func TestKeyLabel(t *testing.T) {
+	label := "system_u:object_r:container_t:s0:c1,c2"
+	if err := SetKeyLabel(label); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := KeyLabel(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestProcessLabel(t *testing.T) {
 	label := "system_u:object_r:container_t:s0:c1,c2"
 	if err := SetProcessLabel(label); err != nil {

@@ -3,10 +3,12 @@
 package storage
 
 import (
+	"context"
 	"os"
 
+	"github.com/Microsoft/opengcs/internal/oc"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	"go.opencensus.io/trace"
 	"golang.org/x/sys/unix"
 )
 
@@ -19,21 +21,14 @@ var (
 
 // UnmountPath unmounts the target path if it exists and is a mount path. If
 // removeTarget this will remove the previously mounted folder.
-func UnmountPath(target string, removeTarget bool) (err error) {
-	activity := "storage::UnmountPath"
-	log := logrus.WithFields(logrus.Fields{
-		"target": target,
-		"remove": removeTarget,
-	})
-	log.Debug(activity + " - Begin Operation")
-	defer func() {
-		if err != nil {
-			log.Data[logrus.ErrorKey] = err
-			log.Error(activity + " - End Operation")
-		} else {
-			log.Debug(activity + " - End Operation")
-		}
-	}()
+func UnmountPath(ctx context.Context, target string, removeTarget bool) (err error) {
+	_, span := trace.StartSpan(ctx, "storage::UnmountPath")
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
+
+	span.AddAttributes(
+		trace.StringAttribute("target", target),
+		trace.BoolAttribute("remove", removeTarget))
 
 	if _, err := osStat(target); err != nil {
 		if os.IsNotExist(err) {

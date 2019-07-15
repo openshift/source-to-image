@@ -50,7 +50,11 @@ out/delta.tar.gz: bin/init bin/vsockexec bin/service/gcs bin/service/gcsutils/gc
 	rm -rf rootfs
 
 out/rootfs.tar.gz: out/initrd.img
-	bsdtar -zcf $@ @out/initrd.img
+	rm -rf rootfs-conv
+	mkdir rootfs-conv
+	gunzip -c out/initrd.img | (cd rootfs-conv && cpio -imd)
+	tar -zcf $@ -C rootfs-conv .
+	rm -rf rootfs-conv
 
 out/initrd.img: $(BASE) out/delta.tar.gz $(SRCROOT)/hack/catcpio.sh
 	$(SRCROOT)/hack/catcpio.sh "$(BASE)" out/delta.tar.gz > out/initrd.img.uncompressed

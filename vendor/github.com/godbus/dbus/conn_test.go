@@ -103,9 +103,9 @@ func TestRemoveSignal(t *testing.T) {
 		t.Errorf("remove signal: signals length not equal: got '%d', want '3'", len(signals))
 	}
 	signals = bus.signalHandler.(*defaultSignalHandler).signals
-	for _, bch := range signals {
-		if bch != ch2 {
-			t.Errorf("remove signal: removed signal present: got '%v', want '%v'", bch, ch2)
+	for _, scd := range signals {
+		if scd.ch != ch2 {
+			t.Errorf("remove signal: removed signal present: got '%v', want '%v'", scd.ch, ch2)
 		}
 	}
 }
@@ -169,6 +169,91 @@ func TestCloseBeforeSignal(t *testing.T) {
 	err = msg.EncodeTo(pipewriter, binary.LittleEndian)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestCloseChannelAfterRemoveSignal(t *testing.T) {
+	bus, err := NewConn(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add an unbuffered signal channel
+	ch := make(chan *Signal)
+	bus.Signal(ch)
+
+	// Send a signal
+	msg := &Message{
+		Type: TypeSignal,
+		Headers: map[HeaderField]Variant{
+			FieldInterface: MakeVariant("foo.bar"),
+			FieldMember:    MakeVariant("bar"),
+			FieldPath:      MakeVariant(ObjectPath("/baz")),
+		},
+	}
+	bus.handleSignal(msg)
+
+	// Remove and close the signal channel
+	bus.RemoveSignal(ch)
+	close(ch)
+}
+
+func TestAddAndRemoveMatchSignal(t *testing.T) {
+	conn, err := SessionBusPrivate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	if err = conn.Auth(nil); err != nil {
+		t.Fatal(err)
+	}
+	if err = conn.Hello(); err != nil {
+		t.Fatal(err)
+	}
+
+	sigc := make(chan *Signal, 1)
+	conn.Signal(sigc)
+
+	// subscribe to a made up signal name and emit one of the type
+	if err = conn.AddMatchSignal(
+		WithMatchInterface("org.test"),
+		WithMatchMember("Test"),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err = conn.Emit("/", "org.test.Test"); err != nil {
+		t.Fatal(err)
+	}
+	if sig := waitSignal(sigc, "org.test.Test", time.Second); sig == nil {
+		t.Fatal("signal receive timed out")
+	}
+
+	// unsubscribe from the signal and check that is not delivered anymore
+	if err = conn.RemoveMatchSignal(
+		WithMatchInterface("org.test"),
+		WithMatchMember("Test"),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err = conn.Emit("/", "org.test.Test"); err != nil {
+		t.Fatal(err)
+	}
+	if sig := waitSignal(sigc, "org.test.Test", time.Second); sig != nil {
+		t.Fatalf("unsubscribed from %q signal, but received %#v", "org.test.Test", sig)
+	}
+}
+
+func waitSignal(sigc <-chan *Signal, name string, timeout time.Duration) *Signal {
+	for {
+		select {
+		case sig := <-sigc:
+			if sig.Name == name {
+				return sig
+			}
+		case <-time.After(timeout):
+			return nil
+		}
 	}
 }
 

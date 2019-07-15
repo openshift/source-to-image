@@ -1,11 +1,14 @@
 package gcs
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/Microsoft/opengcs/internal/network"
 	"github.com/Microsoft/opengcs/service/gcs/prot"
@@ -17,7 +20,7 @@ import (
 // configureAdapterInNamespace moves a given adapter into a network
 // namespace and configures it there.
 func (c *gcsCore) configureAdapterInNamespace(container runtime.Container, adapter prot.NetworkAdapter) error {
-	interfaceName, err := network.InstanceIDToName(adapter.AdapterInstanceID, false)
+	interfaceName, err := network.InstanceIDToName(context.Background(), adapter.AdapterInstanceID, false)
 	if err != nil {
 		return err
 	}
@@ -44,7 +47,7 @@ func (c *gcsCore) configureAdapterInNamespace(container runtime.Container, adapt
 
 	if adapter.NatEnabled {
 		// Set the DNS configuration.
-		if err := network.GenerateResolvConfFile(resolvPath, adapter.HostDNSServerList, adapter.HostDNSSuffix); err != nil {
+		if err := c.generateResolvConfFile(resolvPath, adapter.HostDNSServerList, adapter.HostDNSSuffix); err != nil {
 			return errors.Wrapf(err, "failed to generate resolv.conf file for adapter %s", adapter.AdapterInstanceID)
 		}
 	} else {
@@ -58,6 +61,46 @@ func (c *gcsCore) configureAdapterInNamespace(container runtime.Container, adapt
 			}
 			return errors.Wrapf(err, "failed to check if resolv.conf path already exists for adapter %s", adapter.AdapterInstanceID)
 		}
+	}
+	return nil
+}
+
+// generateResolvConfFile parses `dnsServerList` and `dnsSuffix` and writes the
+// `nameserver` and `search` entries to `resolvPath`.
+func (c *gcsCore) generateResolvConfFile(resolvPath, dnsServerList, dnsSuffix string) (err error) {
+	logrus.WithFields(logrus.Fields{
+		"resolvPath":    resolvPath,
+		"dnsServerList": dnsServerList,
+		"dnsSuffix":     dnsSuffix,
+	}).Debug("generateResolvConfFile")
+
+	fileContents := ""
+
+	split := func(r rune) bool {
+		return r == ',' || r == ' '
+	}
+
+	nameservers := strings.FieldsFunc(dnsServerList, split)
+	for i, server := range nameservers {
+		// Limit number of nameservers to 3.
+		if i >= 3 {
+			break
+		}
+
+		fileContents += fmt.Sprintf("nameserver %s\n", server)
+	}
+
+	if dnsSuffix != "" {
+		fileContents += fmt.Sprintf("search %s\n", dnsSuffix)
+	}
+
+	file, err := os.OpenFile(resolvPath, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return errors.Wrap(err, "failed to create resolv.conf")
+	}
+	defer file.Close()
+	if _, err := io.WriteString(file, fileContents); err != nil {
+		return errors.Wrapf(err, "failed to write to resolv.conf")
 	}
 	return nil
 }

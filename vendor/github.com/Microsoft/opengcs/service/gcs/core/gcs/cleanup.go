@@ -1,6 +1,8 @@
 package gcs
 
 import (
+	"context"
+
 	"github.com/Microsoft/opengcs/internal/storage"
 	"github.com/Microsoft/opengcs/service/gcs/runtime"
 	"github.com/sirupsen/logrus"
@@ -21,7 +23,7 @@ func (c *gcsCore) cleanupContainer(containerEntry *containerCacheEntry) error {
 
 	for _, disk := range containerEntry.MappedVirtualDisks {
 		if !disk.AttachOnly {
-			if err := storage.UnmountPath(disk.ContainerPath, false); err != nil {
+			if err := storage.UnmountPath(context.Background(), disk.ContainerPath, false); err != nil {
 				logrus.Warn(err)
 				if errToReturn == nil {
 					errToReturn = err
@@ -30,7 +32,7 @@ func (c *gcsCore) cleanupContainer(containerEntry *containerCacheEntry) error {
 		}
 	}
 	for _, directory := range containerEntry.MappedDirectories {
-		if err := storage.UnmountPath(directory.ContainerPath, false); err != nil {
+		if err := storage.UnmountPath(context.Background(), directory.ContainerPath, false); err != nil {
 			logrus.Warn(err)
 			if errToReturn == nil {
 				errToReturn = err
