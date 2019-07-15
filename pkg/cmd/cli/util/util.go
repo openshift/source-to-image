@@ -36,8 +36,8 @@ func AddCommonFlags(c *cobra.Command, cfg *api.Config) {
 		"Specify a destination location for untar operation")
 }
 
-// SetupGlog makes --loglevel reflect in glog's -v flag
-func SetupGlog(flags *pflag.FlagSet) {
+// SetupLogger makes --loglevel reflect in klog's -v flag
+func SetupLogger(flags *pflag.FlagSet) {
 
 	from := flag.CommandLine
 	if fflag := from.Lookup("v"); fflag != nil {
