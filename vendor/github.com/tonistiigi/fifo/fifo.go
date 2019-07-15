@@ -1,3 +1,19 @@
+/*
+   Copyright The containerd Authors.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 package fifo
 
 import (
@@ -9,7 +25,6 @@ import (
 
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
-	"golang.org/x/sys/unix"
 )
 
 type fifo struct {
@@ -39,7 +54,7 @@ var leakCheckWg *sync.WaitGroup
 func OpenFifo(ctx context.Context, fn string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
 	if _, err := os.Stat(fn); err != nil {
 		if os.IsNotExist(err) && flag&syscall.O_CREAT != 0 {
-			if err := unix.Mkfifo(fn, uint32(perm&os.ModePerm)); err != nil && !os.IsExist(err) {
+			if err := mkfifo(fn, uint32(perm&os.ModePerm)); err != nil && !os.IsExist(err) {
 				return nil, errors.Wrapf(err, "error creating fifo %v", fn)
 			}
 		} else {
@@ -76,7 +91,11 @@ func OpenFifo(ctx context.Context, fn string, flag int, perm os.FileMode) (io.Re
 		}
 		select {
 		case <-ctx.Done():
-			f.Close()
+			select {
+			case <-f.opened:
+			default:
+				f.Close()
+			}
 		case <-f.opened:
 		case <-f.closed:
 		}

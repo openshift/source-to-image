@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"math/rand"
@@ -17,35 +18,11 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-type testResponseWriter struct {
-	header         *prot.MessageHeader
-	response       interface{}
-	err            error
-	errActivityID  string
-	respWriteCount int
-}
-
-func (w *testResponseWriter) Header() *prot.MessageHeader {
-	return w.header
-}
-
-func (w *testResponseWriter) Write(r interface{}) {
-	w.response = r
-	w.respWriteCount++
-}
-
-func (w *testResponseWriter) Error(activityID string, err error) {
-	if activityID == "" {
-		activityID = "00000000-0000-0000-0000-000000000000"
-	}
-
-	w.errActivityID = activityID
-	w.err = err
-	w.respWriteCount++
-}
-
 func createRequest(t *testing.T, id prot.MessageIdentifier, ver prot.ProtocolVersion, message interface{}) *Request {
-	r := &Request{}
+	r := &Request{
+		Context: context.Background(),
+		Version: ver,
+	}
 
 	bytes := make([]byte, 0)
 	if message != nil {
@@ -63,83 +40,35 @@ func createRequest(t *testing.T, id prot.MessageIdentifier, ver prot.ProtocolVer
 
 	r.Header = hdr
 	r.Message = bytes
-	r.Version = ver
 	return r
 }
 
-func createResponseWriter(r *Request) *testResponseWriter {
-	hdr := &prot.MessageHeader{
-		Type: prot.GetResponseIdentifier(r.Header.Type),
-		ID:   r.Header.ID,
+func verifyResponseError(t *testing.T, resp RequestResponse, err error) {
+	if resp != nil {
+		t.Fatalf("response was returned on expected error: %+v", resp)
 	}
-
-	return &testResponseWriter{header: hdr}
-}
-
-func setupRequestResponse(t *testing.T, id prot.MessageIdentifier, ver prot.ProtocolVersion, message interface{}) (*Request, *testResponseWriter) {
-	r := createRequest(t, id, ver, message)
-	rw := createResponseWriter(r)
-	return r, rw
-}
-
-func verifyResponseWriteCount(t *testing.T, rw *testResponseWriter) {
-	if rw.respWriteCount != 1 {
-		t.Fatalf("response was written (%d) times != 1", rw.respWriteCount)
+	if err == nil {
+		t.Fatal("expected valid error, got: nil")
 	}
 }
 
-func verifyResponseError(t *testing.T, rw *testResponseWriter) {
-	verifyResponseWriteCount(t, rw)
-	if rw.response != nil {
-		t.Fatal("response wrote a response not an error")
-	}
-	if rw.err == nil {
-		t.Fatal("response did not write an error")
+func verifyResponseJSONError(t *testing.T, resp RequestResponse, err error) {
+	verifyResponseError(t, resp, err)
+	if !strings.Contains(err.Error(), "failed to unmarshal JSON") {
+		t.Fatalf("response error %v, was not a json marshal error", err)
 	}
 }
 
-func verifyResponseJSONError(t *testing.T, rw *testResponseWriter) {
-	verifyResponseError(t, rw)
-	if !strings.Contains(rw.err.Error(), "failed to unmarshal JSON") {
-		t.Fatal("response error was not a json marshal error")
+func verifyResponseSuccess(t *testing.T, resp RequestResponse, err error) {
+	if resp == nil {
+		t.Fatal("expected valid response, got: nil")
+	}
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
 	}
 }
 
-func verifyResponseSuccess(t *testing.T, rw *testResponseWriter) {
-	verifyResponseWriteCount(t, rw)
-	if rw.err != nil {
-		t.Fatalf("response was an error response: %v", rw.err)
-	}
-	if rw.response == nil {
-		t.Fatal("response was a success but no message was included")
-	}
-}
-
-func verifyActivityIDEmptyGUID(t *testing.T, rw *testResponseWriter) {
-	if rw.err == nil {
-		t.Fatal("we only expect an empty activity ID on error cases")
-	}
-
-	if "00000000-0000-0000-0000-000000000000" != rw.errActivityID {
-		t.Fatalf("response activity ID (%s) was not equal to the empty guid '00000000-0000-0000-0000-000000000000'", rw.errActivityID)
-	}
-}
-
-func verifyActivityID(t *testing.T, req *prot.MessageBase, rw *testResponseWriter) {
-	var respActivityID string
-	if rw.err != nil {
-		respActivityID = rw.errActivityID
-	} else {
-		rwv := reflect.ValueOf(rw.response)
-		respActivityID = rwv.Elem().FieldByName("ActivityID").String()
-	}
-
-	if req.ActivityID != respActivityID {
-		t.Fatalf("response activity ID (%s) was not equal to request (%s) for 'Error' case", req.ActivityID, rw.errActivityID)
-	}
-}
-
-func newMessageBase() *prot.MessageBase {
+func newMessageBase() prot.MessageBase {
 	const chars = "abcdefghijklmnopqrstuvwxyz"
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	f := func() string {
@@ -150,37 +79,35 @@ func newMessageBase() *prot.MessageBase {
 		return string(b)
 	}
 
-	base := &prot.MessageBase{
+	base := prot.MessageBase{
 		ContainerID: f(),
 		ActivityID:  f(),
 	}
 	return base
 }
 
-func newMessageUVMBase() *prot.MessageBase {
+func newMessageUVMBase() prot.MessageBase {
 	b := newMessageBase()
 	b.ContainerID = hcsv2.UVMContainerID
 	return b
 }
 
 func Test_NegotiateProtocol_DuplicateCall_Failure(t *testing.T) {
-	req, rw := setupRequestResponse(t, prot.ComputeSystemNegotiateProtocolV1, prot.PvInvalid, nil)
+	req := createRequest(t, prot.ComputeSystemNegotiateProtocolV1, prot.PvInvalid, nil)
 
 	tb := new(Bridge)
-	tb.negotiateProtocolV2(rw, req)
+	resp, err := tb.negotiateProtocolV2(req)
 
-	verifyResponseJSONError(t, rw)
-	verifyActivityIDEmptyGUID(t, rw)
+	verifyResponseJSONError(t, resp, err)
 }
 
 func Test_NegotiateProtocol_InvalidJson_Failure(t *testing.T) {
-	req, rw := setupRequestResponse(t, prot.ComputeSystemNegotiateProtocolV1, prot.PvInvalid, nil)
+	req := createRequest(t, prot.ComputeSystemNegotiateProtocolV1, prot.PvInvalid, nil)
 
 	tb := new(Bridge)
-	tb.negotiateProtocolV2(rw, req)
+	resp, err := tb.negotiateProtocolV2(req)
 
-	verifyResponseJSONError(t, rw)
-	verifyActivityIDEmptyGUID(t, rw)
+	verifyResponseJSONError(t, resp, err)
 }
 
 func Test_NegotiateProtocol_InvalidRange_Low_Failure(t *testing.T) {
@@ -190,13 +117,12 @@ func Test_NegotiateProtocol_InvalidRange_Low_Failure(t *testing.T) {
 		MaximumVersion: 3,
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemNegotiateProtocolV1, prot.PvInvalid, r)
+	req := createRequest(t, prot.ComputeSystemNegotiateProtocolV1, prot.PvInvalid, r)
 
 	tb := new(Bridge)
-	tb.negotiateProtocolV2(rw, req)
+	resp, err := tb.negotiateProtocolV2(req)
 
-	verifyResponseError(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseError(t, resp, err)
 }
 
 func Test_NegotiateProtocol_InvalidRange_High_Failure(t *testing.T) {
@@ -206,13 +132,12 @@ func Test_NegotiateProtocol_InvalidRange_High_Failure(t *testing.T) {
 		MaximumVersion: uint32(prot.PvMax) + 1,
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemNegotiateProtocolV1, prot.PvInvalid, r)
+	req := createRequest(t, prot.ComputeSystemNegotiateProtocolV1, prot.PvInvalid, r)
 
 	tb := new(Bridge)
-	tb.negotiateProtocolV2(rw, req)
+	resp, err := tb.negotiateProtocolV2(req)
 
-	verifyResponseError(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseError(t, resp, err)
 }
 
 func Test_NegotiateProtocol_ValidRange_Success(t *testing.T) {
@@ -222,17 +147,16 @@ func Test_NegotiateProtocol_ValidRange_Success(t *testing.T) {
 		MaximumVersion: uint32(prot.PvMax) + 1,
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemNegotiateProtocolV1, prot.PvInvalid, r)
+	req := createRequest(t, prot.ComputeSystemNegotiateProtocolV1, prot.PvInvalid, r)
 
 	tb := new(Bridge)
-	tb.negotiateProtocolV2(rw, req)
+	resp, err := tb.negotiateProtocolV2(req)
 
-	verifyResponseSuccess(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseSuccess(t, resp, err)
 
-	resp := rw.response.(*prot.NegotiateProtocolResponse)
-	if resp.Version != uint32(prot.PvMax) {
-		t.Errorf("Invalid version number selected for response: %v", resp.Version)
+	npr := resp.(*prot.NegotiateProtocolResponse)
+	if npr.Version != uint32(prot.PvMax) {
+		t.Errorf("Invalid version number selected for response: %v", npr.Version)
 	}
 	// verify that the bridge global was updated
 	if tb.protVer != prot.PvMax {
@@ -241,13 +165,12 @@ func Test_NegotiateProtocol_ValidRange_Success(t *testing.T) {
 }
 
 func Test_CreateContainer_InvalidJson_Failure(t *testing.T) {
-	req, rw := setupRequestResponse(t, prot.ComputeSystemCreateV1, prot.PvInvalid, nil)
+	req := createRequest(t, prot.ComputeSystemCreateV1, prot.PvInvalid, nil)
 
 	tb := new(Bridge)
-	tb.createContainer(rw, req)
+	resp, err := tb.createContainer(req)
 
-	verifyResponseJSONError(t, rw)
-	verifyActivityIDEmptyGUID(t, rw)
+	verifyResponseJSONError(t, resp, err)
 }
 
 func Test_CreateContainer_InvalidHostedJson_Failure(t *testing.T) {
@@ -255,13 +178,12 @@ func Test_CreateContainer_InvalidHostedJson_Failure(t *testing.T) {
 		MessageBase: newMessageBase(),
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemCreateV1, prot.PvInvalid, r)
+	req := createRequest(t, prot.ComputeSystemCreateV1, prot.PvInvalid, r)
 
 	tb := new(Bridge)
-	tb.createContainer(rw, req)
+	resp, err := tb.createContainer(req)
 
-	verifyResponseJSONError(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseJSONError(t, resp, err)
 }
 
 func Test_CreateContainer_CoreCreateContainerFails_Failure(t *testing.T) {
@@ -270,25 +192,24 @@ func Test_CreateContainer_CoreCreateContainerFails_Failure(t *testing.T) {
 		ContainerConfig: "{}", // Just unmarshal to defaults
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemCreateV1, prot.PvInvalid, r)
+	req := createRequest(t, prot.ComputeSystemCreateV1, prot.PvInvalid, r)
 
 	tb := &Bridge{
 		coreint: &mockcore.MockCore{
 			Behavior: mockcore.Error,
 		},
 	}
-	tb.createContainer(rw, req)
+	resp, err := tb.createContainer(req)
 
-	verifyResponseError(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseError(t, resp, err)
 }
 
 func createContainerConfig() (*prot.ContainerCreate, prot.VMHostedContainerSettings) {
 	hs := prot.VMHostedContainerSettings{
-		Layers:          []prot.Layer{prot.Layer{Path: "0"}, prot.Layer{Path: "1"}, prot.Layer{Path: "2"}},
+		Layers:          []prot.Layer{{Path: "0"}, {Path: "1"}, {Path: "2"}},
 		SandboxDataPath: "3",
 		MappedVirtualDisks: []prot.MappedVirtualDisk{
-			prot.MappedVirtualDisk{
+			{
 				ContainerPath:     "/path/inside/container",
 				Lun:               4,
 				CreateInUtilityVM: true,
@@ -296,7 +217,7 @@ func createContainerConfig() (*prot.ContainerCreate, prot.VMHostedContainerSetti
 			},
 		},
 		NetworkAdapters: []prot.NetworkAdapter{
-			prot.NetworkAdapter{
+			{
 				AdapterInstanceID:  "00000000-0000-0000-0000-000000000000",
 				FirewallEnabled:    false,
 				NatEnabled:         true,
@@ -323,16 +244,15 @@ func Test_CreateContainer_Success_WaitContainer_Failure(t *testing.T) {
 	logrus.SetOutput(ioutil.Discard)
 
 	r, hs := createContainerConfig()
-	req, rw := setupRequestResponse(t, prot.ComputeSystemCreateV1, prot.PvInvalid, r)
+	req := createRequest(t, prot.ComputeSystemCreateV1, prot.PvInvalid, r)
 
 	mc := &mockcore.MockCore{Behavior: mockcore.SingleSuccess}
 	mc.WaitContainerWg.Add(1)
 
 	tb := &Bridge{coreint: mc}
-	tb.createContainer(rw, req)
+	resp, err := tb.createContainer(req)
 
-	verifyResponseSuccess(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseSuccess(t, resp, err)
 	if r.ContainerID != mc.LastCreateContainer.ID {
 		t.Fatal("last create container did not have the same container ID")
 	}
@@ -348,7 +268,7 @@ func Test_CreateContainer_Success_WaitContainer_Failure(t *testing.T) {
 
 func Test_CreateContainer_Success_WaitContainer_Success(t *testing.T) {
 	r, hs := createContainerConfig()
-	req, rw := setupRequestResponse(t, prot.ComputeSystemCreateV1, prot.PvInvalid, r)
+	req := createRequest(t, prot.ComputeSystemCreateV1, prot.PvInvalid, r)
 
 	mc := &mockcore.MockCore{Behavior: mockcore.Success}
 	mc.WaitContainerWg.Add(1)
@@ -381,9 +301,8 @@ func Test_CreateContainer_Success_WaitContainer_Success(t *testing.T) {
 		}
 	}()
 
-	b.createContainer(rw, req)
-	verifyResponseSuccess(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	resp, err := b.createContainer(req)
+	verifyResponseSuccess(t, resp, err)
 	if r.ContainerID != mc.LastCreateContainer.ID {
 		t.Fatal("last create container did not have the same container ID")
 	}
@@ -405,36 +324,33 @@ func Test_CreateContainer_Success_WaitContainer_Success(t *testing.T) {
 }
 
 func Test_StartContainer_InvalidJson_Failure(t *testing.T) {
-	req, rw := setupRequestResponse(t, prot.ComputeSystemStartV1, prot.PvV4, nil)
+	req := createRequest(t, prot.ComputeSystemStartV1, prot.PvV4, nil)
 
 	b := new(Bridge)
-	b.startContainerV2(rw, req)
+	resp, err := b.startContainerV2(req)
 
-	verifyResponseJSONError(t, rw)
-	verifyActivityIDEmptyGUID(t, rw)
+	verifyResponseJSONError(t, resp, err)
 }
 
 func Test_StartContainer_Success(t *testing.T) {
 	r := newMessageBase()
-	req, rw := setupRequestResponse(t, prot.ComputeSystemStartV1, prot.PvV4, r)
+	req := createRequest(t, prot.ComputeSystemStartV1, prot.PvV4, r)
 
 	b := new(Bridge)
 	b.responseChan = make(chan bridgeResponse)
 	defer close(b.responseChan)
 
-	b.startContainerV2(rw, req)
-	verifyResponseSuccess(t, rw)
-	verifyActivityID(t, r, rw)
+	resp, err := b.startContainerV2(req)
+	verifyResponseSuccess(t, resp, err)
 }
 
 func Test_ExecProcess_InvalidJson_Failure(t *testing.T) {
-	req, rw := setupRequestResponse(t, prot.ComputeSystemExecuteProcessV1, prot.PvV3, nil)
+	req := createRequest(t, prot.ComputeSystemExecuteProcessV1, prot.PvV3, nil)
 
 	tb := new(Bridge)
-	tb.execProcess(rw, req)
+	resp, err := tb.execProcess(req)
 
-	verifyResponseJSONError(t, rw)
-	verifyActivityIDEmptyGUID(t, rw)
+	verifyResponseJSONError(t, resp, err)
 }
 
 func Test_ExecProcess_InvalidProcessParameters_Failure(t *testing.T) {
@@ -445,13 +361,12 @@ func Test_ExecProcess_InvalidProcessParameters_Failure(t *testing.T) {
 		},
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemExecuteProcessV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemExecuteProcessV1, prot.PvV3, r)
 
 	tb := new(Bridge)
-	tb.execProcess(rw, req)
+	resp, err := tb.execProcess(req)
 
-	verifyResponseJSONError(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseJSONError(t, resp, err)
 }
 
 func Test_ExecProcess_External_CoreFails_Failure(t *testing.T) {
@@ -466,17 +381,16 @@ func Test_ExecProcess_External_CoreFails_Failure(t *testing.T) {
 		},
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemExecuteProcessV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemExecuteProcessV1, prot.PvV3, r)
 
 	tb := &Bridge{
 		coreint: &mockcore.MockCore{
 			Behavior: mockcore.Error,
 		},
 	}
-	tb.execProcess(rw, req)
+	resp, err := tb.execProcess(req)
 
-	verifyResponseError(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseError(t, resp, err)
 }
 
 func Test_ExecProcess_External_CoreSucceeds_Success(t *testing.T) {
@@ -491,15 +405,14 @@ func Test_ExecProcess_External_CoreSucceeds_Success(t *testing.T) {
 		},
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemExecuteProcessV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemExecuteProcessV1, prot.PvV3, r)
 	mc := &mockcore.MockCore{Behavior: mockcore.Success}
 	tb := &Bridge{
 		coreint: mc,
 	}
-	tb.execProcess(rw, req)
+	resp, err := tb.execProcess(req)
 
-	verifyResponseSuccess(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseSuccess(t, resp, err)
 	if !reflect.DeepEqual(pp, mc.LastRunExternalProcess.Params) {
 		t.Fatal("last run external process did not have equal params structs")
 	}
@@ -513,7 +426,7 @@ func Test_ExecProcess_Container_CoreFails_Failure(t *testing.T) {
 		},
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemExecuteProcessV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemExecuteProcessV1, prot.PvV3, r)
 
 	uvm := hcsv2.NewHost(nil, nil)
 	tb := &Bridge{
@@ -522,10 +435,9 @@ func Test_ExecProcess_Container_CoreFails_Failure(t *testing.T) {
 			Behavior: mockcore.Error,
 		},
 	}
-	tb.execProcess(rw, req)
+	resp, err := tb.execProcess(req)
 
-	verifyResponseError(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseError(t, resp, err)
 }
 
 func Test_ExecProcess_Container_CoreSucceeds_Success(t *testing.T) {
@@ -540,7 +452,7 @@ func Test_ExecProcess_Container_CoreSucceeds_Success(t *testing.T) {
 		},
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemExecuteProcessV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemExecuteProcessV1, prot.PvV3, r)
 
 	uvm := hcsv2.NewHost(nil, nil)
 	mc := &mockcore.MockCore{Behavior: mockcore.Success}
@@ -548,10 +460,9 @@ func Test_ExecProcess_Container_CoreSucceeds_Success(t *testing.T) {
 		hostState: uvm,
 		coreint:   mc,
 	}
-	tb.execProcess(rw, req)
+	resp, err := tb.execProcess(req)
 
-	verifyResponseSuccess(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseSuccess(t, resp, err)
 	if r.ContainerID != mc.LastExecProcess.ID {
 		t.Fatal("last exec process did not have the same container ID")
 	}
@@ -561,18 +472,17 @@ func Test_ExecProcess_Container_CoreSucceeds_Success(t *testing.T) {
 }
 
 func Test_KillContainer_InvalidJson_Failure(t *testing.T) {
-	req, rw := setupRequestResponse(t, prot.ComputeSystemShutdownForcedV1, prot.PvV3, nil)
+	req := createRequest(t, prot.ComputeSystemShutdownForcedV1, prot.PvV3, nil)
 
 	tb := new(Bridge)
-	tb.killContainer(rw, req)
+	resp, err := tb.killContainer(req)
 
-	verifyResponseJSONError(t, rw)
-	verifyActivityIDEmptyGUID(t, rw)
+	verifyResponseJSONError(t, resp, err)
 }
 
 func Test_KillContainer_CoreFails_Failure(t *testing.T) {
 	r := newMessageBase()
-	req, rw := setupRequestResponse(t, prot.ComputeSystemShutdownForcedV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemShutdownForcedV1, prot.PvV3, r)
 
 	uvm := hcsv2.NewHost(nil, nil)
 	tb := &Bridge{
@@ -581,23 +491,21 @@ func Test_KillContainer_CoreFails_Failure(t *testing.T) {
 			Behavior: mockcore.Error,
 		},
 	}
-	tb.killContainer(rw, req)
+	resp, err := tb.killContainer(req)
 
-	verifyResponseError(t, rw)
-	verifyActivityID(t, r, rw)
+	verifyResponseError(t, resp, err)
 }
 
 func Test_KillContainer_CoreSucceeds_Success(t *testing.T) {
 	r := newMessageBase()
-	req, rw := setupRequestResponse(t, prot.ComputeSystemShutdownForcedV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemShutdownForcedV1, prot.PvV3, r)
 
 	uvm := hcsv2.NewHost(nil, nil)
 	mc := &mockcore.MockCore{Behavior: mockcore.Success}
 	tb := &Bridge{hostState: uvm, coreint: mc}
-	tb.killContainer(rw, req)
+	resp, err := tb.killContainer(req)
 
-	verifyResponseSuccess(t, rw)
-	verifyActivityID(t, r, rw)
+	verifyResponseSuccess(t, resp, err)
 	if r.ContainerID != mc.LastSignalContainer.ID {
 		t.Fatal("last signal container did not have the same container ID")
 	}
@@ -607,18 +515,17 @@ func Test_KillContainer_CoreSucceeds_Success(t *testing.T) {
 }
 
 func Test_ShutdownContainer_InvalidJson_Failure(t *testing.T) {
-	req, rw := setupRequestResponse(t, prot.ComputeSystemShutdownGracefulV1, prot.PvV3, nil)
+	req := createRequest(t, prot.ComputeSystemShutdownGracefulV1, prot.PvV3, nil)
 
 	tb := new(Bridge)
-	tb.shutdownContainer(rw, req)
+	resp, err := tb.shutdownContainer(req)
 
-	verifyResponseJSONError(t, rw)
-	verifyActivityIDEmptyGUID(t, rw)
+	verifyResponseJSONError(t, resp, err)
 }
 
 func Test_ShutdownContainer_CoreFails_Failure(t *testing.T) {
 	r := newMessageBase()
-	req, rw := setupRequestResponse(t, prot.ComputeSystemShutdownGracefulV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemShutdownGracefulV1, prot.PvV3, r)
 
 	uvm := hcsv2.NewHost(nil, nil)
 	tb := &Bridge{
@@ -627,23 +534,21 @@ func Test_ShutdownContainer_CoreFails_Failure(t *testing.T) {
 			Behavior: mockcore.Error,
 		},
 	}
-	tb.shutdownContainer(rw, req)
+	resp, err := tb.shutdownContainer(req)
 
-	verifyResponseError(t, rw)
-	verifyActivityID(t, r, rw)
+	verifyResponseError(t, resp, err)
 }
 
 func Test_ShutdownContainer_CoreSucceeds_Success(t *testing.T) {
 	r := newMessageBase()
-	req, rw := setupRequestResponse(t, prot.ComputeSystemShutdownGracefulV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemShutdownGracefulV1, prot.PvV3, r)
 
 	uvm := hcsv2.NewHost(nil, nil)
 	mc := &mockcore.MockCore{Behavior: mockcore.Success}
 	tb := &Bridge{hostState: uvm, coreint: mc}
-	tb.shutdownContainer(rw, req)
+	resp, err := tb.shutdownContainer(req)
 
-	verifyResponseSuccess(t, rw)
-	verifyActivityID(t, r, rw)
+	verifyResponseSuccess(t, resp, err)
 	if r.ContainerID != mc.LastSignalContainer.ID {
 		t.Fatal("last signal container did not have the same container ID")
 	}
@@ -653,13 +558,12 @@ func Test_ShutdownContainer_CoreSucceeds_Success(t *testing.T) {
 }
 
 func Test_SignalProcess_InvalidJson_Failure(t *testing.T) {
-	req, rw := setupRequestResponse(t, prot.ComputeSystemSignalProcessV1, prot.PvV3, nil)
+	req := createRequest(t, prot.ComputeSystemSignalProcessV1, prot.PvV3, nil)
 
 	tb := new(Bridge)
-	tb.signalProcess(rw, req)
+	resp, err := tb.signalProcess(req)
 
-	verifyResponseJSONError(t, rw)
-	verifyActivityIDEmptyGUID(t, rw)
+	verifyResponseJSONError(t, resp, err)
 }
 
 func Test_SignalProcess_CoreFails_Failure(t *testing.T) {
@@ -671,7 +575,7 @@ func Test_SignalProcess_CoreFails_Failure(t *testing.T) {
 		},
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemSignalProcessV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemSignalProcessV1, prot.PvV3, r)
 
 	uvm := hcsv2.NewHost(nil, nil)
 	tb := &Bridge{
@@ -680,10 +584,9 @@ func Test_SignalProcess_CoreFails_Failure(t *testing.T) {
 			Behavior: mockcore.Error,
 		},
 	}
-	tb.signalProcess(rw, req)
+	resp, err := tb.signalProcess(req)
 
-	verifyResponseError(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseError(t, resp, err)
 }
 
 func Test_SignalProcess_CoreSucceeds_Success(t *testing.T) {
@@ -695,15 +598,14 @@ func Test_SignalProcess_CoreSucceeds_Success(t *testing.T) {
 		},
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemSignalProcessV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemSignalProcessV1, prot.PvV3, r)
 
 	uvm := hcsv2.NewHost(nil, nil)
 	mc := &mockcore.MockCore{Behavior: mockcore.Success}
 	tb := &Bridge{hostState: uvm, coreint: mc}
-	tb.signalProcess(rw, req)
+	resp, err := tb.signalProcess(req)
 
-	verifyResponseSuccess(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseSuccess(t, resp, err)
 	if uint32(mc.LastSignalProcess.Pid) != r.ProcessID {
 		t.Fatal("last signal process did not have the same pid")
 	}
@@ -713,13 +615,12 @@ func Test_SignalProcess_CoreSucceeds_Success(t *testing.T) {
 }
 
 func Test_GetProperties_InvalidJson_Failure(t *testing.T) {
-	req, rw := setupRequestResponse(t, prot.ComputeSystemGetPropertiesV1, prot.PvV3, nil)
+	req := createRequest(t, prot.ComputeSystemGetPropertiesV1, prot.PvV3, nil)
 
 	tb := new(Bridge)
-	tb.getProperties(rw, req)
+	resp, err := tb.getProperties(req)
 
-	verifyResponseJSONError(t, rw)
-	verifyActivityIDEmptyGUID(t, rw)
+	verifyResponseJSONError(t, resp, err)
 }
 
 func Test_GetProperties_CoreFails_Failure(t *testing.T) {
@@ -728,7 +629,7 @@ func Test_GetProperties_CoreFails_Failure(t *testing.T) {
 		Query:       "",
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemGetPropertiesV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemGetPropertiesV1, prot.PvV3, r)
 
 	uvm := hcsv2.NewHost(nil, nil)
 	tb := &Bridge{
@@ -737,10 +638,9 @@ func Test_GetProperties_CoreFails_Failure(t *testing.T) {
 			Behavior: mockcore.Error,
 		},
 	}
-	tb.getProperties(rw, req)
+	resp, err := tb.getProperties(req)
 
-	verifyResponseError(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseError(t, resp, err)
 }
 
 func Test_GetProperties_CoreSucceeds_Success(t *testing.T) {
@@ -749,25 +649,24 @@ func Test_GetProperties_CoreSucceeds_Success(t *testing.T) {
 		Query:       "{\"PropertyTypes\":[\"ProcessList\"]}",
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemGetPropertiesV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemGetPropertiesV1, prot.PvV3, r)
 
 	uvm := hcsv2.NewHost(nil, nil)
 	mc := &mockcore.MockCore{Behavior: mockcore.Success}
 	tb := &Bridge{hostState: uvm, coreint: mc}
-	tb.getProperties(rw, req)
+	resp, err := tb.getProperties(req)
 
-	verifyResponseSuccess(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseSuccess(t, resp, err)
 	if mc.LastGetProperties.ID != r.ContainerID {
 		t.Fatal("last get properties did not have the same container ID")
 	}
-	response, ok := rw.response.(*prot.ContainerGetPropertiesResponse)
+	cgpr, ok := resp.(*prot.ContainerGetPropertiesResponse)
 	if !ok {
-		t.Fatalf("get properties returned the wrong response type: %T", rw.response)
+		t.Fatalf("get properties returned the wrong response type: %T", resp)
 	}
 
 	var properties prot.Properties
-	json.Unmarshal([]byte(response.Properties), &properties)
+	json.Unmarshal([]byte(cgpr.Properties), &properties)
 	numProcesses := len(properties.ProcessList)
 	if numProcesses != 1 {
 		t.Fatalf("get properties returned an incorrect number of processes: %d", numProcesses)
@@ -779,13 +678,12 @@ func Test_GetProperties_CoreSucceeds_Success(t *testing.T) {
 }
 
 func Test_WaitOnProcess_InvalidJson_Failure(t *testing.T) {
-	req, rw := setupRequestResponse(t, prot.ComputeSystemWaitForProcessV1, prot.PvV3, nil)
+	req := createRequest(t, prot.ComputeSystemWaitForProcessV1, prot.PvV3, nil)
 
 	tb := new(Bridge)
-	tb.waitOnProcess(rw, req)
+	resp, err := tb.waitOnProcess(req)
 
-	verifyResponseJSONError(t, rw)
-	verifyActivityIDEmptyGUID(t, rw)
+	verifyResponseJSONError(t, resp, err)
 }
 
 func Test_WaitOnProcess_CoreFails_Failure(t *testing.T) {
@@ -795,7 +693,7 @@ func Test_WaitOnProcess_CoreFails_Failure(t *testing.T) {
 		TimeoutInMs: 1000,
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemWaitForProcessV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemWaitForProcessV1, prot.PvV3, r)
 
 	uvm := hcsv2.NewHost(nil, nil)
 	tb := &Bridge{
@@ -804,10 +702,9 @@ func Test_WaitOnProcess_CoreFails_Failure(t *testing.T) {
 			Behavior: mockcore.Error,
 		},
 	}
-	tb.waitOnProcess(rw, req)
+	resp, err := tb.waitOnProcess(req)
 
-	verifyResponseError(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseError(t, resp, err)
 }
 
 func Test_WaitOnProcess_CoreSucceeds_Timeout_Error(t *testing.T) {
@@ -817,7 +714,7 @@ func Test_WaitOnProcess_CoreSucceeds_Timeout_Error(t *testing.T) {
 		TimeoutInMs: 10,
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemWaitForProcessV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemWaitForProcessV1, prot.PvV3, r)
 
 	mc := &mockcore.MockCore{Behavior: mockcore.Success}
 	mc.LastWaitProcessReturnContext = &mockcore.WaitProcessReturnContext{
@@ -828,10 +725,9 @@ func Test_WaitOnProcess_CoreSucceeds_Timeout_Error(t *testing.T) {
 	// Do not write the exit code so that the timeout occurs.
 	uvm := hcsv2.NewHost(nil, nil)
 	tb := &Bridge{hostState: uvm, coreint: mc}
-	tb.waitOnProcess(rw, req)
+	resp, err := tb.waitOnProcess(req)
 
-	verifyResponseError(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseError(t, resp, err)
 
 	// Verify that the caller bridge calls done in the timeout case
 	// to acknowledge the response.
@@ -845,7 +741,7 @@ func Test_WaitOnProcess_CoreSucceeds_Success(t *testing.T) {
 		TimeoutInMs: 1000,
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemWaitForProcessV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemWaitForProcessV1, prot.PvV3, r)
 
 	mc := &mockcore.MockCore{Behavior: mockcore.Success}
 	mc.LastWaitProcessReturnContext = &mockcore.WaitProcessReturnContext{
@@ -858,9 +754,9 @@ func Test_WaitOnProcess_CoreSucceeds_Success(t *testing.T) {
 
 	uvm := hcsv2.NewHost(nil, nil)
 	tb := &Bridge{hostState: uvm, coreint: mc}
-	tb.waitOnProcess(rw, req)
+	resp, err := tb.waitOnProcess(req)
 
-	verifyResponseSuccess(t, rw)
+	verifyResponseSuccess(t, resp, err)
 	if uint32(mc.LastWaitProcess.Pid) != r.ProcessID {
 		t.Fatal("last wait process did not have same pid")
 	}
@@ -870,13 +766,12 @@ func Test_WaitOnProcess_CoreSucceeds_Success(t *testing.T) {
 }
 
 func Test_ResizeConsole_InvalidJson_Failure(t *testing.T) {
-	req, rw := setupRequestResponse(t, prot.ComputeSystemResizeConsoleV1, prot.PvV3, nil)
+	req := createRequest(t, prot.ComputeSystemResizeConsoleV1, prot.PvV3, nil)
 
 	tb := new(Bridge)
-	tb.resizeConsole(rw, req)
+	resp, err := tb.resizeConsole(req)
 
-	verifyResponseJSONError(t, rw)
-	verifyActivityIDEmptyGUID(t, rw)
+	verifyResponseJSONError(t, resp, err)
 }
 
 func Test_ResizeConsole_CoreFails_Failure(t *testing.T) {
@@ -887,7 +782,7 @@ func Test_ResizeConsole_CoreFails_Failure(t *testing.T) {
 		Height:      20,
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemResizeConsoleV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemResizeConsoleV1, prot.PvV3, r)
 
 	uvm := hcsv2.NewHost(nil, nil)
 	tb := &Bridge{
@@ -896,10 +791,9 @@ func Test_ResizeConsole_CoreFails_Failure(t *testing.T) {
 			Behavior: mockcore.Error,
 		},
 	}
-	tb.resizeConsole(rw, req)
+	resp, err := tb.resizeConsole(req)
 
-	verifyResponseError(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseError(t, resp, err)
 }
 
 func Test_ResizeConsole_CoreSucceeds_Success(t *testing.T) {
@@ -910,15 +804,14 @@ func Test_ResizeConsole_CoreSucceeds_Success(t *testing.T) {
 		Height:      480,
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemResizeConsoleV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemResizeConsoleV1, prot.PvV3, r)
 
 	uvm := hcsv2.NewHost(nil, nil)
 	mc := &mockcore.MockCore{Behavior: mockcore.Success}
 	tb := &Bridge{hostState: uvm, coreint: mc}
-	tb.resizeConsole(rw, req)
+	resp, err := tb.resizeConsole(req)
 
-	verifyResponseSuccess(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseSuccess(t, resp, err)
 	if uint32(mc.LastResizeConsole.Pid) != r.ProcessID {
 		t.Fatal("last resize console did not have same pid")
 	}
@@ -931,13 +824,12 @@ func Test_ResizeConsole_CoreSucceeds_Success(t *testing.T) {
 }
 
 func Test_ModifySettings_InvalidJson_Failure(t *testing.T) {
-	req, rw := setupRequestResponse(t, prot.ComputeSystemModifySettingsV1, prot.PvV3, nil)
+	req := createRequest(t, prot.ComputeSystemModifySettingsV1, prot.PvV3, nil)
 
 	tb := new(Bridge)
-	tb.modifySettings(rw, req)
+	resp, err := tb.modifySettings(req)
 
-	verifyResponseJSONError(t, rw)
-	verifyActivityIDEmptyGUID(t, rw)
+	verifyResponseJSONError(t, resp, err)
 }
 
 func Test_ModifySettings_VirtualDisk_InvalidSettingsJson_Failure(t *testing.T) {
@@ -948,13 +840,12 @@ func Test_ModifySettings_VirtualDisk_InvalidSettingsJson_Failure(t *testing.T) {
 		},
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemModifySettingsV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemModifySettingsV1, prot.PvV3, r)
 
 	tb := new(Bridge)
-	tb.modifySettings(rw, req)
+	resp, err := tb.modifySettings(req)
 
-	verifyResponseJSONError(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseJSONError(t, resp, err)
 }
 
 func Test_ModifySettings_MappedDirectory_InvalidSettingsJson_Failure(t *testing.T) {
@@ -965,13 +856,12 @@ func Test_ModifySettings_MappedDirectory_InvalidSettingsJson_Failure(t *testing.
 		},
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemModifySettingsV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemModifySettingsV1, prot.PvV3, r)
 
 	tb := new(Bridge)
-	tb.modifySettings(rw, req)
+	resp, err := tb.modifySettings(req)
 
-	verifyResponseJSONError(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseJSONError(t, resp, err)
 }
 
 func Test_ModifySettings_CoreFails_Failure(t *testing.T) {
@@ -983,7 +873,7 @@ func Test_ModifySettings_CoreFails_Failure(t *testing.T) {
 		},
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemModifySettingsV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemModifySettingsV1, prot.PvV3, r)
 
 	uvm := hcsv2.NewHost(nil, nil)
 	tb := &Bridge{
@@ -992,10 +882,9 @@ func Test_ModifySettings_CoreFails_Failure(t *testing.T) {
 			Behavior: mockcore.Error,
 		},
 	}
-	tb.modifySettings(rw, req)
+	resp, err := tb.modifySettings(req)
 
-	verifyResponseError(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseError(t, resp, err)
 }
 
 func Test_ModifySettings_CoreSucceeds_Success(t *testing.T) {
@@ -1010,7 +899,7 @@ func Test_ModifySettings_CoreSucceeds_Success(t *testing.T) {
 		},
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemModifySettingsV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemModifySettingsV1, prot.PvV3, r)
 
 	mc := &mockcore.MockCore{Behavior: mockcore.Success}
 	uvm := hcsv2.NewHost(nil, nil)
@@ -1018,10 +907,9 @@ func Test_ModifySettings_CoreSucceeds_Success(t *testing.T) {
 		hostState: uvm,
 		coreint:   mc,
 	}
-	tb.modifySettings(rw, req)
+	resp, err := tb.modifySettings(req)
 
-	verifyResponseSuccess(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseSuccess(t, resp, err)
 	if r.ContainerID != mc.LastModifySettings.ID {
 		t.Fatal("last modify settings did not have the same container ID")
 	}
@@ -1044,16 +932,15 @@ func Test_ModifySettings_V2_Success(t *testing.T) {
 		},
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemModifySettingsV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemModifySettingsV1, prot.PvV3, r)
 
 	mc := &mockcore.MockCore{Behavior: mockcore.Success}
 	tb := &Bridge{
 		coreint: mc,
 	}
-	tb.modifySettings(rw, req)
+	resp, err := tb.modifySettings(req)
 
-	verifyResponseSuccess(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseSuccess(t, resp, err)
 	if r.ContainerID != mc.LastModifySettings.ID {
 		t.Fatal("last modify settings did not have the same container ID")
 	}
@@ -1086,7 +973,7 @@ func Test_ModifySettings_BothV1V2_Success(t *testing.T) {
 		},
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemModifySettingsV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemModifySettingsV1, prot.PvV3, r)
 
 	mc := &mockcore.MockCore{Behavior: mockcore.Success}
 	uvm := hcsv2.NewHost(nil, nil)
@@ -1094,10 +981,9 @@ func Test_ModifySettings_BothV1V2_Success(t *testing.T) {
 		hostState: uvm,
 		coreint:   mc,
 	}
-	tb.modifySettings(rw, req)
+	resp, err := tb.modifySettings(req)
 
-	verifyResponseSuccess(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseSuccess(t, resp, err)
 	if r.ContainerID != mc.LastModifySettings.ID {
 		t.Fatal("last modify settings did not have the same container ID")
 	}
@@ -1111,14 +997,13 @@ func Test_ModifySettings_NeitherV1V2_Fails(t *testing.T) {
 		MessageBase: newMessageBase(),
 	}
 
-	req, rw := setupRequestResponse(t, prot.ComputeSystemModifySettingsV1, prot.PvV3, r)
+	req := createRequest(t, prot.ComputeSystemModifySettingsV1, prot.PvV3, r)
 
 	mc := &mockcore.MockCore{Behavior: mockcore.Success}
 	tb := &Bridge{
 		coreint: mc,
 	}
-	tb.modifySettings(rw, req)
+	resp, err := tb.modifySettings(req)
 
-	verifyResponseError(t, rw)
-	verifyActivityID(t, r.MessageBase, rw)
+	verifyResponseError(t, resp, err)
 }

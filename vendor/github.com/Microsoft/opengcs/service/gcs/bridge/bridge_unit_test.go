@@ -32,11 +32,14 @@ func Test_Bridge_Mux_New_Success(t *testing.T) {
 }
 
 type thandler struct {
-	set bool
+	set  bool
+	resp RequestResponse
+	err  error
 }
 
-func (h *thandler) ServeMsg(w ResponseWriter, r *Request) {
+func (h *thandler) ServeMsg(r *Request) (RequestResponse, error) {
 	h.set = true
+	return h.resp, h.err
 }
 
 func TestBridgeMux_Handle_NilHandler_Panic(t *testing.T) {
@@ -79,7 +82,7 @@ func Test_Bridge_Mux_Handle_Succeeds(t *testing.T) {
 	}
 
 	// Is it the correct handler?
-	hOut.ServeMsg(nil, nil)
+	hOut.ServeMsg(nil)
 
 	if !th.set {
 		t.Error("The handler added was not the same handler.")
@@ -104,7 +107,8 @@ func TestBridgeMux_HandleFunc_NilMap_Panic(t *testing.T) {
 		}
 	}()
 
-	hIn := func(ResponseWriter, *Request) {
+	hIn := func(*Request) (RequestResponse, error) {
+		return nil, nil
 	}
 
 	m := &Mux{} // Caller didn't use NewBridgeMux (not supported).
@@ -113,8 +117,9 @@ func TestBridgeMux_HandleFunc_NilMap_Panic(t *testing.T) {
 
 func Test_Bridge_Mux_HandleFunc_Succeeds(t *testing.T) {
 	var set bool
-	hIn := func(ResponseWriter, *Request) {
+	hIn := func(*Request) (RequestResponse, error) {
 		set = true
+		return nil, nil
 	}
 
 	m := NewBridgeMux()
@@ -132,7 +137,7 @@ func Test_Bridge_Mux_HandleFunc_Succeeds(t *testing.T) {
 	}
 
 	// Is it the correct handler?
-	hOut.ServeMsg(nil, nil)
+	hOut.ServeMsg(nil)
 
 	if !set {
 		t.Error("The handler added was not the same handler.")
@@ -147,8 +152,9 @@ func Test_Bridge_Mux_Handler_NilRequest_Panic(t *testing.T) {
 	}()
 
 	var set bool
-	hIn := func(ResponseWriter, *Request) {
+	hIn := func(*Request) (RequestResponse, error) {
 		set = true
+		return nil, nil
 	}
 
 	m := NewBridgeMux()
@@ -159,23 +165,23 @@ func Test_Bridge_Mux_Handler_NilRequest_Panic(t *testing.T) {
 	}
 }
 
-func verifyResponseIsDefaultHandler(t *testing.T, i interface{}) {
-	if i == nil {
-		t.Error("The response is nil")
-		return
+func verifyResponseIsDefaultHandler(t *testing.T, resp RequestResponse) {
+	if resp == nil {
+		t.Fatal("The response is nil")
 	}
 
-	base := i.(*prot.MessageResponseBase)
+	base := resp.Base()
 	if base.Result != int32(gcserr.HrNotImpl) {
-		t.Error("The default handler did not set a -1 error result.")
+		t.Fatal("The default handler did not set a -1 error result.")
 	}
 	if len(base.ErrorRecords) != 1 {
-		t.Error("The default handler did not set an error record.")
+		t.Fatal("The default handler did not set an error record.")
 	}
 	if !strings.Contains(base.ErrorRecords[0].Message, "bridge: function not supported") {
-		t.Error("The default handler did not return the not supported message")
+		t.Fatal("The default handler did not return the not supported message")
 	}
 }
+
 func Test_Bridge_Mux_Handler_NotAdded_Default(t *testing.T) {
 	// Testing specifically that if we have a bridge with no handlers that
 	// for the incomming request we get the default handler.
@@ -191,16 +197,12 @@ func Test_Bridge_Mux_Handler_NotAdded_Default(t *testing.T) {
 	}
 
 	hOut := m.Handler(req)
-	respChan := make(chan bridgeResponse, 1) // We need to allocate the space because we are running ServeMsg sync.
-	defer close(respChan)
-	respW := &requestResponseWriter{header: req.Header, respChan: respChan}
-	hOut.ServeMsg(respW, req)
-
-	select {
-	case resp := <-respChan:
-		verifyResponseIsDefaultHandler(t, resp.response)
-	default:
-		t.Error("The deafult handler returned no writes.")
+	resp, err := hOut.ServeMsg(req)
+	if resp != nil {
+		t.Fatalf("expected nil response got: %+v", resp)
+	}
+	if err == nil {
+		t.Fatal("expected valid error got: nil")
 	}
 }
 
@@ -227,16 +229,14 @@ func Test_Bridge_Mux_Handler_Added_NotMatched(t *testing.T) {
 	hOut := m.Handler(req)
 	respChan := make(chan bridgeResponse, 1) // We need to allocate the space because we are running ServeMsg sync.
 	defer close(respChan)
-	respW := &requestResponseWriter{header: req.Header, respChan: respChan}
-	hOut.ServeMsg(respW, req)
 
-	select {
-	case resp := <-respChan:
-		verifyResponseIsDefaultHandler(t, resp.response)
-	default:
-		t.Error("The deafult handler returned no writes.")
+	resp, err := hOut.ServeMsg(req)
+	if resp != nil {
+		t.Fatalf("expected nil response got: %+v", resp)
 	}
-
+	if err == nil {
+		t.Fatal("expected valid error got: nil")
+	}
 	if th.set {
 		t.Error("Handler did not call the appropriate handler for a match request")
 	}
@@ -244,7 +244,9 @@ func Test_Bridge_Mux_Handler_Added_NotMatched(t *testing.T) {
 
 func Test_Bridge_Mux_Handler_Success(t *testing.T) {
 	m := NewBridgeMux()
-	th := &thandler{}
+	th := &thandler{
+		resp: &prot.ContainerCreateResponse{},
+	}
 
 	m.Handle(prot.ComputeSystemCreateV1, prot.PvInvalid, th)
 
@@ -259,9 +261,14 @@ func Test_Bridge_Mux_Handler_Success(t *testing.T) {
 	hOut := m.Handler(req)
 	respChan := make(chan bridgeResponse, 1) // We need to allocate the space because we are running ServeMsg sync.
 	defer close(respChan)
-	respW := &requestResponseWriter{header: req.Header, respChan: respChan}
-	hOut.ServeMsg(respW, req)
 
+	resp, err := hOut.ServeMsg(req)
+	if resp == nil {
+		t.Fatal("expected valid response got: nil")
+	}
+	if err != nil {
+		t.Fatalf("expected nil error got: %v", err)
+	}
 	if !th.set {
 		t.Error("Handler did not call the appropriate handler for a match request")
 	}
@@ -283,15 +290,13 @@ func Test_Bridge_Mux_ServeMsg_NotAdded_Default(t *testing.T) {
 
 	respChan := make(chan bridgeResponse, 1) // We need to allocate the space because we are running ServeMsg sync.
 	defer close(respChan)
-	respW := &requestResponseWriter{header: req.Header, respChan: respChan}
 
-	m.ServeMsg(respW, req)
-
-	select {
-	case resp := <-respChan:
-		verifyResponseIsDefaultHandler(t, resp.response)
-	default:
-		t.Error("The deafult handler returned no writes.")
+	resp, err := m.ServeMsg(req)
+	if resp != nil {
+		t.Fatalf("expected nil response, got: %+v", resp)
+	}
+	if err == nil {
+		t.Fatal("expected error got: nil")
 	}
 }
 
@@ -317,17 +322,14 @@ func Test_Bridge_Mux_ServeMsg_Added_NotMatched(t *testing.T) {
 	// Handle the request of a different type.
 	respChan := make(chan bridgeResponse, 1) // We need to allocate the space because we are running ServeMsg sync.
 	defer close(respChan)
-	respW := &requestResponseWriter{header: req.Header, respChan: respChan}
 
-	m.ServeMsg(respW, req)
-
-	select {
-	case resp := <-respChan:
-		verifyResponseIsDefaultHandler(t, resp.response)
-	default:
-		t.Error("The deafult handler returned no writes.")
+	resp, err := m.ServeMsg(req)
+	if resp != nil {
+		t.Fatalf("expected nil response, got: %+v", resp)
 	}
-
+	if err == nil {
+		t.Fatal("expected error got: nil")
+	}
 	if th.set {
 		t.Error("Handler did not call the appropriate handler for a match request")
 	}
@@ -335,7 +337,9 @@ func Test_Bridge_Mux_ServeMsg_Added_NotMatched(t *testing.T) {
 
 func Test_Bridge_Mux_ServeMsg_Success(t *testing.T) {
 	m := NewBridgeMux()
-	th := &thandler{}
+	th := &thandler{
+		resp: &prot.ContainerCreateResponse{},
+	}
 
 	m.Handle(prot.ComputeSystemCreateV1, prot.PvInvalid, th)
 
@@ -349,9 +353,14 @@ func Test_Bridge_Mux_ServeMsg_Success(t *testing.T) {
 
 	respChan := make(chan bridgeResponse, 1) // We need to allocate the space because we are running ServeMsg sync.
 	defer close(respChan)
-	respW := &requestResponseWriter{header: req.Header, respChan: respChan}
-	m.ServeMsg(respW, req)
 
+	resp, err := m.ServeMsg(req)
+	if resp == nil {
+		t.Fatal("expected valid response got: nil")
+	}
+	if err != nil {
+		t.Fatalf("expected nil error got: %v", err)
+	}
 	if !th.set {
 		t.Error("Handler did not call the appropriate handler for a match request")
 	}
@@ -462,7 +471,7 @@ func Test_Bridge_ListenAndServe_UnknownMessageHandler_Success(t *testing.T) {
 	}()
 
 	message := &prot.ContainerResizeConsole{
-		MessageBase: &prot.MessageBase{
+		MessageBase: prot.MessageBase{
 			ContainerID: "01234567-89ab-cdef-0123-456789abcdef",
 			ActivityID:  "00000000-0000-0000-0000-000000000001",
 		},
@@ -490,6 +499,9 @@ func Test_Bridge_ListenAndServe_UnknownMessageHandler_Success(t *testing.T) {
 		t.Error("Response header had wrong sequence id")
 	}
 	verifyResponseIsDefaultHandler(t, response)
+	if response.ActivityID != message.ActivityID {
+		t.Fatal("Response had invalid activity id")
+	}
 }
 
 func Test_Bridge_ListenAndServe_CorrectHandler_Success(t *testing.T) {
@@ -501,38 +513,33 @@ func Test_Bridge_ListenAndServe_CorrectHandler_Success(t *testing.T) {
 
 	mux := NewBridgeMux()
 	message := &prot.ContainerResizeConsole{
-		MessageBase: &prot.MessageBase{
+		MessageBase: prot.MessageBase{
 			ContainerID: "01234567-89ab-cdef-0123-456789abcdef",
 			ActivityID:  "00000000-0000-0000-0000-000000000010",
 		},
 	}
-	resizeFn := func(w ResponseWriter, r *Request) {
+	resizeFn := func(r *Request) (RequestResponse, error) {
 		// Verify the request is as expected.
 		if r.Header.Type != prot.ComputeSystemResizeConsoleV1 {
-			w.Error("", errors.New("bridge_test: wrong request type"))
-			return
+			return nil, errors.New("bridge_test: wrong request type")
 		}
 		if r.Header.ID != prot.SequenceID(1) {
-			w.Error("", errors.New("bridge_test: wrong sequence id"))
-			return
+			return nil, errors.New("bridge_test: wrong sequence id")
 		}
 
 		rBody := prot.ContainerResizeConsole{}
 
 		if err := json.Unmarshal(r.Message, &rBody); err != nil {
-			w.Error("", errors.New("failed to unmarshal body"))
-			return
+			return nil, errors.New("failed to unmarshal body")
 		}
 		if message.ContainerID != rBody.ContainerID {
-			w.Error("", errors.New("containerID of source and handler func not equal"))
-			return
+			return nil, errors.New("containerID of source and handler func not equal")
 		}
 
-		response := &prot.MessageResponseBase{
+		return &prot.MessageResponseBase{
 			Result:     1,
 			ActivityID: rBody.ActivityID,
-		}
-		w.Write(response)
+		}, nil
 	}
 	mux.HandleFunc(prot.ComputeSystemResizeConsoleV1, prot.PvV3, resizeFn)
 	b := &Bridge{
@@ -590,21 +597,18 @@ func Test_Bridge_ListenAndServe_HandlersAreAsync_Success(t *testing.T) {
 	orderWg := sync.WaitGroup{}
 	orderWg.Add(1)
 
-	firstFn := func(w ResponseWriter, r *Request) {
+	firstFn := func(r *Request) (RequestResponse, error) {
 		// Wait for the second request to come in.
 		orderWg.Wait()
-		response := &prot.MessageResponseBase{
+		return &prot.MessageResponseBase{
 			Result: 1,
-		}
-		w.Write(response)
+		}, nil
 	}
-	secondFn := func(w ResponseWriter, r *Request) {
-		response := &prot.MessageResponseBase{
+	secondFn := func(r *Request) (RequestResponse, error) {
+		defer orderWg.Done()
+		return &prot.MessageResponseBase{
 			Result: 10,
-		}
-		w.Write(response)
-		// Allow the first to proceed.
-		orderWg.Done()
+		}, nil
 	}
 	mux.HandleFunc(prot.ComputeSystemResizeConsoleV1, prot.PvV3, firstFn)
 	mux.HandleFunc(prot.ComputeSystemModifySettingsV1, prot.PvV3, secondFn)

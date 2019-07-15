@@ -3,11 +3,13 @@
 package overlay
 
 import (
+	"context"
 	"os"
 	"strings"
 
+	"github.com/Microsoft/opengcs/internal/oc"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	"go.opencensus.io/trace"
 	"golang.org/x/sys/unix"
 )
 
@@ -28,26 +30,18 @@ var (
 //
 // Always creates `rootfsPath`. On mount failure the created `rootfsPath` will
 // be automatically cleaned up.
-func Mount(layerPaths []string, upperdirPath, workdirPath, rootfsPath string, readonly bool) (err error) {
-	lowerdir := strings.Join(layerPaths, ":")
+func Mount(ctx context.Context, layerPaths []string, upperdirPath, workdirPath, rootfsPath string, readonly bool) (err error) {
+	_, span := trace.StartSpan(ctx, "overlay::Mount")
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
 
-	activity := "overlay::Mount"
-	log := logrus.WithFields(logrus.Fields{
-		"layerPaths":   lowerdir,
-		"upperdirPath": upperdirPath,
-		"workdirPath":  workdirPath,
-		"rootfsPath":   rootfsPath,
-		"readonly":     readonly,
-	})
-	log.Debug(activity + " - Begin Operation")
-	defer func() {
-		if err != nil {
-			log.Data[logrus.ErrorKey] = err
-			log.Error(activity + " - End Operation")
-		} else {
-			log.Debug(activity + " - End Operation")
-		}
-	}()
+	lowerdir := strings.Join(layerPaths, ":")
+	span.AddAttributes(
+		trace.StringAttribute("layerPaths", lowerdir),
+		trace.StringAttribute("upperdirPath", upperdirPath),
+		trace.StringAttribute("workdirPath", workdirPath),
+		trace.StringAttribute("rootfsPath", rootfsPath),
+		trace.BoolAttribute("readonly", readonly))
 
 	if rootfsPath == "" {
 		return errors.New("cannot have empty rootfsPath")

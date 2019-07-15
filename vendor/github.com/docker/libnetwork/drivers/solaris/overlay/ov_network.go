@@ -331,7 +331,7 @@ func (n *network) restoreSubnetSandbox(s *subnet, brName, vxlanName string) erro
 	brIfaceOption := make([]osl.IfaceOption, 2)
 	brIfaceOption = append(brIfaceOption, sbox.InterfaceOptions().Address(s.gwIP))
 	brIfaceOption = append(brIfaceOption, sbox.InterfaceOptions().Bridge(true))
-	Ifaces[brName+"+br"] = brIfaceOption
+	Ifaces[fmt.Sprintf("%s+%s", brName, "br")] = brIfaceOption
 
 	err := sbox.Restore(Ifaces, nil, nil, nil)
 	if err != nil {
@@ -341,7 +341,7 @@ func (n *network) restoreSubnetSandbox(s *subnet, brName, vxlanName string) erro
 	Ifaces = make(map[string][]osl.IfaceOption)
 	vxlanIfaceOption := make([]osl.IfaceOption, 1)
 	vxlanIfaceOption = append(vxlanIfaceOption, sbox.InterfaceOptions().Master(brName))
-	Ifaces[vxlanName+"+vxlan"] = vxlanIfaceOption
+	Ifaces[fmt.Sprintf("%s+%s", vxlanName, "vxlan")] = vxlanIfaceOption
 	err = sbox.Restore(Ifaces, nil, nil, nil)
 	if err != nil {
 		return err

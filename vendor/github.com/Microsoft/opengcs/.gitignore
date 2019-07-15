@@ -26,3 +26,6 @@ service/pkg/
 bin/*
 rootfs/*
 *.o
+
+deps/*
+out/*

@@ -5,6 +5,7 @@
 package gcs
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -683,11 +684,11 @@ func (c *gcsCore) ModifySettings(id string, request *prot.ResourceModificationRe
 			// If the disk was specified AttachOnly, it shouldn't have been mounted
 			// in the first place.
 			if !mvd.AttachOnly {
-				if err := storage.UnmountPath(mvd.ContainerPath, false); err != nil {
+				if err := storage.UnmountPath(context.Background(), mvd.ContainerPath, false); err != nil {
 					return errors.Wrapf(err, "failed to unmount mapped virtual disks for container %s", id)
 				}
 			}
-			if err := scsi.UnplugDevice(0, mvd.Lun); err != nil {
+			if err := scsi.UnplugDevice(context.Background(), 0, mvd.Lun); err != nil {
 				return errors.Wrapf(err, "failed to unplug mapped virtual disks for container %s, scsi lun: %d", id, mvd.Lun)
 			}
 			containerEntry.RemoveMappedVirtualDisk(*mvd)
@@ -706,7 +707,7 @@ func (c *gcsCore) ModifySettings(id string, request *prot.ResourceModificationRe
 			}
 			containerEntry.AddMappedDirectory(*md)
 		case prot.RtRemove:
-			if err := storage.UnmountPath(md.ContainerPath, false); err != nil {
+			if err := storage.UnmountPath(context.Background(), md.ContainerPath, false); err != nil {
 				return errors.Wrapf(err, "failed to mount mapped directories for container %s", id)
 			}
 			containerEntry.RemoveMappedDirectory(*md)
@@ -863,7 +864,7 @@ func (c *gcsCore) setupMappedDirectories(id string, dirs []prot.MappedDirectory)
 		if !dir.CreateInUtilityVM {
 			return errors.New("we do not currently support mapping directories inside the container namespace")
 		}
-		if err := plan9.Mount(c.vsock, dir.ContainerPath, "", dir.Port, dir.ReadOnly); err != nil {
+		if err := plan9.Mount(context.Background(), c.vsock, dir.ContainerPath, "", dir.Port, dir.ReadOnly); err != nil {
 			return errors.Wrapf(err, "failed to mount mapped directory %s for container %s", dir.ContainerPath, id)
 		}
 	}
@@ -966,7 +967,7 @@ func processParametersToOCI(params prot.ProcessParameters) (*oci.Process, error)
 			},
 		},
 		Rlimits: []oci.POSIXRlimit{
-			oci.POSIXRlimit{Type: "RLIMIT_NOFILE", Hard: 1024, Soft: 1024},
+			{Type: "RLIMIT_NOFILE", Hard: 1024, Soft: 1024},
 		},
 		NoNewPrivileges: true,
 	}, nil

@@ -3,6 +3,7 @@
 package scsi
 
 import (
+	"context"
 	"errors"
 	"os"
 	"testing"
@@ -24,7 +25,7 @@ func Test_Mount_Mkdir_Fails_Error(t *testing.T) {
 	osMkdirAll = func(path string, perm os.FileMode) error {
 		return expectedErr
 	}
-	err := Mount(0, 0, "", false)
+	err := Mount(context.Background(), 0, 0, "", false)
 	if err != expectedErr {
 		t.Fatalf("expected err: %v, got: %v", expectedErr, err)
 	}
@@ -44,14 +45,14 @@ func Test_Mount_Mkdir_ExpectedPath(t *testing.T) {
 		}
 		return nil
 	}
-	controllerLunToName = func(controller, lun uint8) (string, error) {
+	controllerLunToName = func(ctx context.Context, controller, lun uint8) (string, error) {
 		return "", nil
 	}
 	unixMount = func(source string, target string, fstype string, flags uintptr, data string) error {
 		// Fake the mount success
 		return nil
 	}
-	err := Mount(0, 0, target, false)
+	err := Mount(context.Background(), 0, 0, target, false)
 	if err != nil {
 		t.Fatalf("expected nil error got: %v", err)
 	}
@@ -71,14 +72,14 @@ func Test_Mount_Mkdir_ExpectedPerm(t *testing.T) {
 		}
 		return nil
 	}
-	controllerLunToName = func(controller, lun uint8) (string, error) {
+	controllerLunToName = func(ctx context.Context, controller, lun uint8) (string, error) {
 		return "", nil
 	}
 	unixMount = func(source string, target string, fstype string, flags uintptr, data string) error {
 		// Fake the mount success
 		return nil
 	}
-	err := Mount(0, 0, target, false)
+	err := Mount(context.Background(), 0, 0, target, false)
 	if err != nil {
 		t.Fatalf("expected nil error got: %v", err)
 	}
@@ -94,7 +95,7 @@ func Test_Mount_ControllerLunToName_Valid_Controller(t *testing.T) {
 		return nil
 	}
 	expectedController := uint8(2)
-	controllerLunToName = func(controller, lun uint8) (string, error) {
+	controllerLunToName = func(ctx context.Context, controller, lun uint8) (string, error) {
 		if expectedController != controller {
 			t.Errorf("expected controller: %v, got: %v", expectedController, controller)
 			return "", errors.New("unexpected controller")
@@ -105,7 +106,7 @@ func Test_Mount_ControllerLunToName_Valid_Controller(t *testing.T) {
 		// Fake the mount success
 		return nil
 	}
-	err := Mount(expectedController, 0, "/fake/path", false)
+	err := Mount(context.Background(), expectedController, 0, "/fake/path", false)
 	if err != nil {
 		t.Fatalf("expected nil error got: %v", err)
 	}
@@ -121,7 +122,7 @@ func Test_Mount_ControllerLunToName_Valid_Lun(t *testing.T) {
 		return nil
 	}
 	expectedLun := uint8(2)
-	controllerLunToName = func(controller, lun uint8) (string, error) {
+	controllerLunToName = func(ctx context.Context, controller, lun uint8) (string, error) {
 		if expectedLun != lun {
 			t.Errorf("expected lun: %v, got: %v", expectedLun, lun)
 			return "", errors.New("unexpected lun")
@@ -132,7 +133,7 @@ func Test_Mount_ControllerLunToName_Valid_Lun(t *testing.T) {
 		// Fake the mount success
 		return nil
 	}
-	err := Mount(0, expectedLun, "/fake/path", false)
+	err := Mount(context.Background(), 0, expectedLun, "/fake/path", false)
 	if err != nil {
 		t.Fatalf("expected nil error got: %v", err)
 	}
@@ -145,7 +146,7 @@ func Test_Mount_Calls_RemoveAll_OnControllerToLunFailure(t *testing.T) {
 		return nil
 	}
 	expectedErr := errors.New("expected controller to lun failure")
-	controllerLunToName = func(controller, lun uint8) (string, error) {
+	controllerLunToName = func(ctx context.Context, controller, lun uint8) (string, error) {
 		return "", expectedErr
 	}
 	target := "/fake/path"
@@ -162,7 +163,7 @@ func Test_Mount_Calls_RemoveAll_OnControllerToLunFailure(t *testing.T) {
 	// NOTE: Do NOT set unixMount because the controller to lun fails. Expect it
 	// not to be called.
 
-	err := Mount(0, 0, target, false)
+	err := Mount(context.Background(), 0, 0, target, false)
 	if err != expectedErr {
 		t.Fatalf("expected err: %v, got: %v", expectedErr, err)
 	}
@@ -177,7 +178,7 @@ func Test_Mount_Calls_RemoveAll_OnMountFailure(t *testing.T) {
 	osMkdirAll = func(path string, perm os.FileMode) error {
 		return nil
 	}
-	controllerLunToName = func(controller, lun uint8) (string, error) {
+	controllerLunToName = func(ctx context.Context, controller, lun uint8) (string, error) {
 		return "", nil
 	}
 	target := "/fake/path"
@@ -195,7 +196,7 @@ func Test_Mount_Calls_RemoveAll_OnMountFailure(t *testing.T) {
 		// Fake the mount failure to test remove is called
 		return expectedErr
 	}
-	err := Mount(0, 0, target, false)
+	err := Mount(context.Background(), 0, 0, target, false)
 	if err != expectedErr {
 		t.Fatalf("expected err: %v, got: %v", expectedErr, err)
 	}
@@ -214,7 +215,7 @@ func Test_Mount_Valid_Source(t *testing.T) {
 		return nil
 	}
 	expectedSource := "/dev/sdz"
-	controllerLunToName = func(controller, lun uint8) (string, error) {
+	controllerLunToName = func(ctx context.Context, controller, lun uint8) (string, error) {
 		return expectedSource, nil
 	}
 	unixMount = func(source string, target string, fstype string, flags uintptr, data string) error {
@@ -224,7 +225,7 @@ func Test_Mount_Valid_Source(t *testing.T) {
 		}
 		return nil
 	}
-	err := Mount(0, 0, "/fake/path", false)
+	err := Mount(context.Background(), 0, 0, "/fake/path", false)
 	if err != nil {
 		t.Fatalf("expected nil err, got: %v", err)
 	}
@@ -239,7 +240,7 @@ func Test_Mount_Valid_Target(t *testing.T) {
 	osMkdirAll = func(path string, perm os.FileMode) error {
 		return nil
 	}
-	controllerLunToName = func(controller, lun uint8) (string, error) {
+	controllerLunToName = func(ctx context.Context, controller, lun uint8) (string, error) {
 		return "", nil
 	}
 	expectedTarget := "/fake/path"
@@ -250,7 +251,7 @@ func Test_Mount_Valid_Target(t *testing.T) {
 		}
 		return nil
 	}
-	err := Mount(0, 0, expectedTarget, false)
+	err := Mount(context.Background(), 0, 0, expectedTarget, false)
 	if err != nil {
 		t.Fatalf("expected nil err, got: %v", err)
 	}
@@ -265,7 +266,7 @@ func Test_Mount_Valid_FSType(t *testing.T) {
 	osMkdirAll = func(path string, perm os.FileMode) error {
 		return nil
 	}
-	controllerLunToName = func(controller, lun uint8) (string, error) {
+	controllerLunToName = func(ctx context.Context, controller, lun uint8) (string, error) {
 		return "", nil
 	}
 	unixMount = func(source string, target string, fstype string, flags uintptr, data string) error {
@@ -276,7 +277,7 @@ func Test_Mount_Valid_FSType(t *testing.T) {
 		}
 		return nil
 	}
-	err := Mount(0, 0, "/fake/path", false)
+	err := Mount(context.Background(), 0, 0, "/fake/path", false)
 	if err != nil {
 		t.Fatalf("expected nil err, got: %v", err)
 	}
@@ -291,7 +292,7 @@ func Test_Mount_Valid_Flags(t *testing.T) {
 	osMkdirAll = func(path string, perm os.FileMode) error {
 		return nil
 	}
-	controllerLunToName = func(controller, lun uint8) (string, error) {
+	controllerLunToName = func(ctx context.Context, controller, lun uint8) (string, error) {
 		return "", nil
 	}
 	unixMount = func(source string, target string, fstype string, flags uintptr, data string) error {
@@ -302,7 +303,7 @@ func Test_Mount_Valid_Flags(t *testing.T) {
 		}
 		return nil
 	}
-	err := Mount(0, 0, "/fake/path", false)
+	err := Mount(context.Background(), 0, 0, "/fake/path", false)
 	if err != nil {
 		t.Fatalf("expected nil err, got: %v", err)
 	}
@@ -317,7 +318,7 @@ func Test_Mount_Readonly_Valid_Flags(t *testing.T) {
 	osMkdirAll = func(path string, perm os.FileMode) error {
 		return nil
 	}
-	controllerLunToName = func(controller, lun uint8) (string, error) {
+	controllerLunToName = func(ctx context.Context, controller, lun uint8) (string, error) {
 		return "", nil
 	}
 	unixMount = func(source string, target string, fstype string, flags uintptr, data string) error {
@@ -328,7 +329,7 @@ func Test_Mount_Readonly_Valid_Flags(t *testing.T) {
 		}
 		return nil
 	}
-	err := Mount(0, 0, "/fake/path", true)
+	err := Mount(context.Background(), 0, 0, "/fake/path", true)
 	if err != nil {
 		t.Fatalf("expected nil err, got: %v", err)
 	}
@@ -343,7 +344,7 @@ func Test_Mount_Valid_Data(t *testing.T) {
 	osMkdirAll = func(path string, perm os.FileMode) error {
 		return nil
 	}
-	controllerLunToName = func(controller, lun uint8) (string, error) {
+	controllerLunToName = func(ctx context.Context, controller, lun uint8) (string, error) {
 		return "", nil
 	}
 	unixMount = func(source string, target string, fstype string, flags uintptr, data string) error {
@@ -353,7 +354,7 @@ func Test_Mount_Valid_Data(t *testing.T) {
 		}
 		return nil
 	}
-	err := Mount(0, 0, "/fake/path", false)
+	err := Mount(context.Background(), 0, 0, "/fake/path", false)
 	if err != nil {
 		t.Fatalf("expected nil err, got: %v", err)
 	}
@@ -368,7 +369,7 @@ func Test_Mount_Readonly_Valid_Data(t *testing.T) {
 	osMkdirAll = func(path string, perm os.FileMode) error {
 		return nil
 	}
-	controllerLunToName = func(controller, lun uint8) (string, error) {
+	controllerLunToName = func(ctx context.Context, controller, lun uint8) (string, error) {
 		return "", nil
 	}
 	unixMount = func(source string, target string, fstype string, flags uintptr, data string) error {
@@ -379,7 +380,7 @@ func Test_Mount_Readonly_Valid_Data(t *testing.T) {
 		}
 		return nil
 	}
-	err := Mount(0, 0, "/fake/path", true)
+	err := Mount(context.Background(), 0, 0, "/fake/path", true)
 	if err != nil {
 		t.Fatalf("expected nil err, got: %v", err)
 	}

@@ -3,14 +3,17 @@
 package hcsv2
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"syscall"
 
+	"github.com/Microsoft/opengcs/internal/log"
+	"github.com/Microsoft/opengcs/internal/oc"
 	"github.com/Microsoft/opengcs/service/gcs/gcserr"
 	"github.com/Microsoft/opengcs/service/gcs/runtime"
 	oci "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/sirupsen/logrus"
+	"go.opencensus.io/trace"
 )
 
 // Process is a struct that defines the lifetime and operations associated with
@@ -59,21 +62,19 @@ func newProcess(c *Container, spec *oci.Process, process runtime.Process, pid ui
 	p.exitWg.Add(1)
 	p.writersWg.Add(1)
 	go func() {
+		ctx, span := trace.StartSpan(context.Background(), "newProcess::waitBackground")
+		defer span.End()
+		span.AddAttributes(
+			trace.StringAttribute("cid", p.cid),
+			trace.Int64Attribute("pid", int64(p.pid)))
+
 		// Wait for the process to exit
 		exitCode, err := p.process.Wait()
 		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"cid":           c.id,
-				"pid":           pid,
-				logrus.ErrorKey: err,
-			}).Error("opengcs::Process - failed to wait for runc process")
+			log.G(ctx).WithError(err).Error("failed to wait for runc process")
 		}
 		p.exitCode = exitCode
-		logrus.WithFields(logrus.Fields{
-			"cid":      c.id,
-			"pid":      pid,
-			"exitCode": p.exitCode,
-		}).Info("opengcs::Process - process exited")
+		log.G(ctx).WithField("exitCode", p.exitCode).Debug("process exited")
 
 		// Free any process waiters
 		p.exitWg.Done()
@@ -88,10 +89,11 @@ func newProcess(c *Container, spec *oci.Process, process runtime.Process, pid ui
 			p.writersWg.Wait()
 			c.processesMutex.Lock()
 
-			logrus.WithFields(logrus.Fields{
-				"cid": c.id,
-				"pid": pid,
-			}).Debug("opengcs::Process - all waiters have completed, removing process")
+			_, span := trace.StartSpan(context.Background(), "newProcess::waitBackground::waitAllWaiters")
+			defer span.End()
+			span.AddAttributes(
+				trace.StringAttribute("cid", p.cid),
+				trace.Int64Attribute("pid", int64(p.pid)))
 
 			delete(c.processes, p.pid)
 			c.processesMutex.Unlock()
@@ -103,12 +105,14 @@ func newProcess(c *Container, spec *oci.Process, process runtime.Process, pid ui
 // Kill sends 'signal' to the process.
 //
 // If the process has already exited returns `gcserr.HrErrNotFound` by contract.
-func (p *Process) Kill(signal syscall.Signal) error {
-	logrus.WithFields(logrus.Fields{
-		"cid":    p.cid,
-		"pid":    p.pid,
-		"signal": signal,
-	}).Info("opengcs::Process::Kill")
+func (p *Process) Kill(ctx context.Context, signal syscall.Signal) (err error) {
+	_, span := trace.StartSpan(ctx, "opengcs::Process::Kill")
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
+	span.AddAttributes(
+		trace.StringAttribute("cid", p.cid),
+		trace.Int64Attribute("pid", int64(p.pid)),
+		trace.Int64Attribute("signal", int64(signal)))
 
 	if err := syscall.Kill(int(p.pid), signal); err != nil {
 		if err == syscall.ESRCH {
@@ -123,13 +127,15 @@ func (p *Process) Kill(signal syscall.Signal) error {
 }
 
 // ResizeConsole resizes the tty to `height`x`width` for the process.
-func (p *Process) ResizeConsole(height, width uint16) error {
-	logrus.WithFields(logrus.Fields{
-		"cid":    p.cid,
-		"pid":    p.pid,
-		"height": height,
-		"width":  width,
-	}).Info("opengcs::Process::ResizeConsole")
+func (p *Process) ResizeConsole(ctx context.Context, height, width uint16) (err error) {
+	_, span := trace.StartSpan(ctx, "opengcs::Process::ResizeConsole")
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
+	span.AddAttributes(
+		trace.StringAttribute("cid", p.cid),
+		trace.Int64Attribute("pid", int64(p.pid)),
+		trace.Int64Attribute("height", int64(height)),
+		trace.Int64Attribute("width", int64(width)))
 
 	tty := p.process.Tty()
 	if tty == nil {
@@ -142,11 +148,10 @@ func (p *Process) ResizeConsole(height, width uint16) error {
 // gather the exit code. The second channel must be signaled from the caller
 // when the caller has completed its use of this call to Wait.
 func (p *Process) Wait() (<-chan int, chan<- bool) {
-	log := logrus.WithFields(logrus.Fields{
-		"cid": p.cid,
-		"pid": p.pid,
-	})
-	log.Info("opengcs::Process::Wait")
+	ctx, span := trace.StartSpan(context.Background(), "opengcs::Process::Wait")
+	span.AddAttributes(
+		trace.StringAttribute("cid", p.cid),
+		trace.Int64Attribute("pid", int64(p.pid)))
 
 	exitCodeChan := make(chan int, 1)
 	doneChan := make(chan bool)
@@ -174,19 +179,20 @@ func (p *Process) Wait() (<-chan int, chan<- bool) {
 			case <-doneChan:
 				p.writersSyncRoot.Lock()
 				// Decrement this waiter
-				log.Debug("opengcs::Process::Wait - wait completed, releasing wait count")
+				log.G(ctx).Debug("wait completed, releasing wait count")
 
 				p.writersWg.Done()
 				if !p.writersCalled {
 					// We have at least 1 response for the exit code for this
 					// process. Decrement the release waiter that will free the
 					// process resources when the writersWg hits 0
-					log.Debug("opengcs::Process::Wait - first wait completed, releasing first wait count")
+					log.G(ctx).Debug("first wait completed, releasing first wait count")
 
 					p.writersCalled = true
 					p.writersWg.Done()
 				}
 				p.writersSyncRoot.Unlock()
+				span.End()
 			}
 
 		case <-doneChan:
@@ -194,10 +200,11 @@ func (p *Process) Wait() (<-chan int, chan<- bool) {
 			// decrement the waiter but since no exit code we just deal with our
 			// waiter.
 			p.writersSyncRoot.Lock()
-			log.Debug("opengcs::Process::Wait - wait canceled before exit, releasing wait count")
+			log.G(ctx).Debug("wait canceled before exit, releasing wait count")
 
 			p.writersWg.Done()
 			p.writersSyncRoot.Unlock()
+			span.End()
 		}
 	}()
 	return exitCodeChan, doneChan

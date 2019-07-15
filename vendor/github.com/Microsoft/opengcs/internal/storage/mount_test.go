@@ -3,6 +3,7 @@
 package storage
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -30,7 +31,7 @@ func Test_Unmount_Stat_Valid_Path(t *testing.T) {
 	unixUnmount = func(target string, flags int) error {
 		return nil
 	}
-	err := UnmountPath(expectedName, false)
+	err := UnmountPath(context.Background(), expectedName, false)
 	if err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
@@ -43,7 +44,7 @@ func Test_Unmount_Stat_NotExist(t *testing.T) {
 	osStat = func(name string) (os.FileInfo, error) {
 		return nil, os.ErrNotExist
 	}
-	err := UnmountPath("/dev/fake", false)
+	err := UnmountPath(context.Background(), "/dev/fake", false)
 	if err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
@@ -56,7 +57,7 @@ func Test_Unmount_Stat_OtherError_Error(t *testing.T) {
 	osStat = func(name string) (os.FileInfo, error) {
 		return nil, expectedErr
 	}
-	err := UnmountPath("/dev/fake", false)
+	err := UnmountPath(context.Background(), "/dev/fake", false)
 	if errors.Cause(err) != expectedErr {
 		t.Fatalf("expected err: %v, got: %v", expectedErr, err)
 	}
@@ -76,7 +77,7 @@ func Test_Unmount_Valid_Target(t *testing.T) {
 		}
 		return nil
 	}
-	err := UnmountPath(expectedTarget, false)
+	err := UnmountPath(context.Background(), expectedTarget, false)
 	if err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
@@ -95,7 +96,7 @@ func Test_Unmount_Valid_Flags(t *testing.T) {
 		}
 		return nil
 	}
-	err := UnmountPath("/fake/path", false)
+	err := UnmountPath(context.Background(), "/fake/path", false)
 	if err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
@@ -110,7 +111,7 @@ func Test_Unmount_NotMounted(t *testing.T) {
 	unixUnmount = func(target string, flags int) error {
 		return unix.EINVAL
 	}
-	err := UnmountPath("/dev/fake", false)
+	err := UnmountPath(context.Background(), "/dev/fake", false)
 	if err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
@@ -126,7 +127,7 @@ func Test_Unmount_OtherError(t *testing.T) {
 	unixUnmount = func(target string, flags int) error {
 		return expectedErr
 	}
-	err := UnmountPath("/dev/fake", false)
+	err := UnmountPath(context.Background(), "/dev/fake", false)
 	if errors.Cause(err) != expectedErr {
 		t.Fatalf("expected err: %v, got: %v", expectedErr, err)
 	}
@@ -149,7 +150,7 @@ func Test_Unmount_RemoveAll_Valid_Path(t *testing.T) {
 		}
 		return nil
 	}
-	err := UnmountPath(expectedPath, true)
+	err := UnmountPath(context.Background(), expectedPath, true)
 	if err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
@@ -169,7 +170,7 @@ func Test_Unmount_RemoveAll_Called(t *testing.T) {
 		removeAllCalled = true
 		return nil
 	}
-	err := UnmountPath("/fake/path", true)
+	err := UnmountPath(context.Background(), "/fake/path", true)
 	if err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}

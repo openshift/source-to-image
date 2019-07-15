@@ -3,85 +3,114 @@
 package network
 
 import (
+	"bytes"
+	"context"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/Microsoft/opengcs/internal/log"
+	"github.com/Microsoft/opengcs/internal/oc"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	"go.opencensus.io/trace"
 )
 
-// GenerateResolvConfFile parses `dnsServerList` and `dnsSuffix` and writes the
-// `nameserver` and `search` entries to `resolvPath`.
-func GenerateResolvConfFile(resolvPath, dnsServerList, dnsSuffix string) (err error) {
-	activity := "network::GenerateResolvConfFile"
-	log := logrus.WithFields(logrus.Fields{
-		"resolvPath":    resolvPath,
-		"dnsServerList": dnsServerList,
-		"dnsSuffix":     dnsSuffix,
-	})
-	log.Debug(activity + " - Begin Operation")
-	defer func() {
-		if err != nil {
-			log.Data[logrus.ErrorKey] = err
-			log.Error(activity + " - End Operation")
-		} else {
-			log.Debug(activity + " - End Operation")
+// maxDNSSearches is limited to 6 in `man 5 resolv.conf`
+const maxDNSSearches = 6
+
+// GenerateEtcHostsContent generates a /etc/hosts file based on `hostname`.
+func GenerateEtcHostsContent(ctx context.Context, hostname string) string {
+	_, span := trace.StartSpan(ctx, "network::GenerateEtcHostsContent")
+	defer span.End()
+	span.AddAttributes(
+		trace.StringAttribute("hostname", hostname))
+
+	nameParts := strings.Split(hostname, ".")
+	buf := bytes.Buffer{}
+	buf.WriteString("127.0.0.1 localhost\n")
+	if len(nameParts) > 1 {
+		buf.WriteString(fmt.Sprintf("127.0.0.1 %s %s\n", hostname, nameParts[0]))
+	} else {
+		buf.WriteString(fmt.Sprintf("127.0.0.1 %s\n", hostname))
+	}
+	buf.WriteString("\n")
+	buf.WriteString("# The following lines are desirable for IPv6 capable hosts\n")
+	buf.WriteString("::1     ip6-localhost ip6-loopback\n")
+	buf.WriteString("fe00::0 ip6-localnet\n")
+	buf.WriteString("ff00::0 ip6-mcastprefix\n")
+	buf.WriteString("ff02::1 ip6-allnodes\n")
+	buf.WriteString("ff02::2 ip6-allrouters\n")
+	return buf.String()
+}
+
+// GenerateResolvConfContent generates the resolv.conf file content based on
+// `searches`, `servers`, and `options`.
+func GenerateResolvConfContent(ctx context.Context, searches, servers, options []string) (_ string, err error) {
+	_, span := trace.StartSpan(ctx, "network::GenerateResolvConfContent")
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
+
+	span.AddAttributes(
+		trace.StringAttribute("searches", strings.Join(searches, ", ")),
+		trace.StringAttribute("servers", strings.Join(servers, ", ")),
+		trace.StringAttribute("options", strings.Join(options, ", ")))
+
+	if len(searches) > maxDNSSearches {
+		return "", errors.Errorf("searches has more than %d domains", maxDNSSearches)
+	}
+
+	content := ""
+	if len(searches) > 0 {
+		content += fmt.Sprintf("search %s\n", strings.Join(searches, " "))
+	}
+	if len(servers) > 0 {
+		content += fmt.Sprintf("nameserver %s\n", strings.Join(servers, "\nnameserver "))
+	}
+	if len(options) > 0 {
+		content += fmt.Sprintf("options %s\n", strings.Join(options, " "))
+	}
+	return content, nil
+}
+
+// MergeValues merges `first` and `second` maintaining order `first, second`.
+func MergeValues(first, second []string) []string {
+	if len(first) == 0 {
+		return second
+	}
+	if len(second) == 0 {
+		return first
+	}
+	values := make([]string, len(first), len(first)+len(second))
+	copy(values, first)
+	for _, v := range second {
+		found := false
+		for i := 0; i < len(values); i++ {
+			if v == values[i] {
+				found = true
+				break
+			}
 		}
-	}()
-
-	fileContents := ""
-
-	split := func(r rune) bool {
-		return r == ',' || r == ' '
-	}
-
-	nameservers := strings.FieldsFunc(dnsServerList, split)
-	for i, server := range nameservers {
-		// Limit number of nameservers to 3.
-		if i >= 3 {
-			break
+		if !found {
+			values = append(values, v)
 		}
-
-		fileContents += fmt.Sprintf("nameserver %s\n", server)
 	}
-
-	if dnsSuffix != "" {
-		fileContents += fmt.Sprintf("search %s\n", dnsSuffix)
-	}
-
-	file, err := os.OpenFile(resolvPath, os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return errors.Wrap(err, "failed to create resolv.conf")
-	}
-	defer file.Close()
-	if _, err := io.WriteString(file, fileContents); err != nil {
-		return errors.Wrapf(err, "failed to write to resolv.conf")
-	}
-	return nil
+	return values
 }
 
 // InstanceIDToName converts from the given instance ID (a GUID generated on the
 // Windows host) to its corresponding interface name (e.g. "eth0").
-func InstanceIDToName(id string, wait bool) (_ string, err error) {
-	activity := "network::InstanceIDToName"
-	log := logrus.WithFields(logrus.Fields{
-		"adapterInstanceID": id,
-		"wait":              wait,
-	})
-	log.Debug(activity + " - Begin Operation")
-	defer func() {
-		if err != nil {
-			log.Data[logrus.ErrorKey] = err
-			log.Error(activity + " - End Operation")
-		} else {
-			log.Debug(activity + " - End Operation")
-		}
-	}()
+func InstanceIDToName(ctx context.Context, id string, wait bool) (_ string, err error) {
+	ctx, span := trace.StartSpan(ctx, "network::InstanceIDToName")
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
+
+	id = strings.ToLower(id)
+	span.AddAttributes(
+		trace.StringAttribute("adapterInstanceID", id),
+		trace.BoolAttribute("wait", wait))
 
 	const timeout = 2 * time.Second
 	var deviceDirs []os.FileInfo
@@ -109,5 +138,6 @@ func InstanceIDToName(id string, wait bool) (_ string, err error) {
 		return "", errors.Errorf("multiple interface names found for adapter %s", id)
 	}
 	ifname := deviceDirs[0].Name()
+	log.G(ctx).WithField("ifname", ifname).Debug("resolved ifname")
 	return ifname, nil
 }

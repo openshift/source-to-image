@@ -3,12 +3,14 @@
 package plan9
 
 import (
+	"context"
 	"fmt"
 	"os"
 
+	"github.com/Microsoft/opengcs/internal/oc"
 	"github.com/Microsoft/opengcs/service/gcs/transport"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	"go.opencensus.io/trace"
 	"golang.org/x/sys/unix"
 )
 
@@ -23,23 +25,16 @@ var (
 //
 // `target` will be created. On mount failure the created `target` will be
 // automatically cleaned up.
-func Mount(vsock transport.Transport, target, share string, port uint32, readonly bool) (err error) {
-	activity := "plan9::Mount"
-	log := logrus.WithFields(logrus.Fields{
-		"target":   target,
-		"share":    share,
-		"port":     port,
-		"readonly": readonly,
-	})
-	log.Debug(activity + " - Begin Operation")
-	defer func() {
-		if err != nil {
-			log.Data[logrus.ErrorKey] = err
-			log.Error(activity + " - End Operation")
-		} else {
-			log.Debug(activity + " - End Operation")
-		}
-	}()
+func Mount(ctx context.Context, vsock transport.Transport, target, share string, port uint32, readonly bool) (err error) {
+	_, span := trace.StartSpan(ctx, "plan9::Mount")
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
+
+	span.AddAttributes(
+		trace.StringAttribute("target", target),
+		trace.StringAttribute("share", share),
+		trace.Int64Attribute("port", int64(port)),
+		trace.BoolAttribute("readonly", readonly))
 
 	if err := osMkdirAll(target, 0700); err != nil {
 		return err

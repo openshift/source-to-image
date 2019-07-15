@@ -50,6 +50,11 @@ import (
 
 const contentTypeHeader = "Content-Type"
 
+// HTTPDoer is an interface for the one method of http.Client that is used by Pusher
+type HTTPDoer interface {
+	Do(*http.Request) (*http.Response, error)
+}
+
 // Pusher manages a push to the Pushgateway. Use New to create one, configure it
 // with its methods, and finally use the Add or Push method to push.
 type Pusher struct {
@@ -61,7 +66,7 @@ type Pusher struct {
 	gatherers  prometheus.Gatherers
 	registerer prometheus.Registerer
 
-	client             *http.Client
+	client             HTTPDoer
 	useBasicAuth       bool
 	username, password string
 
@@ -112,14 +117,14 @@ func New(url, job string) *Pusher {
 // Push returns the first error encountered by any method call (including this
 // one) in the lifetime of the Pusher.
 func (p *Pusher) Push() error {
-	return p.push("PUT")
+	return p.push(http.MethodPut)
 }
 
 // Add works like push, but only previously pushed metrics with the same name
 // (and the same job and other grouping labels) will be replaced. (It uses HTTP
 // method “POST” to push to the Pushgateway.)
 func (p *Pusher) Add() error {
-	return p.push("POST")
+	return p.push(http.MethodPost)
 }
 
 // Gatherer adds a Gatherer to the Pusher, from which metrics will be gathered
@@ -170,7 +175,11 @@ func (p *Pusher) Grouping(name, value string) *Pusher {
 
 // Client sets a custom HTTP client for the Pusher. For convenience, this method
 // returns a pointer to the Pusher itself.
-func (p *Pusher) Client(c *http.Client) *Pusher {
+// Pusher only needs one method of the custom HTTP client: Do(*http.Request).
+// Thus, rather than requiring a fully fledged http.Client,
+// the provided client only needs to implement the HTTPDoer interface.
+// Since *http.Client naturally implements that interface, it can still be used normally.
+func (p *Pusher) Client(c HTTPDoer) *Pusher {
 	p.client = c
 	return p
 }
@@ -193,6 +202,42 @@ func (p *Pusher) BasicAuth(username, password string) *Pusher {
 func (p *Pusher) Format(format expfmt.Format) *Pusher {
 	p.expfmt = format
 	return p
+}
+
+// Delete sends a “DELETE” request to the Pushgateway configured while creating
+// this Pusher, using the configured job name and any added grouping labels as
+// grouping key. Any added Gatherers and Collectors added to this Pusher are
+// ignored by this method.
+//
+// Delete returns the first error encountered by any method call (including this
+// one) in the lifetime of the Pusher.
+func (p *Pusher) Delete() error {
+	if p.error != nil {
+		return p.error
+	}
+	urlComponents := []string{url.QueryEscape(p.job)}
+	for ln, lv := range p.grouping {
+		urlComponents = append(urlComponents, ln, lv)
+	}
+	deleteURL := fmt.Sprintf("%s/metrics/job/%s", p.url, strings.Join(urlComponents, "/"))
+
+	req, err := http.NewRequest(http.MethodDelete, deleteURL, nil)
+	if err != nil {
+		return err
+	}
+	if p.useBasicAuth {
+		req.SetBasicAuth(p.username, p.password)
+	}
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 202 {
+		body, _ := ioutil.ReadAll(resp.Body) // Ignore any further error as this is for an error message only.
+		return fmt.Errorf("unexpected status code %d while deleting %s: %s", resp.StatusCode, deleteURL, body)
+	}
+	return nil
 }
 
 func (p *Pusher) push(method string) error {
