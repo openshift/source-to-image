@@ -3,6 +3,7 @@
 package bridge
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -14,6 +15,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Microsoft/opengcs/internal/log"
+	"github.com/Microsoft/opengcs/internal/oc"
 	"github.com/Microsoft/opengcs/internal/runtime/hcsv2"
 	"github.com/Microsoft/opengcs/service/gcs/core"
 	"github.com/Microsoft/opengcs/service/gcs/gcserr"
@@ -22,13 +25,14 @@ import (
 	"github.com/Microsoft/opengcs/service/libs/commonutils"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"go.opencensus.io/trace"
 	"golang.org/x/sys/unix"
 )
 
 // UnknownMessage represents the default handler logic for an unmatched request
 // type sent from the bridge.
-func UnknownMessage(w ResponseWriter, r *Request) {
-	w.Error("", gcserr.WrapHresult(errors.Errorf("bridge: function not supported, header type: %v", r.Header.Type), gcserr.HrNotImpl))
+func UnknownMessage(r *Request) (RequestResponse, error) {
+	return nil, gcserr.WrapHresult(errors.Errorf("bridge: function not supported, header type: %v", r.Header.Type), gcserr.HrNotImpl)
 }
 
 // UnknownMessageHandler creates a default HandlerFunc out of the
@@ -39,15 +43,15 @@ func UnknownMessageHandler() Handler {
 
 // Handler responds to a bridge request.
 type Handler interface {
-	ServeMsg(ResponseWriter, *Request)
+	ServeMsg(*Request) (RequestResponse, error)
 }
 
 // HandlerFunc is an adapter to use functions as handlers.
-type HandlerFunc func(ResponseWriter, *Request)
+type HandlerFunc func(*Request) (RequestResponse, error)
 
 // ServeMsg calls f(w, r).
-func (f HandlerFunc) ServeMsg(w ResponseWriter, r *Request) {
-	f(w, r)
+func (f HandlerFunc) ServeMsg(r *Request) (RequestResponse, error) {
+	return f(r)
 }
 
 // Mux is a protocol multiplexer for request response pairs
@@ -86,7 +90,7 @@ func (mux *Mux) Handle(id prot.MessageIdentifier, ver prot.ProtocolVersion, hand
 }
 
 // HandleFunc registers the handler function for the given message id and protocol version.
-func (mux *Mux) HandleFunc(id prot.MessageIdentifier, ver prot.ProtocolVersion, handler func(ResponseWriter, *Request)) {
+func (mux *Mux) HandleFunc(id prot.MessageIdentifier, ver prot.ProtocolVersion, handler func(*Request) (RequestResponse, error)) {
 	if handler == nil {
 		panic("bridge: nil handler func")
 	}
@@ -119,80 +123,51 @@ func (mux *Mux) Handler(r *Request) Handler {
 
 // ServeMsg dispatches the request to the handler whose
 // type matches the request type.
-func (mux *Mux) ServeMsg(w ResponseWriter, r *Request) {
+func (mux *Mux) ServeMsg(r *Request) (RequestResponse, error) {
 	h := mux.Handler(r)
-	h.ServeMsg(w, r)
+	return h.ServeMsg(r)
 }
 
 // Request is the bridge request that has been sent.
 type Request struct {
-	Header  *prot.MessageHeader
+	// Context is the request context received from the bridge.
+	Context context.Context
+	// Header is the wire format message header that preceeded the message for
+	// this request.
+	Header *prot.MessageHeader
+	// ContainerID is the id of the container that this message cooresponds to.
+	ContainerID string
+	// ActivityID is the id of the specific activity for this request.
+	ActivityID string
+	// Message is the portion of the request that follows the `Header`. This is
+	// a json encoded string that MUST contain `prot.MessageBase`.
 	Message []byte
+	// Version is the version of the protocol that `Header` and `Message` were
+	// sent in.
 	Version prot.ProtocolVersion
 }
 
-// ResponseWriter is the dispatcher used to construct the Bridge response.
-type ResponseWriter interface {
-	// Header is the request header that was requested.
-	Header() *prot.MessageHeader
-	// Write a successful response message.
-	Write(interface{})
-	// Error writes the provided error as a response to the message correlated
-	// with the activity ID passed. If the activity ID is the empty string it
-	// will be translated to an empty guid.
-	Error(string, error)
+// RequestResponse is the base response for any bridge message request.
+type RequestResponse interface {
+	Base() *prot.MessageResponseBase
 }
 
 type bridgeResponse struct {
+	// ctx is the context created on request read
+	ctx      context.Context
 	header   *prot.MessageHeader
 	response interface{}
 }
 
-type requestResponseWriter struct {
-	header      *prot.MessageHeader
-	respChan    chan bridgeResponse
-	respWritten bool
-}
-
-func (w *requestResponseWriter) Header() *prot.MessageHeader {
-	return w.header
-}
-
-func (w *requestResponseWriter) Write(r interface{}) {
-	logrus.WithFields(logrus.Fields{
-		"message-type": w.header.Type.String(),
-		"message-id":   w.header.ID,
-	}).Info("opengcs::bridge::requestResponseWriter")
-
-	w.respChan <- bridgeResponse{header: w.header, response: r}
-	w.respWritten = true
-}
-
-func (w *requestResponseWriter) Error(activityID string, err error) {
-	if activityID == "" {
-		activityID = "00000000-0000-0000-0000-000000000000"
-	}
-
-	resp := &prot.MessageResponseBase{ActivityID: activityID}
-	setErrorForResponseBase(resp, err)
-	logrus.WithFields(logrus.Fields{
-		"activityID":    activityID,
-		"message-type":  w.header.Type.String(),
-		"message-id":    w.header.ID,
-		logrus.ErrorKey: err,
-	}).Error("opengcs::bridge::requestResponseWriter - error")
-	w.Write(resp)
-}
-
-// Bridge defines the bridge client in the GCS. It acts in many
-// ways analogous to go's `http` package and multiplexer.
+// Bridge defines the bridge client in the GCS. It acts in many ways analogous
+// to go's `http` package and multiplexer.
 //
 // It has two fundamentally different dispatch options:
 //
 // 1. Request/Response where using the `Handler` a request
 //    of a given type will be dispatched to the apprpriate handler
-//    and an appropriate `ResponseWriter` will respond to exactly
-//    that request that caused the dispatch.
+//    and an appropriate response will respond to exactly that request that
+//    caused the dispatch.
 //
 // 2. `PublishNotification` where a notification that was not initiated
 //    by a request from any client can be written to the bridge at any time
@@ -296,12 +271,32 @@ func (b *Bridge) ListenAndServe(bridgeIn io.ReadCloser, bridgeOut io.WriteCloser
 					recverr = errors.Wrap(err, "bridge: failed reading message payload")
 					break
 				}
-				logrus.WithFields(logrus.Fields{
-					"message-type": header.Type.String(),
-					"message-id":   header.ID,
-					"message":      string(message),
-				}).Debug("opengcs::bridge - read message")
-				requestChan <- &Request{header, message, b.protVer}
+
+				base := prot.MessageBase{}
+				if err := json.Unmarshal(message, &base); err != nil {
+					// TODO: JTERRY75 - This should fail the request but right
+					// now we still forward to the method and let them return
+					// this error. Unify the JSON part previous to invoking a
+					// request.
+				}
+
+				ctx, span := trace.StartSpan(context.Background(), "opengcs::bridge::request")
+				span.AddAttributes(
+					trace.Int64Attribute("message-id", int64(header.ID)),
+					trace.StringAttribute("message-type", header.Type.String()),
+					trace.StringAttribute("activityID", base.ActivityID),
+					trace.StringAttribute("cid", base.ContainerID))
+
+				log.G(ctx).WithField("message", string(message)).Debug("request read message")
+
+				requestChan <- &Request{
+					Context:     ctx,
+					Header:      header,
+					ContainerID: base.ContainerID,
+					ActivityID:  base.ActivityID,
+					Message:     message,
+					Version:     b.protVer,
+				}
 			}
 		}
 		requestErrChan <- recverr
@@ -310,20 +305,27 @@ func (b *Bridge) ListenAndServe(bridgeIn io.ReadCloser, bridgeOut io.WriteCloser
 	go func() {
 		for req := range requestChan {
 			go func(r *Request) {
-				wr := &requestResponseWriter{
+				br := bridgeResponse{
+					ctx: r.Context,
 					header: &prot.MessageHeader{
 						Type: prot.GetResponseIdentifier(r.Header.Type),
 						ID:   r.Header.ID,
 					},
-					respChan: b.responseChan,
 				}
-				b.Handler.ServeMsg(wr, r)
-				if !wr.respWritten {
-					logrus.WithFields(logrus.Fields{
-						"message-type": r.Header.Type.String(),
-						"message-id":   r.Header.ID,
-					}).Error("opengcs::bridge - request didn't write response")
+				resp, err := b.Handler.ServeMsg(r)
+				if resp == nil {
+					resp = &prot.MessageResponseBase{}
 				}
+				resp.Base().ActivityID = r.ActivityID
+				if err != nil {
+					span := trace.FromContext(r.Context)
+					if span != nil {
+						oc.SetSpanStatus(span, err)
+					}
+					setErrorForResponseBase(resp.Base(), err)
+				}
+				br.response = resp
+				b.responseChan <- br
 			}(req)
 		}
 	}()
@@ -346,11 +348,12 @@ func (b *Bridge) ListenAndServe(bridgeIn io.ReadCloser, bridgeOut io.WriteCloser
 				resperr = errors.Wrap(err, "bridge: failed writing message payload")
 				break
 			}
-			logrus.WithFields(logrus.Fields{
-				"message-type": resp.header.Type.String(),
-				"message-id":   resp.header.ID,
-				"message":      string(responseBytes),
-			}).Debug("opengcs::bridge - response sent")
+
+			s := trace.FromContext(resp.ctx)
+			if s != nil {
+				log.G(resp.ctx).WithField("message", string(responseBytes)).Debug("request write response")
+				s.End()
+			}
 		}
 		responseErrChan <- resperr
 	}()
@@ -384,19 +387,13 @@ func (b *Bridge) ListenAndServe(bridgeIn io.ReadCloser, bridgeOut io.WriteCloser
 
 // PublishNotification writes a specific notification to the bridge.
 func (b *Bridge) PublishNotification(n *prot.ContainerNotification) {
-	if n == nil {
-		panic("bridge: cannot publish nil notification")
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"activityID": n.ActivityID,
-		"cid":        n.ContainerID,
-		"type":       n.Type,
-		"operation":  n.Operation,
-		"result":     n.Result,
-	}).Info("opengcs::bridge::PublishNotification")
+	ctx, span := trace.StartSpan(context.Background(), "opengcs::bridge::PublishNotification")
+	span.AddAttributes(trace.StringAttribute("notification", fmt.Sprintf("%+v", n)))
+	// DONT defer span.End() here. Publish is odd because bridgeResponse calls
+	// `End` on the `ctx` after the response is sent.
 
 	resp := bridgeResponse{
+		ctx: ctx,
 		header: &prot.MessageHeader{
 			Type: prot.ComputeSystemNotificationV1,
 			ID:   0,
@@ -406,11 +403,10 @@ func (b *Bridge) PublishNotification(n *prot.ContainerNotification) {
 	b.responseChan <- resp
 }
 
-func (b *Bridge) createContainer(w ResponseWriter, r *Request) {
+func (b *Bridge) createContainer(r *Request) (RequestResponse, error) {
 	var request prot.ContainerCreate
 	if err := commonutils.UnmarshalJSONWithHresult(r.Message, &request); err != nil {
-		w.Error("", errors.Wrapf(err, "failed to unmarshal JSON in message \"%s\"", r.Message))
-		return
+		return nil, errors.Wrapf(err, "failed to unmarshal JSON in message \"%s\"", r.Message)
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -422,18 +418,13 @@ func (b *Bridge) createContainer(w ResponseWriter, r *Request) {
 	// CreateContainerInfo struct.
 	var settings prot.VMHostedContainerSettings
 	if err := commonutils.UnmarshalJSONWithHresult([]byte(request.ContainerConfig), &settings); err != nil {
-		w.Error(request.ActivityID, errors.Wrapf(err, "failed to unmarshal JSON for ContainerConfig \"%s\"", request.ContainerConfig))
-		return
+		return nil, errors.Wrapf(err, "failed to unmarshal JSON for ContainerConfig \"%s\"", request.ContainerConfig)
 	}
 	if err := b.coreint.CreateContainer(request.ContainerID, settings); err != nil {
-		w.Error(request.ActivityID, err)
-		return
+		return nil, err
 	}
 
 	response := &prot.ContainerCreateResponse{
-		MessageResponseBase: &prot.MessageResponseBase{
-			ActivityID: request.ActivityID,
-		},
 		SelectedProtocolVersion: uint32(prot.PvV3),
 	}
 
@@ -445,7 +436,7 @@ func (b *Bridge) createContainer(w ResponseWriter, r *Request) {
 	go func() {
 		nt := waitFn()
 		notification := &prot.ContainerNotification{
-			MessageBase: &prot.MessageBase{
+			MessageBase: prot.MessageBase{
 				ContainerID: request.ContainerID,
 				ActivityID:  request.ActivityID,
 			},
@@ -459,14 +450,13 @@ func (b *Bridge) createContainer(w ResponseWriter, r *Request) {
 
 	// Set our protocol selected version before return.
 	b.protVer = prot.PvV3
-	w.Write(response)
+	return response, nil
 }
 
-func (b *Bridge) execProcess(w ResponseWriter, r *Request) {
+func (b *Bridge) execProcess(r *Request) (RequestResponse, error) {
 	var request prot.ContainerExecuteProcess
 	if err := commonutils.UnmarshalJSONWithHresult(r.Message, &request); err != nil {
-		w.Error("", errors.Wrapf(err, "failed to unmarshal JSON for message \"%s\"", r.Message))
-		return
+		return nil, errors.Wrapf(err, "failed to unmarshal JSON for message \"%s\"", r.Message)
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -478,8 +468,7 @@ func (b *Bridge) execProcess(w ResponseWriter, r *Request) {
 	// ExecuteProcessInfo struct.
 	var params prot.ProcessParameters
 	if err := commonutils.UnmarshalJSONWithHresult([]byte(request.Settings.ProcessParameters), &params); err != nil {
-		w.Error(request.ActivityID, errors.Wrapf(err, "failed to unmarshal JSON for ProcessParameters \"%s\"", request.Settings.ProcessParameters))
-		return
+		return nil, errors.Wrapf(err, "failed to unmarshal JSON for ProcessParameters \"%s\"", request.Settings.ProcessParameters)
 	}
 
 	var conSettings stdio.ConnectionSettings
@@ -512,60 +501,48 @@ func (b *Bridge) execProcess(w ResponseWriter, r *Request) {
 	}
 
 	if err != nil {
-		w.Error(request.ActivityID, err)
-		return
+		return nil, err
 	}
 
-	response := &prot.ContainerExecuteProcessResponse{
-		MessageResponseBase: &prot.MessageResponseBase{
-			ActivityID: request.ActivityID,
-		},
+	return &prot.ContainerExecuteProcessResponse{
 		ProcessID: uint32(pid),
-	}
-	w.Write(response)
+	}, nil
 }
 
-func (b *Bridge) killContainer(w ResponseWriter, r *Request) {
-	b.signalContainer(w, r, unix.SIGKILL)
+func (b *Bridge) killContainer(r *Request) (RequestResponse, error) {
+	return b.signalContainer(r, unix.SIGKILL)
 }
 
-func (b *Bridge) shutdownContainer(w ResponseWriter, r *Request) {
-	b.signalContainer(w, r, unix.SIGTERM)
+func (b *Bridge) shutdownContainer(r *Request) (RequestResponse, error) {
+	return b.signalContainer(r, unix.SIGTERM)
 }
 
 // signalContainer is not a handler func. This is because the actual signal is
 // implied based on the message type.
-func (b *Bridge) signalContainer(w ResponseWriter, r *Request, signal syscall.Signal) {
+func (b *Bridge) signalContainer(r *Request, signal syscall.Signal) (RequestResponse, error) {
 	var request prot.MessageBase
 	if err := commonutils.UnmarshalJSONWithHresult(r.Message, &request); err != nil {
-		w.Error("", errors.Wrapf(err, "failed to unmarshal JSON for message \"%s\"", r.Message))
-		return
+		return nil, errors.Wrapf(err, "failed to unmarshal JSON for message \"%s\"", r.Message)
 	}
 
-	log := logrus.WithFields(logrus.Fields{
+	logrus.WithFields(logrus.Fields{
 		"activityID": request.ActivityID,
 		"cid":        request.ContainerID,
 		"signal":     signal,
-	})
-	log.Info("opengcs::bridge::signalContainer")
+	}).Info("opengcs::bridge::signalContainer")
 
 	err := b.coreint.SignalContainer(request.ContainerID, signal)
 	if err != nil {
-		w.Error(request.ActivityID, err)
-		return
+		return nil, err
 	}
 
-	response := &prot.MessageResponseBase{
-		ActivityID: request.ActivityID,
-	}
-	w.Write(response)
+	return &prot.MessageResponseBase{}, nil
 }
 
-func (b *Bridge) signalProcess(w ResponseWriter, r *Request) {
+func (b *Bridge) signalProcess(r *Request) (RequestResponse, error) {
 	var request prot.ContainerSignalProcess
 	if err := commonutils.UnmarshalJSONWithHresult(r.Message, &request); err != nil {
-		w.Error("", errors.Wrapf(err, "failed to unmarshal JSON for message \"%s\"", r.Message))
-		return
+		return nil, errors.Wrapf(err, "failed to unmarshal JSON for message \"%s\"", r.Message)
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -576,21 +553,16 @@ func (b *Bridge) signalProcess(w ResponseWriter, r *Request) {
 	}).Info("opengcs::bridge::signalProcess")
 
 	if err := b.coreint.SignalProcess(int(request.ProcessID), request.Options); err != nil {
-		w.Error(request.ActivityID, err)
-		return
+		return nil, err
 	}
 
-	response := &prot.MessageResponseBase{
-		ActivityID: request.ActivityID,
-	}
-	w.Write(response)
+	return &prot.MessageResponseBase{}, nil
 }
 
-func (b *Bridge) getProperties(w ResponseWriter, r *Request) {
+func (b *Bridge) getProperties(r *Request) (RequestResponse, error) {
 	var request prot.ContainerGetProperties
 	if err := commonutils.UnmarshalJSONWithHresult(r.Message, &request); err != nil {
-		w.Error("", errors.Wrapf(err, "failed to unmarshal JSON for message \"%s\"", r.Message))
-		return
+		return nil, errors.Wrapf(err, "failed to unmarshal JSON for message \"%s\"", r.Message)
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -600,8 +572,7 @@ func (b *Bridge) getProperties(w ResponseWriter, r *Request) {
 
 	properties, err := b.coreint.GetProperties(request.ContainerID, request.Query)
 	if err != nil {
-		w.Error(request.ActivityID, err)
-		return
+		return nil, err
 	}
 
 	propertyJSON := []byte("{}")
@@ -609,25 +580,19 @@ func (b *Bridge) getProperties(w ResponseWriter, r *Request) {
 		var err error
 		propertyJSON, err = json.Marshal(properties)
 		if err != nil {
-			w.Error(request.ActivityID, errors.Wrapf(err, "failed to marshal properties into JSON: %v", properties))
-			return
+			return nil, errors.Wrapf(err, "failed to marshal properties into JSON: %v", properties)
 		}
 	}
 
-	response := &prot.ContainerGetPropertiesResponse{
-		MessageResponseBase: &prot.MessageResponseBase{
-			ActivityID: request.ActivityID,
-		},
+	return &prot.ContainerGetPropertiesResponse{
 		Properties: string(propertyJSON),
-	}
-	w.Write(response)
+	}, nil
 }
 
-func (b *Bridge) waitOnProcess(w ResponseWriter, r *Request) {
+func (b *Bridge) waitOnProcess(r *Request) (RequestResponse, error) {
 	var request prot.ContainerWaitForProcess
 	if err := commonutils.UnmarshalJSONWithHresult(r.Message, &request); err != nil {
-		w.Error("", errors.Wrapf(err, "failed to unmarshal JSON for message \"%s\"", r.Message))
-		return
+		return nil, errors.Wrapf(err, "failed to unmarshal JSON for message \"%s\"", r.Message)
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -639,33 +604,26 @@ func (b *Bridge) waitOnProcess(w ResponseWriter, r *Request) {
 
 	exitCodeChan, doneChan, err := b.coreint.WaitProcess(int(request.ProcessID))
 	if err != nil {
-		w.Error(request.ActivityID, err)
-		return
+		return nil, err
 	}
+
+	// If we timed out or if we got the exit code. Acknowledge we no longer want to wait.
 	defer close(doneChan)
 
 	select {
 	case exitCode := <-exitCodeChan:
-		response := &prot.ContainerWaitForProcessResponse{
-			MessageResponseBase: &prot.MessageResponseBase{
-				ActivityID: request.ActivityID,
-			},
+		return &prot.ContainerWaitForProcessResponse{
 			ExitCode: uint32(exitCode),
-		}
-		w.Write(response)
+		}, nil
 	case <-time.After(time.Duration(request.TimeoutInMs) * time.Millisecond):
-		w.Error(request.ActivityID, gcserr.NewHresultError(gcserr.HvVmcomputeTimeout))
+		return nil, gcserr.NewHresultError(gcserr.HvVmcomputeTimeout)
 	}
-
-	// If we timed out or if we got the exit code. Acknowledge we no longer want to wait.
-	doneChan <- true
 }
 
-func (b *Bridge) resizeConsole(w ResponseWriter, r *Request) {
+func (b *Bridge) resizeConsole(r *Request) (RequestResponse, error) {
 	var request prot.ContainerResizeConsole
 	if err := commonutils.UnmarshalJSONWithHresult(r.Message, &request); err != nil {
-		w.Error("", errors.Wrapf(err, "failed to unmarshal JSON for message \"%s\"", r.Message))
-		return
+		return nil, errors.Wrapf(err, "failed to unmarshal JSON for message \"%s\"", r.Message)
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -678,25 +636,18 @@ func (b *Bridge) resizeConsole(w ResponseWriter, r *Request) {
 
 	err := b.coreint.ResizeConsole(int(request.ProcessID), request.Height, request.Width)
 	if err != nil {
-		w.Error(request.ActivityID, err)
-		return
+		return nil, err
 	}
 
-	response := &prot.MessageResponseBase{
+	return &prot.MessageResponseBase{
 		ActivityID: request.ActivityID,
-	}
-	w.Write(response)
+	}, nil
 }
 
-func (b *Bridge) modifySettings(w ResponseWriter, r *Request) {
+func (b *Bridge) modifySettings(r *Request) (RequestResponse, error) {
 	request, err := prot.UnmarshalContainerModifySettings(r.Message)
 	if err != nil {
-		aid := ""
-		if request != nil {
-			aid = request.ActivityID
-		}
-		w.Error(aid, errors.Wrapf(err, "failed to unmarshal JSON for message \"%s\"", r.Message))
-		return
+		return nil, errors.Wrapf(err, "failed to unmarshal JSON for message \"%s\"", r.Message)
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -706,14 +657,10 @@ func (b *Bridge) modifySettings(w ResponseWriter, r *Request) {
 
 	err = b.coreint.ModifySettings(request.ContainerID, request.Request.(*prot.ResourceModificationRequestResponse))
 	if err != nil {
-		w.Error(request.ActivityID, err)
-		return
+		return nil, err
 	}
 
-	response := &prot.MessageResponseBase{
-		ActivityID: request.ActivityID,
-	}
-	w.Write(response)
+	return &prot.MessageResponseBase{}, nil
 }
 
 // setErrorForResponseBase modifies the passed-in MessageResponseBase to

@@ -3,10 +3,12 @@
 package pmem
 
 import (
+	"context"
 	"fmt"
 	"os"
 
-	"github.com/sirupsen/logrus"
+	"github.com/Microsoft/opengcs/internal/oc"
+	"go.opencensus.io/trace"
 	"golang.org/x/sys/unix"
 )
 
@@ -24,21 +26,14 @@ var (
 //
 // Note: For now the platform only supports readonly pmem that is assumed to be
 // `dax`, `ext4`.
-func Mount(device uint32, target string) (err error) {
-	activity := "pmem::Mount"
-	log := logrus.WithFields(logrus.Fields{
-		"device": device,
-		"target": target,
-	})
-	log.Debug(activity + " - Begin Operation")
-	defer func() {
-		if err != nil {
-			log.Data[logrus.ErrorKey] = err
-			log.Error(activity + " - End Operation")
-		} else {
-			log.Debug(activity + " - End Operation")
-		}
-	}()
+func Mount(ctx context.Context, device uint32, target string) (err error) {
+	_, span := trace.StartSpan(ctx, "pmem::Mount")
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
+
+	span.AddAttributes(
+		trace.Int64Attribute("device", int64(device)),
+		trace.StringAttribute("target", target))
 
 	if err := osMkdirAll(target, 0700); err != nil {
 		return err

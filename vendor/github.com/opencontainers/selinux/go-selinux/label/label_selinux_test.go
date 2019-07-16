@@ -197,3 +197,20 @@ func TestSocketLabel(t *testing.T) {
 		t.Errorf("SocketLabel %s != %s", nlabel, label)
 	}
 }
+
+func TestKeyLabel(t *testing.T) {
+	if !selinux.GetEnabled() {
+		return
+	}
+	label := "system_u:object_r:container_t:s0:c1,c2"
+	if err := selinux.SetKeyLabel(label); err != nil {
+		t.Fatal(err)
+	}
+	nlabel, err := selinux.KeyLabel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if label != nlabel {
+		t.Errorf("KeyLabel %s != %s", nlabel, label)
+	}
+}

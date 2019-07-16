@@ -4,7 +4,7 @@ The [Open Container Initiative][oci] develops specifications for standards on Op
 
 # <a name="ociRuntimeSpecAbstract" />Abstract
 
-The OCI Runtime Specification aims to specify the configuration, execution environment, and lifecycle of a container.
+The Open Container Initiative Runtime Specification aims to specify the configuration, execution environment, and lifecycle of a container.
 
 A container's configuration is specified as the `config.json` for the supported platforms and details the fields that enable the creation of a container.
 The execution environment is specified to ensure that applications running inside a container have a consistent environment between runtimes along with common actions defined for the container's lifecycle.
@@ -16,6 +16,7 @@ Platforms defined by this specification are:
 * `linux`: [runtime.md](runtime.md), [config.md](config.md), [config-linux.md](config-linux.md), and [runtime-linux.md](runtime-linux.md).
 * `solaris`: [runtime.md](runtime.md), [config.md](config.md), and [config-solaris.md](config-solaris.md).
 * `windows`: [runtime.md](runtime.md), [config.md](config.md), and [config-windows.md](config-windows.md).
+* `vm`: [runtime.md](runtime.md), [config.md](config.md), and [config-vm.md](config-vm.md).
 
 # <a name="ociRuntimeSpecTOC" />Table of Contents
 
@@ -29,6 +30,7 @@ Platforms defined by this specification are:
     - [Linux-specific Configuration](config-linux.md)
     - [Solaris-specific Configuration](config-solaris.md)
     - [Windows-specific Configuration](config-windows.md)
+    - [Virtual-Machine-specific Configuration](config-vm.md)
 - [Glossary](glossary.md)
 
 # <a name="ociRuntimeSpecNotationalConventions" />Notational Conventions

@@ -3,14 +3,17 @@
 package scsi
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/Microsoft/opengcs/internal/log"
+	"github.com/Microsoft/opengcs/internal/oc"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	"go.opencensus.io/trace"
 	"golang.org/x/sys/unix"
 )
 
@@ -35,21 +38,14 @@ var (
 //
 // `target` will be created. On mount failure the created `target` will be
 // automatically cleaned up.
-func Mount(controller, lun uint8, target string, readonly bool) (err error) {
-	activity := "scsi::Mount"
-	log := logrus.WithFields(logrus.Fields{
-		"controller": controller,
-		"lun":        lun,
-	})
-	log.Debug(activity + " - Begin Operation")
-	defer func() {
-		if err != nil {
-			log.Data[logrus.ErrorKey] = err
-			log.Error(activity + " - End Operation")
-		} else {
-			log.Debug(activity + " - End Operation")
-		}
-	}()
+func Mount(ctx context.Context, controller, lun uint8, target string, readonly bool) (err error) {
+	ctx, span := trace.StartSpan(ctx, "scsi::Mount")
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
+
+	span.AddAttributes(
+		trace.Int64Attribute("controller", int64(controller)),
+		trace.Int64Attribute("lun", int64(lun)))
 
 	if err := osMkdirAll(target, 0700); err != nil {
 		return err
@@ -59,7 +55,7 @@ func Mount(controller, lun uint8, target string, readonly bool) (err error) {
 			osRemoveAll(target)
 		}
 	}()
-	source, err := controllerLunToName(controller, lun)
+	source, err := controllerLunToName(ctx, controller, lun)
 	if err != nil {
 		return err
 	}
@@ -89,21 +85,14 @@ func Mount(controller, lun uint8, target string, readonly bool) (err error) {
 
 // ControllerLunToName finds the `/dev/sd*` path to the SCSI device on
 // `controller` index `lun`.
-func ControllerLunToName(controller, lun uint8) (_ string, err error) {
-	activity := "scsi::ControllerLunToName"
-	log := logrus.WithFields(logrus.Fields{
-		"controller": controller,
-		"lun":        lun,
-	})
-	log.Debug(activity + " - Begin Operation")
-	defer func() {
-		if err != nil {
-			log.Data[logrus.ErrorKey] = err
-			log.Error(activity + " - End Operation")
-		} else {
-			log.Debug(activity + " - End Operation")
-		}
-	}()
+func ControllerLunToName(ctx context.Context, controller, lun uint8) (_ string, err error) {
+	ctx, span := trace.StartSpan(ctx, "scsi::ControllerLunToName")
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
+
+	span.AddAttributes(
+		trace.Int64Attribute("controller", int64(controller)),
+		trace.Int64Attribute("lun", int64(lun)))
 
 	scsiID := fmt.Sprintf("0:0:%d:%d", controller, lun)
 
@@ -131,28 +120,24 @@ func ControllerLunToName(controller, lun uint8) (_ string, err error) {
 	if len(deviceNames) > 1 {
 		return "", errors.Errorf("more than one block device could match SCSI ID \"%s\"", scsiID)
 	}
-	return filepath.Join("/dev", deviceNames[0].Name()), nil
+
+	devicePath := filepath.Join("/dev", deviceNames[0].Name())
+	log.G(ctx).WithField("devicePath", devicePath).Debug("found device path")
+	return devicePath, nil
 }
 
 // UnplugDevice finds the SCSI device on `controller` index `lun` and issues a
 // guest initiated unplug.
 //
 // If the device is not attached returns no error.
-func UnplugDevice(controller, lun uint8) (err error) {
-	activity := "scsi::UnplugDevice"
-	log := logrus.WithFields(logrus.Fields{
-		"controller": controller,
-		"lun":        lun,
-	})
-	log.Debug(activity + " - Begin Operation")
-	defer func() {
-		if err != nil {
-			log.Data[logrus.ErrorKey] = err
-			log.Error(activity + " - End Operation")
-		} else {
-			log.Debug(activity + " - End Operation")
-		}
-	}()
+func UnplugDevice(ctx context.Context, controller, lun uint8) (err error) {
+	_, span := trace.StartSpan(ctx, "scsi::UnplugDevice")
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
+
+	span.AddAttributes(
+		trace.Int64Attribute("controller", int64(controller)),
+		trace.Int64Attribute("lun", int64(lun)))
 
 	scsiID := fmt.Sprintf("0:0:%d:%d", controller, lun)
 	f, err := os.OpenFile(filepath.Join("/sys/bus/scsi/devices", scsiID, "delete"), os.O_WRONLY, 0644)

@@ -3,6 +3,7 @@
 package pmem
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -24,7 +25,7 @@ func Test_Mount_Mkdir_Fails_Error(t *testing.T) {
 	osMkdirAll = func(path string, perm os.FileMode) error {
 		return expectedErr
 	}
-	err := Mount(0, "")
+	err := Mount(context.Background(), 0, "")
 	if err != expectedErr {
 		t.Fatalf("expected err: %v, got: %v", expectedErr, err)
 	}
@@ -48,7 +49,7 @@ func Test_Mount_Mkdir_ExpectedPath(t *testing.T) {
 		// Fake the mount success
 		return nil
 	}
-	err := Mount(0, target)
+	err := Mount(context.Background(), 0, target)
 	if err != nil {
 		t.Fatalf("expected nil error got: %v", err)
 	}
@@ -72,7 +73,7 @@ func Test_Mount_Mkdir_ExpectedPerm(t *testing.T) {
 		// Fake the mount success
 		return nil
 	}
-	err := Mount(0, target)
+	err := Mount(context.Background(), 0, target)
 	if err != nil {
 		t.Fatalf("expected nil error got: %v", err)
 	}
@@ -99,7 +100,7 @@ func Test_Mount_Calls_RemoveAll_OnMountFailure(t *testing.T) {
 		// Fake the mount failure to test remove is called
 		return expectedErr
 	}
-	err := Mount(0, target)
+	err := Mount(context.Background(), 0, target)
 	if err != expectedErr {
 		t.Fatalf("expected err: %v, got: %v", expectedErr, err)
 	}
@@ -126,7 +127,7 @@ func Test_Mount_Valid_Source(t *testing.T) {
 		}
 		return nil
 	}
-	err := Mount(device, "/fake/path")
+	err := Mount(context.Background(), device, "/fake/path")
 	if err != nil {
 		t.Fatalf("expected nil err, got: %v", err)
 	}
@@ -149,7 +150,7 @@ func Test_Mount_Valid_Target(t *testing.T) {
 		}
 		return nil
 	}
-	err := Mount(0, expectedTarget)
+	err := Mount(context.Background(), 0, expectedTarget)
 	if err != nil {
 		t.Fatalf("expected nil err, got: %v", err)
 	}
@@ -172,7 +173,7 @@ func Test_Mount_Valid_FSType(t *testing.T) {
 		}
 		return nil
 	}
-	err := Mount(0, "/fake/path")
+	err := Mount(context.Background(), 0, "/fake/path")
 	if err != nil {
 		t.Fatalf("expected nil err, got: %v", err)
 	}
@@ -195,7 +196,7 @@ func Test_Mount_Valid_Flags(t *testing.T) {
 		}
 		return nil
 	}
-	err := Mount(0, "/fake/path")
+	err := Mount(context.Background(), 0, "/fake/path")
 	if err != nil {
 		t.Fatalf("expected nil err, got: %v", err)
 	}
@@ -218,7 +219,7 @@ func Test_Mount_Valid_Data(t *testing.T) {
 		}
 		return nil
 	}
-	err := Mount(0, "/fake/path")
+	err := Mount(context.Background(), 0, "/fake/path")
 	if err != nil {
 		t.Fatalf("expected nil err, got: %v", err)
 	}

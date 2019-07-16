@@ -165,7 +165,7 @@ func (t *tester) DeliverSignal(iface, name string, signal *Signal) {
 	t.sigs <- signal
 }
 
-func (t *tester) AddSignal(iface, name string) {
+func (t *tester) AddSignal(iface, name string) error {
 	t.subSigsMu.Lock()
 	if i, ok := t.subSigs[iface]; ok {
 		i[name] = struct{}{}
@@ -174,8 +174,7 @@ func (t *tester) AddSignal(iface, name string) {
 		t.subSigs[iface][name] = struct{}{}
 	}
 	t.subSigsMu.Unlock()
-	t.conn.BusObject().(*Object).AddMatchSignal(
-		iface, name)
+	return t.conn.AddMatchSignal(WithMatchInterface(iface), WithMatchMember(name))
 }
 
 func (t *tester) Close() {
@@ -422,9 +421,16 @@ func TestHandlerSignal(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %s", err)
 	}
-	tester.AddSignal("com.github.godbus.dbus.Tester", "sig1")
-	conn.Emit("/com/github/godbus/tester",
-		"com.github.godbus.dbus.Tester.sig1", "foo")
+	if err = tester.AddSignal("com.github.godbus.dbus.Tester", "sig1"); err != nil {
+		t.Fatal(err)
+	}
+	if err = conn.Emit(
+		"/com/github/godbus/tester",
+		"com.github.godbus.dbus.Tester.sig1",
+		"foo",
+	); err != nil {
+		t.Fatal(err)
+	}
 	select {
 	case sig := <-tester.sigs:
 		if sig.Body[0] != "foo" {
