@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/openshift/source-to-image/pkg/api"
@@ -56,11 +57,11 @@ func (b *DockerIgnorer) Ignore(config *api.Config) error {
 // GetListOfFilesToIgnore returns list of files from the workspace based on the contents of the
 // .s2iignore file
 func (b *DockerIgnorer) GetListOfFilesToIgnore(workingDir string) (map[string]string, error) {
-	path := filepath.Join(workingDir, constants.IgnoreFile)
-	file, err := os.Open(path)
+	ignoreFilePath := filepath.Join(workingDir, constants.IgnoreFile)
+	file, err := os.Open(ignoreFilePath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			log.Errorf("Ignore processing, problem opening %s because of %v\n", path, err)
+			log.Errorf("Ignore processing, problem opening %s because of %v\n", ignoreFilePath, err)
 			return nil, err
 		}
 		log.V(4).Info(".s2iignore file does not exist")
@@ -120,8 +121,11 @@ func (b *DockerIgnorer) GetListOfFilesToIgnore(workingDir string) (map[string]st
 		} else {
 			for _, globresult := range list {
 				log.V(5).Infof("Glob result %s \n", globresult)
+				// Using slash instead of OS-dependant Path Separator since in other operations path.Join() is used
+				if runtime.GOOS == "windows" {
+					globresult = strings.ReplaceAll(globresult, string(os.PathSeparator), "/")
+				}
 				filesToDel[globresult] = globresult
-
 			}
 		}
 
