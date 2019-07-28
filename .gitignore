@@ -4,4 +4,5 @@
 /.vagrant
 .vscode/
 cmd/s2i/debug
+.idea/
 *~
