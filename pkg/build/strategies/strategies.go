@@ -13,12 +13,6 @@ import (
 	utilstatus "github.com/openshift/source-to-image/pkg/util/status"
 )
 
-// GetStrategy decides what build strategy will be used for the STI build.
-// TODO: deprecated, use Strategy() instead
-func GetStrategy(client docker.Client, config *api.Config) (build.Builder, api.BuildInfo, error) {
-	return Strategy(client, config, build.Overrides{})
-}
-
 // Strategy creates the appropriate build strategy for the provided config, using
 // the overrides provided. Not all strategies support all overrides.
 func Strategy(client docker.Client, config *api.Config, overrides build.Overrides) (build.Builder, api.BuildInfo, error) {
