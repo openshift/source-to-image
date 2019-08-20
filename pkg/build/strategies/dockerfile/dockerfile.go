@@ -331,8 +331,8 @@ func (builder *Dockerfile) Prepare(config *api.Config) error {
 			}
 			return err
 		}
-		if config.SourceInfo != nil {
-			builder.sourceInfo = config.SourceInfo
+		if builder.sourceInfo != nil {
+			config.SourceInfo = builder.sourceInfo
 		}
 	}
 
