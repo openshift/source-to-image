@@ -61,7 +61,7 @@ func NewCmdRebuild(cfg *api.Config) *cobra.Command {
 
 			log.V(2).Infof("\n%s\n", describe.Config(client, cfg))
 
-			builder, _, err := strategies.GetStrategy(client, cfg)
+			builder, _, err := strategies.Strategy(client, cfg, build.Overrides{})
 			s2ierr.CheckError(err)
 			result, err := builder.Build(cfg)
 			s2ierr.CheckError(err)

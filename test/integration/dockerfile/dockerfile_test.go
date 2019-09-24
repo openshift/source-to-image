@@ -13,6 +13,7 @@ import (
 
 	"github.com/docker/docker/builder/dockerfile/parser"
 	"github.com/openshift/source-to-image/pkg/api"
+	"github.com/openshift/source-to-image/pkg/build"
 	"github.com/openshift/source-to-image/pkg/build/strategies"
 	"github.com/openshift/source-to-image/pkg/scm/git"
 )
@@ -1033,7 +1034,7 @@ func TestDockerfileLocalSource(t *testing.T) {
 
 func runDockerfileTest(t *testing.T, config *api.Config, expected []string, notExpected []string, expectedFiles []string, expectFailure bool) {
 
-	b, _, err := strategies.GetStrategy(nil, config)
+	b, _, err := strategies.Strategy(nil, config, build.Overrides{})
 	if err != nil {
 		t.Fatalf("Cannot create a new builder.")
 	}
