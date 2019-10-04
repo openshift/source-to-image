@@ -6,6 +6,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/build"
 	"github.com/openshift/source-to-image/pkg/build/strategies/dockerfile"
+	"github.com/openshift/source-to-image/pkg/build/strategies/external"
 	"github.com/openshift/source-to-image/pkg/build/strategies/onbuild"
 	"github.com/openshift/source-to-image/pkg/build/strategies/sti"
 	"github.com/openshift/source-to-image/pkg/docker"
@@ -23,6 +24,18 @@ func Strategy(client docker.Client, config *api.Config, overrides build.Override
 	fileSystem := fs.NewFileSystem()
 
 	startTime := time.Now()
+
+	if len(config.WithBuilder) != 0 {
+		builder, err = external.New(config, fileSystem)
+		if err != nil {
+			buildInfo.FailureReason = utilstatus.NewFailureReason(
+				utilstatus.ReasonGenericS2IBuildFailed,
+				utilstatus.ReasonMessageGenericS2iBuildFailed,
+			)
+			return nil, buildInfo, err
+		}
+		return builder, buildInfo, nil
+	}
 
 	if len(config.AsDockerfile) != 0 {
 		builder, err = dockerfile.New(config, fileSystem)
