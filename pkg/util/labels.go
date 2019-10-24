@@ -1,11 +1,20 @@
 package util
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/api/constants"
 	"github.com/openshift/source-to-image/pkg/scm/git"
+)
+
+const (
+	// MetadataFilename is the name of the config file defining additional labels to set on the output image.
+	MetadataFilename = "image_metadata.json"
 )
 
 // GenerateOutputImageLabels generate the labels based on the s2i Config
@@ -19,6 +28,15 @@ func GenerateOutputImageLabels(info *git.SourceInfo, config *api.Config) map[str
 
 	labels = GenerateLabelsFromConfig(labels, config, namespace)
 	labels = GenerateLabelsFromSourceInfo(labels, info, namespace)
+
+	if data, err := ProcessImageMetadataFile(filepath.Join(config.WorkingDir, constants.SourceConfig)); err == nil {
+		ll := data["labels"]
+		for _, l := range ll.([]interface{}) {
+			for k, v := range l.(map[string]interface{}) {
+				labels[k] = v.(string)
+			}
+		}
+	}
 	return labels
 }
 
@@ -67,4 +85,27 @@ func addBuildLabel(to map[string]string, key, value, namespace string) {
 		return
 	}
 	to[namespace+"build."+key] = value
+}
+
+// ProcessImageMetadataFile returns a map of the labels to set on the output image.
+func ProcessImageMetadataFile(path string) (map[string]interface{}, error) {
+	filePath := filepath.Join(path, MetadataFilename)
+	fd, err := os.Open(filePath)
+	if fd == nil || err != nil {
+		return nil, fmt.Errorf("unable to open file '%s' : %v", filePath, err)
+	}
+	defer fd.Close()
+
+	// read the file to a string
+	str, err := ioutil.ReadAll(fd)
+	if err != nil {
+		return nil, fmt.Errorf("error reading file '%s' in to a string: %v", filePath, err)
+	}
+	log.V(3).Infof("new Labels File contents : \n%s\n", str)
+	var data map[string]interface{}
+
+	if err = json.Unmarshal([]byte(str), &data); err != nil {
+		return nil, fmt.Errorf("JSON Unmarshal Error with '%s' file : %v", MetadataFilename, err)
+	}
+	return data, nil
 }
