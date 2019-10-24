@@ -108,7 +108,7 @@ func describeBuilderImage(client docker.Client, config *api.Config, out io.Write
 	dkr := docker.New(client, c.PullAuthentication)
 	builderImage, err := docker.GetBuilderImage(dkr, c)
 	if err == nil {
-		build.GenerateConfigFromLabels(c, builderImage)
+		build.GenerateConfigFromApplicationImageLabels(c, builderImage)
 		if len(c.DisplayName) > 0 {
 			fmt.Fprintf(out, "Builder Name:\t%s\n", c.DisplayName)
 		}

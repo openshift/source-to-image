@@ -12,12 +12,12 @@ import (
 
 // GenerateConfigFromLabels generates the S2I Config struct from the Docker
 // image labels.
-func GenerateConfigFromLabels(config *api.Config, metadata *docker.PullResult) error {
+func GenerateConfigFromApplicationImageLabels(config *api.Config, metadata *docker.PullResult) error {
 	if config == nil {
-		return errors.New("config must be provided to GenerateConfigFromLabels")
+		return errors.New("config must be provided to GenerateConfigFromApplicationImageLabels")
 	}
 	if metadata == nil {
-		return errors.New("image metadata must be provided to GenerateConfigFromLabels")
+		return errors.New("image metadata must be provided to GenerateConfigFromApplicationImageLabels")
 	}
 
 	labels := metadata.Image.Config.Labels

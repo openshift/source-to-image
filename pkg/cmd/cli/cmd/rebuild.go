@@ -50,7 +50,7 @@ func NewCmdRebuild(cfg *api.Config) *cobra.Command {
 			dkr := docker.New(client, cfg.PullAuthentication)
 			pr, err := docker.GetRebuildImage(dkr, cfg)
 			s2ierr.CheckError(err)
-			err = build.GenerateConfigFromLabels(cfg, pr)
+			err = build.GenerateConfigFromApplicationImageLabels(cfg, pr)
 			s2ierr.CheckError(err)
 
 			if len(args) >= 2 {
