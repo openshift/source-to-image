@@ -12,6 +12,13 @@ const (
 	// script failing.
 	ReasonMessageAssembleFailed api.StepFailureMessage = "Assemble script failed."
 
+	// ReasonGenerateConfigFromBuilderImageLabelsFailed is the reason associated with the
+	// extraction of configuration from builder image labels failing.
+	ReasonGenerateConfigFromBuilderImageLabelsFailed api.StepFailureReason = "GenerateConfigFromBuilderImageLabelsFailed"
+	// ReasonMessageGenerateConfigFromBuilderImageLabelsFailed is the message associated with
+	// the extraction of configuration from builder image labels failing.
+	ReasonMessageGenerateConfigFromBuilderImageLabelsFailed api.StepFailureMessage = "Generate configuration from builder image labels failed."
+
 	// ReasonPullBuilderImageFailed is the reason associated with failing to pull
 	// the builder image.
 	ReasonPullBuilderImageFailed api.StepFailureReason = "PullBuilderImageFailed"

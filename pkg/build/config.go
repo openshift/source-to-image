@@ -10,7 +10,20 @@ import (
 	"github.com/openshift/source-to-image/pkg/scm/git"
 )
 
-// GenerateConfigFromLabels generates the S2I Config struct from the Docker
+// GenerateConfigFromBuilderImageLabels generates the S@I Config struct from the Docker
+// image labels.
+func GenerateConfigFromBuilderImageLabels(config *api.Config, metadata *docker.PullResult) error {
+	if config == nil {
+		return errors.New("config must be provided to GenerateConfigFromBuilderImageLabels")
+	}
+	if metadata == nil {
+		return errors.New("image metadata must be provided to GenerateConfigFromBuilderImageLabels")
+	}
+
+	return nil
+}
+
+// GenerateConfigFromApplicationImageLabels generates the S2I Config struct from the Docker
 // image labels.
 func GenerateConfigFromApplicationImageLabels(config *api.Config, metadata *docker.PullResult) error {
 	if config == nil {

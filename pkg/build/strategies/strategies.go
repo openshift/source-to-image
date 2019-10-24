@@ -48,6 +48,15 @@ func Strategy(client docker.Client, config *api.Config, overrides build.Override
 	}
 	config.HasOnBuild = image.OnBuild
 
+	err = build.GenerateConfigFromBuilderImageLabels(config, image)
+	if err != nil {
+		buildInfo.FailureReason = utilstatus.NewFailureReason(
+			utilstatus.ReasonGenerateConfigFromBuilderImageLabelsFailed,
+			utilstatus.ReasonMessageGenerateConfigFromBuilderImageLabelsFailed,
+		)
+		return nil, buildInfo, err
+	}
+
 	if config.AssembleUser, err = docker.GetAssembleUser(dkr, config); err != nil {
 		buildInfo.FailureReason = utilstatus.NewFailureReason(
 			utilstatus.ReasonPullBuilderImageFailed,
