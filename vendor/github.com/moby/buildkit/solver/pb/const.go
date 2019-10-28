@@ -1,3 +1,0 @@
-package pb
-
-const RootMount = "/"

@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-
-set -eu -o pipefail -x
-
-# update this to iidfile after 17.06
-docker build -t buildkit:lint -f ./hack/dockerfiles/lint.Dockerfile --force-rm .
-docker run buildkit:lint gometalinter --config=gometalinter.json ./...

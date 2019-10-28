@@ -1197,46 +1197,23 @@ func parseDefaultIfNameFromRoute(routeOut string) (string, error) {
 // parseDefaultIfNameFromIPCmd parses the default interface from ip(8) for
 // Linux.
 func parseDefaultIfNameFromIPCmd(routeOut string) (string, error) {
-	parsedLines := parseIfNameFromIPCmd(routeOut)
-	for _, parsedLine := range parsedLines {
-		if parsedLine[0] == "default" &&
-			parsedLine[1] == "via" &&
-			parsedLine[3] == "dev" {
-			ifName := strings.TrimSpace(parsedLine[4])
-			return ifName, nil
-		}
-	}
-
-	return "", errors.New("No default interface found")
-}
-
-// parseDefaultIfNameFromIPCmdAndroid parses the default interface from ip(8) for
-// Android.
-func parseDefaultIfNameFromIPCmdAndroid(routeOut string) (string, error) {
-	parsedLines := parseIfNameFromIPCmd(routeOut)
-	if (len(parsedLines) > 0) {
-		ifName := strings.TrimSpace(parsedLines[0][4])
-		return ifName, nil
-	}
-
-	return "", errors.New("No default interface found")
-}
-
-
-// parseIfNameFromIPCmd parses interfaces from ip(8) for
-// Linux.
-func parseIfNameFromIPCmd(routeOut string) [][]string {
 	lines := strings.Split(routeOut, "\n")
 	re := whitespaceRE.Copy()
-	parsedLines := make([][]string, 0, len(lines))
 	for _, line := range lines {
 		kvs := re.Split(line, -1)
 		if len(kvs) < 5 {
 			continue
 		}
-		parsedLines = append(parsedLines, kvs)
+
+		if kvs[0] == "default" &&
+			kvs[1] == "via" &&
+			kvs[3] == "dev" {
+			ifName := strings.TrimSpace(kvs[4])
+			return ifName, nil
+		}
 	}
-	return parsedLines
+
+	return "", errors.New("No default interface found")
 }
 
 // parseDefaultIfNameWindows parses the default interface from `netstat -rn` and
