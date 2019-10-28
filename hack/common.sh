@@ -92,6 +92,7 @@ s2i::build::build_binaries() {
       CGO_ENABLED=0 go install "${goflags[@]:+${goflags[@]}}" \
           -pkgdir "${S2I_OUTPUT_PKGDIR}" \
           -ldflags "${version_ldflags} ${RELEASE_LDFLAGS}" \
+          -mod vendor \
           "${binaries[@]}"
       s2i::build::unset_platform_envs "${platform}"
     done
@@ -175,7 +176,6 @@ s2i::build::create_gopath_tree() {
 #
 # Input Vars:
 #   S2I_EXTRA_GOPATH - If set, this is included in created GOPATH
-#   S2I_NO_GODEPS - If set, we don't add 'vendor' to GOPATH
 #
 # Output Vars:
 #   export GOPATH - A modified GOPATH to our created tree along with extra
@@ -195,6 +195,9 @@ EOF
     exit 2
   fi
 
+  # Enabling support for Go Modules.
+  export GO111MODULE=on
+
   # For any tools that expect this to be set (it is default in golang 1.6),
   # force vendor experiment.
   export GO15VENDOREXPERIMENT=1
@@ -204,12 +207,6 @@ EOF
   # Append S2I_EXTRA_GOPATH to the GOPATH if it is defined.
   if [[ -n ${S2I_EXTRA_GOPATH:-} ]]; then
     GOPATH="${GOPATH}:${S2I_EXTRA_GOPATH}"
-  fi
-
-  # Append the tree maintained by `godep` to the GOPATH unless S2I_NO_GODEPS
-  # is defined.
-  if [[ -z ${S2I_NO_GODEPS:-} ]]; then
-    GOPATH="${GOPATH}:${S2I_ROOT}/vendor"
   fi
 
   if [[ "$OSTYPE" == "cygwin" ]]; then

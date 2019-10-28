@@ -16,8 +16,7 @@ find_test_dirs() {
   cd "${S2I_ROOT}"
   find . -not \( \
       \( \
-        -wholename './Godeps' \
-        -o -wholename './release' \
+        -wholename './release' \
         -o -wholename './target' \
         -o -wholename './vendor' \
         -o -wholename '*/_output/*' \

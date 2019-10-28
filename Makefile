@@ -32,7 +32,7 @@ verify: build
 	hack/verify-gofmt.sh
 	hack/verify-golint.sh
 	hack/verify-govet.sh
-	hack/verify-godeps.sh || true # remove this to make godepchecker's warnings actionable
+	hack/verify-deps.sh
 	hack/verify-bash-completion.sh
 .PHONY: verify
 
