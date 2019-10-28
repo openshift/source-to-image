@@ -87,17 +87,18 @@ Run the integration tests with:
     $ hack/test-integration.sh
 
 
-## Installing Glide
+## Dependency Management
 
-S2I uses [Glide](https://github.com/Masterminds/glide) for dependency management.
-Glide allows versions of dependent packages to be locked at a specific commit by *vendoring* them
-(checking a copy of them into `vendor`).  This means that everything you need for
-S2I is checked into this repository.  To install `glide` locally run:
+S2I uses [Go Modules](https://github.com/golang/go/wiki/Modules) for `vendor` directory
+management. Please consider [`go.mod`](./go.mod) to see how dependencies are organized in this
+project, and consider official documentation about
+[Go Modules](https://github.com/golang/go/wiki/Modules#how-to-use-modules).
 
-    $ go get github.com/Masterminds/glide
+The basic usage of `go mod` in this project is:
 
-If you are not updating packages you should not need glide installed.
-
+    $ go mod tidy -v
+    $ go mod vendor
+    $ go mod verify
 
 ## Building a Release
 
