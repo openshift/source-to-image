@@ -5,3 +5,8 @@
 .vscode/
 cmd/s2i/debug
 *~
+.idea
+upload
+*.classpath
+*.project
+*.settings
