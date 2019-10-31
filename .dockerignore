@@ -1,0 +1,9 @@
+.*
+_output/
+docs/
+examples/
+images/
+*.md
+AUTHORS
+LICENSE
+OWNERS
