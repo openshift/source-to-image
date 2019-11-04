@@ -8,7 +8,7 @@ echo $(go version)
 
 if ! which golint &>/dev/null; then
   echo "Unable to detect 'golint' package"
-  echo "To install it, run: 'go get github.com/golang/lint/golint'"
+  echo "To install it, run: 'go get -u golang.org/x/lint/golint'"
   exit 1
 fi
 

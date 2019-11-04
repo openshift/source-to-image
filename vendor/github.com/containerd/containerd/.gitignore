@@ -1,7 +1,0 @@
-*.exe
-/containerd/containerd
-/containerd-shim/containerd-shim
-/bin/
-/ctr/ctr
-/hack/benchmark
-/output

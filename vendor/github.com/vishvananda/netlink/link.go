@@ -171,6 +171,7 @@ type LinkXdp struct {
 	Fd       int
 	Attached bool
 	Flags    uint32
+	ProgId   uint32
 }
 
 // Device links cannot be created via netlink. These links
@@ -339,6 +340,7 @@ type Vxlan struct {
 	UDPCSum      bool
 	NoAge        bool
 	GBP          bool
+	FlowBased    bool
 	Age          int
 	Limit        int
 	Port         int
@@ -684,6 +686,7 @@ type Gretap struct {
 	EncapType  uint16
 	EncapFlags uint16
 	Link       uint32
+	FlowBased  bool
 }
 
 func (gretap *Gretap) Attrs() *LinkAttrs {
@@ -727,6 +730,28 @@ func (vti *Vti) Attrs() *LinkAttrs {
 
 func (iptun *Vti) Type() string {
 	return "vti"
+}
+
+type Gretun struct {
+	LinkAttrs
+	Link     uint32
+	IFlags   uint16
+	OFlags   uint16
+	IKey     uint32
+	OKey     uint32
+	Local    net.IP
+	Remote   net.IP
+	Ttl      uint8
+	Tos      uint8
+	PMtuDisc uint8
+}
+
+func (gretun *Gretun) Attrs() *LinkAttrs {
+	return &gretun.LinkAttrs
+}
+
+func (gretun *Gretun) Type() string {
+	return "gre"
 }
 
 type Vrf struct {

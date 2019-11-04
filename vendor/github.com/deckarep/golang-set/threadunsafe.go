@@ -76,9 +76,6 @@ func (set *threadUnsafeSet) Contains(i ...interface{}) bool {
 
 func (set *threadUnsafeSet) IsSubset(other Set) bool {
 	_ = other.(*threadUnsafeSet)
-	if set.Cardinality() > other.Cardinality() {
-		return false
-	}
 	for elem := range *set {
 		if !other.Contains(elem) {
 			return false
