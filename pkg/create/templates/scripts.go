@@ -19,7 +19,9 @@ fi
 #
 if [ "$(ls /tmp/artifacts/ 2>/dev/null)" ]; then
   echo "---> Restoring build artifacts..."
-  mv /tmp/artifacts/. ./
+  shopt -s dotglob
+  mv /tmp/artifacts/* ./
+  shopt -u dotglob
 fi
 
 echo "---> Installing application source..."
