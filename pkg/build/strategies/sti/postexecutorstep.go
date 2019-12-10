@@ -2,6 +2,7 @@ package sti
 
 import (
 	"archive/tar"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -522,30 +523,50 @@ func checkAndGetNewLabels(builder *STI, docker dockerpkg.Docker, tar s2itar.Tar,
 	log.V(3).Infof("Checking for new Labels to apply... ")
 
 	// metadata filename and its path inside the container
-	sourceFilepath := filepath.Join("/tmp/.s2i", util.MetadataFilename)
+	metadataFilename := "image_metadata.json"
+	sourceFilepath := filepath.Join("/tmp/.s2i", metadataFilename)
 
 	// create the 'downloadPath' folder if it doesn't exist
 	downloadPath := filepath.Join(builder.config.WorkingDir, "metadata")
 	log.V(3).Infof("Creating the download path '%s'", downloadPath)
 	if err := os.MkdirAll(downloadPath, 0700); err != nil {
-		log.Errorf("Error creating dir %q for '%s': %v", downloadPath, util.MetadataFilename, err)
+		log.Errorf("Error creating dir %q for '%s': %v", downloadPath, metadataFilename, err)
 		return err
 	}
 
 	// download & extract the file from container
 	if _, err := downloadAndExtractFileFromContainer(docker, tar, sourceFilepath, downloadPath, containerID); err != nil {
-		log.V(3).Infof("unable to download and extract '%s' ... continuing", util.MetadataFilename)
+		log.V(3).Infof("unable to download and extract '%s' ... continuing", metadataFilename)
 		return nil
 	}
 
 	// open the file
-	if data, err := util.ProcessImageMetadataFile(downloadPath); err == nil {
-		// update newLabels[]
-		labels := data["labels"]
-		for _, l := range labels.([]interface{}) {
-			for k, v := range l.(map[string]interface{}) {
-				builder.newLabels[k] = v.(string)
-			}
+	filePath := filepath.Join(downloadPath, metadataFilename)
+	fd, err := os.Open(filePath)
+	if fd == nil || err != nil {
+		return fmt.Errorf("unable to open file '%s' : %v", downloadPath, err)
+	}
+	defer fd.Close()
+
+	// read the file to a string
+	str, err := ioutil.ReadAll(fd)
+	if err != nil {
+		return fmt.Errorf("error reading file '%s' in to a string: %v", filePath, err)
+	}
+	log.V(3).Infof("new Labels File contents : \n%s\n", str)
+
+	// string into a map
+	var data map[string]interface{}
+
+	if err = json.Unmarshal([]byte(str), &data); err != nil {
+		return fmt.Errorf("JSON Unmarshal Error with '%s' file : %v", metadataFilename, err)
+	}
+
+	// update newLabels[]
+	labels := data["labels"]
+	for _, l := range labels.([]interface{}) {
+		for k, v := range l.(map[string]interface{}) {
+			builder.newLabels[k] = v.(string)
 		}
 	}
 
