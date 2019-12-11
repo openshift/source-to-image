@@ -1,113 +1,127 @@
-Hacking on source-to-image
-==========================
+# Contributing Guide
 
-## Local development
+## Filing Bugs
 
-S2I comes with a `Makefile` which defines following targets:
+Bug reports may be filed as an issue on GitHub, with the label `kind/bug`.
+The label can be added by placing the [Prow](https://prow.svc.ci.openshift.org/command-help?repo=openshift%2Fsource-to-image)
+command `/kind bug` in your issue.
 
-* `build` - is the default target responsible for building S2I binary, under the covers
-it calls `hack/build-go.sh`. The resulting binary will be placed in `_output/local/go/bin/`.
-* `all` - is synonym for `build`.
-* `test` - is responsible for testing S2I, under the covers it calls `hack/test-go.sh`.
-Additionally you can pass `WHAT` or `TEST` variable specifying directory names to test,
-eg. `make test WHAT=pkg/build`
-* `check` - is synonym for `test`.
-* `clean` - cleans environment by removing `_output`
+A well-written bug report has the following format:
 
-## Generating Bash completion
+```markdown
+**Is this a feature request or bug?**
 
-If you are modifying or adding sub-command or command flag, make sure you update
-the generated Bash completion and include it in your PR. To update Bash
-completion, you can run the following command:
+/kind bug
 
-    $ hack/update-generated-completions.sh
+**What went wrong?**
 
-This will regenerate the `./contrib/bash/s2i` file.
+Enter a description of what went wrong.
 
-## Test Suites
+**Steps to reproduce:**
 
-S2I uses two levels of testing - unit tests and integration tests, both of them are run on each
-pull request, so make sure to run those before submitting one.
+1. Step 1
+2. Step 2
+3. Step 3
 
+**Expected results:**
 
-### Unit tests
+Enter what you expected to happen.
 
-Unit tests follow standard Go conventions and are intended to test the behavior and output of a
-single package in isolation. All code is expected to be easily testable with mock interfaces and
-stubs, and when they are not it usually means that there's a missing interface or abstraction in the
-code. A unit test should focus on testing that branches and error conditions are properly returned
-and that the interface and code flows work as described. Unit tests can depend on other packages but
-should not depend on other components.
+**Actual results:**
 
-The unit tests for an entire package should not take more than 0.5s to run, and if they do, are
-probably not really unit tests or need to be rewritten to avoid sleeps or pauses. Coverage on a unit
-test should be above 70% unless the units are a special case.
+Enter what actually occurred, including command line output
 
-Run the unit tests with:
+**Version:**
 
-    $ hack/test-go.sh
+s2i: Enter output of `s2i version`
+docker: Enter the output of `docker version` if you are using docker to build container images.
 
-or an individual package unit test with:
+**Additional info:**
 
-    $ hack/test-go.sh pkg/build/strategies/sti
+Add any relevant context here.
+```
 
-To run only a certain regex of tests in a package, use:
+## Submitting Feature Requests
 
-    $ hack/test-go.sh pkg/build/strategies/sti -test.run=TestLayeredBuild
+Feature requests are likewise submitted as GitHub issues, with the `kind/feature` label.
+The label can be added by placing the [Prow](https://prow.svc.ci.openshift.org/command-help?repo=openshift%2Fsource-to-image)
+command `/kind feature` in your issue.
 
-To get verbose output add `-v` to the end:
+A well-written feature request has the following format:
 
-    $ hack/test-go.sh pkg/build/strategies/sti -test.run=TestLayeredBuild -v
+```markdown
+**Is this a feature request or bug?**
 
-To run all tests with verbose output:
+/kind feature
 
-    $ hack/test-go.sh "" -v
+**User Stories**
 
-To run tests without the Go race detector, which is on by default, use:
+As a developer using source-to-image
+I would like ...
+So that ...
 
-    $ S2I_RACE="" hack/test-go.sh
+(you may add more than one story to provide further use cases to consider)
 
-A line coverage report is printed by default. To turn it off, use:
+**Additional info:**
 
-    $ S2I_COVER="" hack/test-go.sh
+Add any relevant context or deeper description here.
+```
 
-To create an HTML coverage report for all packages:
+## Submitting a Pull Request
 
-    $ OUTPUT_COVERAGE=/tmp/s2i-cover hack/test-go.sh
+You can contribute to source-to-image by submitting a pull request ("PR").
+Any member of the OpenShift organization can review your PR and signal their approval with the
+`/lgtm` command. Only approvers listed in the [OWNERS](OWNERS) file may add the `approved` label to
+your PR. In order for PR to merge, it must have the following:
 
+1. The `approved` label
+2. The `lgtm` label
+3. All tests passing in CI, which is managed by Prow.
 
-### Integration tests
+If you are not a member of the OpenShift GitHub organization, an OpenShift team member will need to
+add the `ok-to-test` label to your PR for our CI tests to run.
 
-The second category are integration tests which verify the whole S2I flow. The integration tests
-require a couple of images for testing, these can be built with `hack/build-test-images.sh`, if
-integration tests don't find them it'll print appropriate information regarding running this command.
+### Feature or Bugfix PRs
 
-Run the integration tests with:
+Pull requests which implement a feature or fix a bug should consist of a single commit with the
+full code changes. Commit messages should have the following structure:
 
-    $ hack/test-integration.sh
+```text
+<Title - under 50 characters>
 
+<Body - under 100 characters per line>
 
-## Dependency Management
+<Footer>
+```
 
-S2I uses [Go Modules](https://github.com/golang/go/wiki/Modules) for `vendor` directory
-management. Please consider [`go.mod`](./go.mod) to see how dependencies are organized in this
-project, and consider official documentation about
-[Go Modules](https://github.com/golang/go/wiki/Modules#how-to-use-modules).
+The title is required, and should be under 50 characters long. This is a short description of your
+change.
 
-The basic usage of `go mod` in this project is:
+The body is optional, and may contain a longer description of the changes in the commit. Lines
+should not exceed 100 characters in length for readability.
 
-    $ go mod tidy -v
-    $ go mod vendor
-    $ go mod verify
+The footer is optional, and may contain information such as sign-off lines. If your code is related
+to a GitHub issue, add it here with the text `Fixes xxx`.
 
-## Building a Release
+### Work In Progress PRs
 
-To build a S2I release you run `make release` on a system with Docker,
-which will create a build environment image and then execute a cross platform Go build within it. The build
-output will be copied to `_output/releases` as a set of tars containing each version.
+Contributors who would like feedback but are still making code modifications can create "work in
+progress" PRs by adding "WIP" to the PR title. Once work is done and ready for final review, please
+remove "WIP" from your PR title and [squash your commits](https://medium.com/@slamflipstrom/a-beginners-guide-to-squashing-commits-with-git-rebase-8185cf6e62ec).
 
-1. Create a new git tag `git tag vX.X.X -a -m "vX.X.X" HEAD`
-2. Push the tag to GitHub `git push origin --tags` where `origin` is `github.com/openshift/source-to-image.git`
-4. Run `make release`
-5. Upload the binary artifacts generated by that build to GitHub release page.
-6. Send an email to the dev list, including the important changes prior to the release.
+### Updating dependencies
+
+Pull requests which update dependencies are an exception to the "one commit" rule.
+To better track dependency changes, PRs with dependency updates should have the following structure:
+
+1. A commit with changes to `go.mod` and `go.sum` declaring the new or updated dependencies.
+2. A commit with updates to vendored code, with `bump(<modules>)` in the title:
+   1. If only a small number of modules are updated, list them in the parentheses.
+      Example: `bump(containers/image/v5):`
+   2. If several modules are updated, use `bump(*)` as the title.
+   3. Include a reason for updating dependencies in the commit body.
+3. If necessary, add a commit with reactions to vendored code changes (ex - method signature
+   updates).
+4. If necessary, add a commit with code that takes advantage of the newly vendored code.
+
+See [HACKING.md](docs/HACKING.md#dependency-management) for more information on how to update dependencies.
