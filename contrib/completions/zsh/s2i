@@ -549,6 +549,41 @@ _s2i_create()
     noun_aliases=()
 }
 
+_s2i_generate()
+{
+    last_command="s2i_generate"
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--assemble-runtime-user=")
+    local_nonpersistent_flags+=("--assemble-runtime-user=")
+    flags+=("--assemble-user=")
+    local_nonpersistent_flags+=("--assemble-user=")
+    flags+=("--env=")
+    two_word_flags+=("-e")
+    local_nonpersistent_flags+=("--env=")
+    flags+=("--quiet")
+    flags+=("-q")
+    local_nonpersistent_flags+=("--quiet")
+    flags+=("--ca=")
+    flags+=("--cert=")
+    flags+=("--key=")
+    flags+=("--loglevel=")
+    flags+=("--tls")
+    flags+=("--tlsverify")
+    flags+=("--url=")
+    two_word_flags+=("-U")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
 _s2i_rebuild()
 {
     last_command="s2i_rebuild"
@@ -680,6 +715,7 @@ _s2i()
     commands+=("build")
     commands+=("completion")
     commands+=("create")
+    commands+=("generate")
     commands+=("rebuild")
     commands+=("usage")
     commands+=("version")

@@ -43,6 +43,7 @@ func NewCmdCLI() *cobra.Command {
 	s2iCmd.AddCommand(cmd.NewCmdRebuild(cfg))
 	s2iCmd.AddCommand(cmd.NewCmdUsage(cfg))
 	s2iCmd.AddCommand(cmd.NewCmdCreate())
+	s2iCmd.AddCommand(cmd.NewCmdGenerate(cfg))
 	cmdutil.SetupLogger(s2iCmd.PersistentFlags())
 	basename := filepath.Base(os.Args[0])
 	// Make case-insensitive and strip executable suffix if present

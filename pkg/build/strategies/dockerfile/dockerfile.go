@@ -168,6 +168,15 @@ func (builder *Dockerfile) CreateDockerfile(config *api.Config) error {
 	for k, v := range config.Labels {
 		imageLabels[k] = v
 	}
+
+	if len(config.ScriptsURL) > 0 {
+		imageLabels[constants.ScriptsURLLabel] = config.ScriptsURL
+	}
+
+	if len(config.Destination) > 0 {
+		imageLabels[constants.DestinationLabel] = config.Destination
+	}
+
 	if len(imageLabels) > 0 {
 		first := true
 		buffer.WriteString("LABEL ")
