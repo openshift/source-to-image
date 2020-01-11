@@ -3,19 +3,13 @@
 package dockerfile
 
 import (
-	"bytes"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 
-	"github.com/moby/buildkit/frontend/dockerfile/parser"
-
 	"github.com/openshift/source-to-image/pkg/api"
-	"github.com/openshift/source-to-image/pkg/build"
-	"github.com/openshift/source-to-image/pkg/build/strategies"
 	"github.com/openshift/source-to-image/pkg/scm/git"
 )
 
@@ -59,7 +53,7 @@ func TestDockerfileBuild(t *testing.T) {
 		filepath.Join(tempdir, "upload/src/server.js"),
 		filepath.Join(tempdir, "MyDockerfile"),
 	}
-	runDockerfileTest(t, config, expected, nil, expectedFiles, false)
+	RunDockerfileTest(t, config, expected, nil, expectedFiles, false)
 }
 
 func TestDockerfileBuildDefaultDockerfile(t *testing.T) {
@@ -101,7 +95,7 @@ func TestDockerfileBuildDefaultDockerfile(t *testing.T) {
 		filepath.Join(tempdir, "upload/src/server.js"),
 		filepath.Join(tempdir, "Dockerfile"),
 	}
-	runDockerfileTest(t, config, expected, nil, expectedFiles, false)
+	RunDockerfileTest(t, config, expected, nil, expectedFiles, false)
 }
 
 func TestDockerfileBuildEnv(t *testing.T) {
@@ -139,7 +133,7 @@ func TestDockerfileBuildEnv(t *testing.T) {
 		"key1=\"value1\"",
 		"key2=\"value2\"",
 	}
-	runDockerfileTest(t, config, expected, nil, nil, false)
+	RunDockerfileTest(t, config, expected, nil, nil, false)
 }
 
 func TestDockerfileBuildLabels(t *testing.T) {
@@ -178,7 +172,7 @@ func TestDockerfileBuildLabels(t *testing.T) {
 		"\"label1\"=\"value1\"",
 		"\"label2\"=\"value2\"",
 	}
-	runDockerfileTest(t, config, expected, nil, nil, false)
+	RunDockerfileTest(t, config, expected, nil, nil, false)
 }
 
 func TestDockerfileBuildInjections(t *testing.T) {
@@ -258,7 +252,7 @@ func TestDockerfileBuildInjections(t *testing.T) {
 		filepath.Join(tempdir, "upload/injections"+trimmedInjection1),
 		filepath.Join(tempdir, "upload/injections"+trimmedInjection2),
 	}
-	runDockerfileTest(t, config, expected, notExpected, expectedFiles, false)
+	RunDockerfileTest(t, config, expected, notExpected, expectedFiles, false)
 }
 
 func TestDockerfileBuildScriptsURLAssemble(t *testing.T) {
@@ -298,7 +292,7 @@ func TestDockerfileBuildScriptsURLAssemble(t *testing.T) {
 		filepath.Join(tempdir, "upload/src/server.js"),
 		filepath.Join(tempdir, "upload/scripts/assemble"),
 	}
-	runDockerfileTest(t, config, expected, nil, expectedFiles, false)
+	RunDockerfileTest(t, config, expected, nil, expectedFiles, false)
 }
 
 func TestDockerfileBuildScriptsURLRun(t *testing.T) {
@@ -338,7 +332,7 @@ func TestDockerfileBuildScriptsURLRun(t *testing.T) {
 		filepath.Join(tempdir, "upload/src/server.js"),
 		filepath.Join(tempdir, "upload/scripts/run"),
 	}
-	runDockerfileTest(t, config, expected, nil, expectedFiles, false)
+	RunDockerfileTest(t, config, expected, nil, expectedFiles, false)
 }
 
 func TestDockerfileBuildScriptsURLNone(t *testing.T) {
@@ -362,7 +356,7 @@ func TestDockerfileBuildScriptsURLNone(t *testing.T) {
 
 		AsDockerfile: filepath.Join(tempdir, "Dockerfile"),
 	}
-	runDockerfileTest(t, config, nil, nil, nil, true)
+	RunDockerfileTest(t, config, nil, nil, nil, true)
 }
 
 func TestDockerfileBuildSourceScriptsAssemble(t *testing.T) {
@@ -409,7 +403,7 @@ func TestDockerfileBuildSourceScriptsAssemble(t *testing.T) {
 	expectedFiles := []string{
 		filepath.Join(tempdir, "upload/scripts/assemble"),
 	}
-	runDockerfileTest(t, config, expected, nil, expectedFiles, false)
+	RunDockerfileTest(t, config, expected, nil, expectedFiles, false)
 }
 
 func TestDockerfileBuildSourceScriptsRun(t *testing.T) {
@@ -456,7 +450,7 @@ func TestDockerfileBuildSourceScriptsRun(t *testing.T) {
 	expectedFiles := []string{
 		filepath.Join(tempdir, "upload/scripts/run"),
 	}
-	runDockerfileTest(t, config, expected, nil, expectedFiles, false)
+	RunDockerfileTest(t, config, expected, nil, expectedFiles, false)
 }
 
 // TestDockerfileBuildScriptsURLImage tests the behavior if the ScriptsURL
@@ -507,7 +501,7 @@ func TestDockerfileBuildScriptsURLImage(t *testing.T) {
 		"(?m)^RUN chown -R 1001:0.* /destination/scripts",
 		"(?m)^RUN /destination/scripts/assemble",
 	}
-	runDockerfileTest(t, config, expected, notExpected, nil, false)
+	RunDockerfileTest(t, config, expected, notExpected, nil, false)
 }
 
 func TestDockerfileBuildImageScriptsURLAssemble(t *testing.T) {
@@ -547,7 +541,7 @@ func TestDockerfileBuildImageScriptsURLAssemble(t *testing.T) {
 		filepath.Join(tempdir, "upload/src/server.js"),
 		filepath.Join(tempdir, "upload/scripts/assemble"),
 	}
-	runDockerfileTest(t, config, expected, nil, expectedFiles, false)
+	RunDockerfileTest(t, config, expected, nil, expectedFiles, false)
 }
 
 func TestDockerfileBuildImageScriptsURLRun(t *testing.T) {
@@ -587,7 +581,7 @@ func TestDockerfileBuildImageScriptsURLRun(t *testing.T) {
 		filepath.Join(tempdir, "upload/src/server.js"),
 		filepath.Join(tempdir, "upload/scripts/run"),
 	}
-	runDockerfileTest(t, config, expected, nil, expectedFiles, false)
+	RunDockerfileTest(t, config, expected, nil, expectedFiles, false)
 }
 
 func TestDockerfileBuildImageScriptsURLImage(t *testing.T) {
@@ -634,7 +628,7 @@ func TestDockerfileBuildImageScriptsURLImage(t *testing.T) {
 	expectedFiles := []string{
 		filepath.Join(tempdir, "upload/scripts/assemble"),
 	}
-	runDockerfileTest(t, config, expected, nil, expectedFiles, false)
+	RunDockerfileTest(t, config, expected, nil, expectedFiles, false)
 }
 
 func TestDockerfileBuildScriptsAndImageURL(t *testing.T) {
@@ -675,7 +669,7 @@ func TestDockerfileBuildScriptsAndImageURL(t *testing.T) {
 		filepath.Join(tempdir, "upload/src/server.js"),
 		filepath.Join(tempdir, "upload/scripts/assemble"),
 	}
-	runDockerfileTest(t, config, expected, nil, expectedFiles, false)
+	RunDockerfileTest(t, config, expected, nil, expectedFiles, false)
 }
 
 // TestDockerfileBuildScriptsAndImageURLConflicts tests if both
@@ -738,7 +732,7 @@ func TestDockerfileBuildScriptsAndImageURLConflicts(t *testing.T) {
 		filepath.Join(outputDir, "upload/src/server.js"),
 		filepath.Join(outputDir, "upload/scripts/assemble"),
 	}
-	runDockerfileTest(t, config, expected, nil, expectedFiles, false)
+	RunDockerfileTest(t, config, expected, nil, expectedFiles, false)
 	dockerfileAssemble, err := ioutil.ReadFile(filepath.Join(outputDir, "upload/scripts/assemble"))
 	if err != nil {
 		t.Errorf("Failed to read uploaded assemble script: %v", err)
@@ -786,7 +780,7 @@ func TestDockerfileIncrementalBuild(t *testing.T) {
 		"(?m)^CMD /usr/libexec/s2i/run",
 	}
 
-	runDockerfileTest(t, config, expected, nil, nil, false)
+	RunDockerfileTest(t, config, expected, nil, nil, false)
 }
 
 func TestDockerfileIncrementalSourceSave(t *testing.T) {
@@ -841,7 +835,7 @@ func TestDockerfileIncrementalSourceSave(t *testing.T) {
 		filepath.Join(tempdir, "upload/scripts/save-artifacts"),
 	}
 
-	runDockerfileTest(t, config, expected, nil, expectedFiles, false)
+	RunDockerfileTest(t, config, expected, nil, expectedFiles, false)
 }
 
 func TestDockerfileIncrementalSaveURL(t *testing.T) {
@@ -889,7 +883,7 @@ func TestDockerfileIncrementalSaveURL(t *testing.T) {
 		filepath.Join(tempdir, "upload/scripts/save-artifacts"),
 	}
 
-	runDockerfileTest(t, config, expected, nil, expectedFiles, false)
+	RunDockerfileTest(t, config, expected, nil, expectedFiles, false)
 }
 
 func TestDockerfileIncrementalTag(t *testing.T) {
@@ -925,7 +919,7 @@ func TestDockerfileIncrementalTag(t *testing.T) {
 		"(?m)^CMD /usr/libexec/s2i/run",
 	}
 
-	runDockerfileTest(t, config, expected, nil, nil, false)
+	RunDockerfileTest(t, config, expected, nil, nil, false)
 }
 
 func TestDockerfileIncrementalAssembleUser(t *testing.T) {
@@ -961,7 +955,7 @@ func TestDockerfileIncrementalAssembleUser(t *testing.T) {
 		"(?m)^CMD /usr/libexec/s2i/run",
 	}
 
-	runDockerfileTest(t, config, expected, nil, nil, false)
+	RunDockerfileTest(t, config, expected, nil, nil, false)
 }
 
 func TestDockerfileLocalSource(t *testing.T) {
@@ -1017,7 +1011,7 @@ func TestDockerfileLocalSource(t *testing.T) {
 		filepath.Join(outputDir, "upload/src/foo/baz/foobar/a_file"),
 	}
 
-	runDockerfileTest(t, config, nil, nil, expectedFiles, false)
+	RunDockerfileTest(t, config, nil, nil, expectedFiles, false)
 
 	s2iignore := filepath.Join(localTempDir, ".s2iignore")
 	s2iignoreDate := []byte("dummy\n#skip_file\nfoo/bar/another_file\nfoo/baz/foobar")
@@ -1032,62 +1026,5 @@ func TestDockerfileLocalSource(t *testing.T) {
 		filepath.Join(outputDir, "upload/src/foo/bar/a_file"),
 	}
 
-	runDockerfileTest(t, config, nil, nil, expectedFiles, false)
-}
-
-func runDockerfileTest(t *testing.T, config *api.Config, expected []string, notExpected []string, expectedFiles []string, expectFailure bool) {
-
-	b, _, err := strategies.Strategy(nil, config, build.Overrides{})
-	if err != nil {
-		t.Fatalf("Cannot create a new builder.")
-	}
-	resp, err := b.Build(config)
-	if expectFailure {
-		if err == nil || resp.Success {
-			t.Errorf("The build succeded when it should have failed. Success: %t, error: %v", resp.Success, err)
-		}
-		return
-	}
-	if err != nil {
-		t.Fatalf("An error occurred during the build: %v", err)
-	}
-	if !resp.Success {
-		t.Fatalf("The build failed when it should have succeeded.")
-	}
-
-	filebytes, err := ioutil.ReadFile(config.AsDockerfile)
-	if err != nil {
-		t.Fatalf("An error occurred reading the dockerfile: %v", err)
-	}
-	dockerfile := string(filebytes)
-
-	buf := bytes.NewBuffer(filebytes)
-	_, err = parser.Parse(buf)
-	if err != nil {
-		t.Fatalf("An error occurred parsing the dockerfile: %v\n%s", err, dockerfile)
-	}
-
-	for _, s := range expected {
-		reg, err := regexp.Compile(s)
-		if err != nil {
-			t.Fatalf("failed to compile regex %q: %v", s, err)
-		}
-		if !reg.MatchString(dockerfile) {
-			t.Fatalf("Expected dockerfile to contain %s, it did not: \n%s", s, dockerfile)
-		}
-	}
-	for _, s := range notExpected {
-		reg, err := regexp.Compile(s)
-		if err != nil {
-			t.Fatalf("failed to compile regex %q: %v", s, err)
-		}
-		if reg.MatchString(dockerfile) {
-			t.Fatalf("Expected dockerfile not to contain %s, it did: \n%s", s, dockerfile)
-		}
-	}
-	for _, f := range expectedFiles {
-		if _, err := os.Stat(f); os.IsNotExist(err) {
-			t.Fatalf("Did not find expected file %s, ", f)
-		}
-	}
+	RunDockerfileTest(t, config, nil, nil, expectedFiles, false)
 }
