@@ -136,7 +136,7 @@ func (e *External) Build(config *api.Config) (*api.Result, error) {
 	}
 
 	// generating dockerfile following AsDockerfile directive
-	err = e.dockerfile.CreateDockerfile(config)
+	_, err = e.dockerfile.Build(config)
 	if err != nil {
 		return nil, err
 	}
