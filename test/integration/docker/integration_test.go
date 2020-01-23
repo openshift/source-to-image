@@ -151,7 +151,7 @@ func (i integrationTest) InspectImage(name string) (*dockertypes.ImageInspect, e
 	defer cancel()
 	resp, _, err := engineClient.ImageInspectWithRaw(ctx, name)
 	if err != nil {
-		if dockerapi.IsErrImageNotFound(err) {
+		if dockerapi.IsErrNotFound(err) {
 			return nil, fmt.Errorf("no such image :%q", name)
 		}
 		return nil, err

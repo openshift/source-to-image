@@ -154,9 +154,9 @@ func TestDockerfileBuildLabels(t *testing.T) {
 		AssembleUser: "",
 		ImageWorkDir: "",
 		Source:       git.MustParse("https://github.com/sclorg/nodejs-ex"),
-		ScriptsURL:   "",
+		ScriptsURL:   "image:///scripts",
 		Injections:   api.VolumeList{},
-		Destination:  "",
+		Destination:  "/destination",
 
 		Environment: api.EnvironmentList{},
 		Labels: map[string]string{"label1": "value1",
@@ -166,6 +166,8 @@ func TestDockerfileBuildLabels(t *testing.T) {
 		AsDockerfile: filepath.Join(tempdir, "Dockerfile"),
 	}
 	expected := []string{
+		"\"io.openshift.s2i.scripts-url\"=\"image:///scripts\"",
+		"\"io.openshift.s2i.destination\"=\"/destination\"",
 		"\"io.openshift.s2i.build.commit.date\"",
 		"\"io.openshift.s2i.build.commit.id\"",
 		"\"io.openshift.s2i.build.commit.ref\"",
