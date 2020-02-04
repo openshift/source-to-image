@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-
 	"github.com/containers/image/v5/transports/alltransports"
 	"github.com/containers/image/v5/types"
 	"github.com/spf13/cobra"
@@ -14,12 +13,7 @@ import (
 )
 
 // getImageLabels attempts to inspect an image existing in a remote registry.
-func getImageLabels(ctx context.Context, imageName string) (map[string]string, error) {
-	ref, err := alltransports.ParseImageName(imageName)
-	if err != nil {
-		return nil, err
-	}
-
+func getImageLabels(ctx context.Context, ref types.ImageReference) (map[string]string, error) {
 	img, err := ref.NewImage(ctx, &types.SystemContext{})
 	if err != nil {
 		return nil, err
@@ -75,13 +69,17 @@ $ s2i generate docker://docker.io/centos/nodejs-10-centos7 Dockerfile.gen
 				return cmd.Help()
 			}
 
-			cfg.BuilderImage = cmd.Flags().Arg(0)
+			ref, err := alltransports.ParseImageName(cmd.Flags().Arg(0))
+			if err != nil {
+				return err
+			}
+
+			cfg.BuilderImage = ref.DockerReference().Name()
 			cfg.AsDockerfile = cmd.Flags().Arg(1)
 
 			ctx := context.Background()
 			var imageLabels map[string]string
-			var err error
-			if imageLabels, err = getImageLabels(ctx, cfg.BuilderImage); err != nil {
+			if imageLabels, err = getImageLabels(ctx, ref); err != nil {
 				return err
 			}
 
