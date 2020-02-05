@@ -3,6 +3,7 @@ module github.com/openshift/source-to-image
 go 1.13
 
 replace (
+	github.com/Azure/go-ansiterm => github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78
 	github.com/containerd/containerd => github.com/containerd/containerd v0.2.10-0.20170808145631-06b9cb351610
 	github.com/docker/docker => github.com/docker/docker v0.0.0-20190404075923-dbe4a30928d4
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20180904163835-0709b304e793
