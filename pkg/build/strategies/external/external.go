@@ -85,7 +85,7 @@ func (e *External) execute(externalCommand string) (*api.Result, error) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	res := &api.Result{Success: false}
+	res := &api.Result{Success: true}
 	res.Messages = append(res.Messages, fmt.Sprintf("Running command: '%s'", externalCommand))
 	err := cmd.Start()
 	if err != nil {
@@ -94,19 +94,15 @@ func (e *External) execute(externalCommand string) (*api.Result, error) {
 	}
 
 	if err := cmd.Wait(); err != nil {
+		res.Success = false
+
 		if exitErr, okay := err.(*exec.ExitError); okay {
 			if status, okay := exitErr.Sys().(syscall.WaitStatus); okay {
 				exitCode := status.ExitStatus()
 				log.V(0).Infof("External command return-code: %d", exitCode)
 				res.Messages = append(res.Messages, fmt.Sprintf("exit-code: %d", exitCode))
-				if exitCode == 0 {
-					res.Success = true
-				} else {
-					return res, exitErr
-				}
+				return res, exitErr
 			}
-		} else {
-			return res, err
 		}
 	}
 	return res, nil

@@ -115,3 +115,38 @@ func TestExternalAsDockerfile(t *testing.T) {
 		})
 	}
 }
+
+func TestExternal_execute(t *testing.T) {
+	e := &External{}
+	tests := []struct {
+		name            string
+		externalCommand string
+		want            bool
+		wantErr         bool
+	}{
+		{
+			"successful-true-command",
+			"/usr/bin/true",
+			true,
+			false,
+		},
+		{
+			"error-false-command",
+			"/usr/bin/false",
+			false,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := e.execute(tt.externalCommand)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("External.execute() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.want != got.Success {
+				t.Errorf("External.execute() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
