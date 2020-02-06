@@ -126,13 +126,13 @@ func TestExternal_execute(t *testing.T) {
 	}{
 		{
 			"successful-true-command",
-			"/usr/bin/true",
+			"true",
 			true,
 			false,
 		},
 		{
 			"error-false-command",
-			"/usr/bin/false",
+			"false",
 			false,
 			true,
 		},
