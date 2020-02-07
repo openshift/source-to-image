@@ -237,6 +237,13 @@ Usage:
 $ s2i generate <builder image> <output file>
 ```
 
+#### Example usage
+
+Generate a Dockerfile for the `centos/nodejs-10-centos7` builder image:
+```
+$ s2i generate docker://docker.io/centos/nodejs-10-centos7 Dockerfile.gen
+```
+
 # s2i usage
 
 The `s2i usage` command starts a container and runs the `usage` script which prints
