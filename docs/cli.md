@@ -228,13 +228,13 @@ The `s2i generate` command generates a Dockerfile using an existing S2I builder
 image that can be used to produce an image by any application supporting the
 format.
 
-The *image name* argument is in the URL-like, for example 
-`docker://docker.io/centos/nodejs-10-centos7`.
+The *builder name* is a reference to the builder image that serves as the base 
+of the generated Dockerfile. For example, 
+`docker://docker.io/centos/nodejs-10-centos7:latest`.
 
 Usage:
-
 ```
-$ s2i generate <image name> <output file>
+$ s2i generate <builder image> <output file>
 ```
 
 # s2i usage
