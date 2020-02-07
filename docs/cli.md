@@ -9,6 +9,7 @@ following sections of this document:
 * [create](#s2i-create)
 * [build](#s2i-build)
 * [rebuild](#s2i-rebuild)
+* [generate](#s2i-generate)
 * [usage](#s2i-usage)
 * [version](#s2i-version)
 * [help](#s2i-help)
@@ -218,6 +219,19 @@ Usage:
 $ s2i rebuild <image name> [<new-tag-name>]
 ```
 
+# s2i generate
+The `s2i generate` command produces a Dockerfile using an existing S2I base 
+image that can be used to produce an image by any application supporting the
+format.
+
+The *image name* argument is in the URL-like, for example 
+`docker://docker.io/centos/nodejs-10-centos7`.
+
+Usage:
+
+```
+$ s2i generate <image name> <output file>
+```
 
 # s2i usage
 
