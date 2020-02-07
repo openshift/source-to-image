@@ -58,10 +58,12 @@ func adjustConfigWithImageLabels(cfg *api.Config, labels map[string]string) {
 // NewCmdGenerate implements the S2I cli generate command.
 func NewCmdGenerate(cfg *api.Config) *cobra.Command {
 	generateCmd := &cobra.Command{
-		Use:   "generate <image> <dockerfile>",
-		Short: "Generate a Dockerfile based on the provided builder image",
+		Use: "generate <image> <dockerfile>",
+		Short: "Generate a Dockerfile using an existing S2I builder	image " +
+			"that can be used to produce an image by any application " +
+			"supporting the format.",
 		Example: `
-# Generate a Dockerfile from a builder image:
+# Generate a Dockerfile for the centos/nodejs-10-centos7 builder image:
 $ s2i generate docker://docker.io/centos/nodejs-10-centos7 Dockerfile.gen
 `,
 		RunE: func(cmd *cobra.Command, _ []string) error {
