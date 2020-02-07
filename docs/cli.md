@@ -220,7 +220,11 @@ $ s2i rebuild <image name> [<new-tag-name>]
 ```
 
 # s2i generate
-The `s2i generate` command produces a Dockerfile using an existing S2I base 
+
+This command is a Technology Preview feature, and is subject to change or be 
+removed without notice in a future release.
+
+The `s2i generate` command generates a Dockerfile using an existing S2I builder 
 image that can be used to produce an image by any application supporting the
 format.
 
