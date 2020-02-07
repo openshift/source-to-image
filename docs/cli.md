@@ -73,7 +73,7 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 |:----------------------------|:--------------------------------------------------------| 
 | `-u (--allowed-uids)`       | Specify a range of allowed user ids for the builder and runtime images. Ranges can be bounded (`1-10001`) or unbounded (`1-`). |
 | `-n (--application-name`)   | Specify the display name for the application (default: output image name) |
-| `--as-dockerfile`           | EXPERIMENTAL: Output a Dockerfile to this path instead of building a new image |
+| `--as-dockerfile`           | Output a Dockerfile to this path instead of building a new image |
 | `--assemble-user`           | Specify the user to run assemble with |
 | `--assemble-runtime-user`   | Specify the user to run assemble-runtime with |
 | `--callback-url`            | URL to be invoked after a build (see [Callback URL](#callback-url)) |
