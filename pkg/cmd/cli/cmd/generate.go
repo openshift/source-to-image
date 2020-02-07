@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+
 	"github.com/containers/image/v5/transports/alltransports"
 	"github.com/containers/image/v5/types"
 	"github.com/spf13/cobra"
@@ -62,20 +63,20 @@ func NewCmdGenerate(cfg *api.Config) *cobra.Command {
 		Short: "Generate a Dockerfile based on the provided builder image",
 		Example: `
 # Generate a Dockerfile from a builder image:
-$ s2i generate docker://docker.io/centos/nodejs-10-centos7 Dockerfile.gen
+$ s2i generate docker.io/centos/nodejs-10-centos7 Dockerfile.gen
 `,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if cmd.Flags().NArg() != 2 {
 				return cmd.Help()
 			}
 
-			ref, err := alltransports.ParseImageName(cmd.Flags().Arg(0))
+			cfg.BuilderImage = cmd.Flags().Arg(0)
+			cfg.AsDockerfile = cmd.Flags().Arg(1)
+
+			ref, err := alltransports.ParseImageName("docker://" + cfg.BuilderImage)
 			if err != nil {
 				return err
 			}
-
-			cfg.BuilderImage = ref.DockerReference().Name()
-			cfg.AsDockerfile = cmd.Flags().Arg(1)
 
 			ctx := context.Background()
 			var imageLabels map[string]string
