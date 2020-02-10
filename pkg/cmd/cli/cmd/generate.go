@@ -5,6 +5,7 @@ import (
 	"github.com/containers/image/v5/transports/alltransports"
 	"github.com/containers/image/v5/types"
 	"github.com/spf13/cobra"
+	"strings"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/api/constants"
@@ -55,6 +56,14 @@ func adjustConfigWithImageLabels(cfg *api.Config, labels map[string]string) {
 
 }
 
+// CanonizeBuilderImageArg appends 'docker://' if the builder image doesn't contain the a schema.
+func CanonizeBuilderImageArg(builderImage string) string {
+	if strings.Contains(builderImage, "://") {
+		return builderImage
+	}
+	return "docker://" + builderImage
+}
+
 // NewCmdGenerate implements the S2I cli generate command.
 func NewCmdGenerate(cfg *api.Config) *cobra.Command {
 	generateCmd := &cobra.Command{
@@ -71,7 +80,9 @@ $ s2i generate docker://docker.io/centos/nodejs-10-centos7 Dockerfile.gen
 				return cmd.Help()
 			}
 
-			ref, err := alltransports.ParseImageName(cmd.Flags().Arg(0))
+			builderImageArg := CanonizeBuilderImageArg(cmd.Flags().Arg(0))
+
+			ref, err := alltransports.ParseImageName(builderImageArg)
 			if err != nil {
 				return err
 			}
