@@ -230,7 +230,7 @@ format.
 
 The *builder name* is a reference to the builder image that serves as the base 
 of the generated Dockerfile. For example, 
-`docker://docker.io/centos/nodejs-10-centos7:latest`.
+`docker.io/centos/nodejs-10-centos7:latest`.
 
 Usage:
 ```
@@ -241,7 +241,7 @@ $ s2i generate <builder image> <output file>
 
 Generate a Dockerfile for the `centos/nodejs-10-centos7` builder image:
 ```
-$ s2i generate docker://docker.io/centos/nodejs-10-centos7 Dockerfile.gen
+$ s2i generate docker.io/centos/nodejs-10-centos7 Dockerfile.gen
 ```
 
 # s2i usage
