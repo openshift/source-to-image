@@ -17,4 +17,4 @@ echo
 echo "Running dockerfile integration tests ..."
 echo
 
-S2I_TIMEOUT="-timeout 600s" "${S2I_ROOT}/hack/test-go.sh" test/integration/dockerfile -v -tags "integration" "${@:1}"
+S2I_BUILD_TAGS="integration" S2I_TIMEOUT="-timeout 600s" "${S2I_ROOT}/hack/test-go.sh" test/integration/dockerfile -v "${@:1}"

@@ -28,6 +28,7 @@ find_test_dirs() {
 S2I_RACE=${S2I_RACE--race}
 S2I_COVER=${S2I_COVER--cover}
 S2I_TIMEOUT=${S2I_TIMEOUT--timeout 60s}
+S2I_BUILD_TAGS=""
 
 if [ "${1-}" != "" ]; then
   test_packages="$S2I_GO_PACKAGE/$1"
@@ -49,7 +50,7 @@ if [[ -n "${OUTPUT_COVERAGE}" ]]; then
     fi
     S2I_COVER_PROFILE="-coverprofile=${PROFILEPATH}"
 
-    go test $S2I_RACE $S2I_TIMEOUT $S2I_COVER "$S2I_COVER_PROFILE" "$test_package" "${@:2}"
+    go test -tags "$S2I_BUILD_TAGS exclude_graphdriver_devicemapper exclude_graphdriver_btrfs" $S2I_RACE $S2I_TIMEOUT $S2I_COVER "$S2I_COVER_PROFILE" "$test_package" "${@:2}"
   done
 
   echo 'mode: atomic' > ${OUTPUT_COVERAGE}/profiles.out
@@ -66,5 +67,5 @@ if [[ -n "${OUTPUT_COVERAGE}" ]]; then
   # remove ${OUTPUT_COVERAGE}/github.com
   rm -rf $OUTPUT_COVERAGE/${S2I_GO_PACKAGE%%/*}
 else
-  go test $S2I_RACE $S2I_TIMEOUT $S2I_COVER "${@:2}" $test_packages
+  go test -tags "$S2I_BUILD_TAGS exclude_graphdriver_devicemapper exclude_graphdriver_btrfs" $S2I_RACE $S2I_TIMEOUT $S2I_COVER "${@:2}" $test_packages
 fi
