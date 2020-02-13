@@ -9,6 +9,7 @@ following sections of this document:
 * [create](#s2i-create)
 * [build](#s2i-build)
 * [rebuild](#s2i-rebuild)
+* [generate](#s2i-generate)
 * [usage](#s2i-usage)
 * [version](#s2i-version)
 * [help](#s2i-help)
@@ -73,7 +74,7 @@ that image and add them to the tar streamed to the container into `/artifacts`.
 |:----------------------------|:--------------------------------------------------------| 
 | `-u (--allowed-uids)`       | Specify a range of allowed user ids for the builder and runtime images. Ranges can be bounded (`1-10001`) or unbounded (`1-`). |
 | `-n (--application-name`)   | Specify the display name for the application (default: output image name) |
-| `--as-dockerfile`           | EXPERIMENTAL: Output a Dockerfile to this path instead of building a new image |
+| `--as-dockerfile`           | Output a Dockerfile to this path instead of building a new image |
 | `--assemble-user`           | Specify the user to run assemble with |
 | `--assemble-runtime-user`   | Specify the user to run assemble-runtime with |
 | `--callback-url`            | URL to be invoked after a build (see [Callback URL](#callback-url)) |
@@ -218,6 +219,30 @@ Usage:
 $ s2i rebuild <image name> [<new-tag-name>]
 ```
 
+# s2i generate
+
+This command is a Technology Preview feature, and is subject to change or be 
+removed without notice in a future release.
+
+The `s2i generate` command generates a Dockerfile using an existing S2I builder 
+image that can be used to produce an image by any application supporting the
+format.
+
+The *builder name* is a reference to the builder image that serves as the base 
+of the generated Dockerfile. For example, 
+`docker.io/centos/nodejs-10-centos7:latest`.
+
+Usage:
+```
+$ s2i generate <builder image> <output file>
+```
+
+#### Example usage
+
+Generate a Dockerfile for the `centos/nodejs-10-centos7` builder image:
+```
+$ s2i generate docker.io/centos/nodejs-10-centos7 Dockerfile.gen
+```
 
 # s2i usage
 

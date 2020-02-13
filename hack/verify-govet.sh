@@ -15,7 +15,7 @@ FAILURE=false
 test_dirs=$(s2i::util::find_files | cut -d '/' -f 1-2 | sort -u)
 for test_dir in $test_dirs
 do
-  if ! go vet $test_dir
+  if ! go vet -tags "exclude_graphdriver_devicemapper exclude_graphdriver_btrfs" $test_dir
   then
     FAILURE=true
   fi
