@@ -85,6 +85,13 @@ test-docker:
 	hack/test-docker.sh $(TESTFLAGS)
 .PHONY: test-docker
 
+# Run tests on the s2i image.
+# Example:
+#	make test-image
+test-image:
+	hack/test-stirunimage.sh
+.PHONY: test-image
+
 # Remove all build artifacts.
 #
 # Example:
