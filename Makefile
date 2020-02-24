@@ -60,6 +60,13 @@ install-travis:
 check: verify test	
 .PHONY: check
 
+# Build sti image.
+# Example:
+#	make image
+image:
+	hack/build-base-images.sh
+.PHONY: image
+
 # Run unit tests
 # Example:
 #   make test
