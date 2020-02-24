@@ -1,21 +1,27 @@
+---
 language: go
-
 go:
   - 1.13.x
-
-install:
-  - make install-travis
-
-script:
-  - GOFLAGS="-mod=vendor" make verify
-  - GOFLAGS="-mod=vendor" make check TESTFLAGS="-p=4" TESTS="''" # empty quotes are because hack/test-go.sh requires 2 args
-
 notifications:
   irc: "chat.freenode.net#openshift-dev"
-
-sudo: false
-
 matrix:
   allow_failures:
-  - go: master
+    - go: master
   fast_finish: true
+services:
+  - docker
+env:
+  global:
+    - S2I_GIT_VERSION=""
+    - S2I_GIT_MAJOR=""
+    - S2I_GIT_MINOR=""
+install:
+  - make install-travis
+script:
+  # running project linting, static tests
+  - GOFLAGS="-mod=vendor" make verify
+  # running unit tests
+  - GOFLAGS="-mod=vendor" make test TESTFLAGS="-p=4" TESTS="''" # empty quotes are because hack/test-go.sh requires 2 args
+  # test image
+  - make test-image
+
