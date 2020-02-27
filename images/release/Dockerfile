@@ -37,7 +37,7 @@ RUN mkdir /var/lib/source-to-image \
 
 # Inform dependency in the PR.
 RUN yum install -y git && \
-    yum clean all && \
+    yum clean all \
     ; \
     rm -rfv /var/cache /var/log/dnf* /var/log/yum.*
 
