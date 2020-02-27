@@ -22,6 +22,8 @@ script:
   - GOFLAGS="-mod=vendor" make verify
   # running unit tests
   - GOFLAGS="-mod=vendor" make test TESTFLAGS="-p=4" TESTS="''" # empty quotes are because hack/test-go.sh requires 2 args
+  # build image from current branch
+  - GOFLAGS="-mod=vendor" make image
   # test image
   - make test-image
 
