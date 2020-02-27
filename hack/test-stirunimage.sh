@@ -4,7 +4,31 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-export PATH="$PWD/_output/local/bin/$(go env GOHOSTOS)/$(go env GOHOSTARCH):$PATH"
+S2I_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+source "${S2I_ROOT}/hack/common.sh"
+
+# S2I_FILE_PATH is the path for s2i to be used in s2i runner.
+S2I_FILE_PATH="$PWD/_output/local/bin/$(go env GOHOSTOS)/$(go env GOHOSTARCH)/s2i"
+
+# Load version vars available in the working directory
+s2i::build::get_version_vars
+
+# S2I_TEST_RUNNER is the test runner to be executed; currently either 's2i' or 'docker'
+export S2I_TEST_RUNNER=${S2I_TEST_RUNNER:-}
+
+# S2I_TEST_IMAGE is the image for the 'docker' test runner to execute during the integration tests.
+export S2I_TEST_IMAGE=${S2I_TEST_IMAGE:-}
+
+if [ -z "$S2I_TEST_RUNNER" ] && [ -z "$S2I_TEST_IMAGE" ]; then
+    # In the case both environment variables are empty, fall back to s2i runner.
+    export S2I_TEST_RUNNER=s2i
+elif [ "$S2I_TEST_RUNNER" == "docker" ] || [ ! -z "$S2I_TEST_IMAGE" ]; then
+    # In the case "docker" is selected or a S2I_TEST_IMAGE has been defined, use the docker runner.
+    export S2I_TEST_RUNNER=docker
+    # Use the given s2i container image if provided, otherwise use this branch's image (based on S2I_GIT_COMMIT
+    # environment variable).
+    export S2I_TEST_IMAGE=${S2I_TEST_IMAGE:-openshift/sti-release:${S2I_GIT_COMMIT}}
+fi
 
 function time_now()
 {
@@ -66,10 +90,39 @@ function test_debug() {
     echo
 }
 
+# _docker_runner executes s2i within a Docker container.
+function _docker_runner() {
+    #
+    # Some notes for future reference:
+    #
+    # * The container's working directory will be equivalent to the host's PWD to simulate running in the same host
+    #   filesystem.
+    # * This program's $WORK_DIR, $PWD and /tmp are mounted in the container as well, since some tests rely on the
+    #   filesystem path (file:// tests, for example), and the build output is located in /tmp.
+    # * The docker socket is also mounted as a volume to allow Docker operations from within the container.
+    # * The current user and group are set to allow the user to read the produced files from the host.
+    #
+    docker_args=(run -i --rm -w "${PWD}" -v "${WORK_DIR}:${WORK_DIR}" -v "${PWD}:${PWD}" -v /tmp:/tmp -v /var/run/docker.sock:/var/run/docker.sock -u "$(id -u):$(id -g)" "${S2I_TEST_IMAGE}" "$@")
+    docker "${docker_args[@]}"
+}
+
+
+# _s2i_runner executes s2i directly in the host.
+function _s2i_runner() {
+    $S2I_FILE_PATH "$@"
+}
+
+# s2i executes the runner specified by the S2I_TEST_RUNNER environment variable.
+function s2i() {
+    "_${S2I_TEST_RUNNER}_runner" "$@"
+}
+
 trap cleanup EXIT SIGINT
 
 echo "working dir:  ${WORK_DIR}"
 echo "s2i working dir:  ${S2I_WORK_DIR}"
+echo "s2i runner: ${S2I_TEST_RUNNER}"
+
 pushd ${WORK_DIR}
 
 test_debug "cloning source into working dir"
