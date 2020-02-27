@@ -96,7 +96,7 @@ test-docker:
 # Example:
 #	make test-image
 test-image:
-	hack/test-stirunimage.sh
+	S2I_TEST_RUNNER=docker hack/test-stirunimage.sh
 .PHONY: test-image
 
 # Remove all build artifacts.
