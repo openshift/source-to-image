@@ -24,5 +24,4 @@ script:
   # running unit tests
   - GOFLAGS="-mod=vendor" make test TESTFLAGS="-p=4" TESTS="''" # empty quotes are because hack/test-go.sh requires 2 args
   # build image from current branch
-  - make image && docker images && sudo make test-image
-
+  - make image && docker images && make test-image

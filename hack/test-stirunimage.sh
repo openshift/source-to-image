@@ -103,7 +103,7 @@ function _docker_runner() {
     # * The current user and group are set to allow the user to read the produced files from the host.
     #
     docker_args=(run -i --rm -w "${PWD}" -v "${WORK_DIR}:${WORK_DIR}" -v "${PWD}:${PWD}" -v /tmp:/tmp -v /var/run/docker.sock:/var/run/docker.sock -u "$(id -u):$(id -g)" "${S2I_TEST_IMAGE}" "$@")
-    docker "${docker_args[@]}"
+    sudo docker "${docker_args[@]}"
 }
 
 
