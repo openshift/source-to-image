@@ -115,6 +115,7 @@ function _s2i_runner() {
 
 # s2i executes the runner specified by the S2I_TEST_RUNNER environment variable.
 function s2i() {
+    echo "Starting ${S2I_TEST_RUNNER}"
     "_${S2I_TEST_RUNNER}_runner" "$@"
 }
 
