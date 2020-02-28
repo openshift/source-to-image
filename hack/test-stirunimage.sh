@@ -3,6 +3,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+set -o functrace
 
 S2I_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${S2I_ROOT}/hack/common.sh"
