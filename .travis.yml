@@ -18,6 +18,7 @@ env:
 install:
   - make install-travis
 script:
+  - docker info
   # running project linting, static tests
   - GOFLAGS="-mod=vendor" make verify
   # running unit tests
