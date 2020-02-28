@@ -122,6 +122,7 @@ trap cleanup EXIT SIGINT
 echo "working dir:  ${WORK_DIR}"
 echo "s2i working dir:  ${S2I_WORK_DIR}"
 echo "s2i runner: ${S2I_TEST_RUNNER}"
+echo "s2i image: ${S2I_TEST_IMAGE:-not specified}"
 
 pushd ${WORK_DIR}
 
