@@ -24,7 +24,7 @@ USER root
 
 RUN make
 
-FROM registry.redhat.io/ubi8/ubi
+FROM registry.access.redhat.com/ubi8/ubi
 
 ENV GOARCH="amd64" \
     S2I_WORKING_DIR="/var/lib/source-to-image" \
