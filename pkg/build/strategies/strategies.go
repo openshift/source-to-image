@@ -9,6 +9,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/build/strategies/onbuild"
 	"github.com/openshift/source-to-image/pkg/build/strategies/sti"
 	"github.com/openshift/source-to-image/pkg/docker"
+	"github.com/openshift/source-to-image/pkg/util/containermanager"
 	"github.com/openshift/source-to-image/pkg/util/fs"
 	utilstatus "github.com/openshift/source-to-image/pkg/util/status"
 )
@@ -36,7 +37,7 @@ func Strategy(client docker.Client, config *api.Config, overrides build.Override
 		return builder, buildInfo, nil
 	}
 
-	dkr := docker.New(client, config.PullAuthentication)
+	dkr := containermanager.GetDocker(client, config, config.PullAuthentication)
 	image, err := docker.GetBuilderImage(dkr, config)
 	buildInfo.Stages = api.RecordStageAndStepInfo(buildInfo.Stages, api.StagePullImages, api.StepPullBuilderImage, startTime, time.Now())
 	if err != nil {

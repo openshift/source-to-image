@@ -6,13 +6,13 @@ import (
 	"runtime"
 	"strings"
 
-	utillog "github.com/openshift/source-to-image/pkg/util/log"
-	"github.com/spf13/cobra"
-
 	"github.com/openshift/source-to-image/pkg/api"
+	"github.com/openshift/source-to-image/pkg/api/constants"
 	"github.com/openshift/source-to-image/pkg/cmd/cli/cmd"
 	cmdutil "github.com/openshift/source-to-image/pkg/cmd/cli/util"
 	"github.com/openshift/source-to-image/pkg/docker"
+	utillog "github.com/openshift/source-to-image/pkg/util/log"
+	"github.com/spf13/cobra"
 )
 
 // log is a placeholder until the builders pass an output stream down
@@ -38,6 +38,7 @@ func NewCmdCLI() *cobra.Command {
 	s2iCmd.PersistentFlags().StringVar(&(cfg.DockerConfig.CAFile), "ca", cfg.DockerConfig.CAFile, "Set the path of the docker TLS ca file")
 	s2iCmd.PersistentFlags().BoolVar(&(cfg.DockerConfig.UseTLS), "tls", cfg.DockerConfig.UseTLS, "Use TLS to connect to docker; implied by --tlsverify")
 	s2iCmd.PersistentFlags().BoolVar(&(cfg.DockerConfig.TLSVerify), "tlsverify", cfg.DockerConfig.TLSVerify, "Use TLS to connect to docker and verify the remote")
+	s2iCmd.PersistentFlags().StringVarP(&(cfg.ContainerManager), "container-manager", "m", defaultContainerManager(), "Backend container manager, either 'docker' or 'buildah'")
 	s2iCmd.AddCommand(cmd.NewCmdVersion())
 	s2iCmd.AddCommand(cmd.NewCmdBuild(cfg))
 	s2iCmd.AddCommand(cmd.NewCmdRebuild(cfg))
@@ -58,6 +59,19 @@ func NewCmdCLI() *cobra.Command {
 	s2iCmd.AddCommand(cmd.NewCmdCompletion(s2iCmd))
 
 	return s2iCmd
+}
+
+// defaultContainerManager returns the default container manager name, based on environment variable.
+func defaultContainerManager() string {
+	if name := os.Getenv(constants.ContainerManagerEnv); isValidContainerManager(name) {
+		return name
+	}
+	return "docker"
+}
+
+// isValidContainerManager validates the given container manager name.
+func isValidContainerManager(s string) bool {
+	return s == "docker" || s == "buildah"
 }
 
 // CommandFor returns the appropriate command for this base name,

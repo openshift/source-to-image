@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/docker/distribution/reference"
-
 	"github.com/openshift/source-to-image/pkg/api"
 )
 
@@ -37,6 +36,12 @@ func ValidateConfig(config *api.Config) []Error {
 		if err := validateDockerReference(config.Tag); err != nil {
 			allErrs = append(allErrs, NewFieldInvalidValueWithReason("tag", err.Error()))
 		}
+	}
+	if config.RunImage && config.ContainerManager != "docker" {
+		allErrs = append(allErrs, NewFieldInvalidValueWithReason(
+			"run",
+			"Using --run is only supported with 'docker' container manager.",
+		))
 	}
 	return allErrs
 }

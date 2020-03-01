@@ -12,6 +12,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/build"
 	"github.com/openshift/source-to-image/pkg/docker"
+	"github.com/openshift/source-to-image/pkg/util/containermanager"
 )
 
 // Config returns the Config object in nice readable, tabbed format.
@@ -105,10 +106,10 @@ func describeBuilderImage(client docker.Client, config *api.Config, out io.Write
 		Tag:                       config.Tag,
 		IncrementalAuthentication: config.IncrementalAuthentication,
 	}
-	dkr := docker.New(client, c.PullAuthentication)
+	dkr := containermanager.GetDocker(client, config, config.PullAuthentication)
 	builderImage, err := docker.GetBuilderImage(dkr, c)
 	if err == nil {
-		build.GenerateConfigFromLabels(c, builderImage)
+		_ = build.GenerateConfigFromLabels(c, builderImage)
 		if len(c.DisplayName) > 0 {
 			fmt.Fprintf(out, "Builder Name:\t%s\n", c.DisplayName)
 		}

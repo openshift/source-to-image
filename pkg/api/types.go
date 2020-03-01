@@ -247,11 +247,15 @@ type Config struct {
 	// ImageScriptsURL is the default location to find the assemble/run scripts for a builder image.
 	// This url can be a reference within the builder image if the scheme is specified as image://
 	ImageScriptsURL string
-	// AddHost Add a line to /etc/hosts for test purpose or private use in LAN. Its format is host:IP,muliple hosts can be added  by using multiple --add-host
+	// AddHost Add a line to /etc/hosts for test purpose or private use in LAN. Its format is
+	// "host:IP", multiple hosts can be added  by using multiple --add-host
 	AddHost []string
 
 	// AssembleRuntimeUser specifies the user to run the assemble-runtime script in container
 	AssembleRuntimeUser string
+
+	// ContainerManager specifies the container manager backend
+	ContainerManager string
 }
 
 // EnvironmentSpec specifies a single environment variable.
@@ -339,7 +343,6 @@ type Image struct {
 
 // Result structure contains information from build process.
 type Result struct {
-
 	// Success describes whether the build was successful.
 	Success bool
 
@@ -390,7 +393,7 @@ const (
 	// StagePullImages pulls the docker images.
 	StagePullImages StageName = "PullImages"
 
-	//StageAssemble runs the assemble steps.
+	// StageAssemble runs the assemble steps.
 	StageAssemble StageName = "Assemble"
 
 	// StageBuild builds the source.
@@ -458,7 +461,6 @@ type FailureReason struct {
 
 // InstallResult structure describes the result of install operation
 type InstallResult struct {
-
 	// Script describes which script this result refers to
 	Script string
 

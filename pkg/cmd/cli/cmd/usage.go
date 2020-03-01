@@ -1,13 +1,12 @@
 package cmd
 
 import (
-	"github.com/spf13/cobra"
-
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/build/strategies/sti"
 	cmdutil "github.com/openshift/source-to-image/pkg/cmd/cli/util"
-	"github.com/openshift/source-to-image/pkg/docker"
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
+	"github.com/openshift/source-to-image/pkg/util/containermanager"
+	"github.com/spf13/cobra"
 )
 
 // NewCmdUsage implements the S2I cli usage command.
@@ -40,7 +39,7 @@ func NewCmdUsage(cfg *api.Config) *cobra.Command {
 				cfg.PreviousImagePullPolicy = api.DefaultPreviousImagePullPolicy
 			}
 
-			client, err := docker.NewEngineAPIClient(cfg.DockerConfig)
+			client, err := containermanager.GetClient(cfg)
 			s2ierr.CheckError(err)
 			uh, err := sti.NewUsage(client, cfg)
 			s2ierr.CheckError(err)

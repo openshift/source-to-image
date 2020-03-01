@@ -10,4 +10,8 @@ const (
 	//
 	// DEPRECATED - use ScriptsURLLabel instead.
 	ScriptsURLEnvironment = "STI_SCRIPTS_URL"
+
+	// ContainerManagerEnv is the environment variable name that specifies the container runtime S2I will use to
+	// build the application's image.
+	ContainerManagerEnv = "S2I_CONTAINER_MANAGER"
 )

@@ -18,6 +18,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/docker"
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/tar"
+	"github.com/openshift/source-to-image/pkg/util/containermanager"
 	"github.com/openshift/source-to-image/pkg/util/fs"
 	utillog "github.com/openshift/source-to-image/pkg/util/log"
 	utilstatus "github.com/openshift/source-to-image/pkg/util/status"
@@ -48,7 +49,7 @@ func New(client docker.Client, config *api.Config, fs fs.FileSystem, scripts bui
 		return nil, err
 	}
 
-	d := docker.New(client, config.PullAuthentication)
+	d := containermanager.GetDocker(client, config, config.PullAuthentication)
 	tarHandler := tar.New(fs)
 	tarHandler.SetExclusionPattern(excludePattern)
 

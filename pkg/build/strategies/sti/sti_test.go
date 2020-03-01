@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"reflect"
 	"regexp/syntax"
@@ -148,8 +149,9 @@ func (f *FakeDockerBuild) Build(*api.Config) (*api.Result, error) {
 
 func TestDefaultSource(t *testing.T) {
 	config := &api.Config{
-		Source:       git.MustParse("."),
-		DockerConfig: &api.DockerConfig{Endpoint: "unix:///var/run/docker.sock"},
+		ContainerManager: os.Getenv(constants.ContainerManagerEnv),
+		Source:           git.MustParse("."),
+		DockerConfig:     &api.DockerConfig{Endpoint: "unix:///var/run/docker.sock"},
 	}
 	client, err := docker.NewEngineAPIClient(config.DockerConfig)
 	if err != nil {
@@ -169,8 +171,9 @@ func TestDefaultSource(t *testing.T) {
 
 func TestEmptySource(t *testing.T) {
 	config := &api.Config{
-		Source:       nil,
-		DockerConfig: &api.DockerConfig{Endpoint: "unix:///var/run/docker.sock"},
+		ContainerManager: os.Getenv(constants.ContainerManagerEnv),
+		Source:           nil,
+		DockerConfig:     &api.DockerConfig{Endpoint: "unix:///var/run/docker.sock"},
 	}
 	client, err := docker.NewEngineAPIClient(config.DockerConfig)
 	if err != nil {
@@ -181,7 +184,7 @@ func TestEmptySource(t *testing.T) {
 		t.Fatal(err)
 	}
 	if config.Source != nil {
-		t.Errorf("Config.Source unexpectantly changed: %v", config.Source)
+		t.Errorf("Config.Source unexpectedly changed: %v", config.Source)
 	}
 	if _, ok := sti.source.(*empty.Noop); !ok || sti.source == nil {
 		t.Errorf("Source interface not set: %#v", sti.source)
@@ -196,7 +199,8 @@ func TestOverrides(t *testing.T) {
 	}
 	sti, err := New(client,
 		&api.Config{
-			DockerConfig: &api.DockerConfig{Endpoint: "unix:///var/run/docker.sock"},
+			ContainerManager: os.Getenv(constants.ContainerManagerEnv),
+			DockerConfig:     &api.DockerConfig{Endpoint: "unix:///var/run/docker.sock"},
 		},
 		fs.NewFileSystem(),
 		build.Overrides{
@@ -222,7 +226,7 @@ func TestBuild(t *testing.T) {
 		builder := newFakeSTI(fh)
 		builder.Build(&api.Config{Incremental: incremental})
 
-		// Verify the right scripts were configed
+		// Verify the right scripts were configured
 		if !reflect.DeepEqual(fh.SetupRequired, []string{constants.Assemble, constants.Run}) {
 			t.Errorf("Unexpected required scripts configured: %#v", fh.SetupRequired)
 		}

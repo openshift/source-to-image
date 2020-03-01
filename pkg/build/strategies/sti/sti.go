@@ -25,6 +25,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
 	"github.com/openshift/source-to-image/pkg/util/cmd"
+	"github.com/openshift/source-to-image/pkg/util/containermanager"
 	"github.com/openshift/source-to-image/pkg/util/fs"
 	utillog "github.com/openshift/source-to-image/pkg/util/log"
 	utilstatus "github.com/openshift/source-to-image/pkg/util/status"
@@ -101,10 +102,10 @@ func New(client dockerpkg.Client, config *api.Config, fs fs.FileSystem, override
 		return nil, err
 	}
 
-	docker := dockerpkg.New(client, config.PullAuthentication)
+	docker := containermanager.GetDocker(client, config, config.PullAuthentication)
 	var incrementalDocker dockerpkg.Docker
 	if config.Incremental {
-		incrementalDocker = dockerpkg.New(client, config.IncrementalAuthentication)
+		incrementalDocker = containermanager.GetDocker(client, config, config.IncrementalAuthentication)
 	}
 
 	inst := scripts.NewInstaller(
@@ -137,7 +138,7 @@ func New(client dockerpkg.Client, config *api.Config, fs fs.FileSystem, override
 	}
 
 	if len(config.RuntimeImage) > 0 {
-		builder.runtimeDocker = dockerpkg.New(client, config.RuntimeAuthentication)
+		builder.runtimeDocker = containermanager.GetDocker(client, config, config.RuntimeAuthentication)
 
 		builder.runtimeInstaller = scripts.NewInstaller(
 			config.RuntimeImage,
@@ -624,6 +625,7 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 		Binds:           config.BuildVolumes,
 		SecurityOpt:     config.SecurityOpt,
 		AddHost:         config.AddHost,
+		WorkingDir:      builder.result.WorkingDir,
 	}
 
 	// If there are injections specified, override the original assemble script
@@ -672,6 +674,8 @@ func (builder *STI) Execute(command string, user string, config *api.Config) err
 			return fmt.Sprintf("while [ ! -f %[1]q ]; do sleep 0.5; done; if [ -s %[1]q ]; then exit 1; fi; %[2]s; result=$?; . %[3]s; exit $result",
 				injectionResultFile, cmd, rmInjectionsScript)
 		}
+		// storing path to injection script in contanier image.
+		opts.RmInjectionsScript = rmInjectionsScript
 		originalOnStart := opts.OnStart
 		opts.OnStart = func(containerID string) error {
 			defer close(injectionError)

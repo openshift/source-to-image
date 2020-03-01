@@ -8,6 +8,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/docker"
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
+	"github.com/openshift/source-to-image/pkg/util/containermanager"
 	utillog "github.com/openshift/source-to-image/pkg/util/log"
 )
 
@@ -24,7 +25,7 @@ type DockerRunner struct {
 // New creates a DockerRunner for executing the methods associated with running
 // the produced image in a docker container for verification purposes.
 func New(client docker.Client, config *api.Config) *DockerRunner {
-	d := docker.New(client, config.PullAuthentication)
+	d := containermanager.GetDocker(client, config, config.PullAuthentication)
 	return &DockerRunner{d}
 }
 

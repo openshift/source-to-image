@@ -4,10 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/openshift/source-to-image/pkg/scm/git"
-	utillog "github.com/openshift/source-to-image/pkg/util/log"
-	"github.com/spf13/cobra"
-
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/api/describe"
 	"github.com/openshift/source-to-image/pkg/api/validation"
@@ -18,9 +14,13 @@ import (
 	"github.com/openshift/source-to-image/pkg/docker"
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/run"
+	"github.com/openshift/source-to-image/pkg/scm/git"
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
+	"github.com/openshift/source-to-image/pkg/util/containermanager"
+	utillog "github.com/openshift/source-to-image/pkg/util/log"
 	"github.com/openshift/source-to-image/pkg/version"
+	"github.com/spf13/cobra"
 )
 
 // log is a placeholder until the builders pass an output stream down
@@ -101,7 +101,7 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 					fmt.Fprintf(os.Stderr, "ERROR: %s\n", e)
 				}
 				fmt.Println()
-				cmd.Help()
+				_ = cmd.Help()
 				return
 			}
 
@@ -148,13 +148,13 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 				cfg.DockerNetworkMode = api.DockerNetworkMode(networkMode)
 			}
 
-			client, err := docker.NewEngineAPIClient(cfg.DockerConfig)
+			client, err := containermanager.GetClient(cfg)
 			if err != nil {
 				log.Fatal(err)
 			}
 
 			if len(cfg.AsDockerfile) == 0 {
-				d := docker.New(client, cfg.PullAuthentication)
+				d := containermanager.GetDocker(client, cfg, cfg.PullAuthentication)
 				err := d.CheckReachable()
 				if err != nil {
 					log.Fatal(err)

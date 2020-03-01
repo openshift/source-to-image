@@ -18,6 +18,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/scripts"
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util/cmd"
+	"github.com/openshift/source-to-image/pkg/util/containermanager"
 	"github.com/openshift/source-to-image/pkg/util/fs"
 	utilstatus "github.com/openshift/source-to-image/pkg/util/status"
 )
@@ -41,7 +42,7 @@ type onBuildSourceHandler struct {
 
 // New returns a new instance of OnBuild builder
 func New(client docker.Client, config *api.Config, fs fs.FileSystem, overrides build.Overrides) (*OnBuild, error) {
-	dockerHandler := docker.New(client, config.PullAuthentication)
+	dockerHandler := containermanager.GetDocker(client, config, config.PullAuthentication)
 	builder := &OnBuild{
 		docker: dockerHandler,
 		git:    git.New(fs, cmd.NewCommandRunner()),
@@ -115,6 +116,7 @@ func (builder *OnBuild) Build(config *api.Config) (*api.Result, error) {
 		Stdin:        tarStream,
 		Stdout:       outWriter,
 		CGroupLimits: config.CGroupLimits,
+		WorkingDir:   config.WorkingDir,
 	}
 
 	log.V(2).Info("Building the application source")

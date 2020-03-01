@@ -3,8 +3,6 @@ package cmd
 import (
 	"os"
 
-	"github.com/spf13/cobra"
-
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/api/describe"
 	"github.com/openshift/source-to-image/pkg/build"
@@ -12,6 +10,8 @@ import (
 	cmdutil "github.com/openshift/source-to-image/pkg/cmd/cli/util"
 	"github.com/openshift/source-to-image/pkg/docker"
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
+	"github.com/openshift/source-to-image/pkg/util/containermanager"
+	"github.com/spf13/cobra"
 )
 
 // NewCmdRebuild implements the S2i cli rebuild command.
@@ -45,9 +45,9 @@ func NewCmdRebuild(cfg *api.Config) *cobra.Command {
 				cfg.PreviousImagePullPolicy = api.DefaultPreviousImagePullPolicy
 			}
 
-			client, err := docker.NewEngineAPIClient(cfg.DockerConfig)
+			client, err := containermanager.GetClient(cfg)
 			s2ierr.CheckError(err)
-			dkr := docker.New(client, cfg.PullAuthentication)
+			dkr := containermanager.GetDocker(client, cfg, cfg.PullAuthentication)
 			pr, err := docker.GetRebuildImage(dkr, cfg)
 			s2ierr.CheckError(err)
 			err = build.GenerateConfigFromLabels(cfg, pr)
