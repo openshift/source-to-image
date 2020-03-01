@@ -13,7 +13,11 @@ s2i::build_test_image() {
   local tag="sti_test/${image_name}"
   local src="test/integration/images/${image_name}"
   cp -R test/integration/scripts "${src}"
-  docker build -t "${tag}" "${src}"
+  if [[ "${S2I_CONTAINER_MANAGER}" == "buildah" ]] ; then
+    buildah bud -t "${tag}" "${src}"
+  else
+    docker build -t "${tag}" "${src}"
+  fi
   rm -rf "${src}/scripts"
 }
 

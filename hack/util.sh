@@ -79,6 +79,8 @@ s2i::util::sed() {
   fi
 }
 
+# Find all go files from local directory recursively, except files located at "vendor" and "_output"
+# directories.
 s2i::util::find_files() {
-  find . -type d -name vendor -prune -o -name '*.go' -print
+  find . -type d \( -path "./vendor" -o -path "./_output" \) -prune -o -name '*.go' -print
 }

@@ -11,17 +11,32 @@ s2i::cleanup() {
   echo "Complete"
 }
 
-readonly img_count="$(docker images | grep -c sti_test/sti-fake || :)"
+if [[ "${S2I_CONTAINER_MANAGER}" == "buildah" ]] ; then
+  img_count="$(buildah images | grep -c sti_test/sti-fake || :)"
+else
+  img_count="$(docker images | grep -c sti_test/sti-fake || :)"
+fi
+
+readonly img_count
 
 if [ "${img_count}" != "12" ]; then
-    echo "Missing test images, run 'hack/build-test-images.sh' and try again."
-    exit 1
+  echo "Missing test images, run 'hack/build-test-images.sh' and try again."
+  exit 1
 fi
 
 trap s2i::cleanup EXIT SIGINT
+
+export S2I_BUILD_TAGS="integration"
+export S2I_TIMEOUT="-timeout 600s"
+
+echo
+echo "Running buildah integration tests ..."
+echo
+
+"${S2I_ROOT}/hack/test-go.sh" test/integration/buildah -v -failfast "${@:1}"
 
 echo
 echo "Running docker integration tests ..."
 echo
 
-S2I_BUILD_TAGS="integration" S2I_TIMEOUT="-timeout 600s" "${S2I_ROOT}/hack/test-go.sh" test/integration/docker -v "${@:1}"
+"${S2I_ROOT}/hack/test-go.sh" test/integration/docker -v -failfast "${@:1}"
