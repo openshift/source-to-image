@@ -24,9 +24,6 @@ import (
 	dockerapi "github.com/docker/docker/client"
 	dockermessage "github.com/docker/docker/pkg/jsonmessage"
 	dockerstdcopy "github.com/docker/docker/pkg/stdcopy"
-	"github.com/docker/go-connections/tlsconfig"
-	"golang.org/x/net/context"
-
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/api/constants"
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
@@ -34,6 +31,9 @@ import (
 	"github.com/openshift/source-to-image/pkg/util"
 	"github.com/openshift/source-to-image/pkg/util/fs"
 	"github.com/openshift/source-to-image/pkg/util/interrupt"
+	"golang.org/x/net/context"
+
+	"github.com/docker/go-connections/tlsconfig"
 )
 
 const (
@@ -201,13 +201,17 @@ type RunContainerOptions struct {
 	CommandExplicit []string
 	// SecurityOpt is passed through as security options to the underlying container.
 	SecurityOpt []string
+	// WorkingDir informs the local directory used to gather application source and scripts
+	WorkingDir string
+	// RmInjectionsScript path to injections clean up script
+	RmInjectionsScript string
 }
 
 // asDockerConfig converts a RunContainerOptions into a Config understood by the
 // docker client
 func (rco RunContainerOptions) asDockerConfig() dockercontainer.Config {
 	return dockercontainer.Config{
-		Image:        getImageName(rco.Image),
+		Image:        GetImageName(rco.Image),
 		User:         rco.User,
 		Env:          rco.Env,
 		Entrypoint:   rco.Entrypoint,
@@ -236,9 +240,9 @@ func (rco RunContainerOptions) asDockerHostConfig() dockercontainer.HostConfig {
 	return hostConfig
 }
 
-// asDockerCreateContainerOptions converts a RunContainerOptions into a
+// AsDockerCreateContainerOptions converts a RunContainerOptions into a
 // ContainerCreateConfig understood by the docker client
-func (rco RunContainerOptions) asDockerCreateContainerOptions() dockertypes.ContainerCreateConfig {
+func (rco RunContainerOptions) AsDockerCreateContainerOptions() dockertypes.ContainerCreateConfig {
 	config := rco.asDockerConfig()
 	hostConfig := rco.asDockerHostConfig()
 	return dockertypes.ContainerCreateConfig{
@@ -276,6 +280,7 @@ type BuildImageOptions struct {
 	Stdin        io.Reader
 	Stdout       io.WriteCloser
 	CGroupLimits *api.CGroupLimits
+	WorkingDir   string // path to temporary working directory
 }
 
 // NewEngineAPIClient creates a new Docker engine API client
@@ -410,7 +415,7 @@ func (d *stiDocker) DownloadFromContainer(containerPath string, w io.Writer, con
 
 // IsImageInLocalRegistry determines whether the supplied image is in the local registry.
 func (d *stiDocker) IsImageInLocalRegistry(name string) (bool, error) {
-	name = getImageName(name)
+	name = GetImageName(name)
 	resp, err := d.InspectImage(name)
 	if resp != nil {
 		return true, nil
@@ -424,7 +429,7 @@ func (d *stiDocker) IsImageInLocalRegistry(name string) (bool, error) {
 // GetImageUser finds and retrieves the user associated with
 // an image if one has been specified
 func (d *stiDocker) GetImageUser(name string) (string, error) {
-	name = getImageName(name)
+	name = GetImageName(name)
 	resp, err := d.InspectImage(name)
 	if err != nil {
 		log.V(4).Infof("error inspecting image %s: %v", name, err)
@@ -451,7 +456,7 @@ func (d *stiDocker) IsImageOnBuild(name string) bool {
 // GetOnBuild returns the set of ONBUILD Dockerfile commands to execute
 // for the given image
 func (d *stiDocker) GetOnBuild(name string) ([]string, error) {
-	name = getImageName(name)
+	name = GetImageName(name)
 	resp, err := d.InspectImage(name)
 	if err != nil {
 		log.V(4).Infof("error inspecting image %s: %v", name, err)
@@ -463,19 +468,11 @@ func (d *stiDocker) GetOnBuild(name string) ([]string, error) {
 // CheckAndPullImage pulls an image into the local registry if not present
 // and returns the image metadata
 func (d *stiDocker) CheckAndPullImage(name string) (*api.Image, error) {
-	name = getImageName(name)
+	name = GetImageName(name)
 	displayName := name
 
 	if !log.Is(3) {
-		// For less verbose log levels (less than 3), shorten long iamge names like:
-		//     "centos/php-56-centos7@sha256:51c3e2b08bd9fadefccd6ec42288680d6d7f861bdbfbd2d8d24960621e4e27f5"
-		// to include just enough characters to differentiate the build from others in the docker repository:
-		//     "centos/php-56-centos7@sha256:51c3e2b08bd..."
-		// 18 characters is somewhat arbitrary, but should be enough to avoid a name collision.
-		split := strings.Split(name, "@")
-		if len(split) > 1 && len(split[1]) > 18 {
-			displayName = split[0] + "@" + split[1][:18] + "..."
-		}
+		displayName = ImageShortName(name)
 	}
 
 	image, err := d.CheckImage(name)
@@ -491,9 +488,18 @@ func (d *stiDocker) CheckAndPullImage(name string) (*api.Image, error) {
 	return image, nil
 }
 
+// ImageShortName shorten image name when tag longer than 18 characters.
+func ImageShortName(name string) string {
+	split := strings.Split(name, "@")
+	if len(split) > 1 && len(split[1]) > 18 {
+		return split[0] + "@" + split[1][:18] + "..."
+	}
+	return name
+}
+
 // CheckImage checks image from the local registry.
 func (d *stiDocker) CheckImage(name string) (*api.Image, error) {
-	name = getImageName(name)
+	name = GetImageName(name)
 	inspect, err := d.InspectImage(name)
 	if err != nil {
 		log.V(4).Infof("error inspecting image %s: %v", name, err)
@@ -518,7 +524,7 @@ func base64EncodeAuth(auth dockertypes.AuthConfig) (string, error) {
 
 // PullImage pulls an image into the local registry
 func (d *stiDocker) PullImage(name string) (*api.Image, error) {
-	name = getImageName(name)
+	name = GetImageName(name)
 
 	// RegistryAuth is the base64 encoded credentials for the registry
 	base64Auth, err := base64EncodeAuth(d.pullAuth)
@@ -626,7 +632,7 @@ func (d *stiDocker) KillContainer(id string) error {
 
 // GetLabels retrieves the labels of the given image.
 func (d *stiDocker) GetLabels(name string) (map[string]string, error) {
-	name = getImageName(name)
+	name = GetImageName(name)
 	resp, err := d.InspectImage(name)
 	if err != nil {
 		log.V(4).Infof("error inspecting image %s: %v", name, err)
@@ -635,8 +641,8 @@ func (d *stiDocker) GetLabels(name string) (map[string]string, error) {
 	return resp.Config.Labels, nil
 }
 
-// getImageName checks the image name and adds DefaultTag if none is specified
-func getImageName(name string) string {
+// GetImageName checks the image name and adds DefaultTag if none is specified
+func GetImageName(name string) string {
 	_, tag, id := parseRepositoryTag(name)
 	if len(tag) == 0 && len(id) == 0 {
 		//_, tag, _ := parseRepositoryTag(name)
@@ -674,7 +680,7 @@ func (d *stiDocker) GetScriptsURL(image string) (string, error) {
 		return "", err
 	}
 
-	return getScriptsURL(imageMetadata), nil
+	return GetScriptsURL(imageMetadata), nil
 }
 
 // GetAssembleInputFiles finds a io.openshift.s2i.assemble-input-files label on the given image.
@@ -702,8 +708,8 @@ func (d *stiDocker) GetAssembleRuntimeUser(image string) (string, error) {
 	return getLabel(imageMetadata, constants.AssembleRuntimeUserLabel), nil
 }
 
-// getScriptsURL finds a scripts url label in the image metadata
-func getScriptsURL(image *api.Image) string {
+// GetScriptsURL finds a scripts url label in the image metadata
+func GetScriptsURL(image *api.Image) string {
 	if image == nil {
 		return ""
 	}
@@ -756,7 +762,7 @@ func getDestination(image *api.Image) string {
 
 func constructCommand(opts RunContainerOptions, imageMetadata *api.Image, tarDestination string) []string {
 	// base directory for all S2I commands
-	commandBaseDir := determineCommandBaseDir(opts, imageMetadata, tarDestination)
+	commandBaseDir := DetermineCommandBaseDir(opts, imageMetadata, tarDestination)
 
 	// NOTE: We use path.Join instead of filepath.Join to avoid converting the
 	// path to UNC (Windows) format as we always run this inside container.
@@ -777,14 +783,17 @@ func constructCommand(opts RunContainerOptions, imageMetadata *api.Image, tarDes
 	return []string{binaryToRun}
 }
 
-func determineTarDestinationDir(opts RunContainerOptions, imageMetadata *api.Image) string {
+// DetermineTarDestinationDir based on RunContainerOptions, return destination based on image metadata.
+func DetermineTarDestinationDir(opts RunContainerOptions, imageMetadata *api.Image) string {
 	if len(opts.Destination) != 0 {
 		return opts.Destination
 	}
 	return getDestination(imageMetadata)
 }
 
-func determineCommandBaseDir(opts RunContainerOptions, imageMetadata *api.Image, tarDestination string) string {
+// DetermineCommandBaseDir based on RunContainerOptions and image metadata, return the base directory
+// for commands in the image.
+func DetermineCommandBaseDir(opts RunContainerOptions, imageMetadata *api.Image, tarDestination string) string {
 	if opts.ExternalScripts {
 		// for external scripts we must always append 'scripts' because this is
 		// the default subdirectory inside tar for them
@@ -797,7 +806,7 @@ func determineCommandBaseDir(opts RunContainerOptions, imageMetadata *api.Image,
 	// for internal scripts we can have separate path for scripts and untar operation destination
 	scriptsURL := opts.ScriptsURL
 	if len(scriptsURL) == 0 {
-		scriptsURL = getScriptsURL(imageMetadata)
+		scriptsURL = GetScriptsURL(imageMetadata)
 	}
 
 	commandBaseDir := strings.TrimPrefix(scriptsURL, "image://")
@@ -895,26 +904,37 @@ func (d *stiDocker) holdHijackedConnection(tty bool, opts *RunContainerOptions, 
 	return <-receiveStdout
 }
 
+// CloseStdInOutErr will guarantee that Std{in,out,err} are closed upon return, including under error
+// circumstances. In normal circumstances, holdHijackedConnection should do this for us.
+func CloseStdInOutErr(opts RunContainerOptions) {
+	if opts.Stdin != nil {
+		opts.Stdin.Close()
+	}
+	if opts.Stdout != nil {
+		opts.Stdout.Close()
+	}
+	if opts.Stderr != nil {
+		opts.Stderr.Close()
+	}
+}
+
+// DumpStack handle quit signal, shows the runtime stack and exit(2).
+func DumpStack(signal os.Signal) {
+	if signal == syscall.SIGQUIT {
+		buf := make([]byte, 1<<16)
+		runtime.Stack(buf, true)
+		fmt.Printf("%s", buf)
+	}
+	os.Exit(2)
+}
+
 // RunContainer creates and starts a container using the image specified in opts
 // with the ability to stream input and/or output.  Any non-nil
 // opts.Std{in,out,err} will be closed upon return.
 func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
-	// Guarantee that Std{in,out,err} are closed upon return, including under
-	// error circumstances.  In normal circumstances, holdHijackedConnection
-	// should do this for us.
-	defer func() {
-		if opts.Stdin != nil {
-			opts.Stdin.Close()
-		}
-		if opts.Stdout != nil {
-			opts.Stdout.Close()
-		}
-		if opts.Stderr != nil {
-			opts.Stderr.Close()
-		}
-	}()
+	defer CloseStdInOutErr(opts)
 
-	createOpts := opts.asDockerCreateContainerOptions()
+	createOpts := opts.AsDockerCreateContainerOptions()
 
 	// get info about the specified image
 	image := createOpts.Config.Image
@@ -955,7 +975,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 		if len(opts.CommandExplicit) != 0 {
 			cmd = opts.CommandExplicit
 		} else {
-			tarDestination = determineTarDestinationDir(opts, imageMetadata)
+			tarDestination = DetermineTarDestinationDir(opts, imageMetadata)
 			cmd = constructCommand(opts, imageMetadata, tarDestination)
 		}
 		log.V(5).Infof("Setting %q command for container ...", strings.Join(cmd, " "))
@@ -990,15 +1010,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 			log.V(4).Infof("Removed container %q", container.ID)
 		}
 	}
-	dumpStack := func(signal os.Signal) {
-		if signal == syscall.SIGQUIT {
-			buf := make([]byte, 1<<16)
-			runtime.Stack(buf, true)
-			fmt.Printf("%s", buf)
-		}
-		os.Exit(2)
-	}
-	return interrupt.New(dumpStack, removeContainer).Run(func() error {
+	return interrupt.New(DumpStack, removeContainer).Run(func() error {
 		log.V(2).Infof("Attaching to container %q ...", container.ID)
 		ctx, cancel := getDefaultContext()
 		defer cancel()
@@ -1077,7 +1089,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 
 // GetImageID retrieves the ID of the image identified by name
 func (d *stiDocker) GetImageID(name string) (string, error) {
-	name = getImageName(name)
+	name = GetImageName(name)
 	image, err := d.InspectImage(name)
 	if err != nil {
 		return "", err

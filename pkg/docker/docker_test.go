@@ -10,14 +10,14 @@ import (
 	"strings"
 	"testing"
 
+	dockertypes "github.com/docker/docker/api/types"
+	dockercontainer "github.com/docker/docker/api/types/container"
+	dockerstrslice "github.com/docker/docker/api/types/strslice"
+
 	"github.com/openshift/source-to-image/pkg/api/constants"
 	dockertest "github.com/openshift/source-to-image/pkg/docker/test"
 	"github.com/openshift/source-to-image/pkg/errors"
 	testfs "github.com/openshift/source-to-image/pkg/test/fs"
-
-	dockertypes "github.com/docker/docker/api/types"
-	dockercontainer "github.com/docker/docker/api/types/container"
-	dockerstrslice "github.com/docker/docker/api/types/strslice"
 )
 
 func TestContainerName(t *testing.T) {
@@ -622,7 +622,7 @@ func TestGetImageName(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		if e, a := tc.expected, getImageName(tc.name); e != a {
+		if e, a := tc.expected, GetImageName(tc.name); e != a {
 			t.Errorf("Expected image name %s, but got %s!", e, a)
 		}
 	}
