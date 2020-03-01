@@ -2,6 +2,14 @@
 /.atom-build.yml
 /.project
 /.vagrant
-.vscode/
+/contrib/completions/bash/*-proposed
+/contrib/completions/zsh/*-proposed
 cmd/s2i/debug
+upload
+__*
+.idea
+.vscode/
+*.classpath
+*.project
+*.settings
 *~
