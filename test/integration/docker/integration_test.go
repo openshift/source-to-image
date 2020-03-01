@@ -3,6 +3,7 @@
 package docker
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -13,24 +14,26 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
-
-	"k8s.io/klog"
 
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerapi "github.com/docker/docker/client"
 	"github.com/openshift/source-to-image/pkg/api"
+	"github.com/openshift/source-to-image/pkg/api/constants"
 	"github.com/openshift/source-to-image/pkg/build"
 	"github.com/openshift/source-to-image/pkg/build/strategies"
+	buildahpkg "github.com/openshift/source-to-image/pkg/buildah"
 	"github.com/openshift/source-to-image/pkg/docker"
-	dockerpkg "github.com/openshift/source-to-image/pkg/docker"
 	"github.com/openshift/source-to-image/pkg/scm/git"
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
+	"github.com/openshift/source-to-image/pkg/util/containermanager"
 	"github.com/openshift/source-to-image/pkg/util/fs"
-	"golang.org/x/net/context"
+	"github.com/openshift/source-to-image/test/integration/buildah"
+	"k8s.io/klog"
 )
 
 const (
@@ -76,15 +79,27 @@ const (
 	FakeScriptsHTTPURL = "http://127.0.0.1:23456/.s2i/bin"
 )
 
-var engineClient docker.Client
+var apiClient docker.Client
+var containerManager docker.Docker
 
 func init() {
 	klog.InitFlags(nil)
 
+	cfg := &api.Config{
+		ContainerManager: os.Getenv(constants.ContainerManagerEnv),
+		DockerConfig:     docker.GetDefaultDockerConfig(),
+	}
 	var err error
-	engineClient, err = docker.NewEngineAPIClient(docker.GetDefaultDockerConfig())
+	apiClient, err = containermanager.GetClient(cfg)
 	if err != nil {
 		panic(err)
+	}
+	containerManager = containermanager.GetDocker(apiClient, cfg, api.AuthConfig{})
+
+	if apiClient == nil {
+		klog.Info("Instantiating buildah client for integration tests...")
+		manager := buildahpkg.NewBuildah(apiClient)
+		apiClient = buildah.NewClient(manager)
 	}
 
 	// get the full path to this .go file so we can construct the file url
@@ -119,14 +134,19 @@ func TestInjectionBuild(t *testing.T) {
 		t.Errorf("Unable to write content to temporary injection file: %v", err)
 	}
 
-	integration(t).exerciseInjectionBuild(TagCleanBuild, FakeBuilderImage, []string{
+	injectionList := []string{
 		tempdir + ":/tmp",
 		tempdir + ":",
 		tempdir + ":test;" + tempdir + ":test2",
-	}, true)
+	}
+	integration(t).exerciseInjectionBuild(TagCleanBuild, FakeBuilderImage, injectionList, true)
 }
 
 func TestInjectionBuildBadDestination(t *testing.T) {
+	if os.Getenv(constants.ContainerManagerEnv) == "buildah" {
+		t.Skip("Using 'buildah copy' all destinations are possible.")
+	}
+
 	tempdir, err := ioutil.TempDir("", "s2i-test-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
@@ -149,12 +169,15 @@ type integrationTest struct {
 func (i integrationTest) InspectImage(name string) (*dockertypes.ImageInspect, error) {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	resp, _, err := engineClient.ImageInspectWithRaw(ctx, name)
+	resp, _, err := apiClient.ImageInspectWithRaw(ctx, name)
 	if err != nil {
 		if dockerapi.IsErrNotFound(err) {
 			return nil, fmt.Errorf("no such image :%q", name)
 		}
 		return nil, err
+	}
+	if resp.ID == "" {
+		return nil, fmt.Errorf("no such image :%q", name)
 	}
 	return &resp, nil
 }
@@ -183,9 +206,16 @@ func (i *integrationTest) setup() {
 		FakeScriptsFileURL = "file://" + filepath.ToSlash(filepath.Join(testImagesDir, ".s2i", "bin"))
 
 		for _, image := range []string{TagCleanBuild, TagCleanBuildUser, TagIncrementalBuild, TagIncrementalBuildUser} {
-			ctx, cancel := getDefaultContext()
-			engineClient.ImageRemove(ctx, image, dockertypes.ImageRemoveOptions{})
-			cancel()
+			img, err := containerManager.CheckImage(image)
+			if err != nil && !strings.Contains(err.Error(), "unable to get metadata") {
+				i.t.Errorf("Unexpected error on inspect image: '%+v'", err)
+			}
+			if img == nil {
+				continue
+			}
+			if err = containerManager.RemoveImage(image); err != nil {
+				i.t.Errorf("Unexpected error on removing image: '%+v'", err)
+			}
 		}
 
 		i.setupComplete = true
@@ -198,7 +228,7 @@ func (i *integrationTest) setup() {
 		// the logging level with -v=# (i.e. -v=0 or -v=3 or -v=5).
 		// so, for the changes stemming from issue 133, we 'reuse' the bash -v, and set the highest klog level.
 		// (if you look at STI's main.go, and setupGlog, it essentially maps klog's -v to --loglevel for use by the sti command)
-		//NOTE - passing --loglevel or -v=5 into test-integration.sh does not work
+		// NOTE - passing --loglevel or -v=5 into test-integration.sh does not work
 		if getLogLevel() != 5 {
 			vflag.Value.Set("5")
 			// FIXME currently klog has only option to redirect output to stderr
@@ -241,7 +271,13 @@ func TestCleanBuildScripts(t *testing.T) {
 }
 
 func TestLayeredBuildNoTar(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanLayeredBuildNoTar, false, FakeImageNoTar, FakeScriptsFileURL, false, true, false)
+	expectImage := false
+	if os.Getenv(constants.ContainerManagerEnv) == "buildah" {
+		// when using buildah container-manager, data is copied into the container without need for
+		// tar command, therefore this test should expect a output image.
+		expectImage = true
+	}
+	integration(t).exerciseCleanBuild(TagCleanLayeredBuildNoTar, false, FakeImageNoTar, FakeScriptsFileURL, expectImage, true, false)
 }
 
 // Test that a build config with a callbackURL will invoke HTTP endpoint
@@ -250,10 +286,16 @@ func TestCleanBuildCallbackInvoked(t *testing.T) {
 }
 
 func TestCleanBuildOnBuild(t *testing.T) {
+	if os.Getenv(constants.ContainerManagerEnv) == "buildah" {
+		t.Skip("ONBUILD directive is not supported on OCI support, skipping!")
+	}
 	integration(t).exerciseCleanBuild(TagCleanBuildOnBuild, false, FakeImageOnBuild, "", true, true, false)
 }
 
 func TestCleanBuildOnBuildNoName(t *testing.T) {
+	if os.Getenv(constants.ContainerManagerEnv) == "buildah" {
+		t.Skip("ONBUILD directive is not supported on OCI support, skipping!")
+	}
 	integration(t).exerciseCleanBuild(TagCleanBuildOnBuildNoName, false, FakeImageOnBuild, "", false, false, false)
 }
 
@@ -262,7 +304,13 @@ func TestCleanBuildNoName(t *testing.T) {
 }
 
 func TestLayeredBuildNoTarNoName(t *testing.T) {
-	integration(t).exerciseCleanBuild(TagCleanLayeredBuildNoTarNoName, false, FakeImageNoTar, FakeScriptsFileURL, false, false, false)
+	expectImage := false
+	if os.Getenv(constants.ContainerManagerEnv) == "buildah" {
+		// when using buildah container-manager, data is copied into the container without need for
+		// tar command, therefore this test should expect a output image.
+		expectImage = true
+	}
+	integration(t).exerciseCleanBuild(TagCleanLayeredBuildNoTarNoName, false, FakeImageNoTar, FakeScriptsFileURL, expectImage, false, false)
 }
 
 func TestAllowedUIDsNamedUser(t *testing.T) {
@@ -278,6 +326,9 @@ func TestAllowedUIDsOnBuildRootUser(t *testing.T) {
 }
 
 func TestAllowedUIDsOnBuildNumericUser(t *testing.T) {
+	if os.Getenv(constants.ContainerManagerEnv) == "buildah" {
+		t.Skip("ONBUILD directive is not supported on OCI support, skipping!")
+	}
 	integration(t).exerciseCleanAllowedUIDsBuild(TagCleanBuildAllowedUIDsNumericUser, FakeImageOnBuildNumericUser, false)
 }
 
@@ -300,9 +351,10 @@ func (i *integrationTest) exerciseCleanAllowedUIDsBuild(tag, imageName string, e
 		Incremental:       false,
 		ScriptsURL:        "",
 		ExcludeRegExp:     tar.DefaultExclusionPattern.String(),
+		ContainerManager:  os.Getenv(constants.ContainerManagerEnv),
 	}
 	config.AllowedUIDs.Set("1-")
-	_, _, err := strategies.Strategy(engineClient, config, build.Overrides{})
+	_, _, err := strategies.Strategy(apiClient, config, build.Overrides{})
 	if err != nil && !expectError {
 		t.Fatalf("Cannot create a new builder: %v", err)
 	}
@@ -358,9 +410,10 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 		CallbackURL:       callbackURL,
 		ScriptsURL:        scriptsURL,
 		ExcludeRegExp:     tar.DefaultExclusionPattern.String(),
+		ContainerManager:  os.Getenv(constants.ContainerManagerEnv),
 	}
 
-	b, _, err := strategies.Strategy(engineClient, config, build.Overrides{})
+	b, _, err := strategies.Strategy(apiClient, config, build.Overrides{})
 	if err != nil {
 		t.Fatalf("Cannot create a new builder.")
 	}
@@ -422,6 +475,9 @@ func TestIncrementalBuildScriptsNoSaveArtifacts(t *testing.T) {
 }
 
 func TestIncrementalBuildOnBuild(t *testing.T) {
+	if os.Getenv(constants.ContainerManagerEnv) == "buildah" {
+		t.Skip("ONBUILD directive is not supported on OCI support, skipping!")
+	}
 	integration(t).exerciseIncrementalBuild(TagIncrementalBuildOnBuild, FakeImageOnBuild, false, true, true)
 }
 
@@ -449,8 +505,9 @@ func (i *integrationTest) exerciseInjectionBuild(tag, imageName string, injectio
 		Tag:               tag,
 		Injections:        injectionList,
 		ExcludeRegExp:     tar.DefaultExclusionPattern.String(),
+		ContainerManager:  os.Getenv(constants.ContainerManagerEnv),
 	}
-	builder, _, err := strategies.Strategy(engineClient, config, build.Overrides{})
+	builder, _, err := strategies.Strategy(apiClient, config, build.Overrides{})
 	if err != nil {
 		t.Fatalf("Unable to create builder: %v", err)
 	}
@@ -519,9 +576,10 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 		Incremental:         false,
 		RemovePreviousImage: removePreviousImage,
 		ExcludeRegExp:       tar.DefaultExclusionPattern.String(),
+		ContainerManager:    os.Getenv(constants.ContainerManagerEnv),
 	}
 
-	builder, _, err := strategies.Strategy(engineClient, config, build.Overrides{})
+	builder, _, err := strategies.Strategy(apiClient, config, build.Overrides{})
 	if err != nil {
 		t.Fatalf("Unable to create builder: %v", err)
 	}
@@ -544,9 +602,10 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 		RemovePreviousImage:     removePreviousImage,
 		PreviousImagePullPolicy: api.PullIfNotPresent,
 		ExcludeRegExp:           tar.DefaultExclusionPattern.String(),
+		ContainerManager:        os.Getenv(constants.ContainerManagerEnv),
 	}
 
-	builder, _, err = strategies.Strategy(engineClient, config, build.Overrides{})
+	builder, _, err = strategies.Strategy(apiClient, config, build.Overrides{})
 	if err != nil {
 		t.Fatalf("Unable to create incremental builder: %v", err)
 	}
@@ -588,8 +647,11 @@ func (i *integrationTest) exerciseIncrementalBuild(tag, imageName string, remove
 
 // Support methods
 func (i *integrationTest) checkForImage(tag string) {
-	_, err := i.InspectImage(tag)
+	image, err := containerManager.CheckImage(tag)
 	if err != nil {
+		i.t.Errorf("Unexpected error on inspecting image: '%+v'", err)
+	}
+	if image == nil {
 		i.t.Errorf("Couldn't find image with tag: %s", tag)
 	}
 }
@@ -598,7 +660,7 @@ func (i *integrationTest) createContainer(image string) string {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
 	opts := dockertypes.ContainerCreateConfig{Name: "", Config: &dockercontainer.Config{Image: image}}
-	container, err := engineClient.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, opts.Name)
+	container, err := apiClient.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, opts.Name)
 	if err != nil {
 		i.t.Errorf("Couldn't create container from image %s with error %+v", image, err)
 		return ""
@@ -606,7 +668,7 @@ func (i *integrationTest) createContainer(image string) string {
 
 	ctx, cancel = getDefaultContext()
 	defer cancel()
-	err = engineClient.ContainerStart(ctx, container.ID, dockertypes.ContainerStartOptions{})
+	err = apiClient.ContainerStart(ctx, container.ID, dockertypes.ContainerStartOptions{})
 	if err != nil {
 		i.t.Errorf("Couldn't start container: %s with error %+v", container.ID, err)
 		return ""
@@ -614,7 +676,7 @@ func (i *integrationTest) createContainer(image string) string {
 
 	ctx, cancel = getDefaultContext()
 	defer cancel()
-	waitC, errC := engineClient.ContainerWait(ctx, container.ID, dockercontainer.WaitConditionNextExit)
+	waitC, errC := apiClient.ContainerWait(ctx, container.ID, dockercontainer.WaitConditionNextExit)
 	select {
 	case result := <-waitC:
 		if result.StatusCode != 0 {
@@ -628,11 +690,13 @@ func (i *integrationTest) createContainer(image string) string {
 	return container.ID
 }
 
-func (i *integrationTest) runInContainer(image string, command []string) int {
+// runContainerWithDocker execute the informed command using docker.Client interface, in a running
+// container.
+func (i *integrationTest) runContainerWithDocker(image string, command []string) int {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
 	opts := dockertypes.ContainerCreateConfig{Name: "", Config: &dockercontainer.Config{Image: image, AttachStdout: false, AttachStdin: false, Cmd: command}}
-	container, err := engineClient.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, opts.Name)
+	container, err := apiClient.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, opts.Name)
 	if err != nil {
 		i.t.Errorf("Couldn't create container from image %s err %+v", image, err)
 		return -1
@@ -640,13 +704,13 @@ func (i *integrationTest) runInContainer(image string, command []string) int {
 
 	ctx, cancel = getDefaultContext()
 	defer cancel()
-	err = engineClient.ContainerStart(ctx, container.ID, dockertypes.ContainerStartOptions{})
+	err = apiClient.ContainerStart(ctx, container.ID, dockertypes.ContainerStartOptions{})
 	if err != nil {
 		i.t.Errorf("Couldn't start container: %s", container.ID)
 	}
 	ctx, cancel = getDefaultContext()
 	defer cancel()
-	waitC, errC := engineClient.ContainerWait(ctx, container.ID, dockercontainer.WaitConditionNextExit)
+	waitC, errC := apiClient.ContainerWait(ctx, container.ID, dockercontainer.WaitConditionNextExit)
 	exitCode := -1
 	select {
 	case result := <-waitC:
@@ -656,21 +720,47 @@ func (i *integrationTest) runInContainer(image string, command []string) int {
 	}
 	ctx, cancel = getDefaultContext()
 	defer cancel()
-	err = engineClient.ContainerRemove(ctx, container.ID, dockertypes.ContainerRemoveOptions{})
+	err = apiClient.ContainerRemove(ctx, container.ID, dockertypes.ContainerRemoveOptions{})
 	if err != nil {
 		i.t.Errorf("Couldn't remove container: %s", container.ID)
 	}
 	return exitCode
 }
 
+// runContainerWithBuildah execute the command in a container based on informed image, using Buildah.
+func (i *integrationTest) runContainerWithBuildah(image string, command []string) int {
+	manager := buildahpkg.NewBuildah(apiClient)
+
+	from, err := manager.From(image)
+	if err != nil {
+		i.t.Error(err)
+	}
+	defer manager.RemoveContainer(from)
+
+	cmd := []string{"buildah", "run", from, "--"}
+	cmd = append(cmd, command...)
+	if _, err = buildahpkg.Execute(cmd, nil, true); err != nil {
+		return 1
+	}
+	return 0
+}
+
+// runInContainer run the informed command.
+func (i *integrationTest) runInContainer(image string, command []string) int {
+	if os.Getenv(constants.ContainerManagerEnv) == "buildah" {
+		return i.runContainerWithBuildah(image, command)
+	}
+	return i.runContainerWithDocker(image, command)
+}
+
 func (i *integrationTest) removeContainer(cID string) {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	engineClient.ContainerKill(ctx, cID, "SIGKILL")
+	apiClient.ContainerKill(ctx, cID, "SIGKILL")
 	removeOpts := dockertypes.ContainerRemoveOptions{
 		RemoveVolumes: true,
 	}
-	err := engineClient.ContainerRemove(ctx, cID, removeOpts)
+	err := apiClient.ContainerRemove(ctx, cID, removeOpts)
 	if err != nil {
 		i.t.Errorf("Couldn't remove container %s: %s", cID, err)
 	}
@@ -698,8 +788,15 @@ func (i *integrationTest) runInImage(image string, cmd string) int {
 
 func (i *integrationTest) checkBasicBuildState(cID string, workingDir string) {
 	i.fileExists(cID, "/sti-fake/assemble-invoked")
-	i.fileExists(cID, "/sti-fake/run-invoked")
 	i.fileExists(cID, "/sti-fake/src/Gemfile")
+
+	// when using buildah container manager, s2i is not executing the final image as it would with
+	// Docker, and therefore, the "run" command is never executed in the image during build process,
+	// and thus the file produced by it won't be present.
+	// FIXME: should we execute this script intentionally when using buildah?
+	if os.Getenv(constants.ContainerManagerEnv) != "buildah" {
+		i.fileExists(cID, "/sti-fake/run-invoked")
+	}
 
 	_, err := os.Stat(workingDir)
 	if !os.IsNotExist(err) {
@@ -719,22 +816,21 @@ func (i *integrationTest) checkIncrementalBuildState(cID string, workingDir stri
 func (i *integrationTest) fileExistsInContainer(cID string, filePath string) bool {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	rdr, stats, err := engineClient.CopyFromContainer(ctx, cID, filePath)
+	rdr, stats, err := apiClient.CopyFromContainer(ctx, cID, filePath)
 	if err != nil {
 		return false
 	}
-	defer rdr.Close()
+	if rdr != nil {
+		defer rdr.Close()
+	}
 	return "" != stats.Name
 }
 
 func (i *integrationTest) checkForLabel(image string) {
-	docker := dockerpkg.New(engineClient, (&api.Config{}).PullAuthentication)
-
-	labelMap, err := docker.GetLabels(image)
+	labelMap, err := containerManager.GetLabels(image)
 	if err != nil {
 		i.t.Fatalf("Unable to get labels from image %s: %v", image, err)
 	}
-
 	if labelMap["testLabel"] != "testLabel_value" {
 		i.t.Errorf("Unable to verify 'testLabel' for image '%s'", image)
 	}

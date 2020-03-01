@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -x
 
 touch /sti-fake/run-invoked
 

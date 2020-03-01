@@ -110,7 +110,7 @@ func ListFiles(fs fs.FileSystem, spec api.VolumeSpec) ([]string, error) {
 // When the scriptName is provided, it is also truncated together with all
 // secrets.
 func CreateTruncateFilesScript(files []string, scriptName string) (string, error) {
-	rmScript := "set -e\n"
+	rmScript := "set -ex\n"
 	for _, s := range files {
 		rmScript += fmt.Sprintf("truncate -s0 %q\n", s)
 	}

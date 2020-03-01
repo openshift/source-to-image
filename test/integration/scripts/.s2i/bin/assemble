@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -x
 
 cp -Rf /tmp/src /sti-fake/
 touch /sti-fake/assemble-invoked
