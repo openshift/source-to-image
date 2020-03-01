@@ -57,15 +57,15 @@ install-travis:
 #   make check
 #   make test
 #   make check WHAT=pkg/docker TESTFLAGS=-v
-check: verify test	
+check: verify test
 .PHONY: check
 
 # Run unit tests
 # Example:
 #   make test
 #   make test-unit
-#   make test WHAT=pkg/docker TESTFLAGS=-v 
-test test-unit: 
+#   make test WHAT=pkg/docker TESTFLAGS=-v
+test test-unit:
 	hack/test-go.sh $(WHAT) $(TESTS) $(TESTFLAGS)
 .PHONY: test test-unit
 
@@ -82,6 +82,7 @@ test-dockerfile:
 #   make test-docker
 #   make test-docker TESTFLAGS="-run TestCleanBuild"
 test-docker:
+	hack/build-test-images.sh
 	hack/test-docker.sh $(TESTFLAGS)
 .PHONY: test-docker
 
