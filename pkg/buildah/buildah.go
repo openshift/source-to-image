@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	dockertypes "github.com/docker/docker/api/types"
+
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/api/constants"
 	"github.com/openshift/source-to-image/pkg/docker"
@@ -416,7 +417,7 @@ func (b *Buildah) RunContainer(opts docker.RunContainerOptions) error {
 		return err
 	}
 
-	log.V(0).Infof("Creating application image based on '%s'", image)
+	log.V(0).Infof("Creating application image based on '%q'", image)
 	// starting a new image based on image informed
 	containerID, err := b.From(image)
 	if err != nil {
@@ -538,7 +539,7 @@ func (b *Buildah) UploadToContainerWithTarWriter(
 // mount execute buildah mount on a container and return the local mount path employed. It can have
 // errors when buildah command does.
 func (b *Buildah) mount(container string) (string, error) {
-	output, err := Execute([]string{"buildah", "mount", container}, nil, true)
+	output, err := Execute([]string{"buildah", "unshare", "buildah", "mount", container}, nil, true)
 	if err != nil {
 		return "", err
 	}
@@ -550,7 +551,7 @@ func (b *Buildah) mount(container string) (string, error) {
 // unmount execute buildah unmount on container, and log eventual errors.
 func (b *Buildah) unmount(container string) {
 	log.V(3).Infof("Unmount container '%s' volumes", container)
-	_, err := Execute([]string{"buildah", "unmount", container}, nil, true)
+	_, err := Execute([]string{"buildah", "unshare", "buildah", "unmount", container}, nil, true)
 	if err != nil {
 		log.Errorf("Error during unmount: '%q'", err)
 	}
