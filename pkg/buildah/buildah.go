@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/user"
 	"path"
 	"strings"
 
@@ -435,6 +436,9 @@ func (b *Buildah) RunContainer(opts docker.RunContainerOptions) error {
 
 	return interrupt.New(docker.DumpStack, removeContainerFn).Run(func() error {
 		cmd, tarDestination, err := b.prepareCmdTarDestination(opts, imageMetadata, containerID)
+		if err != nil {
+			return err
+		}
 
 		// calling out for on-start before actual command, since using buildah it works in a sightly
 		// different way than using Docker, using buildah the target container image is not being
@@ -536,22 +540,43 @@ func (b *Buildah) UploadToContainerWithTarWriter(
 	return b.UploadToContainer(fs, srcPath, destPath, container)
 }
 
+// amIRoot returns true when current user has UID 0.
+func (b *Buildah) amIRoot() bool {
+	current, err := user.Current()
+	if err != nil {
+		log.Error(err)
+		return false
+	}
+	log.V(3).Infof("Current user %q, UID %q", current.Username, current.Uid)
+	return current.Uid == "0"
+}
+
+// unshare append unshare on informed command, when not using root.
+func (b *Buildah) unshare(cmd []string) []string {
+	if b.amIRoot() {
+		return cmd
+	}
+	return append([]string{"buildah", "unshare"}, cmd...)
+}
+
 // mount execute buildah mount on a container and return the local mount path employed. It can have
 // errors when buildah command does.
 func (b *Buildah) mount(container string) (string, error) {
-	output, err := Execute([]string{"buildah", "unshare", "buildah", "mount", container}, nil, true)
+	cmd := b.unshare([]string{"buildah", "mount", container})
+	output, err := Execute(cmd, nil, true)
 	if err != nil {
 		return "", err
 	}
 	mountPath := chompBytesToString(output)
-	log.V(3).Infof("Container '%s' is mounted on '%s'", container, mountPath)
+	log.V(3).Infof("Container '%q' is mounted on '%q'", container, mountPath)
 	return mountPath, nil
 }
 
 // unmount execute buildah unmount on container, and log eventual errors.
 func (b *Buildah) unmount(container string) {
 	log.V(3).Infof("Unmount container '%s' volumes", container)
-	_, err := Execute([]string{"buildah", "unshare", "buildah", "unmount", container}, nil, true)
+	cmd := b.unshare([]string{"buildah", "unmount", container})
+	_, err := Execute(cmd, nil, true)
 	if err != nil {
 		log.Errorf("Error during unmount: '%q'", err)
 	}

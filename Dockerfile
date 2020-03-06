@@ -21,7 +21,7 @@ ENV GOARCH="amd64" \
     S2I_HOME="/s2i" \
     S2I_CONTAINER_MANAGER="buildah"
 
-RUN useradd --uid 1001 --groups root --home-dir $S2I_HOME s2i && \
+RUN useradd --uid 1000 --groups root --home-dir $S2I_HOME s2i && \
     mkdir /src && \
     chown s2i:s2i /src
 
