@@ -6,6 +6,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+readonly S2I_CONTAINER_MANAGER="${S2I_CONTAINER_MANAGER:-docker}"
 readonly S2I_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 s2i::build_test_image() {
