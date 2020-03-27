@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -25,7 +26,7 @@ func NewCmdCLI() *cobra.Command {
 	s2iCmd := &cobra.Command{
 		Use: "s2i",
 		Long: "Source-to-image (S2I) is a tool for building repeatable docker images.\n\n" +
-			"A command line interface that injects and assembles source code into a docker image.\n" +
+			"A command line interface that injects and assembles source code into a container image.\n" +
 			"Complete documentation is available at http://github.com/openshift/source-to-image",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
@@ -38,7 +39,13 @@ func NewCmdCLI() *cobra.Command {
 	s2iCmd.PersistentFlags().StringVar(&(cfg.DockerConfig.CAFile), "ca", cfg.DockerConfig.CAFile, "Set the path of the docker TLS ca file")
 	s2iCmd.PersistentFlags().BoolVar(&(cfg.DockerConfig.UseTLS), "tls", cfg.DockerConfig.UseTLS, "Use TLS to connect to docker; implied by --tlsverify")
 	s2iCmd.PersistentFlags().BoolVar(&(cfg.DockerConfig.TLSVerify), "tlsverify", cfg.DockerConfig.TLSVerify, "Use TLS to connect to docker and verify the remote")
-	s2iCmd.PersistentFlags().StringVarP(&(cfg.ContainerManager), "container-manager", "m", defaultContainerManager(), "Backend container manager, either 'docker' or 'buildah'")
+	s2iCmd.PersistentFlags().StringVarP(
+		&(cfg.ContainerManager),
+		constants.ContainerManager,
+		"m",
+		defaultContainerManager(),
+		fmt.Sprintf("Backend container manager, either '%s' or '%s'", constants.DockerContainerManager, constants.BuildahContainerManager),
+	)
 	s2iCmd.AddCommand(cmd.NewCmdVersion())
 	s2iCmd.AddCommand(cmd.NewCmdBuild(cfg))
 	s2iCmd.AddCommand(cmd.NewCmdRebuild(cfg))
@@ -66,12 +73,12 @@ func defaultContainerManager() string {
 	if name := os.Getenv(constants.ContainerManagerEnv); isValidContainerManager(name) {
 		return name
 	}
-	return "docker"
+	return constants.DockerContainerManager
 }
 
 // isValidContainerManager validates the given container manager name.
 func isValidContainerManager(s string) bool {
-	return s == "docker" || s == "buildah"
+	return s == constants.DockerContainerManager || s == constants.BuildahContainerManager
 }
 
 // CommandFor returns the appropriate command for this base name,

@@ -22,6 +22,9 @@ import (
 	utillog "github.com/openshift/source-to-image/pkg/util/log"
 )
 
+// buildahCmd buildah in command-line.
+const buildahCmd = "buildah"
+
 var log = utillog.StderrLog
 
 // Buildah implements docker.Docker interface using buildah as a backend.
@@ -85,7 +88,7 @@ func (b *Buildah) GetOnBuild(name string) ([]string, error) {
 
 // RemoveContainer by executing "buldah rm", and returns the error it may raise.
 func (b *Buildah) RemoveContainer(id string) error {
-	_, err := Execute([]string{"buildah", "rm", id}, nil, true)
+	_, err := Execute([]string{buildahCmd, "rm", id}, nil, true)
 	return err
 }
 
@@ -163,7 +166,7 @@ func (b *Buildah) GetImageWorkdir(name string) (string, error) {
 // "commit" sub-commands.
 func (b *Buildah) CommitContainer(opts docker.CommitContainerOptions) (string, error) {
 	containerID := opts.ContainerID
-	configCmd := []string{"buildah", "config"}
+	configCmd := []string{buildahCmd, "config"}
 
 	if opts.User != "" {
 		configCmd = append(configCmd, []string{"--user", opts.User}...)
@@ -201,7 +204,7 @@ func (b *Buildah) CommitContainer(opts docker.CommitContainerOptions) (string, e
 	// executing container commit command, saving the actual container image, and keeping committed
 	// container unique-id
 	log.V(2).Infof("Commiting container '%s'...", containerID)
-	commitCmd := []string{"buildah", "commit", "--quiet", containerID}
+	commitCmd := []string{buildahCmd, "commit", "--quiet", containerID}
 	if imageTag != "" {
 		commitCmd = append(commitCmd, imageTag)
 	}
@@ -219,7 +222,7 @@ func (b *Buildah) CommitContainer(opts docker.CommitContainerOptions) (string, e
 // the command does.
 func (b *Buildah) RemoveImage(containerID string) error {
 	log.V(2).Infof("Removing image '%s'...", containerID)
-	_, err := Execute([]string{"buildah", "rmi", "--force", containerID}, nil, true)
+	_, err := Execute([]string{buildahCmd, "rmi", "--force", containerID}, nil, true)
 	return err
 }
 
@@ -233,7 +236,7 @@ func (b *Buildah) CheckImage(name string) (*api.Image, error) {
 func (b *Buildah) PullImage(name string) (*api.Image, error) {
 	log.V(2).Infof("Pulling image '%s'...", name)
 	name = docker.GetImageName(name)
-	if _, err := Execute([]string{"buildah", "pull", name}, nil, true); err != nil {
+	if _, err := Execute([]string{buildahCmd, "pull", name}, nil, true); err != nil {
 		return nil, err
 	}
 	return b.InspectImage(name)
@@ -267,7 +270,7 @@ func (b *Buildah) BuildImage(opts docker.BuildImageOptions) error {
 	name := opts.Name
 	contextDir := path.Join(opts.WorkingDir, "upload/src")
 	log.V(0).Infof("Building Dockerfile on context directory '%s' using tag '%s'", contextDir, name)
-	output, err := Execute([]string{"buildah", "bud", "--tag", name, contextDir}, nil, true)
+	output, err := Execute([]string{buildahCmd, "bud", "--tag", name, contextDir}, nil, true)
 	if output != nil {
 		log.V(0).Infof("Build output:\n%s", output)
 	}
@@ -315,7 +318,7 @@ func (b *Buildah) GetLabels(name string) (map[string]string, error) {
 func (b *Buildah) From(name string) (string, error) {
 	log.V(2).Infof("Buildah FROM using '%s'...", name)
 
-	containerIDBytes, err := Execute([]string{"buildah", "from", "--quiet", name}, nil, true)
+	containerIDBytes, err := Execute([]string{buildahCmd, "from", "--quiet", name}, nil, true)
 	if err != nil {
 		log.Error(err)
 		return "", err
@@ -459,7 +462,7 @@ func (b *Buildah) RunContainer(opts docker.RunContainerOptions) error {
 			}
 
 			// preparing buildah run command
-			baseCmd := []string{"buildah", "run", containerID, "--"}
+			baseCmd := []string{buildahCmd, "run", containerID, "--"}
 			runCmd := append(baseCmd, cmd...)
 
 			var stdinReader io.Reader
@@ -525,7 +528,7 @@ func (b *Buildah) RunContainer(opts docker.RunContainerOptions) error {
 func (b *Buildah) UploadToContainer(fs fs.FileSystem, srcPath, destPath, container string) error {
 	log.V(3).Infof("Copying local '%s' into container's '%s' (container-id '%s')",
 		srcPath, destPath, container)
-	_, err := Execute([]string{"buildah", "copy", container, srcPath, destPath}, nil, true)
+	_, err := Execute([]string{buildahCmd, "copy", container, srcPath, destPath}, nil, true)
 	return err
 }
 
@@ -556,13 +559,13 @@ func (b *Buildah) unshare(cmd []string) []string {
 	if b.amIRoot() {
 		return cmd
 	}
-	return append([]string{"buildah", "unshare"}, cmd...)
+	return append([]string{buildahCmd, "unshare"}, cmd...)
 }
 
 // mount execute buildah mount on a container and return the local mount path employed. It can have
 // errors when buildah command does.
 func (b *Buildah) mount(container string) (string, error) {
-	cmd := b.unshare([]string{"buildah", "mount", container})
+	cmd := b.unshare([]string{buildahCmd, "mount", container})
 	output, err := Execute(cmd, nil, true)
 	if err != nil {
 		return "", err
@@ -575,7 +578,7 @@ func (b *Buildah) mount(container string) (string, error) {
 // unmount execute buildah unmount on container, and log eventual errors.
 func (b *Buildah) unmount(container string) {
 	log.V(3).Infof("Unmount container '%s' volumes", container)
-	cmd := b.unshare([]string{"buildah", "unmount", container})
+	cmd := b.unshare([]string{buildahCmd, "unmount", container})
 	_, err := Execute(cmd, nil, true)
 	if err != nil {
 		log.Errorf("Error during unmount: '%q'", err)

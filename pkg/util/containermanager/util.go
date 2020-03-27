@@ -2,6 +2,7 @@ package containermanager
 
 import (
 	"github.com/openshift/source-to-image/pkg/api"
+	"github.com/openshift/source-to-image/pkg/api/constants"
 	"github.com/openshift/source-to-image/pkg/buildah"
 	"github.com/openshift/source-to-image/pkg/docker"
 )
@@ -12,7 +13,7 @@ func GetClient(cfg *api.Config) (docker.Client, error) {
 	var err error
 
 	switch cfg.ContainerManager {
-	case "buildah":
+	case constants.BuildahContainerManager:
 		apiClient = nil
 	default:
 		apiClient, err = docker.NewEngineAPIClient(cfg.DockerConfig)
@@ -26,7 +27,7 @@ func GetClient(cfg *api.Config) (docker.Client, error) {
 // GetDocker returns the container runtime instance based on environment variable.
 func GetDocker(client docker.Client, config *api.Config, authConfig api.AuthConfig) docker.Docker {
 	switch config.ContainerManager {
-	case "buildah":
+	case constants.BuildahContainerManager:
 		return buildah.NewBuildah(client)
 	default:
 		return docker.New(client, authConfig)

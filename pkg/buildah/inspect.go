@@ -29,7 +29,7 @@ type InspectDockerConfig struct {
 // can return error in case of buildah does, and in case of not being able to parse out json output.
 func InspectImage(image string) (*Inspect, error) {
 	log.V(3).Infof("Inspecting image '%s' with buildah...", image)
-	output, err := Execute([]string{"buildah", "inspect", image}, nil, false)
+	output, err := Execute([]string{buildahCmd, "inspect", image}, nil, false)
 	if err != nil {
 		return nil, err
 	}

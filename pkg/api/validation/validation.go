@@ -6,6 +6,7 @@ import (
 
 	"github.com/docker/distribution/reference"
 	"github.com/openshift/source-to-image/pkg/api"
+	"github.com/openshift/source-to-image/pkg/api/constants"
 )
 
 // ValidateConfig returns a list of error from validation.
@@ -37,7 +38,7 @@ func ValidateConfig(config *api.Config) []Error {
 			allErrs = append(allErrs, NewFieldInvalidValueWithReason("tag", err.Error()))
 		}
 	}
-	if config.RunImage && config.ContainerManager != "docker" {
+	if config.RunImage && config.ContainerManager != constants.DockerContainerManager {
 		allErrs = append(allErrs, NewFieldInvalidValueWithReason(
 			"run",
 			"Using --run is only supported with 'docker' container manager.",

@@ -143,7 +143,7 @@ func TestInjectionBuild(t *testing.T) {
 }
 
 func TestInjectionBuildBadDestination(t *testing.T) {
-	if os.Getenv(constants.ContainerManagerEnv) == "buildah" {
+	if os.Getenv(constants.ContainerManagerEnv) == constants.BuildahContainerManager {
 		t.Skip("Using 'buildah copy' all destinations are possible.")
 	}
 
@@ -272,7 +272,7 @@ func TestCleanBuildScripts(t *testing.T) {
 
 func TestLayeredBuildNoTar(t *testing.T) {
 	expectImage := false
-	if os.Getenv(constants.ContainerManagerEnv) == "buildah" {
+	if os.Getenv(constants.ContainerManagerEnv) == constants.BuildahContainerManager {
 		// when using buildah container-manager, data is copied into the container without need for
 		// tar command, therefore this test should expect a output image.
 		expectImage = true
@@ -286,14 +286,14 @@ func TestCleanBuildCallbackInvoked(t *testing.T) {
 }
 
 func TestCleanBuildOnBuild(t *testing.T) {
-	if os.Getenv(constants.ContainerManagerEnv) == "buildah" {
+	if os.Getenv(constants.ContainerManagerEnv) == constants.BuildahContainerManager {
 		t.Skip("ONBUILD directive is not supported on OCI support, skipping!")
 	}
 	integration(t).exerciseCleanBuild(TagCleanBuildOnBuild, false, FakeImageOnBuild, "", true, true, false)
 }
 
 func TestCleanBuildOnBuildNoName(t *testing.T) {
-	if os.Getenv(constants.ContainerManagerEnv) == "buildah" {
+	if os.Getenv(constants.ContainerManagerEnv) == constants.BuildahContainerManager {
 		t.Skip("ONBUILD directive is not supported on OCI support, skipping!")
 	}
 	integration(t).exerciseCleanBuild(TagCleanBuildOnBuildNoName, false, FakeImageOnBuild, "", false, false, false)
@@ -305,7 +305,7 @@ func TestCleanBuildNoName(t *testing.T) {
 
 func TestLayeredBuildNoTarNoName(t *testing.T) {
 	expectImage := false
-	if os.Getenv(constants.ContainerManagerEnv) == "buildah" {
+	if os.Getenv(constants.ContainerManagerEnv) == constants.BuildahContainerManager {
 		// when using buildah container-manager, data is copied into the container without need for
 		// tar command, therefore this test should expect a output image.
 		expectImage = true
@@ -326,7 +326,7 @@ func TestAllowedUIDsOnBuildRootUser(t *testing.T) {
 }
 
 func TestAllowedUIDsOnBuildNumericUser(t *testing.T) {
-	if os.Getenv(constants.ContainerManagerEnv) == "buildah" {
+	if os.Getenv(constants.ContainerManagerEnv) == constants.BuildahContainerManager {
 		t.Skip("ONBUILD directive is not supported on OCI support, skipping!")
 	}
 	integration(t).exerciseCleanAllowedUIDsBuild(TagCleanBuildAllowedUIDsNumericUser, FakeImageOnBuildNumericUser, false)
@@ -475,7 +475,7 @@ func TestIncrementalBuildScriptsNoSaveArtifacts(t *testing.T) {
 }
 
 func TestIncrementalBuildOnBuild(t *testing.T) {
-	if os.Getenv(constants.ContainerManagerEnv) == "buildah" {
+	if os.Getenv(constants.ContainerManagerEnv) == constants.BuildahContainerManager {
 		t.Skip("ONBUILD directive is not supported on OCI support, skipping!")
 	}
 	integration(t).exerciseIncrementalBuild(TagIncrementalBuildOnBuild, FakeImageOnBuild, false, true, true)
@@ -747,7 +747,7 @@ func (i *integrationTest) runContainerWithBuildah(image string, command []string
 
 // runInContainer run the informed command.
 func (i *integrationTest) runInContainer(image string, command []string) int {
-	if os.Getenv(constants.ContainerManagerEnv) == "buildah" {
+	if os.Getenv(constants.ContainerManagerEnv) == constants.BuildahContainerManager {
 		return i.runContainerWithBuildah(image, command)
 	}
 	return i.runContainerWithDocker(image, command)
@@ -794,7 +794,7 @@ func (i *integrationTest) checkBasicBuildState(cID string, workingDir string) {
 	// Docker, and therefore, the "run" command is never executed in the image during build process,
 	// and thus the file produced by it won't be present.
 	// FIXME: should we execute this script intentionally when using buildah?
-	if os.Getenv(constants.ContainerManagerEnv) != "buildah" {
+	if os.Getenv(constants.ContainerManagerEnv) != constants.BuildahContainerManager {
 		i.fileExists(cID, "/sti-fake/run-invoked")
 	}
 

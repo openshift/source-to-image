@@ -11,7 +11,7 @@ import (
 )
 
 func TestInspect(t *testing.T) {
-	if os.Getenv(constants.ContainerManagerEnv) != "buildah" {
+	if os.Getenv(constants.ContainerManagerEnv) != constants.BuildahContainerManager {
 		t.Skip("skipping buildah-inspect integration tests")
 		return
 	}
