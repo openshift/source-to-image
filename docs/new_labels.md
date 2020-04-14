@@ -25,3 +25,9 @@ Note: If the JSON format is different than shown above, it will cause an error.
 
 ## Creating the File
 The file should be created during the `assemble` step. 
+
+## Notes on OpenShift 4.x
+The feature of updating output image labels as described above is currently not working in OpenShift 4.x at the time of writing this section (04.14.2020). See the error report at https://bugzilla.redhat.com/show_bug.cgi?id=1758305#c20
+
+A workaround is to update the output image labels during building by adding custom labels to the BuildConfig as described in https://docs.openshift.com/container-platform/4.3/builds/managing-build-output.html#builds-output-image-labels_managing-build-output
+
