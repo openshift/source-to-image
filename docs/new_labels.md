@@ -31,3 +31,4 @@ The feature of updating output image labels as described above is currently not 
 
 A workaround is to update the output image labels during building by adding custom labels to the BuildConfig as described in https://docs.openshift.com/container-platform/4.3/builds/managing-build-output.html#builds-output-image-labels_managing-build-output
 
+Another consequence of the above described faulty behavior of OpenShift 4.x is that the command inside the docker image is not created correctly based on the value of the *io.openshift.s2i.scripts-url* label, even if you updated the value of the label correctly with the workaround described above. This can lead to a failing deployment process. The workaround for this is to define the correct command directly in the DeploymentConfig as described here: https://docs.openshift.com/container-platform/4.3/applications/deployments/managing-deployment-processes.html#deployments-exe-cmd-in-container_deployment-operations
