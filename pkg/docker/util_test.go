@@ -1,8 +1,10 @@
 package docker
 
 import (
+	"os"
 	"testing"
 
+	cliconfig "github.com/docker/docker/cli/config"
 	"github.com/openshift/source-to-image/pkg/api/constants"
 	"github.com/openshift/source-to-image/pkg/util/user"
 )
@@ -192,6 +194,70 @@ func TestCheckAllowedUser(t *testing.T) {
 		}
 		if err == nil && tc.expectErr {
 			t.Errorf("%s: expected error, but did not get any", tc.name)
+		}
+	}
+}
+
+func TestGetDefaultDockerConfig(t *testing.T) {
+	tests := []struct {
+		envHost           string
+		envCertPath       string
+		envTLSVerify      string
+		envTLS            string
+		expectedHost      string
+		expectedCertFile  string
+		expectedTLSVerify bool
+		expectedTLS       bool
+	}{
+		{
+			envHost:      "tcp://docker:2376",
+			envCertPath:  "/expected/cert/path",
+			envTLSVerify: "true",
+			envTLS:       "true",
+
+			expectedHost:      "tcp://docker:2376",
+			expectedCertFile:  "/expected/cert/path/cert.pem",
+			expectedTLSVerify: true,
+			expectedTLS:       true,
+		},
+		{
+			envHost:      "",
+			envCertPath:  "",
+			envTLSVerify: "",
+			envTLS:       "",
+
+			expectedHost:      "unix:///var/run/docker.sock",
+			expectedCertFile:  cliconfig.Dir() + "/cert.pem",
+			expectedTLSVerify: false,
+			expectedTLS:       false,
+		},
+	}
+	for _, tc := range tests {
+		oldHost := os.Getenv("DOCKER_HOST")
+		oldCertPath := os.Getenv("DOCKER_CERT_PATH")
+		oldTLSVerify := os.Getenv("DOCKER_TLS_VERIFY")
+		oldTLS := os.Getenv("DOCKER_TLS")
+		os.Setenv("DOCKER_HOST", tc.envHost)
+		os.Setenv("DOCKER_CERT_PATH", tc.envCertPath)
+		os.Setenv("DOCKER_TLS_VERIFY", tc.envTLSVerify)
+		os.Setenv("DOCKER_TLS", tc.envTLS)
+		defer os.Setenv("DOCKER_HOST", oldHost)
+		defer os.Setenv("DOCKER_CERT_PATH", oldCertPath)
+		defer os.Setenv("DOCKER_TLS_VERIFY", oldTLSVerify)
+		defer os.Setenv("DOCKER_TLS", oldTLS)
+
+		cfg := GetDefaultDockerConfig()
+		if tc.expectedHost != cfg.Endpoint {
+			t.Errorf("Endpoint: expected '%s', but got '%s'", tc.expectedHost, cfg.Endpoint)
+		}
+		if tc.expectedCertFile != cfg.CertFile {
+			t.Errorf("CertFile: expected '%s', but got '%s'", tc.expectedCertFile, cfg.CertFile)
+		}
+		if tc.expectedTLSVerify != cfg.TLSVerify {
+			t.Errorf("TLSVerify: expected '%t', but got '%t'", tc.expectedTLSVerify, cfg.TLSVerify)
+		}
+		if tc.expectedTLS != cfg.UseTLS {
+			t.Errorf("UseTLS: expected '%t', but got '%t'", tc.expectedTLS, cfg.UseTLS)
 		}
 	}
 }
