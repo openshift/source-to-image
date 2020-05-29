@@ -32,6 +32,7 @@ readonly S2I_CROSS_COMPILE_PLATFORMS=(
   darwin/amd64
   windows/amd64
   linux/386
+  linux/ppc64le
 )
 readonly S2I_CROSS_COMPILE_TARGETS=(
   cmd/s2i
