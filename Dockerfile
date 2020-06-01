@@ -1,5 +1,7 @@
+ARG arch=amd64
 FROM openshift/origin-release:golang-1.13 AS builder
 
+ARG arch
 ENV S2I_GIT_VERSION="" \
     S2I_GIT_MAJOR="" \
     S2I_GIT_MINOR=""
@@ -8,7 +10,7 @@ ENV S2I_GIT_VERSION="" \
 WORKDIR /tmp/source-to-image
 COPY . .
 
-ENV GOARCH="amd64"
+ENV GOARCH=$arch
 
 USER root
 
@@ -20,7 +22,8 @@ RUN make
 
 FROM registry.redhat.io/ubi8/ubi
 
-ENV GOARCH="amd64"
+ARG arch
+ENV GOARCH=$arch
 
 COPY --from=builder /tmp/source-to-image/_output/local/bin/linux/${GOARCH}/s2i  /usr/local/bin/s2i
 
