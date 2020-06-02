@@ -10,14 +10,14 @@ import (
 	"strings"
 	"testing"
 
+	dockertypes "github.com/docker/docker/api/types"
+	dockercontainer "github.com/docker/docker/api/types/container"
+	dockerstrslice "github.com/docker/docker/api/types/strslice"
+
 	"github.com/openshift/source-to-image/pkg/api/constants"
 	dockertest "github.com/openshift/source-to-image/pkg/docker/test"
 	"github.com/openshift/source-to-image/pkg/errors"
 	testfs "github.com/openshift/source-to-image/pkg/test/fs"
-
-	dockertypes "github.com/docker/docker/api/types"
-	dockercontainer "github.com/docker/docker/api/types/container"
-	dockerstrslice "github.com/docker/docker/api/types/strslice"
 )
 
 func TestContainerName(t *testing.T) {

@@ -11,11 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/openshift/source-to-image/pkg/util/fs"
-	utillog "github.com/openshift/source-to-image/pkg/util/log"
-
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/util"
+	"github.com/openshift/source-to-image/pkg/util/fs"
+	utillog "github.com/openshift/source-to-image/pkg/util/log"
 )
 
 var log = utillog.StderrLog

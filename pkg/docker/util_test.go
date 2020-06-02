@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	cliconfig "github.com/docker/docker/cli/config"
+
 	"github.com/openshift/source-to-image/pkg/api/constants"
 	"github.com/openshift/source-to-image/pkg/util/user"
 )

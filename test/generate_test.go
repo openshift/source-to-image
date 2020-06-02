@@ -1,8 +1,9 @@
 package test
 
 import (
-	"github.com/openshift/source-to-image/pkg/cmd/cli/cmd"
 	"testing"
+
+	"github.com/openshift/source-to-image/pkg/cmd/cli/cmd"
 )
 
 func TestGenerate_canonizeBuilderImageArg(t *testing.T) {

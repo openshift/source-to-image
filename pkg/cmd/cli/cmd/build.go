@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/openshift/source-to-image/pkg/scm/git"
-	utillog "github.com/openshift/source-to-image/pkg/util/log"
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/source-to-image/pkg/api"
@@ -18,8 +16,10 @@ import (
 	"github.com/openshift/source-to-image/pkg/docker"
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
 	"github.com/openshift/source-to-image/pkg/run"
+	"github.com/openshift/source-to-image/pkg/scm/git"
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
+	utillog "github.com/openshift/source-to-image/pkg/util/log"
 	"github.com/openshift/source-to-image/pkg/version"
 )
 

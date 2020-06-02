@@ -16,11 +16,13 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/klog"
-
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerapi "github.com/docker/docker/client"
+	"golang.org/x/net/context"
+
+	"k8s.io/klog"
+
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/build"
 	"github.com/openshift/source-to-image/pkg/build/strategies"
@@ -30,7 +32,6 @@ import (
 	"github.com/openshift/source-to-image/pkg/tar"
 	"github.com/openshift/source-to-image/pkg/util"
 	"github.com/openshift/source-to-image/pkg/util/fs"
-	"golang.org/x/net/context"
 )
 
 const (
