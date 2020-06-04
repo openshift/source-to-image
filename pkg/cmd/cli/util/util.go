@@ -5,11 +5,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
 	log "k8s.io/klog"
 
 	"github.com/openshift/source-to-image/pkg/api"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 // AddCommonFlags adds the common flags for usage, build and rebuild commands

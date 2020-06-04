@@ -7,11 +7,12 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/scm/git"
 	utillog "github.com/openshift/source-to-image/pkg/util/log"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 var log = utillog.StderrLog

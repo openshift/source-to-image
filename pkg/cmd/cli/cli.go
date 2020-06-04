@@ -6,13 +6,13 @@ import (
 	"runtime"
 	"strings"
 
-	utillog "github.com/openshift/source-to-image/pkg/util/log"
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/cmd/cli/cmd"
 	cmdutil "github.com/openshift/source-to-image/pkg/cmd/cli/util"
 	"github.com/openshift/source-to-image/pkg/docker"
+	utillog "github.com/openshift/source-to-image/pkg/util/log"
 )
 
 // log is a placeholder until the builders pass an output stream down

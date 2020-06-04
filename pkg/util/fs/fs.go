@@ -12,9 +12,8 @@ import (
 	"sync"
 	"time"
 
-	utillog "github.com/openshift/source-to-image/pkg/util/log"
-
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
+	utillog "github.com/openshift/source-to-image/pkg/util/log"
 )
 
 var log = utillog.StderrLog
