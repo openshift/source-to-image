@@ -33,6 +33,7 @@ readonly S2I_CROSS_COMPILE_PLATFORMS=(
   windows/amd64
   linux/386
   linux/ppc64le
+  linux/s390x
 )
 readonly S2I_CROSS_COMPILE_TARGETS=(
   cmd/s2i
