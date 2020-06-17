@@ -8,11 +8,9 @@ ENV S2I_GIT_VERSION="" \
 WORKDIR /tmp/source-to-image
 COPY . .
 
-ENV GOARCH="amd64"
-
 USER root
 
-RUN make
+RUN make && cp _output/local/bin/linux/$(go env GOARCH)/s2i _output/local/go/bin/s2i
 
 #
 # Runner Image
@@ -20,9 +18,7 @@ RUN make
 
 FROM registry.redhat.io/ubi8/ubi
 
-ENV GOARCH="amd64"
-
-COPY --from=builder /tmp/source-to-image/_output/local/bin/linux/${GOARCH}/s2i  /usr/local/bin/s2i
+COPY --from=builder /tmp/source-to-image/_output/local/go/bin/s2i  /usr/local/bin/s2i
 
 USER 1001
 
