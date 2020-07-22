@@ -18,6 +18,7 @@ import (
 	"github.com/containers/storage/pkg/archive"
 	"github.com/containers/storage/pkg/idtools"
 	"github.com/containers/storage/pkg/ioutils"
+	"github.com/containers/storage/pkg/mount"
 	"github.com/containers/storage/pkg/stringid"
 	"github.com/containers/storage/pkg/system"
 	"github.com/containers/storage/pkg/tarlog"
@@ -238,6 +239,10 @@ type LayerStore interface {
 	// ApplyDiff reads a tarstream which was created by a previous call to Diff and
 	// applies its changes to a specified layer.
 	ApplyDiff(to string, diff io.Reader) (int64, error)
+
+	// LoadLocked wraps Load in a locked state. This means it loads the store
+	// and cleans-up invalid layers if needed.
+	LoadLocked() error
 }
 
 type layerStore struct {
@@ -276,6 +281,8 @@ func copyLayer(l *Layer) *Layer {
 		Flags:              copyStringInterfaceMap(l.Flags),
 		UIDMap:             copyIDMap(l.UIDMap),
 		GIDMap:             copyIDMap(l.GIDMap),
+		UIDs:               copyUint32Slice(l.UIDs),
+		GIDs:               copyUint32Slice(l.GIDs),
 	}
 }
 
@@ -345,6 +352,7 @@ func (r *layerStore) Load() error {
 	r.byname = names
 	r.bycompressedsum = compressedsums
 	r.byuncompressedsum = uncompressedsums
+
 	// Load and merge information about which layers are mounted, and where.
 	if r.IsReadWrite() {
 		r.mountsLockfile.RLock()
@@ -352,22 +360,23 @@ func (r *layerStore) Load() error {
 		if err = r.loadMounts(); err != nil {
 			return err
 		}
-	}
-	// Last step: if we're writable, try to remove anything that a previous
-	// user of this storage area marked for deletion but didn't manage to
-	// actually delete.
-	if r.IsReadWrite() && r.Locked() {
-		for _, layer := range r.layers {
-			if layer.Flags == nil {
-				layer.Flags = make(map[string]interface{})
-			}
-			if cleanup, ok := layer.Flags[incompleteFlag]; ok {
-				if b, ok := cleanup.(bool); ok && b {
-					err = r.deleteInternal(layer.ID)
-					if err != nil {
-						break
+
+		// Last step: as we’re writable, try to remove anything that a previous
+		// user of this storage area marked for deletion but didn't manage to
+		// actually delete.
+		if r.Locked() {
+			for _, layer := range r.layers {
+				if layer.Flags == nil {
+					layer.Flags = make(map[string]interface{})
+				}
+				if cleanup, ok := layer.Flags[incompleteFlag]; ok {
+					if b, ok := cleanup.(bool); ok && b {
+						err = r.deleteInternal(layer.ID)
+						if err != nil {
+							break
+						}
+						shouldSave = true
 					}
-					shouldSave = true
 				}
 			}
 		}
@@ -375,7 +384,14 @@ func (r *layerStore) Load() error {
 			return r.saveLayers()
 		}
 	}
+
 	return err
+}
+
+func (r *layerStore) LoadLocked() error {
+	r.lockfile.Lock()
+	defer r.lockfile.Unlock()
+	return r.Load()
 }
 
 func (r *layerStore) loadMounts() error {
@@ -475,7 +491,7 @@ func (r *layerStore) saveMounts() error {
 	return r.loadMounts()
 }
 
-func newLayerStore(rundir string, layerdir string, driver drivers.Driver, uidMap, gidMap []idtools.IDMap) (LayerStore, error) {
+func (s *store) newLayerStore(rundir string, layerdir string, driver drivers.Driver) (LayerStore, error) {
 	if err := os.MkdirAll(rundir, 0700); err != nil {
 		return nil, err
 	}
@@ -486,8 +502,6 @@ func newLayerStore(rundir string, layerdir string, driver drivers.Driver, uidMap
 	if err != nil {
 		return nil, err
 	}
-	lockfile.Lock()
-	defer lockfile.Unlock()
 	mountsLockfile, err := GetLockfile(filepath.Join(rundir, "mountpoints.lock"))
 	if err != nil {
 		return nil, err
@@ -501,8 +515,8 @@ func newLayerStore(rundir string, layerdir string, driver drivers.Driver, uidMap
 		byid:           make(map[string]*Layer),
 		bymount:        make(map[string]*Layer),
 		byname:         make(map[string]*Layer),
-		uidMap:         copyIDMap(uidMap),
-		gidMap:         copyIDMap(gidMap),
+		uidMap:         copyIDMap(s.uidMap),
+		gidMap:         copyIDMap(s.gidMap),
 	}
 	if err := rlstore.Load(); err != nil {
 		return nil, err
@@ -515,8 +529,6 @@ func newROLayerStore(rundir string, layerdir string, driver drivers.Driver) (ROL
 	if err != nil {
 		return nil, err
 	}
-	lockfile.RLock()
-	defer lockfile.Unlock()
 	rlstore := layerStore{
 		lockfile:       lockfile,
 		mountsLockfile: nil,
@@ -776,8 +788,17 @@ func (r *layerStore) Mount(id string, options drivers.MountOpts) (string, error)
 		return "", ErrLayerUnknown
 	}
 	if layer.MountCount > 0 {
-		layer.MountCount++
-		return layer.MountPoint, r.saveMounts()
+		mounted, err := mount.Mounted(layer.MountPoint)
+		if err != nil {
+			return "", err
+		}
+		// If the container is not mounted then we have a condition
+		// where the kernel umounted the mount point. This means
+		// that the mount count never got decremented.
+		if mounted {
+			layer.MountCount++
+			return layer.MountPoint, r.saveMounts()
+		}
 	}
 	if options.MountLabel == "" {
 		options.MountLabel = layer.MountLabel

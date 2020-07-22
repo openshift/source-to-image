@@ -29,14 +29,16 @@ GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null)
 GIT_BRANCH_CLEAN := $(shell echo $(GIT_BRANCH) | sed -e "s/[^[:alnum:]]/-/g")
 EPOCH_TEST_COMMIT := 0418ebf59f9e1f564831c0ba9378b7f8e40a1c73
 NATIVETAGS :=
-AUTOTAGS := $(shell ./hack/btrfs_tag.sh) $(shell ./hack/libdm_tag.sh) $(shell ./hack/ostree_tag.sh)
+AUTOTAGS := $(shell ./hack/btrfs_tag.sh) $(shell ./hack/libdm_tag.sh)
 BUILDFLAGS := -tags "$(AUTOTAGS) $(TAGS)" $(FLAGS)
 GO ?= go
 
 GO_BUILD=$(GO) build
+GO_TEST=$(GO) test
 # Go module support: set `-mod=vendor` to use the vendored sources
 ifeq ($(shell $(GO) help mod >/dev/null 2>&1 && echo true), true)
 	GO_BUILD=GO111MODULE=on $(GO) build -mod=vendor
+	GO_TEST=GO111MODULE=on $(GO) test -mod=vendor
 endif
 
 RUNINVM := vagrant/runinvm.sh
@@ -52,19 +54,19 @@ sources := $(wildcard *.go cmd/containers-storage/*.go drivers/*.go drivers/*/*.
 containers-storage: $(sources) ## build using gc on the host
 	$(GO_BUILD) -compiler gc $(BUILDFLAGS) ./cmd/containers-storage
 
-layers_ffjson.go: layers.go
+layers_ffjson.go: $(FFJSON) layers.go
 	$(RM) $@
 	$(FFJSON) layers.go
 
-images_ffjson.go: images.go
+images_ffjson.go: $(FFJSON) images.go
 	$(RM) $@
 	$(FFJSON) images.go
 
-containers_ffjson.go: containers.go
+containers_ffjson.go: $(FFJSON) containers.go
 	$(RM) $@
 	$(FFJSON) containers.go
 
-pkg/archive/archive_ffjson.go: pkg/archive/archive.go
+pkg/archive/archive_ffjson.go: $(FFJSON) pkg/archive/archive.go
 	$(RM) $@
 	$(FFJSON) pkg/archive/archive.go
 
@@ -95,7 +97,7 @@ test: local-binary ## build the binaries and run the tests using VMs
 	$(RUNINVM) make local-binary local-cross local-test-unit local-test-integration
 
 local-test-unit: local-binary ## run the unit tests on the host (requires\nsuperuser privileges)
-	@$(GO) test $(BUILDFLAGS) $(shell $(GO) list ./... | grep -v ^$(PACKAGE)/vendor)
+	@$(GO_TEST) $(BUILDFLAGS) $(shell $(GO) list ./... | grep -v ^$(PACKAGE)/vendor)
 
 test-unit: local-binary ## run the unit tests using VMs
 	$(RUNINVM) make local-$@
@@ -116,6 +118,9 @@ validate: ## validate DCO, gofmt, ./pkg/ isolation, golint,\ngo vet and vendor u
 install.tools:
 	make -C tests/tools
 
+$(FFJSON):
+	make -C tests/tools build/ffjson
+
 install.docs: docs
 	make -C docs install
 
@@ -126,6 +131,9 @@ lint: install.tools
 
 help: ## this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-z A-Z_-]+:.*?## / {gsub(" ",",",$$1);gsub("\\\\n",sprintf("\n%22c"," "), $$2);printf "\033[36m%-21s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+vendor-in-container:
+	podman run --privileged --rm --env HOME=/root -v `pwd`:/src -w /src golang make vendor
 
 vendor:
 	export GO111MODULE=on \
