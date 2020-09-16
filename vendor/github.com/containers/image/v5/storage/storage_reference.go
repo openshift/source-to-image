@@ -30,6 +30,14 @@ func newReference(transport storageTransport, named reference.Named, id string) 
 	if named == nil && id == "" {
 		return nil, ErrInvalidReference
 	}
+	if named != nil && reference.IsNameOnly(named) {
+		return nil, errors.Wrapf(ErrInvalidReference, "reference %s has neither a tag nor a digest", named.String())
+	}
+	if id != "" {
+		if err := validateImageID(id); err != nil {
+			return nil, errors.Wrapf(ErrInvalidReference, "invalid ID value %q: %v", id, err)
+		}
+	}
 	// We take a copy of the transport, which contains a pointer to the
 	// store that it used for resolving this reference, so that the
 	// transport that we'll return from Transport() won't be affected by
@@ -93,6 +101,9 @@ func imageMatchesSystemContext(store storage.Store, img *storage.Image, manifest
 	}
 	// Load the image's configuration blob.
 	m, err := manifest.FromBlob(manifestBytes, manifestType)
+	if err != nil {
+		return false
+	}
 	getConfig := func(blobInfo types.BlobInfo) ([]byte, error) {
 		return store.ImageBigData(img.ID, blobInfo.Digest.String())
 	}
@@ -295,5 +306,5 @@ func (s storageReference) NewImageSource(ctx context.Context, sys *types.SystemC
 }
 
 func (s storageReference) NewImageDestination(ctx context.Context, sys *types.SystemContext) (types.ImageDestination, error) {
-	return newImageDestination(s)
+	return newImageDestination(sys, s)
 }

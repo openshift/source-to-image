@@ -104,6 +104,19 @@ const (
 	Compress
 )
 
+// LayerCrypto indicates if layers have been encrypted or decrypted or none
+type LayerCrypto int
+
+const (
+	// PreserveOriginalCrypto indicates the layer must be preserved, ie
+	// no encryption/decryption
+	PreserveOriginalCrypto LayerCrypto = iota
+	// Encrypt indicates the layer is encrypted
+	Encrypt
+	// Decrypt indicates the layer is decrypted
+	Decrypt
+)
+
 // BlobInfo collects known information about a blob (layer/config).
 // In some situations, some fields may be unknown, in others they may be mandatory; documenting an “unknown” value here does not override that.
 type BlobInfo struct {
@@ -115,11 +128,18 @@ type BlobInfo struct {
 	// CompressionOperation is used in Image.UpdateLayerInfos to instruct
 	// whether the original layer should be preserved or (de)compressed. The
 	// field defaults to preserve the original layer.
+	// TODO: To remove together with CryptoOperation in re-design to remove
+	// field out out of BlobInfo.
 	CompressionOperation LayerCompression
 	// CompressionAlgorithm is used in Image.UpdateLayerInfos to set the correct
 	// MIME type for compressed layers (e.g., gzip or zstd). This field MUST be
 	// set when `CompressionOperation == Compress`.
 	CompressionAlgorithm *compression.Algorithm
+	// CryptoOperation is used in Image.UpdateLayerInfos to instruct
+	// whether the original layer was encrypted/decrypted
+	// TODO: To remove together with CompressionOperation in re-design to
+	// remove field out out of BlobInfo.
+	CryptoOperation LayerCrypto
 }
 
 // BICTransportScope encapsulates transport-dependent representation of a “scope” where blobs are or are not present.
@@ -264,7 +284,7 @@ type ImageDestination interface {
 	// AcceptsForeignLayerURLs returns false iff foreign layers in manifest should be actually
 	// uploaded to the image destination, true otherwise.
 	AcceptsForeignLayerURLs() bool
-	// MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime OS. False otherwise.
+	// MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime architecture and OS. False otherwise.
 	MustMatchRuntimeOS() bool
 	// IgnoresEmbeddedDockerReference() returns true iff the destination does not care about Image.EmbeddedDockerReferenceConflicts(),
 	// and would prefer to receive an unmodified manifest instead of one modified for the destination.
@@ -378,6 +398,12 @@ type Image interface {
 	// Everything in options.InformationOnly should be provided, other fields should be set only if a modification is desired.
 	// This does not change the state of the original Image object.
 	UpdatedImage(ctx context.Context, options ManifestUpdateOptions) (Image, error)
+	// SupportsEncryption returns an indicator that the image supports encryption
+	//
+	// Deprecated: Initially used to determine if a manifest can be copied from a source manifest type since
+	// the process of updating a manifest between different manifest types was to update then convert.
+	// This resulted in some fields in the update being lost. This has been fixed by: https://github.com/containers/image/pull/836
+	SupportsEncryption(ctx context.Context) bool
 	// Size returns an approximation of the amount of disk space which is consumed by the image in its current
 	// location.  If the size is not known, -1 will be returned.
 	Size() (int64, error)
@@ -418,6 +444,7 @@ type ImageInspectInfo struct {
 	DockerVersion string
 	Labels        map[string]string
 	Architecture  string
+	Variant       string
 	Os            string
 	Layers        []string
 	Env           []string
@@ -428,6 +455,11 @@ type ImageInspectInfo struct {
 type DockerAuthConfig struct {
 	Username string
 	Password string
+	// IdentityToken can be used as an refresh_token in place of username and
+	// password to obtain the bearer/access token in oauth2 flow. If identity
+	// token is set, password should not be set.
+	// Ref: https://docs.docker.com/registry/spec/auth/oauth/
+	IdentityToken string
 }
 
 // OptionalBool is a boolean with an additional undefined value, which is meant
@@ -448,7 +480,7 @@ const (
 // OptionalBoolFalse.  The function is meant to avoid boilerplate code of users.
 func NewOptionalBool(b bool) OptionalBool {
 	o := OptionalBoolFalse
-	if b == true {
+	if b {
 		o = OptionalBoolTrue
 	}
 	return o
@@ -475,6 +507,8 @@ type SystemContext struct {
 	RegistriesDirPath string
 	// Path to the system-wide registries configuration file
 	SystemRegistriesConfPath string
+	// Path to the system-wide registries configuration directory
+	SystemRegistriesConfDirPath string
 	// If not "", overrides the default path for the authentication file, but only new format files
 	AuthFilePath string
 	// if not "", overrides the default path for the authentication file, but with the legacy format;
@@ -488,11 +522,14 @@ type SystemContext struct {
 	ArchitectureChoice string
 	// If not "", overrides the use of platform.GOOS when choosing an image or verifying OS match.
 	OSChoice string
+	// If not "", overrides the use of detected ARM platform variant when choosing an image or verifying variant match.
+	VariantChoice string
 	// If not "", overrides the system's default directory containing a blob info cache.
 	BlobInfoCacheDir string
-
 	// Additional tags when creating or copying a docker-archive.
 	DockerArchiveAdditionalTags []reference.NamedTagged
+	// If not "", overrides the temporary directory to use for storing big files
+	BigFilesTemporaryDir string
 
 	// === OCI.Transport overrides ===
 	// If not "", a directory containing a CA certificate (ending with ".crt"),
@@ -517,13 +554,18 @@ type SystemContext struct {
 	// Allow contacting docker registries over HTTP, or HTTPS with failed TLS verification. Note that this does not affect other TLS connections.
 	DockerInsecureSkipTLSVerify OptionalBool
 	// if nil, the library tries to parse ~/.docker/config.json to retrieve credentials
+	// Ignored if DockerBearerRegistryToken is non-empty.
 	DockerAuthConfig *DockerAuthConfig
+	// if not "", the library uses this registry token to authenticate to the registry
+	DockerBearerRegistryToken string
 	// if not "", an User-Agent header is added to each request when contacting a registry.
 	DockerRegistryUserAgent string
 	// if true, a V1 ping attempt isn't done to give users a better error. Default is false.
 	// Note that this field is used mainly to integrate containers/image into projectatomic/docker
 	// in order to not break any existing docker's integration tests.
 	DockerDisableV1Ping bool
+	// If true, dockerImageDestination.SupportedManifestMIMETypes will omit the Schema1 media types from the supported list
+	DockerDisableDestSchema1MIMETypes bool
 	// Directory to use for OSTree temporary files
 	OSTreeTmpDirPath string
 
@@ -547,9 +589,37 @@ type SystemContext struct {
 	CompressionLevel *int
 }
 
+// ProgressEvent is the type of events a progress reader can produce
+// Warning: new event types may be added any time.
+type ProgressEvent uint
+
+const (
+	// ProgressEventNewArtifact will be fired on progress reader setup
+	ProgressEventNewArtifact ProgressEvent = iota
+
+	// ProgressEventRead indicates that the artifact download is currently in
+	// progress
+	ProgressEventRead
+
+	// ProgressEventDone is fired when the data transfer has been finished for
+	// the specific artifact
+	ProgressEventDone
+)
+
 // ProgressProperties is used to pass information from the copy code to a monitor which
 // can use the real-time information to produce output or react to changes.
 type ProgressProperties struct {
+	// The event indicating what
+	Event ProgressEvent
+
+	// The artifact which has been updated in this interval
 	Artifact BlobInfo
-	Offset   uint64
+
+	// The currently downloaded size in bytes
+	// Increases from 0 to the final Artifact size
+	Offset uint64
+
+	// The additional offset which has been downloaded inside the last update
+	// interval. Will be reset after each ProgressEventRead event.
+	OffsetUpdate uint64
 }

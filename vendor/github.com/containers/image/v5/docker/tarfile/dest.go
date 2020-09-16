@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/iolimits"
 	"github.com/containers/image/v5/internal/tmpdir"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
@@ -29,10 +30,17 @@ type Destination struct {
 	// Other state.
 	blobs  map[digest.Digest]types.BlobInfo // list of already-sent blobs
 	config []byte
+	sysCtx *types.SystemContext
 }
 
 // NewDestination returns a tarfile.Destination for the specified io.Writer.
+// Deprecated: please use NewDestinationWithContext instead
 func NewDestination(dest io.Writer, ref reference.NamedTagged) *Destination {
+	return NewDestinationWithContext(nil, dest, ref)
+}
+
+// NewDestinationWithContext returns a tarfile.Destination for the specified io.Writer.
+func NewDestinationWithContext(sys *types.SystemContext, dest io.Writer, ref reference.NamedTagged) *Destination {
 	repoTags := []reference.NamedTagged{}
 	if ref != nil {
 		repoTags = append(repoTags, ref)
@@ -42,6 +50,7 @@ func NewDestination(dest io.Writer, ref reference.NamedTagged) *Destination {
 		tar:      tar.NewWriter(dest),
 		repoTags: repoTags,
 		blobs:    make(map[digest.Digest]types.BlobInfo),
+		sysCtx:   sys,
 	}
 }
 
@@ -70,7 +79,7 @@ func (d *Destination) AcceptsForeignLayerURLs() bool {
 	return false
 }
 
-// MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime OS. False otherwise.
+// MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime architecture and OS. False otherwise.
 func (d *Destination) MustMatchRuntimeOS() bool {
 	return false
 }
@@ -99,7 +108,7 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 	// When the layer is decompressed, we also have to generate the digest on uncompressed datas.
 	if inputInfo.Size == -1 || inputInfo.Digest.String() == "" {
 		logrus.Debugf("docker tarfile: input with unknown size, streaming to disk first ...")
-		streamCopy, err := ioutil.TempFile(tmpdir.TemporaryDirectoryForBigFiles(), "docker-tarfile-blob")
+		streamCopy, err := ioutil.TempFile(tmpdir.TemporaryDirectoryForBigFiles(d.sysCtx), "docker-tarfile-blob")
 		if err != nil {
 			return types.BlobInfo{}, err
 		}
@@ -113,7 +122,7 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 		if err != nil {
 			return types.BlobInfo{}, err
 		}
-		_, err = streamCopy.Seek(0, os.SEEK_SET)
+		_, err = streamCopy.Seek(0, io.SeekStart)
 		if err != nil {
 			return types.BlobInfo{}, err
 		}
@@ -135,7 +144,7 @@ func (d *Destination) PutBlob(ctx context.Context, stream io.Reader, inputInfo t
 	}
 
 	if isConfig {
-		buf, err := ioutil.ReadAll(stream)
+		buf, err := iolimits.ReadAtMost(stream, iolimits.MaxConfigBodySize)
 		if err != nil {
 			return types.BlobInfo{}, errors.Wrap(err, "Error reading Config file stream")
 		}

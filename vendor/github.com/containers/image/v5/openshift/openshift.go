@@ -7,13 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/containers/image/v5/docker"
 	"github.com/containers/image/v5/docker/reference"
+	"github.com/containers/image/v5/internal/iolimits"
 	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/image/v5/version"
@@ -102,7 +102,7 @@ func (c *openshiftClient) doRequest(ctx context.Context, method, path string, re
 		return nil, err
 	}
 	defer res.Body.Close()
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := iolimits.ReadAtMost(res.Body, iolimits.MaxOpenShiftStatusBody)
 	if err != nil {
 		return nil, err
 	}
@@ -378,7 +378,7 @@ func (d *openshiftImageDestination) AcceptsForeignLayerURLs() bool {
 	return true
 }
 
-// MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime OS. False otherwise.
+// MustMatchRuntimeOS returns true iff the destination can store only images targeted for the current runtime architecture and OS. False otherwise.
 func (d *openshiftImageDestination) MustMatchRuntimeOS() bool {
 	return false
 }
@@ -491,6 +491,9 @@ sigExists:
 			Content:    newSig,
 		}
 		body, err := json.Marshal(sig)
+		if err != nil {
+			return err
+		}
 		_, err = d.client.doRequest(ctx, "POST", "/oapi/v1/imagesignatures", body)
 		if err != nil {
 			return err
