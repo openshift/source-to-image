@@ -21,7 +21,7 @@ import (
 	dockerapi "github.com/docker/docker/client"
 	"golang.org/x/net/context"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/build"
@@ -195,7 +195,7 @@ func (i *integrationTest) setup() {
 	from := flag.CommandLine
 	if vflag := from.Lookup("v"); vflag != nil {
 		// the thing here is that we are looking for the bash -v passed into test-integration.sh (with no value),
-		// but for klog (https://k8s.io/klog/blob/master/klog.go), one specifies
+		// but for klog (https://k8s.io/klog/v2/blob/master/klog.go), one specifies
 		// the logging level with -v=# (i.e. -v=0 or -v=3 or -v=5).
 		// so, for the changes stemming from issue 133, we 'reuse' the bash -v, and set the highest klog level.
 		// (if you look at STI's main.go, and setupGlog, it essentially maps klog's -v to --loglevel for use by the sti command)
