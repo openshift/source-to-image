@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Logger is a simple interface that is roughly equivalent to klog.
@@ -109,7 +109,7 @@ func (f *FileLogger) Is(level int32) bool {
 // V will returns a logger which will discard output if the specified level is greater than the current logging level.
 func (f *FileLogger) V(level int32) VerboseLogger {
 	// Is the loglevel set verbose enough to accept the forthcoming log statement
-	if klog.V(klog.Level(level)) {
+	if klog.V(klog.Level(level)).Enabled() {
 		return f
 	}
 	// Otherwise discard
@@ -147,7 +147,7 @@ func (f *FileLogger) writeln(sev severity, line string) {
 	// If the loglevel has been elevated above this file logger's verbosity (generally set to 2)
 	// then delegate ALL messages to elevated logger in order to leverage its file/line/timestamp
 	// prefix information.
-	if klog.V(klog.Level(f.level + 1)) {
+	if klog.V(klog.Level(f.level + 1)).Enabled() {
 		severity.delegateFn(3, line)
 	} else {
 		// buf.io is not threadsafe, so serialize access to the stream

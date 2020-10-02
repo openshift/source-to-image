@@ -26,5 +26,5 @@ require (
 	github.com/spf13/pflag v1.0.3
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
 	google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55 // indirect
-	k8s.io/klog v1.0.0
+	k8s.io/klog/v2 v2.3.0
 )
