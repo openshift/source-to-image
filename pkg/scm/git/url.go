@@ -86,6 +86,8 @@ func splitOnByte(s string, c byte) (string, string) {
 // Parse parses a "Git URL"
 func Parse(rawurl string) (*URL, error) {
 	if urlSchemeRegexp.MatchString(rawurl) &&
+		// at least through golang 1.14.9, url.Parse cannot handle ssh://git@github.com:sclorg/nodejs-ex
+		!strings.HasPrefix(rawurl, "ssh://") &&
 		(runtime.GOOS != "windows" || !dosDriveRegexp.MatchString(rawurl)) {
 		u, err := url.Parse(rawurl)
 		if err != nil {
@@ -104,6 +106,12 @@ func Parse(rawurl string) (*URL, error) {
 			URL:  *u,
 			Type: URLTypeURL,
 		}, nil
+	}
+
+	// if ssh://git@github.com:sclorg/nodejs-ex then strip ssh:// a la what we
+	// see in other upstream git parsing handling of scp styled git URLs;
+	if strings.HasPrefix(rawurl, "ssh://") {
+		rawurl = strings.Trim(rawurl, "ssh://")
 	}
 
 	s, fragment := splitOnByte(rawurl, '#')
