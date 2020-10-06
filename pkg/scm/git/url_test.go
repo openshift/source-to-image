@@ -10,6 +10,7 @@ import (
 
 type parseTest struct {
 	rawurl         string
+	ammendedRawURL string
 	expectedGitURL *URL
 	expectedError  bool
 }
@@ -184,6 +185,19 @@ func TestParse(t *testing.T) {
 				Type: URLTypeSCP,
 			},
 		},
+		parseTest{
+			rawurl:         "ssh://git@github.com:sclorg/nodejs-ex",
+			ammendedRawURL: "git@github.com:sclorg/nodejs-ex",
+			expectedGitURL: &URL{
+				URL: url.URL{
+					User: url.User("git"),
+					Host: "github.com",
+					Path: "sclorg/nodejs-ex",
+				},
+				Type: URLTypeSCP,
+			},
+			expectedError: false,
+		},
 
 		// path ...
 		parseTest{
@@ -221,12 +235,23 @@ func TestParse(t *testing.T) {
 			t.Errorf("%s: Parse() returned\n\t%#v\nWanted\n\t%#v", test.rawurl, parsedURL, test.expectedGitURL)
 		}
 
-		if parsedURL.String() != test.rawurl {
-			t.Errorf("%s: String() returned %s", test.rawurl, parsedURL.String())
-		}
+		if len(test.ammendedRawURL) > 0 {
+			if parsedURL.String() != test.ammendedRawURL {
+				t.Errorf("%s: String() returned %s", test.ammendedRawURL, parsedURL.String())
+			}
 
-		if parsedURL.StringNoFragment() != strings.SplitN(test.rawurl, "#", 2)[0] {
-			t.Errorf("%s: StringNoFragment() returned %s", test.rawurl, parsedURL.StringNoFragment())
+			if parsedURL.StringNoFragment() != strings.SplitN(test.ammendedRawURL, "#", 2)[0] {
+				t.Errorf("%s: StringNoFragment() returned %s", test.ammendedRawURL, parsedURL.StringNoFragment())
+			}
+
+		} else {
+			if parsedURL.String() != test.rawurl {
+				t.Errorf("%s: String() returned %s", test.rawurl, parsedURL.String())
+			}
+
+			if parsedURL.StringNoFragment() != strings.SplitN(test.rawurl, "#", 2)[0] {
+				t.Errorf("%s: StringNoFragment() returned %s", test.rawurl, parsedURL.StringNoFragment())
+			}
 		}
 	}
 }
