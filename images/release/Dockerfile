@@ -15,9 +15,10 @@ ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 RUN yum install -y gcc zip && \
     yum clean all && \
     curl https://storage.googleapis.com/golang/go$VERSION.linux-amd64.tar.gz | tar -C /usr/local -xzf - && \
-    touch /sti-build-image
+    touch /sti-build-image && \
+    mkdir -p /go/src/github.com/openshift/source-to-image
 
 WORKDIR /go/src/github.com/openshift/source-to-image
-
-# Expect a tar with the source of STI (and /sti-version-defs in the root)
-CMD tar mxzf - && hack/build-cross.sh
+VOLUME ["/go/src/github.com/openshift/source-to-image"]
+# Expect source to be mounted in
+CMD ["./hack/build-cross.sh"]
