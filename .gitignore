@@ -5,3 +5,6 @@
 .vscode/
 cmd/s2i/debug
 *~
+
+# Version definition file used in release build
+sti-version-defs
