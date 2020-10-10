@@ -83,7 +83,7 @@ Running the application image is as simple as invoking the docker run command:
 Rebuilding the application using the saved artifacts can be accomplished using the following command:
 ` +
 	"```\n" +
-	"s2i build --incremental=true test/test-app nginx-centos7 nginx-app\n" +
+	"s2i build --incremental=true test/test-app {{.ImageName}} {{.ImageName}}-app\n" +
 	"---> Restoring build artifacts...\n" +
 	"---> Building and installing application from source...\n" +
 	"```\n" +
