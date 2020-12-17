@@ -1,4 +1,4 @@
-FROM openshift/origin-release:golang-1.13 AS builder
+FROM openshift/origin-release:golang-1.14 AS builder
 
 ENV S2I_GIT_VERSION="" \
     S2I_GIT_MAJOR="" \
