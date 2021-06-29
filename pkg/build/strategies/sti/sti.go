@@ -114,6 +114,7 @@ func New(client dockerpkg.Client, config *api.Config, fs fs.FileSystem, override
 		docker,
 		config.PullAuthentication,
 		fs,
+		config,
 	)
 	tarHandler := tar.NewParanoid(fs)
 	tarHandler.SetExclusionPattern(excludePattern)
@@ -146,6 +147,7 @@ func New(client dockerpkg.Client, config *api.Config, fs fs.FileSystem, override
 			builder.runtimeDocker,
 			config.RuntimeAuthentication,
 			builder.fs,
+			config,
 		)
 	}
 

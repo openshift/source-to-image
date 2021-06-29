@@ -322,8 +322,10 @@ func (builder *Dockerfile) Prepare(config *api.Config) error {
 
 	// Default - install scripts specified by image metadata.
 	// Typically this will point to an image:// URL, and no scripts are downloaded.
-	// However, this is not guaranteed.
-	builder.installScripts(config.ImageScriptsURL, config)
+	// However, if builder image labels are specified, we'll go with those and not the default
+	if config.BuilderImageLabels == nil {
+		builder.installScripts(config.ImageScriptsURL, config)
+	}
 
 	// Fetch sources, since their .s2i/bin might contain s2i scripts which override defaults.
 	if config.Source != nil {
@@ -398,6 +400,7 @@ func (builder *Dockerfile) installScripts(scriptsURL string, config *api.Config)
 		nil,
 		api.AuthConfig{},
 		builder.fs,
+		config,
 	)
 
 	// all scripts are optional, we trust the image contains scripts if we don't find them
@@ -424,6 +427,10 @@ func getDestination(config *api.Config) string {
 func getImageScriptsDir(config *api.Config) (string, bool) {
 	if strings.HasPrefix(config.ScriptsURL, "image://") {
 		return strings.TrimPrefix(config.ScriptsURL, "image://"), true
+	}
+	scriptsURL, _ := util.AdjustConfigWithImageLabels(config)
+	if strings.HasPrefix(scriptsURL, "image://") {
+		return strings.TrimPrefix(scriptsURL, "image://"), true
 	}
 	if strings.HasPrefix(config.ImageScriptsURL, "image://") {
 		return strings.TrimPrefix(config.ImageScriptsURL, "image://"), false
