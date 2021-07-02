@@ -60,6 +60,32 @@ func GenerateLabelsFromSourceInfo(labels map[string]string, info *git.SourceInfo
 	return labels
 }
 
+// AdjustConfigWithImageLabels examines previously retrieved builder image labels and returns
+// any specified update to the scripts URL and destination settings.  Note, we do
+// not set those fields in the Config object itself, so as to not confuse the s2i build case in
+// which the script install code expects those values to set via the explicit command line argument
+// overrides.  Otherwise, we can inadvertently override scripts from the source repo.
+func AdjustConfigWithImageLabels(cfg *api.Config) (string, string) {
+	if cfg.BuilderImageLabels == nil {
+		return "", ""
+	}
+
+	scriptsURL, destination := "", ""
+	if v, ok := cfg.BuilderImageLabels[constants.DeprecatedScriptsURLLabel]; ok {
+		scriptsURL = v
+	}
+	if v, ok := cfg.BuilderImageLabels[constants.ScriptsURLLabel]; ok {
+		scriptsURL = v
+	}
+
+	if v, ok := cfg.BuilderImageLabels[constants.DestinationLabel]; ok {
+		// there is no alternative for destination obtainable from the source git clone
+		// so we don't track our setting of this field from the builder image labels
+		destination = v
+	}
+	return scriptsURL, destination
+}
+
 // addBuildLabel adds a new "*.build.*" label into map when the
 // value of this label is not empty
 func addBuildLabel(to map[string]string, key, value, namespace string) {

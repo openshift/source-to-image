@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -159,6 +160,11 @@ $ s2i build . centos/ruby-22-centos7 hello-world-app
 				if err != nil {
 					log.Fatal(err)
 				}
+			}
+
+			err = manageConfigImageLabelsBuildImageName(context.Background(), cfg)
+			if err != nil {
+				log.Warningf("could not inspect the builder image for labels: %s", err.Error())
 			}
 
 			log.V(2).Infof("\n%s\n", describe.Config(client, cfg))

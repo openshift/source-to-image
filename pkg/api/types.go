@@ -147,6 +147,10 @@ type Config struct {
 	// This url can be a reference within the builder image if the scheme is specified as image://
 	ScriptsURL string
 
+	// BuilderImageLabels is a map containing the builder image labels for possible adjustment of fields
+	// on this object.
+	BuilderImageLabels map[string]string
+
 	// Destination specifies a location where the untar operation will place its artifacts.
 	Destination string
 

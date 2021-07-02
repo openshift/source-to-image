@@ -188,6 +188,29 @@ func TestEmptySource(t *testing.T) {
 	}
 }
 
+func TestScriptInstallerWithLabels(t *testing.T) {
+	config := &api.Config{
+		BuilderImageLabels: map[string]string{
+			constants.ScriptsURLLabel: "image:///usr/some/dir",
+		},
+		DockerConfig: &api.DockerConfig{Endpoint: "unix:///var/run/docker.sock"},
+	}
+	client, err := docker.NewEngineAPIClient(config.DockerConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sti, err := New(client, config, fs.NewFileSystem(), build.Overrides{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.BuilderImageLabels == nil {
+		t.Errorf("Config.BuilderImageLabels unexpectantly changed: %v", config.BuilderImageLabels)
+	}
+	if sti.installer == nil {
+		t.Errorf("sti installer not set")
+	}
+}
+
 func TestOverrides(t *testing.T) {
 	fd := &FakeSTI{}
 	client, err := docker.NewEngineAPIClient(&api.DockerConfig{Endpoint: "unix:///var/run/docker.sock"})
