@@ -165,6 +165,8 @@ github.com/docker/go-metrics
 github.com/docker/go-units
 # github.com/ghodss/yaml v1.0.0
 github.com/ghodss/yaml
+# github.com/go-logr/logr v0.2.0
+github.com/go-logr/logr
 # github.com/gogo/protobuf v1.3.1
 github.com/gogo/protobuf/gogoproto
 github.com/gogo/protobuf/proto
@@ -295,5 +297,5 @@ google.golang.org/grpc/codes
 google.golang.org/grpc/status
 # gopkg.in/yaml.v2 v2.2.8
 gopkg.in/yaml.v2
-# k8s.io/klog v1.0.0
-k8s.io/klog
+# k8s.io/klog/v2 v2.3.0
+k8s.io/klog/v2

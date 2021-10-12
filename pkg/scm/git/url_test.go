@@ -184,6 +184,23 @@ func TestParse(t *testing.T) {
 				Type: URLTypeSCP,
 			},
 		},
+		parseTest{
+			rawurl:        "ssh://git@github.com:sclorg/nodejs-ex",
+			expectedError: true,
+		},
+		parseTest{
+			rawurl: "ssh://git@github.com:22/user/repo.git",
+			expectedGitURL: &URL{
+				URL: url.URL{
+					Scheme: "ssh",
+					User:   url.User("git"),
+					Host:   "github.com:22",
+					Path:   "/user/repo.git",
+				},
+				Type: URLTypeURL,
+			},
+			expectedError: false,
+		},
 
 		// path ...
 		parseTest{
@@ -228,6 +245,7 @@ func TestParse(t *testing.T) {
 		if parsedURL.StringNoFragment() != strings.SplitN(test.rawurl, "#", 2)[0] {
 			t.Errorf("%s: StringNoFragment() returned %s", test.rawurl, parsedURL.StringNoFragment())
 		}
+
 	}
 }
 

@@ -79,11 +79,11 @@ check_result $? "${WORK_DIR}/s2i-git-clone.log"
 
 test_debug "s2i build with relative path without file://"
 
-s2i build cakephp-ex docker.io/centos/php-70-centos7 test --loglevel=5 &> "${WORK_DIR}/s2i-rel-noproto.log"
+s2i build cakephp-ex registry.access.redhat.com/ubi8/php-74:latest test --loglevel=5 &> "${WORK_DIR}/s2i-rel-noproto.log"
 check_result $? "${WORK_DIR}/s2i-rel-noproto.log"
 
 test_debug "s2i build with volume options"
-s2i build cakephp-ex docker.io/centos/php-70-centos7 test --volume "${WORK_DIR}:/home/:z" --loglevel=5 &> "${WORK_DIR}/s2i-volume-correct.log"
+s2i build cakephp-ex registry.access.redhat.com/ubi8/php-74:latest test --volume "${WORK_DIR}:/home/:z" --loglevel=5 &> "${WORK_DIR}/s2i-volume-correct.log"
 check_result $? "${WORK_DIR}/s2i-volume-correct.log"
 
 popd
@@ -96,12 +96,12 @@ else
   S2I_WORK_DIR_URL="file://${S2I_WORK_DIR}/cakephp-ex"
 fi
 
-s2i build "${S2I_WORK_DIR_URL}" docker.io/centos/php-70-centos7 test --loglevel=5 &> "${WORK_DIR}/s2i-abs-proto.log"
+s2i build "${S2I_WORK_DIR_URL}" registry.access.redhat.com/ubi8/php-74:latest test --loglevel=5 &> "${WORK_DIR}/s2i-abs-proto.log"
 check_result $? "${WORK_DIR}/s2i-abs-proto.log"
 
 test_debug "s2i build with absolute path without file://"
 
-s2i build "${S2I_WORK_DIR}/cakephp-ex" docker.io/centos/php-70-centos7 test --loglevel=5 &> "${WORK_DIR}/s2i-abs-noproto.log"
+s2i build "${S2I_WORK_DIR}/cakephp-ex" registry.access.redhat.com/ubi8/php-74:latest test --loglevel=5 &> "${WORK_DIR}/s2i-abs-noproto.log"
 check_result $? "${WORK_DIR}/s2i-abs-noproto.log"
 
 ## don't do ssh tests here because credentials are needed (even for the git user), which
@@ -110,7 +110,7 @@ check_result $? "${WORK_DIR}/s2i-abs-noproto.log"
 test_debug "s2i build with non-git repo file location"
 
 rm -rf "${WORK_DIR}/cakephp-ex/.git"
-s2i build "${S2I_WORK_DIR}/cakephp-ex" docker.io/centos/php-70-centos7 test --loglevel=5 --loglevel=5 &> "${WORK_DIR}/s2i-non-repo.log"
+s2i build "${S2I_WORK_DIR}/cakephp-ex" registry.access.redhat.com/ubi8/php-74:latest test --loglevel=5 --loglevel=5 &> "${WORK_DIR}/s2i-non-repo.log"
 check_result $? ""
 grep "Copying sources" "${WORK_DIR}/s2i-non-repo.log"
 check_result $? "${WORK_DIR}/s2i-non-repo.log"
@@ -129,7 +129,7 @@ grep "Sample invocation" "${WORK_DIR}/s2i-usage.log"
 check_result $? "${WORK_DIR}/s2i-usage.log"
 
 test_debug "s2i build with overriding assemble/run scripts"
-s2i build https://github.com/openshift/source-to-image docker.io/centos/php-70-centos7 test --context-dir=test_apprepo >& "${WORK_DIR}/s2i-override-build.log"
+s2i build https://github.com/openshift/source-to-image registry.access.redhat.com/ubi8/php-74:latest test --context-dir=test_apprepo >& "${WORK_DIR}/s2i-override-build.log"
 grep "Running custom assemble" "${WORK_DIR}/s2i-override-build.log"
 check_result $? "${WORK_DIR}/s2i-override-build.log"
 docker run test >& "${WORK_DIR}/s2i-override-run.log"
@@ -143,7 +143,7 @@ grep "Gem::RemoteFetcher::FetchError: Errno::ECONNREFUSED" "${WORK_DIR}/s2i-add-
 check_result $? "${WORK_DIR}/s2i-add-host.log"
 set -e
 test_debug "s2i build with remote git repo"
-s2i build https://github.com/sclorg/cakephp-ex docker.io/centos/php-70-centos7 test --loglevel=5 &> "${WORK_DIR}/s2i-git-proto.log"
+s2i build https://github.com/sclorg/cakephp-ex registry.access.redhat.com/ubi8/php-74:latest test --loglevel=5 &> "${WORK_DIR}/s2i-git-proto.log"
 check_result $? "${WORK_DIR}/s2i-git-proto.log"
 
 test_debug "s2i build with runtime image"
@@ -151,7 +151,7 @@ s2i build --ref=10.x --context-dir=helloworld https://github.com/wildfly/quickst
 check_result $? "${WORK_DIR}/s2i-runtime-image.log"
 
 test_debug "s2i build with Dockerfile output"
-s2i build https://github.com/sclorg/cakephp-ex docker.io/centos/php-70-centos7 --as-dockerfile=${WORK_DIR}/asdockerfile/Dockerfile --loglevel=5 >& "${WORK_DIR}/s2i-dockerfile.log"
+s2i build https://github.com/sclorg/cakephp-ex registry.access.redhat.com/ubi8/php-74:latest --as-dockerfile=${WORK_DIR}/asdockerfile/Dockerfile --loglevel=5 >& "${WORK_DIR}/s2i-dockerfile.log"
 check_result $? "${WORK_DIR}/s2i-dockerfile.log"
 
 

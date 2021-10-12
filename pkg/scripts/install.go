@@ -10,6 +10,7 @@ import (
 	"github.com/openshift/source-to-image/pkg/api/constants"
 	"github.com/openshift/source-to-image/pkg/docker"
 	s2ierr "github.com/openshift/source-to-image/pkg/errors"
+	"github.com/openshift/source-to-image/pkg/util"
 	"github.com/openshift/source-to-image/pkg/util/fs"
 )
 
@@ -191,7 +192,7 @@ func (m *DefaultScriptSourceManager) Add(s ScriptHandler) {
 }
 
 // NewInstaller returns a new instance of the default Installer implementation
-func NewInstaller(image string, scriptsURL string, proxyConfig *api.ProxyConfig, docker docker.Docker, auth api.AuthConfig, fs fs.FileSystem) Installer {
+func NewInstaller(image string, scriptsURL string, proxyConfig *api.ProxyConfig, docker docker.Docker, auth api.AuthConfig, fs fs.FileSystem, config *api.Config) Installer {
 	m := DefaultScriptSourceManager{
 		Image:      image,
 		ScriptsURL: scriptsURL,
@@ -214,6 +215,13 @@ func NewInstaller(image string, scriptsURL string, proxyConfig *api.ProxyConfig,
 		defaultURL, err := m.docker.GetScriptsURL(m.Image)
 		if err == nil && defaultURL != "" {
 			m.Add(&URLScriptHandler{URL: defaultURL, Download: m.download, FS: m.fs, Name: ImageURLHandler})
+		}
+	} else {
+		// this means we are doing a s2i build with --as-dockerfile
+		// so lets see if we found builder image labels
+		scriptsURL, _ := util.AdjustConfigWithImageLabels(config)
+		if len(scriptsURL) > 0 {
+			m.Add(&URLScriptHandler{URL: scriptsURL, Download: m.download, FS: m.fs, Name: ScriptURLHandler})
 		}
 	}
 	return &m

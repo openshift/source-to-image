@@ -267,7 +267,7 @@ func TestInstallRequiredFromInvalidURL(t *testing.T) {
 
 func TestNewInstaller(t *testing.T) {
 	docker := &dockerpkg.FakeDocker{DefaultURLResult: "image://docker"}
-	inst := NewInstaller("test-image", "http://foo.bar", nil, docker, api.AuthConfig{}, &testfs.FakeFileSystem{})
+	inst := NewInstaller("test-image", "http://foo.bar", nil, docker, api.AuthConfig{}, &testfs.FakeFileSystem{}, nil)
 	sources := inst.(*DefaultScriptSourceManager).sources
 	firstHandler, ok := sources[0].(*URLScriptHandler)
 	if !ok {
@@ -283,6 +283,31 @@ func TestNewInstaller(t *testing.T) {
 	if lastHandler.URL != "image://docker" {
 		t.Errorf("expected last handler to handle the docker default url, got %+v", lastHandler)
 	}
+}
+
+func TestNewInstallerWithBuilderImageLabels(t *testing.T) {
+	config := &api.Config{
+		BuilderImageLabels: map[string]string{
+			constants.ScriptsURLLabel: "image:///usr/some/dir",
+		},
+	}
+	inst := NewInstaller("test-image", "http://foo.bar", nil, nil, api.AuthConfig{}, &testfs.FakeFileSystem{}, config)
+	sources := inst.(*DefaultScriptSourceManager).sources
+	firstHandler, ok := sources[0].(*URLScriptHandler)
+	if !ok {
+		t.Errorf("expected first handler to be script url handler, got %#v", inst.(*DefaultScriptSourceManager).sources)
+	}
+	if firstHandler.URL != "http://foo.bar" {
+		t.Errorf("expected first handler to handle the script url, got %+v", firstHandler)
+	}
+	lastHandler, ok := sources[len(sources)-1].(*URLScriptHandler)
+	if !ok {
+		t.Errorf("expected last handler to be docker url handler, got %#v", inst.(*DefaultScriptSourceManager).sources)
+	}
+	if lastHandler.URL != "image:///usr/some/dir" {
+		t.Errorf("expected last handler to handle the builder image label url, got %+v", lastHandler)
+	}
+
 }
 
 type fakeSource struct {

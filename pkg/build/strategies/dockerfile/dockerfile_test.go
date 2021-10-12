@@ -64,6 +64,34 @@ func TestGetImageScriptsDir(t *testing.T) {
 			ExpectedDir:   "/usr/some/dir",
 			HasAllScripts: true,
 		},
+		{
+			Config: &api.Config{
+				BuilderImageLabels: map[string]string{
+					constants.ScriptsURLLabel: "image:///usr/some/dir",
+				},
+			},
+			ExpectedDir:   "/usr/some/dir",
+			HasAllScripts: true,
+		},
+		{
+			Config: &api.Config{
+				BuilderImageLabels: map[string]string{
+					constants.ScriptsURLLabel:           "image:///usr/some/dir",
+					constants.DeprecatedScriptsURLLabel: "image:///usr/other/dir",
+				},
+			},
+			ExpectedDir:   "/usr/some/dir",
+			HasAllScripts: true,
+		},
+		{
+			Config: &api.Config{
+				BuilderImageLabels: map[string]string{
+					constants.DeprecatedScriptsURLLabel: "image:///usr/some/dir",
+				},
+			},
+			ExpectedDir:   "/usr/some/dir",
+			HasAllScripts: true,
+		},
 	}
 	for _, tc := range cases {
 		output, hasScripts := getImageScriptsDir(tc.Config)

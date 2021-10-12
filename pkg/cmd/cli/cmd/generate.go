@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/source-to-image/pkg/api"
-	"github.com/openshift/source-to-image/pkg/api/constants"
 	"github.com/openshift/source-to-image/pkg/build/strategies/dockerfile"
+	"github.com/openshift/source-to-image/pkg/util"
 	"github.com/openshift/source-to-image/pkg/util/fs"
 )
 
@@ -46,15 +46,8 @@ func generateDockerfile(cfg *api.Config) error {
 }
 
 // adjustConfigWithImageLabels adjusts the configuration with given labels.
-func adjustConfigWithImageLabels(cfg *api.Config, labels map[string]string) {
-	if v, ok := labels[constants.ScriptsURLLabel]; ok {
-		cfg.ScriptsURL = v
-	}
-
-	if v, ok := labels[constants.DestinationLabel]; ok {
-		cfg.Destination = v
-	}
-
+func adjustConfigWithImageLabels(cfg *api.Config) {
+	cfg.ScriptsURL, cfg.Description = util.AdjustConfigWithImageLabels(cfg)
 }
 
 // CanonizeBuilderImageArg appends 'docker://' if the builder image doesn't contain the a schema.
@@ -81,23 +74,17 @@ $ s2i generate docker.io/centos/nodejs-10-centos7 Dockerfile.gen
 				return cmd.Help()
 			}
 
-			builderImageArg := CanonizeBuilderImageArg(cmd.Flags().Arg(0))
-
-			ref, err := alltransports.ParseImageName(builderImageArg)
-			if err != nil {
-				return err
-			}
-
-			cfg.BuilderImage = ref.DockerReference().Name()
+			cfg.BuilderImage = cmd.Flags().Arg(0)
 			cfg.AsDockerfile = cmd.Flags().Arg(1)
-
 			ctx := context.Background()
-			var imageLabels map[string]string
-			if imageLabels, err = getImageLabels(ctx, ref); err != nil {
-				return err
-			}
 
-			adjustConfigWithImageLabels(cfg, imageLabels)
+			err := manageConfigImageLabelsBuildImageName(ctx, cfg)
+			if err != nil {
+				log.Warningf("could not inspect the builder image for labels: %s", err.Error())
+			}
+			// for generate we go ahead and modify the config scripts url and destination field since we do not have specific arg
+			// overrides for those 2 fields
+			adjustConfigWithImageLabels(cfg)
 			return generateDockerfile(cfg)
 		},
 	}
@@ -108,4 +95,21 @@ $ s2i generate docker.io/centos/nodejs-10-centos7 Dockerfile.gen
 	generateCmd.Flags().StringVarP(&(cfg.AssembleRuntimeUser), "assemble-runtime-user", "", "", "Specify the user to run assemble-runtime with")
 
 	return generateCmd
+}
+
+// manageConfigImageLabelsBuildImageName extracts the image labels from builder image in the provided config.
+// Returns an error if the builder image name is invalid or there is an error extracting the image labels.
+func manageConfigImageLabelsBuildImageName(ctx context.Context, cfg *api.Config) error {
+	builderImageName := CanonizeBuilderImageArg(cfg.BuilderImage)
+	ref, err := alltransports.ParseImageName(builderImageName)
+	if err != nil {
+		return err
+	}
+
+	cfg.BuilderImage = ref.DockerReference().Name()
+
+	if cfg.BuilderImageLabels, err = getImageLabels(ctx, ref); err != nil {
+		return err
+	}
+	return nil
 }
