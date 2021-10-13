@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -299,8 +298,8 @@ func (h *fs) CopyContents(src string, dest string, filesToIgnore map[string]stri
 	}
 
 	for _, obj := range objects {
-		source := path.Join(src, obj.Name())
-		destination := path.Join(dest, obj.Name())
+		source := filepath.Join(src, obj.Name())
+		destination := filepath.Join(dest, obj.Name())
 		if err := h.Copy(source, destination, filesToIgnore); err != nil {
 			return err
 		}
