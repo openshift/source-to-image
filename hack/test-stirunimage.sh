@@ -116,7 +116,7 @@ grep "Copying sources" "${WORK_DIR}/s2i-non-repo.log"
 check_result $? "${WORK_DIR}/s2i-non-repo.log"
 
 test_debug "s2i rebuild"
-s2i build https://github.com/sclorg/s2i-php-container.git --context-dir=5.5/test/test-app registry.access.redhat.com/openshift3/php-55-rhel7 rack-test-app --incremental=true --loglevel=5 &> "${WORK_DIR}/s2i-pre-rebuild.log"
+s2i build https://github.com/sclorg/s2i-php-container.git --context-dir=7.4/test/test-app registry.access.redhat.com/ubi8/php-74:latest rack-test-app --incremental=true --loglevel=5 &> "${WORK_DIR}/s2i-pre-rebuild.log"
 check_result $? "${WORK_DIR}/s2i-pre-rebuild.log"
 s2i rebuild rack-test-app:latest rack-test-app:v1 -p never --loglevel=5 &> "${WORK_DIR}/s2i-rebuild.log"
 check_result $? "${WORK_DIR}/s2i-rebuild.log"
