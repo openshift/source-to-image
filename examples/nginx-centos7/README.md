@@ -12,7 +12,7 @@
 | s2i/bin/run            | Yes       | Script that runs the application                             |
 | s2i/bin/save-artifacts | No        | Script for incremental builds that saves the built artifacts |
 | test/run               | No        | Test script for the builder image                            |
-| test/test-app          | Yes       | Test application source code                                 |
+| test/test-app          | No        | Test application source code                                 |
 
 #### Dockerfile
 Create a *Dockerfile* that installs all of the necessary tools and libraries that are needed to build and run our application.  This file will also handle copying the s2i scripts into the created image.
