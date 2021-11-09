@@ -318,7 +318,7 @@ func CheckAllowedUser(d Docker, imageName string, uids user.RangeList, isOnbuild
 		return err
 	}
 	if len(assembleUser) > 0 {
-		if !user.IsUserAllowed(assembleUser, &uids) {
+		if !user.IsUserAllowed(extractUser(assembleUser), &uids) {
 			// Pass in the override, since assembleUser can come from the image label
 			return s2ierr.NewAssembleUserNotAllowedError(imageName, false)
 		}
