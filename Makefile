@@ -36,14 +36,6 @@ verify: build
 	hack/verify-bash-completion.sh
 .PHONY: verify
 
-# Install travis dependencies
-#
-# Example:
-#   make install-travis
-install-travis:
-	hack/install-tools.sh
-.PHONY: install-travis
-
 # Build and run unit tests
 #
 # Args:
