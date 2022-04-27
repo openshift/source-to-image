@@ -166,7 +166,7 @@ var (
 
 func getLogLevel() (level int) {
 	for level = 5; level >= 0; level-- {
-		if klog.V(klog.Level(level)) == true {
+		if klog.V(klog.Level(level)).Enabled() == true {
 			break
 		}
 	}
