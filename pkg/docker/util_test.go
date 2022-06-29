@@ -6,6 +6,7 @@ import (
 
 	cliconfig "github.com/docker/docker/cli/config"
 
+	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/api/constants"
 	"github.com/openshift/source-to-image/pkg/util/user"
 )
@@ -260,5 +261,80 @@ func TestGetDefaultDockerConfig(t *testing.T) {
 		if tc.expectedTLS != cfg.UseTLS {
 			t.Errorf("UseTLS: expected '%t', but got '%t'", tc.expectedTLS, cfg.UseTLS)
 		}
+	}
+}
+
+func TestGetAssembleUser(t *testing.T) {
+	testCases := []struct {
+		name              string
+		containerUser     string
+		assembleUserLabel string
+		expectedResult    string
+		extractedResult   string
+	}{
+		{
+			name: "empty",
+		},
+		{
+			name:            "container user set",
+			containerUser:   "1002",
+			expectedResult:  "1002",
+			extractedResult: "1002",
+		},
+		{
+			name:            "container user:group set",
+			containerUser:   "1002:1002",
+			expectedResult:  "1002:1002",
+			extractedResult: "1002",
+		},
+		{
+			name:              "assemble user label set",
+			assembleUserLabel: "1003",
+			expectedResult:    "1003",
+			extractedResult:   "1003",
+		},
+		{
+			name:              "assemble user:group label set",
+			assembleUserLabel: "1003:1003",
+			expectedResult:    "1003:1003",
+			extractedResult:   "1003",
+		},
+		{
+			name:              "assemble user override",
+			containerUser:     "1002",
+			assembleUserLabel: "1003",
+			expectedResult:    "1003",
+			extractedResult:   "1003",
+		},
+		{
+			name:              "assemble user:group override",
+			containerUser:     "1002:1002",
+			assembleUserLabel: "1003:1003",
+			expectedResult:    "1003:1003",
+			extractedResult:   "1003",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeDocker := &FakeDocker{
+				GetImageUserResult:        tc.containerUser,
+				AssembleRuntimeUserResult: tc.assembleUserLabel,
+				Labels:                    make(map[string]string),
+			}
+			if tc.assembleUserLabel != "" {
+				fakeDocker.Labels[constants.AssembleUserLabel] = tc.assembleUserLabel
+			}
+			assembleUser, err := GetAssembleUser(fakeDocker, &api.Config{BuilderImage: "dummy-image:latest"})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if assembleUser != tc.expectedResult {
+				t.Fatalf("expected assemble user %s, got %s", tc.expectedResult, assembleUser)
+			}
+			extractedUser := extractUser(assembleUser)
+			if extractedUser != tc.extractedResult {
+				t.Fatalf("expected extracted user %s, got %s", tc.extractedResult, extractedUser)
+			}
+		})
 	}
 }

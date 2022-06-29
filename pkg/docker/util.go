@@ -453,7 +453,10 @@ func GetAssembleUser(docker Docker, config *api.Config) (string, error) {
 	if len(config.AssembleUser) > 0 {
 		return config.AssembleUser, nil
 	}
-	return extractAssembleUser(docker, config.BuilderImage)
+	if assembleUser, err := extractAssembleUser(docker, config.BuilderImage); err == nil && assembleUser != "" {
+		return assembleUser, nil
+	}
+	return docker.GetImageUser(config.BuilderImage)
 }
 
 func extractAssembleUser(docker Docker, imageName string) (string, error) {
