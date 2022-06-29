@@ -28,7 +28,7 @@ find_test_dirs() {
 S2I_RACE=${S2I_RACE--race}
 S2I_COVER=${S2I_COVER--cover}
 S2I_TIMEOUT=${S2I_TIMEOUT--timeout 60s}
-S2I_BUILD_TAGS=""
+S2I_BUILD_TAGS="${S2I_BUILD_TAGS:-}"
 
 if [ "${1-}" != "" ]; then
   test_packages="$S2I_GO_PACKAGE/$1"
