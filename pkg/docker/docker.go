@@ -25,6 +25,7 @@ import (
 	dockermessage "github.com/docker/docker/pkg/jsonmessage"
 	dockerstdcopy "github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/tlsconfig"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/net/context"
 
 	"github.com/openshift/source-to-image/pkg/api"
@@ -121,7 +122,7 @@ type Docker interface {
 type Client interface {
 	ContainerAttach(ctx context.Context, container string, options dockertypes.ContainerAttachOptions) (dockertypes.HijackedResponse, error)
 	ContainerCommit(ctx context.Context, container string, options dockertypes.ContainerCommitOptions) (dockertypes.IDResponse, error)
-	ContainerCreate(ctx context.Context, config *dockercontainer.Config, hostConfig *dockercontainer.HostConfig, networkingConfig *dockernetwork.NetworkingConfig, containerName string) (dockercontainer.ContainerCreateCreatedBody, error)
+	ContainerCreate(ctx context.Context, config *dockercontainer.Config, hostConfig *dockercontainer.HostConfig, networkingConfig *dockernetwork.NetworkingConfig, platform *v1.Platform, containerName string) (dockercontainer.ContainerCreateCreatedBody, error)
 	ContainerInspect(ctx context.Context, container string) (dockertypes.ContainerJSON, error)
 	ContainerRemove(ctx context.Context, container string, options dockertypes.ContainerRemoveOptions) error
 	ContainerStart(ctx context.Context, container string, options dockertypes.ContainerStartOptions) error
@@ -970,7 +971,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 	log.V(2).Infof("Creating container with options {Name:%q Config:%+v HostConfig:%+v} ...", createOpts.Name, *util.SafeForLoggingContainerConfig(createOpts.Config), createOpts.HostConfig)
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	container, err := d.client.ContainerCreate(ctx, createOpts.Config, createOpts.HostConfig, createOpts.NetworkingConfig, createOpts.Name)
+	container, err := d.client.ContainerCreate(ctx, createOpts.Config, createOpts.HostConfig, createOpts.NetworkingConfig, nil, createOpts.Name)
 	if err != nil {
 		return err
 	}
