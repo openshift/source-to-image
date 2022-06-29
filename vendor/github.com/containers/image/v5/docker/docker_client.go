@@ -1,13 +1,11 @@
 package docker
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -23,6 +21,7 @@ import (
 	"github.com/containers/image/v5/pkg/sysregistriesv2"
 	"github.com/containers/image/v5/pkg/tlsclientconfig"
 	"github.com/containers/image/v5/types"
+	"github.com/containers/image/v5/version"
 	"github.com/containers/storage/pkg/homedir"
 	clientLib "github.com/docker/distribution/registry/client"
 	"github.com/docker/go-connections/tlsconfig"
@@ -65,6 +64,8 @@ var (
 		{path: "/etc/containers/certs.d", absolute: true},
 		{path: "/etc/docker/certs.d", absolute: true},
 	}
+
+	defaultUserAgent = "containers/" + version.Version + " (github.com/containers/image)"
 )
 
 // extensionSignature and extensionSignatureList come from github.com/openshift/origin/pkg/dockerregistry/server/signaturedispatcher.go:
@@ -89,11 +90,12 @@ type bearerToken struct {
 	expirationTime time.Time
 }
 
-// dockerClient is configuration for dealing with a single Docker registry.
+// dockerClient is configuration for dealing with a single container registry.
 type dockerClient struct {
 	// The following members are set by newDockerClient and do not change afterwards.
-	sys      *types.SystemContext
-	registry string
+	sys       *types.SystemContext
+	registry  string
+	userAgent string
 
 	// tlsClientConfig is setup by newDockerClient and will be used and updated
 	// by detectProperties(). Callers can edit tlsClientConfig.InsecureSkipVerify in the meantime.
@@ -200,27 +202,26 @@ func dockerCertDir(sys *types.SystemContext, hostPort string) (string, error) {
 			logrus.Debugf("error accessing certs directory due to permissions: %v", err)
 			continue
 		}
-		if err != nil {
-			return "", err
-		}
+		return "", err
 	}
 	return fullCertDirPath, nil
 }
 
 // newDockerClientFromRef returns a new dockerClient instance for refHostname (a host a specified in the Docker image reference, not canonicalized to dockerRegistry)
 // “write” specifies whether the client will be used for "write" access (in particular passed to lookaside.go:toplevelFromSection)
+// signatureBase is always set in the return value
 func newDockerClientFromRef(sys *types.SystemContext, ref dockerReference, write bool, actions string) (*dockerClient, error) {
-	registry := reference.Domain(ref.ref)
-	auth, err := config.GetCredentials(sys, registry)
+	auth, err := config.GetCredentialsForRef(sys, ref.ref)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error getting username and password")
+		return nil, errors.Wrapf(err, "getting username and password")
 	}
 
-	sigBase, err := configuredSignatureStorageBase(sys, ref, write)
+	sigBase, err := SignatureStorageBaseURL(sys, ref, write)
 	if err != nil {
 		return nil, err
 	}
 
+	registry := reference.Domain(ref.ref)
 	client, err := newDockerClient(sys, registry, ref.ref.Name())
 	if err != nil {
 		return nil, err
@@ -266,7 +267,7 @@ func newDockerClient(sys *types.SystemContext, registry, reference string) (*doc
 	skipVerify := false
 	reg, err := sysregistriesv2.FindRegistry(sys, reference)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error loading registries")
+		return nil, errors.Wrapf(err, "loading registries")
 	}
 	if reg != nil {
 		if reg.Blocked {
@@ -276,9 +277,15 @@ func newDockerClient(sys *types.SystemContext, registry, reference string) (*doc
 	}
 	tlsClientConfig.InsecureSkipVerify = skipVerify
 
+	userAgent := defaultUserAgent
+	if sys != nil && sys.DockerRegistryUserAgent != "" {
+		userAgent = sys.DockerRegistryUserAgent
+	}
+
 	return &dockerClient{
 		sys:             sys,
 		registry:        registry,
+		userAgent:       userAgent,
 		tlsClientConfig: tlsClientConfig,
 	}, nil
 }
@@ -288,14 +295,14 @@ func newDockerClient(sys *types.SystemContext, registry, reference string) (*doc
 func CheckAuth(ctx context.Context, sys *types.SystemContext, username, password, registry string) error {
 	client, err := newDockerClient(sys, registry, registry)
 	if err != nil {
-		return errors.Wrapf(err, "error creating new docker client")
+		return errors.Wrapf(err, "creating new docker client")
 	}
 	client.auth = types.DockerAuthConfig{
 		Username: username,
 		Password: password,
 	}
 
-	resp, err := client.makeRequest(ctx, "GET", "/v2/", nil, nil, v2Auth, nil)
+	resp, err := client.makeRequest(ctx, http.MethodGet, "/v2/", nil, nil, v2Auth, nil)
 	if err != nil {
 		return err
 	}
@@ -331,13 +338,13 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 		// Results holds the results returned by the /v1/search endpoint
 		Results []SearchResult `json:"results"`
 	}
-	v2Res := &V2Results{}
 	v1Res := &V1Results{}
 
 	// Get credentials from authfile for the underlying hostname
+	// We can't use GetCredentialsForRef here because we want to search the whole registry.
 	auth, err := config.GetCredentials(sys, registry)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error getting username and password")
+		return nil, errors.Wrapf(err, "getting username and password")
 	}
 
 	// The /v2/_catalog endpoint has been disabled for docker.io therefore
@@ -351,7 +358,7 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 
 	client, err := newDockerClient(sys, hostname, registry)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error creating new docker client")
+		return nil, errors.Wrapf(err, "creating new docker client")
 	}
 	client.auth = auth
 	if sys != nil {
@@ -371,7 +378,7 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 		u.RawQuery = q.Encode()
 
 		logrus.Debugf("trying to talk to v1 search endpoint")
-		resp, err := client.makeRequest(ctx, "GET", u.String(), nil, nil, noAuth, nil)
+		resp, err := client.makeRequest(ctx, http.MethodGet, u.String(), nil, nil, noAuth, nil)
 		if err != nil {
 			logrus.Debugf("error getting search results from v1 endpoint %q: %v", registry, err)
 		} else {
@@ -388,31 +395,63 @@ func SearchRegistry(ctx context.Context, sys *types.SystemContext, registry, ima
 	}
 
 	logrus.Debugf("trying to talk to v2 search endpoint")
-	resp, err := client.makeRequest(ctx, "GET", "/v2/_catalog", nil, nil, v2Auth, nil)
-	if err != nil {
-		logrus.Debugf("error getting search results from v2 endpoint %q: %v", registry, err)
-	} else {
+	searchRes := []SearchResult{}
+	path := "/v2/_catalog"
+	for len(searchRes) < limit {
+		resp, err := client.makeRequest(ctx, http.MethodGet, path, nil, nil, v2Auth, nil)
+		if err != nil {
+			logrus.Debugf("error getting search results from v2 endpoint %q: %v", registry, err)
+			return nil, errors.Wrapf(err, "couldn't search registry %q", registry)
+		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			logrus.Errorf("error getting search results from v2 endpoint %q: %v", registry, httpResponseToError(resp, ""))
-		} else {
-			if err := json.NewDecoder(resp.Body).Decode(v2Res); err != nil {
-				return nil, err
+			err := httpResponseToError(resp, "")
+			logrus.Errorf("error getting search results from v2 endpoint %q: %v", registry, err)
+			return nil, errors.Wrapf(err, "couldn't search registry %q", registry)
+		}
+		v2Res := &V2Results{}
+		if err := json.NewDecoder(resp.Body).Decode(v2Res); err != nil {
+			return nil, err
+		}
+
+		for _, repo := range v2Res.Repositories {
+			if len(searchRes) == limit {
+				break
 			}
-			searchRes := []SearchResult{}
-			for _, repo := range v2Res.Repositories {
-				if strings.Contains(repo, image) {
-					res := SearchResult{
-						Name: repo,
-					}
+			if strings.Contains(repo, image) {
+				res := SearchResult{
+					Name: repo,
+				}
+				// bugzilla.redhat.com/show_bug.cgi?id=1976283
+				// If we have a full match, make sure it's listed as the first result.
+				// (Note there might be a full match we never see if we reach the result limit first.)
+				if repo == image {
+					searchRes = append([]SearchResult{res}, searchRes...)
+				} else {
 					searchRes = append(searchRes, res)
 				}
 			}
-			return searchRes, nil
+		}
+
+		link := resp.Header.Get("Link")
+		if link == "" {
+			break
+		}
+		linkURLStr := strings.Trim(strings.Split(link, ";")[0], "<>")
+		linkURL, err := url.Parse(linkURLStr)
+		if err != nil {
+			return searchRes, err
+		}
+
+		// can be relative or absolute, but we only want the path (and I
+		// guess we're in trouble if it forwards to a new place...)
+		path = linkURL.Path
+		if linkURL.RawQuery != "" {
+			path += "?"
+			path += linkURL.RawQuery
 		}
 	}
-
-	return nil, errors.Wrapf(err, "couldn't search registry %q", registry)
+	return searchRes, nil
 }
 
 // makeRequest creates and executes a http.Request with the specified parameters, adding authentication and TLS options for the Docker client.
@@ -422,7 +461,11 @@ func (c *dockerClient) makeRequest(ctx context.Context, method, path string, hea
 		return nil, err
 	}
 
-	url := fmt.Sprintf("%s://%s%s", c.scheme, c.registry, path)
+	urlString := fmt.Sprintf("%s://%s%s", c.scheme, c.registry, path)
+	url, err := url.Parse(urlString)
+	if err != nil {
+		return nil, err
+	}
 	return c.makeRequestToResolvedURL(ctx, method, url, headers, stream, -1, auth, extraScope)
 }
 
@@ -459,7 +502,7 @@ func parseRetryAfter(res *http.Response, fallbackDelay time.Duration) time.Durat
 // makeRequest should generally be preferred.
 // In case of an HTTP 429 status code in the response, it may automatically retry a few times.
 // TODO(runcom): too many arguments here, use a struct
-func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url string, headers map[string][]string, stream io.Reader, streamLen int64, auth sendAuth, extraScope *authScope) (*http.Response, error) {
+func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method string, url *url.URL, headers map[string][]string, stream io.Reader, streamLen int64, auth sendAuth, extraScope *authScope) (*http.Response, error) {
 	delay := backoffInitialDelay
 	attempts := 0
 	for {
@@ -470,12 +513,14 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 			attempts == backoffNumIterations {
 			return res, err
 		}
+		// close response body before retry or context done
+		res.Body.Close()
 
 		delay = parseRetryAfter(res, delay)
 		if delay > backoffMaxDelay {
 			delay = backoffMaxDelay
 		}
-		logrus.Debugf("Too many requests to %s: sleeping for %f seconds before next attempt", url, delay.Seconds())
+		logrus.Debugf("Too many requests to %s: sleeping for %f seconds before next attempt", url.Redacted(), delay.Seconds())
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -490,13 +535,12 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method, url
 // streamLen, if not -1, specifies the length of the data expected on stream.
 // makeRequest should generally be preferred.
 // Note that no exponential back off is performed when receiving an http 429 status code.
-func (c *dockerClient) makeRequestToResolvedURLOnce(ctx context.Context, method, url string, headers map[string][]string, stream io.Reader, streamLen int64, auth sendAuth, extraScope *authScope) (*http.Response, error) {
-	req, err := http.NewRequest(method, url, stream)
+func (c *dockerClient) makeRequestToResolvedURLOnce(ctx context.Context, method string, url *url.URL, headers map[string][]string, stream io.Reader, streamLen int64, auth sendAuth, extraScope *authScope) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, method, url.String(), stream)
 	if err != nil {
 		return nil, err
 	}
-	req = req.WithContext(ctx)
-	if streamLen != -1 { // Do not blindly overwrite if streamLen == -1, http.NewRequest above can figure out the length of bytes.Reader and similar objects without us having to compute it.
+	if streamLen != -1 { // Do not blindly overwrite if streamLen == -1, http.NewRequestWithContext above can figure out the length of bytes.Reader and similar objects without us having to compute it.
 		req.ContentLength = streamLen
 	}
 	req.Header.Set("Docker-Distribution-API-Version", "registry/2.0")
@@ -505,15 +549,13 @@ func (c *dockerClient) makeRequestToResolvedURLOnce(ctx context.Context, method,
 			req.Header.Add(n, hh)
 		}
 	}
-	if c.sys != nil && c.sys.DockerRegistryUserAgent != "" {
-		req.Header.Add("User-Agent", c.sys.DockerRegistryUserAgent)
-	}
+	req.Header.Add("User-Agent", c.userAgent)
 	if auth == v2Auth {
 		if err := c.setupRequestAuth(req, extraScope); err != nil {
 			return nil, err
 		}
 	}
-	logrus.Debugf("%s %s", method, url)
+	logrus.Debugf("%s %s", method, url.Redacted())
 	res, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
@@ -590,12 +632,10 @@ func (c *dockerClient) getBearerTokenOAuth2(ctx context.Context, challenge chall
 		return nil, errors.Errorf("missing realm in bearer auth challenge")
 	}
 
-	authReq, err := http.NewRequest(http.MethodPost, realm, nil)
+	authReq, err := http.NewRequestWithContext(ctx, http.MethodPost, realm, nil)
 	if err != nil {
 		return nil, err
 	}
-
-	authReq = authReq.WithContext(ctx)
 
 	// Make the form data required against the oauth2 authentication
 	// More details here: https://docs.docker.com/registry/spec/auth/oauth/
@@ -612,9 +652,10 @@ func (c *dockerClient) getBearerTokenOAuth2(ctx context.Context, challenge chall
 	params.Add("refresh_token", c.auth.IdentityToken)
 	params.Add("client_id", "containers/image")
 
-	authReq.Body = ioutil.NopCloser(bytes.NewBufferString(params.Encode()))
+	authReq.Body = io.NopCloser(strings.NewReader(params.Encode()))
+	authReq.Header.Add("User-Agent", c.userAgent)
 	authReq.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	logrus.Debugf("%s %s", authReq.Method, authReq.URL.String())
+	logrus.Debugf("%s %s", authReq.Method, authReq.URL.Redacted())
 	res, err := c.client.Do(authReq)
 	if err != nil {
 		return nil, err
@@ -639,12 +680,11 @@ func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge,
 		return nil, errors.Errorf("missing realm in bearer auth challenge")
 	}
 
-	authReq, err := http.NewRequest(http.MethodGet, realm, nil)
+	authReq, err := http.NewRequestWithContext(ctx, http.MethodGet, realm, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	authReq = authReq.WithContext(ctx)
 	params := authReq.URL.Query()
 	if c.auth.Username != "" {
 		params.Add("account", c.auth.Username)
@@ -665,14 +705,15 @@ func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge,
 	if c.auth.Username != "" && c.auth.Password != "" {
 		authReq.SetBasicAuth(c.auth.Username, c.auth.Password)
 	}
+	authReq.Header.Add("User-Agent", c.userAgent)
 
-	logrus.Debugf("%s %s", authReq.Method, authReq.URL.String())
+	logrus.Debugf("%s %s", authReq.Method, authReq.URL.Redacted())
 	res, err := c.client.Do(authReq)
 	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
-	if err := httpResponseToError(res, "Requesting bear token"); err != nil {
+	if err := httpResponseToError(res, "Requesting bearer token"); err != nil {
 		return nil, err
 	}
 	tokenBlob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxAuthTokenBodySize)
@@ -696,14 +737,17 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 	c.client = &http.Client{Transport: tr}
 
 	ping := func(scheme string) error {
-		url := fmt.Sprintf(resolvedPingV2URL, scheme, c.registry)
-		resp, err := c.makeRequestToResolvedURL(ctx, "GET", url, nil, nil, -1, noAuth, nil)
+		url, err := url.Parse(fmt.Sprintf(resolvedPingV2URL, scheme, c.registry))
 		if err != nil {
-			logrus.Debugf("Ping %s err %s (%#v)", url, err.Error(), err)
+			return err
+		}
+		resp, err := c.makeRequestToResolvedURL(ctx, http.MethodGet, url, nil, nil, -1, noAuth, nil)
+		if err != nil {
+			logrus.Debugf("Ping %s err %s (%#v)", url.Redacted(), err.Error(), err)
 			return err
 		}
 		defer resp.Body.Close()
-		logrus.Debugf("Ping %s status %d", url, resp.StatusCode)
+		logrus.Debugf("Ping %s status %d", url.Redacted(), resp.StatusCode)
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
 			return httpResponseToError(resp, "")
 		}
@@ -717,20 +761,23 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 		err = ping("http")
 	}
 	if err != nil {
-		err = errors.Wrapf(err, "error pinging docker registry %s", c.registry)
+		err = errors.Wrapf(err, "pinging container registry %s", c.registry)
 		if c.sys != nil && c.sys.DockerDisableV1Ping {
 			return err
 		}
 		// best effort to understand if we're talking to a V1 registry
 		pingV1 := func(scheme string) bool {
-			url := fmt.Sprintf(resolvedPingV1URL, scheme, c.registry)
-			resp, err := c.makeRequestToResolvedURL(ctx, "GET", url, nil, nil, -1, noAuth, nil)
+			url, err := url.Parse(fmt.Sprintf(resolvedPingV1URL, scheme, c.registry))
 			if err != nil {
-				logrus.Debugf("Ping %s err %s (%#v)", url, err.Error(), err)
+				return false
+			}
+			resp, err := c.makeRequestToResolvedURL(ctx, http.MethodGet, url, nil, nil, -1, noAuth, nil)
+			if err != nil {
+				logrus.Debugf("Ping %s err %s (%#v)", url.Redacted(), err.Error(), err)
 				return false
 			}
 			defer resp.Body.Close()
-			logrus.Debugf("Ping %s status %d", url, resp.StatusCode)
+			logrus.Debugf("Ping %s status %d", url.Redacted(), resp.StatusCode)
 			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
 				return false
 			}
@@ -758,14 +805,14 @@ func (c *dockerClient) detectProperties(ctx context.Context) error {
 // using the original data structures.
 func (c *dockerClient) getExtensionsSignatures(ctx context.Context, ref dockerReference, manifestDigest digest.Digest) (*extensionSignatureList, error) {
 	path := fmt.Sprintf(extensionsSignaturePath, reference.Path(ref.ref), manifestDigest)
-	res, err := c.makeRequest(ctx, "GET", path, nil, nil, v2Auth, nil)
+	res, err := c.makeRequest(ctx, http.MethodGet, path, nil, nil, v2Auth, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return nil, errors.Wrapf(clientLib.HandleErrorResponse(res), "Error downloading signatures for %s in %s", manifestDigest, ref.ref.Name())
+		return nil, errors.Wrapf(clientLib.HandleErrorResponse(res), "downloading signatures for %s in %s", manifestDigest, ref.ref.Name())
 	}
 
 	body, err := iolimits.ReadAtMost(res.Body, iolimits.MaxSignatureListBodySize)
@@ -775,7 +822,7 @@ func (c *dockerClient) getExtensionsSignatures(ctx context.Context, ref dockerRe
 
 	var parsedBody extensionSignatureList
 	if err := json.Unmarshal(body, &parsedBody); err != nil {
-		return nil, errors.Wrapf(err, "Error decoding signature list")
+		return nil, errors.Wrapf(err, "decoding signature list")
 	}
 	return &parsedBody, nil
 }

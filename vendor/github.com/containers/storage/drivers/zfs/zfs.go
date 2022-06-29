@@ -13,6 +13,7 @@ import (
 	"time"
 
 	graphdriver "github.com/containers/storage/drivers"
+	"github.com/containers/storage/pkg/directory"
 	"github.com/containers/storage/pkg/idtools"
 	"github.com/containers/storage/pkg/mount"
 	"github.com/containers/storage/pkg/parsers"
@@ -28,6 +29,8 @@ type zfsOptions struct {
 	mountPath    string
 	mountOptions string
 }
+
+const defaultPerms = os.FileMode(0555)
 
 func init() {
 	graphdriver.Register("zfs", Init)
@@ -105,7 +108,7 @@ func Init(base string, opt graphdriver.Options) (graphdriver.Driver, error) {
 
 	rootUID, rootGID, err := idtools.GetRootUIDGID(opt.UIDMaps, opt.GIDMaps)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get root uid/guid: %v", err)
+		return nil, fmt.Errorf("Failed to get root uid/gid: %v", err)
 	}
 	if err := idtools.MkdirAllAs(base, 0700, rootUID, rootGID); err != nil {
 		return nil, fmt.Errorf("Failed to create '%s': %v", base, err)
@@ -160,7 +163,7 @@ func lookupZfsDataset(rootdir string) (string, error) {
 			continue // may fail on fuse file systems
 		}
 
-		if stat.Dev == wantedDev && m.Fstype == "zfs" {
+		if stat.Dev == wantedDev && m.FSType == "zfs" {
 			return m.Source, nil
 		}
 	}
@@ -272,12 +275,7 @@ func (d *Driver) CreateReadWrite(id, parent string, opts *graphdriver.CreateOpts
 
 // Create prepares the dataset and filesystem for the ZFS driver for the given id under the parent.
 func (d *Driver) Create(id, parent string, opts *graphdriver.CreateOpts) error {
-	var storageOpt map[string]string
-	if opts != nil {
-		storageOpt = opts.StorageOpt
-	}
-
-	err := d.create(id, parent, storageOpt)
+	err := d.create(id, parent, opts)
 	if err == nil {
 		return nil
 	}
@@ -296,16 +294,31 @@ func (d *Driver) Create(id, parent string, opts *graphdriver.CreateOpts) error {
 	}
 
 	// retry
-	return d.create(id, parent, storageOpt)
+	return d.create(id, parent, opts)
 }
 
-func (d *Driver) create(id, parent string, storageOpt map[string]string) error {
+func (d *Driver) create(id, parent string, opts *graphdriver.CreateOpts) error {
+	var storageOpt map[string]string
+	if opts != nil {
+		storageOpt = opts.StorageOpt
+	}
+
 	name := d.zfsPath(id)
+	mountpoint := d.mountPath(id)
 	quota, err := parseStorageOpt(storageOpt)
 	if err != nil {
 		return err
 	}
 	if parent == "" {
+		var rootUID, rootGID int
+		var mountLabel string
+		if opts != nil {
+			rootUID, rootGID, err = idtools.GetRootUIDGID(opts.UIDs(), opts.GIDs())
+			if err != nil {
+				return fmt.Errorf("Failed to get root uid/gid: %v", err)
+			}
+			mountLabel = opts.MountLabel
+		}
 		mountoptions := map[string]string{"mountpoint": "legacy"}
 		fs, err := zfs.CreateFilesystem(name, mountoptions)
 		if err == nil {
@@ -315,6 +328,37 @@ func (d *Driver) create(id, parent string, storageOpt map[string]string) error {
 				d.filesystemsCache[fs.Name] = true
 				d.Unlock()
 			}
+
+			if err := idtools.MkdirAllAs(mountpoint, defaultPerms, rootUID, rootGID); err != nil {
+				return err
+			}
+			defer func() {
+				if err := unix.Rmdir(mountpoint); err != nil && !os.IsNotExist(err) {
+					logrus.Debugf("Failed to remove %s mount point %s: %v", id, mountpoint, err)
+				}
+			}()
+
+			mountOpts := label.FormatMountLabel(d.options.mountOptions, mountLabel)
+
+			if err := mount.Mount(name, mountpoint, "zfs", mountOpts); err != nil {
+				return errors.Wrap(err, "error creating zfs mount")
+			}
+			defer func() {
+				if err := detachUnmount(mountpoint); err != nil {
+					logrus.Warnf("Failed to unmount %s mount %s: %v", id, mountpoint, err)
+				}
+			}()
+
+			if err := os.Chmod(mountpoint, defaultPerms); err != nil {
+				return errors.Wrap(err, "error setting permissions on zfs mount")
+			}
+
+			// this is our first mount after creation of the filesystem, and the root dir may still have root
+			// permissions instead of the remapped root uid:gid (if user namespaces are enabled):
+			if err := os.Chown(mountpoint, rootUID, rootGID); err != nil {
+				return errors.Wrapf(err, "modifying zfs mountpoint (%s) ownership", mountpoint)
+			}
+
 		}
 		return err
 	}
@@ -384,9 +428,21 @@ func (d *Driver) Get(id string, options graphdriver.MountOpts) (_ string, retErr
 		}
 	}()
 
+	// In the case of a read-only mount we first mount read-write so we can set the
+	// correct permissions on the mount point and remount read-only afterwards.
+	remountReadOnly := false
 	mountOptions := d.options.mountOptions
 	if len(options.Options) > 0 {
-		mountOptions = strings.Join(options.Options, ",")
+		var newOptions []string
+		for _, option := range options.Options {
+			if option == "ro" {
+				// Filter out read-only mount option but remember for later remounting.
+				remountReadOnly = true
+			} else {
+				newOptions = append(newOptions, option)
+			}
+		}
+		mountOptions = strings.Join(newOptions, ",")
 	}
 
 	filesystem := d.zfsPath(id)
@@ -406,10 +462,11 @@ func (d *Driver) Get(id string, options graphdriver.MountOpts) (_ string, retErr
 		return "", errors.Wrap(err, "error creating zfs mount")
 	}
 
-	// this could be our first mount after creation of the filesystem, and the root dir may still have root
-	// permissions instead of the remapped root uid:gid (if user namespaces are enabled):
-	if err := os.Chown(mountpoint, rootUID, rootGID); err != nil {
-		return "", fmt.Errorf("error modifying zfs mountpoint (%s) directory ownership: %v", mountpoint, err)
+	if remountReadOnly {
+		opts = label.FormatMountLabel("remount,ro", options.MountLabel)
+		if err := mount.Mount(filesystem, mountpoint, "zfs", opts); err != nil {
+			return "", errors.Wrap(err, "error remounting zfs mount read-only")
+		}
 	}
 
 	return mountpoint, nil
@@ -426,7 +483,7 @@ func (d *Driver) Put(id string) error {
 
 	logger.Debugf(`unmount("%s")`, mountpoint)
 
-	if err := unix.Unmount(mountpoint, unix.MNT_DETACH); err != nil {
+	if err := detachUnmount(mountpoint); err != nil {
 		logger.Warnf("Failed to unmount %s mount %s: %v", id, mountpoint, err)
 	}
 	if err := unix.Rmdir(mountpoint); err != nil && !os.IsNotExist(err) {
@@ -434,6 +491,12 @@ func (d *Driver) Put(id string) error {
 	}
 
 	return nil
+}
+
+// ReadWriteDiskUsage returns the disk usage of the writable directory for the ID.
+// For ZFS, it queries the full mount path for this ID.
+func (d *Driver) ReadWriteDiskUsage(id string) (*directory.DiskUsage, error) {
+	return directory.Usage(d.mountPath(id))
 }
 
 // Exists checks to see if the cache entry exists for the given id.

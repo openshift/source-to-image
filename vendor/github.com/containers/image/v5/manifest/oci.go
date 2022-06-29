@@ -5,14 +5,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/containers/image/v5/pkg/compression"
+	compressiontypes "github.com/containers/image/v5/pkg/compression/types"
 	"github.com/containers/image/v5/types"
 	ociencspec "github.com/containers/ocicrypt/spec"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // BlobInfoFromOCI1Descriptor returns a types.BlobInfo based on the input OCI1 descriptor.
@@ -55,6 +54,10 @@ func OCI1FromManifest(manifest []byte) (*OCI1, error) {
 	if err := json.Unmarshal(manifest, &oci1); err != nil {
 		return nil, err
 	}
+	if err := validateUnambiguousManifestFormat(manifest, imgspecv1.MediaTypeImageIndex,
+		allowedFieldConfig|allowedFieldLayers); err != nil {
+		return nil, err
+	}
 	return &oci1, nil
 }
 
@@ -63,6 +66,7 @@ func OCI1FromComponents(config imgspecv1.Descriptor, layers []imgspecv1.Descript
 	return &OCI1{
 		imgspecv1.Manifest{
 			Versioned: specs.Versioned{SchemaVersion: 2},
+			MediaType: imgspecv1.MediaTypeImageManifest,
 			Config:    config,
 			Layers:    layers,
 		},
@@ -95,29 +99,22 @@ func (m *OCI1) LayerInfos() []LayerInfo {
 	return blobs
 }
 
-// isOCI1NonDistributableLayer is a convenience wrapper to check if a given mime
-// type is a compressed or decompressed OCI v1 non-distributable layer.
-func isOCI1NonDistributableLayer(mimeType string) bool {
-	switch mimeType {
-	case imgspecv1.MediaTypeImageLayerNonDistributable, imgspecv1.MediaTypeImageLayerNonDistributableGzip, imgspecv1.MediaTypeImageLayerNonDistributableZstd:
-		return true
-	default:
-		return false
-	}
-}
-
-// isOCI1Layer is a convenience wrapper to check if a given mime type is a
-// compressed or decompressed OCI v1 layer.
-func isOCI1Layer(mimeType string) bool {
-	switch mimeType {
-	case imgspecv1.MediaTypeImageLayer, imgspecv1.MediaTypeImageLayerGzip, imgspecv1.MediaTypeImageLayerZstd:
-		return true
-	default:
-		return false
-	}
+var oci1CompressionMIMETypeSets = []compressionMIMETypeSet{
+	{
+		mtsUncompressed:                    imgspecv1.MediaTypeImageLayerNonDistributable,
+		compressiontypes.GzipAlgorithmName: imgspecv1.MediaTypeImageLayerNonDistributableGzip,
+		compressiontypes.ZstdAlgorithmName: imgspecv1.MediaTypeImageLayerNonDistributableZstd,
+	},
+	{
+		mtsUncompressed:                    imgspecv1.MediaTypeImageLayer,
+		compressiontypes.GzipAlgorithmName: imgspecv1.MediaTypeImageLayerGzip,
+		compressiontypes.ZstdAlgorithmName: imgspecv1.MediaTypeImageLayerZstd,
+	},
 }
 
 // UpdateLayerInfos replaces the original layers with the specified BlobInfos (size+digest+urls+mediatype), in order (the root layer first, and then successive layered layers)
+// The returned error will be a manifest.ManifestLayerCompressionIncompatibilityError if any of the layerInfos includes a combination of CompressionOperation and
+// CompressionAlgorithm that isn't supported by OCI.
 func (m *OCI1) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 	if len(m.Layers) != len(layerInfos) {
 		return errors.Errorf("Error preparing updated manifest: layer count changed from %d to %d", len(m.Layers), len(layerInfos))
@@ -133,79 +130,19 @@ func (m *OCI1) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 			}
 			mimeType = decMimeType
 		}
-
-		// Set the correct media types based on the specified compression
-		// operation, the desired compression algorithm AND the original media
-		// type.
-		//
-		// Note that manifests in containers-storage might be reporting the
-		// wrong media type since the original manifests are stored while layers
-		// are decompressed in storage.  Hence, we need to consider the case
-		// that an already {de}compressed layer should be {de}compressed, which
-		// is being addressed in `isSchema2{Foreign}Layer`.
-		switch info.CompressionOperation {
-		case types.PreserveOriginal:
-			// Keep the original media type.
-			m.Layers[i].MediaType = mimeType
-
-		case types.Decompress:
-			// Decompress the original media type and check if it was
-			// non-distributable one or not.
-			switch {
-			case isOCI1NonDistributableLayer(mimeType):
-				m.Layers[i].MediaType = imgspecv1.MediaTypeImageLayerNonDistributable
-			case isOCI1Layer(mimeType):
-				m.Layers[i].MediaType = imgspecv1.MediaTypeImageLayer
-			default:
-				return fmt.Errorf("Error preparing updated manifest: unsupported media type for decompression: %q", mimeType)
-			}
-
-		case types.Compress:
-			if info.CompressionAlgorithm == nil {
-				logrus.Debugf("Error preparing updated manifest: blob %q was compressed but does not specify by which algorithm: falling back to use the original blob", info.Digest)
-				m.Layers[i].MediaType = mimeType
-				break
-			}
-			// Compress the original media type and set the new one based on
-			// that type (distributable or not) and the specified compression
-			// algorithm. Throw an error if the algorithm is not supported.
-			switch info.CompressionAlgorithm.Name() {
-			case compression.Gzip.Name():
-				switch {
-				case isOCI1NonDistributableLayer(mimeType):
-					m.Layers[i].MediaType = imgspecv1.MediaTypeImageLayerNonDistributableGzip
-				case isOCI1Layer(mimeType):
-					m.Layers[i].MediaType = imgspecv1.MediaTypeImageLayerGzip
-				default:
-					return fmt.Errorf("Error preparing updated manifest: unsupported media type for compression: %q", mimeType)
-				}
-
-			case compression.Zstd.Name():
-				switch {
-				case isOCI1NonDistributableLayer(mimeType):
-					m.Layers[i].MediaType = imgspecv1.MediaTypeImageLayerNonDistributableZstd
-				case isOCI1Layer(mimeType):
-					m.Layers[i].MediaType = imgspecv1.MediaTypeImageLayerZstd
-				default:
-					return fmt.Errorf("Error preparing updated manifest: unsupported media type for compression: %q", mimeType)
-				}
-
-			default:
-				return fmt.Errorf("Error preparing updated manifest: unknown compression algorithm %q for layer %q", info.CompressionAlgorithm.Name(), info.Digest)
-			}
-
-		default:
-			return fmt.Errorf("Error preparing updated manifest: unknown compression operation (%d) for layer %q", info.CompressionOperation, info.Digest)
+		mimeType, err := updatedMIMEType(oci1CompressionMIMETypeSets, mimeType, info)
+		if err != nil {
+			return errors.Wrapf(err, "preparing updated manifest, layer %q", info.Digest)
 		}
-
 		if info.CryptoOperation == types.Encrypt {
-			encMediaType, err := getEncryptedMediaType(m.Layers[i].MediaType)
+			encMediaType, err := getEncryptedMediaType(mimeType)
 			if err != nil {
-				return fmt.Errorf("error preparing updated manifest: encryption specified but no counterpart for mediatype: %q", m.Layers[i].MediaType)
+				return fmt.Errorf("error preparing updated manifest: encryption specified but no counterpart for mediatype: %q", mimeType)
 			}
-			m.Layers[i].MediaType = encMediaType
+			mimeType = encMediaType
 		}
 
+		m.Layers[i].MediaType = mimeType
 		m.Layers[i].Digest = info.Digest
 		m.Layers[i].Size = info.Size
 		m.Layers[i].Annotations = info.Annotations
@@ -242,7 +179,7 @@ func (m *OCI1) Inspect(configGetter func(types.BlobInfo) ([]byte, error)) (*type
 		Architecture:  v1.Architecture,
 		Os:            v1.OS,
 		Layers:        layerInfosToStrings(m.LayerInfos()),
-		Env:           d1.Config.Env,
+		Env:           v1.Config.Env,
 	}
 	return i, nil
 }

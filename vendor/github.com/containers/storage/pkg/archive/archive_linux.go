@@ -12,7 +12,11 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func getWhiteoutConverter(format WhiteoutFormat, data interface{}) tarWhiteoutConverter {
+func getOverlayOpaqueXattrName() string {
+	return GetOverlayXattrName("opaque")
+}
+
+func GetWhiteoutConverter(format WhiteoutFormat, data interface{}) TarWhiteoutConverter {
 	if format == OverlayWhiteoutFormat {
 		if rolayers, ok := data.([]string); ok && len(rolayers) > 0 {
 			return overlayWhiteoutConverter{rolayers: rolayers}
@@ -32,20 +36,20 @@ func (o overlayWhiteoutConverter) ConvertWrite(hdr *tar.Header, path string, fi 
 		// we just rename the file and make it normal
 		dir, filename := filepath.Split(hdr.Name)
 		hdr.Name = filepath.Join(dir, WhiteoutPrefix+filename)
-		hdr.Mode = 0600
+		hdr.Mode = 0
 		hdr.Typeflag = tar.TypeReg
 		hdr.Size = 0
 	}
 
 	if fi.Mode()&os.ModeDir != 0 {
 		// convert opaque dirs to AUFS format by writing an empty file with the whiteout prefix
-		opaque, err := system.Lgetxattr(path, "trusted.overlay.opaque")
+		opaque, err := system.Lgetxattr(path, getOverlayOpaqueXattrName())
 		if err != nil {
 			return nil, err
 		}
 		if len(opaque) == 1 && opaque[0] == 'y' {
 			if hdr.Xattrs != nil {
-				delete(hdr.Xattrs, "trusted.overlay.opaque")
+				delete(hdr.Xattrs, getOverlayOpaqueXattrName())
 			}
 			// If there are no lower layers, then it can't have been deleted in this layer.
 			if len(o.rolayers) == 0 {
@@ -108,13 +112,13 @@ func (o overlayWhiteoutConverter) ConvertWrite(hdr *tar.Header, path string, fi 
 	return
 }
 
-func (overlayWhiteoutConverter) ConvertRead(hdr *tar.Header, path string) (bool, error) {
+func (overlayWhiteoutConverter) ConvertReadWithHandler(hdr *tar.Header, path string, handler TarWhiteoutHandler) (bool, error) {
 	base := filepath.Base(path)
 	dir := filepath.Dir(path)
 
 	// if a directory is marked as opaque by the AUFS special file, we need to translate that to overlay
 	if base == WhiteoutOpaqueDir {
-		err := unix.Setxattr(dir, "trusted.overlay.opaque", []byte{'y'}, 0)
+		err := handler.Setxattr(dir, getOverlayOpaqueXattrName(), []byte{'y'})
 		// don't write the file itself
 		return false, err
 	}
@@ -124,10 +128,21 @@ func (overlayWhiteoutConverter) ConvertRead(hdr *tar.Header, path string) (bool,
 		originalBase := base[len(WhiteoutPrefix):]
 		originalPath := filepath.Join(dir, originalBase)
 
-		if err := unix.Mknod(originalPath, unix.S_IFCHR, 0); err != nil {
+		if err := handler.Mknod(originalPath, unix.S_IFCHR, 0); err != nil {
+			// If someone does:
+			//     rm -rf /foo/bar
+			// in an image, some tools will generate a layer with:
+			//     /.wh.foo
+			//     /foo/.wh.bar
+			// and when doing the second mknod(), we will fail with
+			// ENOTDIR, since the previous /foo was mknod()'d as a
+			// character device node and not a directory.
+			if isENOTDIR(err) {
+				return false, nil
+			}
 			return false, err
 		}
-		if err := idtools.SafeChown(originalPath, hdr.Uid, hdr.Gid); err != nil {
+		if err := handler.Chown(originalPath, hdr.Uid, hdr.Gid); err != nil {
 			return false, err
 		}
 
@@ -138,7 +153,39 @@ func (overlayWhiteoutConverter) ConvertRead(hdr *tar.Header, path string) (bool,
 	return true, nil
 }
 
+type directHandler struct {
+}
+
+func (d directHandler) Setxattr(path, name string, value []byte) error {
+	return unix.Setxattr(path, name, value, 0)
+}
+
+func (d directHandler) Mknod(path string, mode uint32, dev int) error {
+	return unix.Mknod(path, mode, dev)
+}
+
+func (d directHandler) Chown(path string, uid, gid int) error {
+	return idtools.SafeChown(path, uid, gid)
+}
+
+func (o overlayWhiteoutConverter) ConvertRead(hdr *tar.Header, path string) (bool, error) {
+	var handler directHandler
+	return o.ConvertReadWithHandler(hdr, path, handler)
+}
+
 func isWhiteOut(stat os.FileInfo) bool {
 	s := stat.Sys().(*syscall.Stat_t)
 	return major(uint64(s.Rdev)) == 0 && minor(uint64(s.Rdev)) == 0
+}
+
+func GetFileOwner(path string) (uint32, uint32, uint32, error) {
+	f, err := os.Stat(path)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	s, ok := f.Sys().(*syscall.Stat_t)
+	if ok {
+		return s.Uid, s.Gid, s.Mode & 07777, nil
+	}
+	return 0, 0, uint32(f.Mode()), nil
 }

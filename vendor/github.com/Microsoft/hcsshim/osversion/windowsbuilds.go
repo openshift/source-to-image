@@ -24,4 +24,27 @@ const (
 	// V19H1 (version 1903) corresponds to Windows Server 1903 (semi-annual
 	// channel).
 	V19H1 = 18362
+
+	// V19H2 (version 1909) corresponds to Windows Server 1909 (semi-annual
+	// channel).
+	V19H2 = 18363
+
+	// V20H1 (version 2004) corresponds to Windows Server 2004 (semi-annual
+	// channel).
+	V20H1 = 19041
+
+	// V20H2 corresponds to Windows Server 20H2 (semi-annual channel).
+	V20H2 = 19042
+
+	// V21H1 corresponds to Windows Server 21H1 (semi-annual channel).
+	V21H1 = 19043
+
+	// V21H2Win10 corresponds to Windows 10 (November 2021 Update).
+	V21H2Win10 = 19044
+
+	// V21H2Server corresponds to Windows Server 2022 (ltsc2022).
+	V21H2Server = 20348
+
+	// V21H2Win11 corresponds to Windows 11 (original release).
+	V21H2Win11 = 22000
 )

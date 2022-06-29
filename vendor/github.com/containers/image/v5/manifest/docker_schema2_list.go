@@ -91,7 +91,7 @@ func (list *Schema2List) UpdateInstances(updates []ListUpdate) error {
 func (list *Schema2List) ChooseInstance(ctx *types.SystemContext) (digest.Digest, error) {
 	wantedPlatforms, err := platform.WantedPlatforms(ctx)
 	if err != nil {
-		return "", errors.Wrapf(err, "error getting platform information %#v", ctx)
+		return "", errors.Wrapf(err, "getting platform information %#v", ctx)
 	}
 	for _, wantedPlatform := range wantedPlatforms {
 		for _, d := range list.Manifests {
@@ -107,7 +107,7 @@ func (list *Schema2List) ChooseInstance(ctx *types.SystemContext) (digest.Digest
 			}
 		}
 	}
-	return "", fmt.Errorf("no image found in manifest list for architecture %s, variant %s, OS %s", wantedPlatforms[0].Architecture, wantedPlatforms[0].Variant, wantedPlatforms[0].OS)
+	return "", fmt.Errorf("no image found in manifest list for architecture %s, variant %q, OS %s", wantedPlatforms[0].Architecture, wantedPlatforms[0].Variant, wantedPlatforms[0].OS)
 }
 
 // Serialize returns the list in a blob format.
@@ -115,7 +115,7 @@ func (list *Schema2List) ChooseInstance(ctx *types.SystemContext) (digest.Digest
 func (list *Schema2List) Serialize() ([]byte, error) {
 	buf, err := json.Marshal(list)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error marshaling Schema2List %#v", list)
+		return nil, errors.Wrapf(err, "marshaling Schema2List %#v", list)
 	}
 	return buf, nil
 }
@@ -190,7 +190,11 @@ func Schema2ListFromManifest(manifest []byte) (*Schema2List, error) {
 		Manifests: []Schema2ManifestDescriptor{},
 	}
 	if err := json.Unmarshal(manifest, &list); err != nil {
-		return nil, errors.Wrapf(err, "error unmarshaling Schema2List %q", string(manifest))
+		return nil, errors.Wrapf(err, "unmarshaling Schema2List %q", string(manifest))
+	}
+	if err := validateUnambiguousManifestFormat(manifest, DockerV2ListMediaType,
+		allowedFieldManifests); err != nil {
+		return nil, err
 	}
 	return &list, nil
 }

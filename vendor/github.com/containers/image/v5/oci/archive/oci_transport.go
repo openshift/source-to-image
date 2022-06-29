@@ -3,7 +3,6 @@ package archive
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -161,9 +160,9 @@ func (t *tempDirOCIRef) deleteTempDir() error {
 // createOCIRef creates the oci reference of the image
 // If SystemContext.BigFilesTemporaryDir not "", overrides the temporary directory to use for storing big files
 func createOCIRef(sys *types.SystemContext, image string) (tempDirOCIRef, error) {
-	dir, err := ioutil.TempDir(tmpdir.TemporaryDirectoryForBigFiles(sys), "oci")
+	dir, err := os.MkdirTemp(tmpdir.TemporaryDirectoryForBigFiles(sys), "oci")
 	if err != nil {
-		return tempDirOCIRef{}, errors.Wrapf(err, "error creating temp directory")
+		return tempDirOCIRef{}, errors.Wrapf(err, "creating temp directory")
 	}
 	ociRef, err := ocilayout.NewReference(dir, image)
 	if err != nil {
@@ -178,16 +177,21 @@ func createOCIRef(sys *types.SystemContext, image string) (tempDirOCIRef, error)
 func createUntarTempDir(sys *types.SystemContext, ref ociArchiveReference) (tempDirOCIRef, error) {
 	tempDirRef, err := createOCIRef(sys, ref.image)
 	if err != nil {
-		return tempDirOCIRef{}, errors.Wrap(err, "error creating oci reference")
+		return tempDirOCIRef{}, errors.Wrap(err, "creating oci reference")
 	}
 	src := ref.resolvedFile
 	dst := tempDirRef.tempDirectory
 	// TODO: This can take quite some time, and should ideally be cancellable using a context.Context.
-	if err := archive.UntarPath(src, dst); err != nil {
+	arch, err := os.Open(src)
+	if err != nil {
+		return tempDirOCIRef{}, err
+	}
+	defer arch.Close()
+	if err := archive.NewDefaultArchiver().Untar(arch, dst, &archive.TarOptions{NoLchown: true}); err != nil {
 		if err := tempDirRef.deleteTempDir(); err != nil {
-			return tempDirOCIRef{}, errors.Wrapf(err, "error deleting temp directory %q", tempDirRef.tempDirectory)
+			return tempDirOCIRef{}, errors.Wrapf(err, "deleting temp directory %q", tempDirRef.tempDirectory)
 		}
-		return tempDirOCIRef{}, errors.Wrapf(err, "error untarring file %q", tempDirRef.tempDirectory)
+		return tempDirOCIRef{}, errors.Wrapf(err, "untarring file %q", tempDirRef.tempDirectory)
 	}
 	return tempDirRef, nil
 }

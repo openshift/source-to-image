@@ -1,3 +1,4 @@
+//go:build !containers_image_storage_stub
 // +build !containers_image_storage_stub
 
 package storage
@@ -172,7 +173,7 @@ func (s storageTransport) ParseStoreReference(store storage.Store, ref string) (
 		var err error
 		named, err = reference.ParseNormalizedNamed(ref)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error parsing named reference %q", ref)
+			return nil, errors.Wrapf(err, "parsing named reference %q", ref)
 		}
 		named = reference.TagNameOnly(named)
 	}
@@ -224,7 +225,7 @@ func (s *storageTransport) ParseReference(reference string) (types.ImageReferenc
 	// needs to match a store that was previously initialized using
 	// storage.GetStore(), or be enough to let the storage library fill out
 	// the rest using knowledge that it has from elsewhere.
-	if reference[0] == '[' {
+	if len(reference) > 0 && reference[0] == '[' {
 		closeIndex := strings.IndexRune(reference, ']')
 		if closeIndex < 1 {
 			return nil, ErrInvalidReference
@@ -303,7 +304,7 @@ func (s storageTransport) GetStoreImage(store storage.Store, ref types.ImageRefe
 	}
 	if sref, ok := ref.(*storageReference); ok {
 		tmpRef := *sref
-		if img, err := tmpRef.resolveImage(&types.SystemContext{}); err == nil {
+		if img, err := tmpRef.resolveImage(nil); err == nil {
 			return img, nil
 		}
 	}

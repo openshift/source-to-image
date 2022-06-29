@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package unshare
@@ -9,6 +10,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"os/user"
 	"runtime"
 	"strconv"
@@ -73,6 +75,28 @@ func getRootlessGID() int {
 		return u
 	}
 	return os.Getegid()
+}
+
+// IsSetID checks if specified path has correct FileMode (Setuid|SETGID) or the
+// matching file capabilitiy
+func IsSetID(path string, modeid os.FileMode, capid capability.Cap) (bool, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false, err
+	}
+
+	mode := info.Mode()
+	if mode&modeid == modeid {
+		return true, nil
+	}
+	cap, err := capability.NewFile2(path)
+	if err != nil {
+		return false, err
+	}
+	if err := cap.Load(); err != nil {
+		return false, err
+	}
+	return cap.Get(capability.EFFECTIVE, capid), nil
 }
 
 func (c *Cmd) Start() error {
@@ -154,7 +178,7 @@ func (c *Cmd) Start() error {
 	pidString := ""
 	b := new(bytes.Buffer)
 	if _, err := io.Copy(b, pidRead); err != nil {
-		return errors.Wrapf(err, "error reading child PID")
+		return errors.Wrapf(err, "Reading child PID")
 	}
 	pidString = b.String()
 	pid, err := strconv.Atoi(pidString)
@@ -188,8 +212,8 @@ func (c *Cmd) Start() error {
 		if len(c.UidMappings) == 0 || len(c.GidMappings) == 0 {
 			uidmap, gidmap, err := GetHostIDMappings("")
 			if err != nil {
-				fmt.Fprintf(continueWrite, "error reading ID mappings in parent: %v", err)
-				return errors.Wrapf(err, "error reading ID mappings in parent")
+				fmt.Fprintf(continueWrite, "Reading ID mappings in parent: %v", err)
+				return errors.Wrapf(err, "Reading ID mappings in parent")
 			}
 			if len(c.UidMappings) == 0 {
 				c.UidMappings = uidmap
@@ -214,16 +238,27 @@ func (c *Cmd) Start() error {
 			gidmapSet := false
 			// Set the GID map.
 			if c.UseNewgidmap {
-				cmd := exec.Command("newgidmap", append([]string{pidString}, strings.Fields(strings.Replace(g.String(), "\n", " ", -1))...)...)
+				path, err := exec.LookPath("newgidmap")
+				if err != nil {
+					return errors.Wrapf(err, "error finding newgidmap")
+				}
+				cmd := exec.Command(path, append([]string{pidString}, strings.Fields(strings.Replace(g.String(), "\n", " ", -1))...)...)
 				g.Reset()
 				cmd.Stdout = g
 				cmd.Stderr = g
-				err := cmd.Run()
-				if err == nil {
+				if err := cmd.Run(); err == nil {
 					gidmapSet = true
 				} else {
-					logrus.Warnf("error running newgidmap: %v: %s", err, g.String())
-					logrus.Warnf("falling back to single mapping")
+					logrus.Warnf("Error running newgidmap: %v: %s", err, g.String())
+					isSetgid, err := IsSetID(path, os.ModeSetgid, capability.CAP_SETGID)
+					if err != nil {
+						logrus.Warnf("Failed to check for setgid on %s: %v", path, err)
+					} else {
+						if !isSetgid {
+							logrus.Warnf("%s should be setgid or have filecaps setgid", path)
+						}
+					}
+					logrus.Warnf("Falling back to single mapping")
 					g.Reset()
 					g.Write([]byte(fmt.Sprintf("0 %d 1\n", os.Getegid())))
 				}
@@ -261,18 +296,30 @@ func (c *Cmd) Start() error {
 				fmt.Fprintf(u, "%d %d %d\n", m.ContainerID, m.HostID, m.Size)
 			}
 			uidmapSet := false
-			// Set the GID map.
+			// Set the UID map.
 			if c.UseNewuidmap {
-				cmd := exec.Command("newuidmap", append([]string{pidString}, strings.Fields(strings.Replace(u.String(), "\n", " ", -1))...)...)
+				path, err := exec.LookPath("newuidmap")
+				if err != nil {
+					return errors.Wrapf(err, "error finding newuidmap")
+				}
+				cmd := exec.Command(path, append([]string{pidString}, strings.Fields(strings.Replace(u.String(), "\n", " ", -1))...)...)
 				u.Reset()
 				cmd.Stdout = u
 				cmd.Stderr = u
-				err := cmd.Run()
-				if err == nil {
+				if err := cmd.Run(); err == nil {
 					uidmapSet = true
 				} else {
-					logrus.Warnf("error running newuidmap: %v: %s", err, u.String())
-					logrus.Warnf("falling back to single mapping")
+					logrus.Warnf("Error running newuidmap: %v: %s", err, u.String())
+					isSetuid, err := IsSetID(path, os.ModeSetuid, capability.CAP_SETUID)
+					if err != nil {
+						logrus.Warnf("Failed to check for setuid on %s: %v", path, err)
+					} else {
+						if !isSetuid {
+							logrus.Warnf("%s should be setuid or have filecaps setuid", path)
+						}
+					}
+
+					logrus.Warnf("Falling back to single mapping")
 					u.Reset()
 					u.Write([]byte(fmt.Sprintf("0 %d 1\n", os.Geteuid())))
 				}
@@ -407,7 +454,7 @@ func MaybeReexecUsingUserNamespace(evenForRoot bool) {
 		// ID and a range size.
 		uidmap, gidmap, err = GetSubIDMappings(me.Username, me.Username)
 		if err != nil {
-			logrus.Warnf("error reading allowed ID mappings: %v", err)
+			logrus.Warnf("Reading allowed ID mappings: %v", err)
 		}
 		if len(uidmap) == 0 {
 			logrus.Warnf("Found no UID ranges set aside for user %q in /etc/subuid.", me.Username)
@@ -434,13 +481,13 @@ func MaybeReexecUsingUserNamespace(evenForRoot bool) {
 		// If we have CAP_SYS_ADMIN, then we don't need to create a new namespace in order to be able
 		// to use unshare(), so don't bother creating a new user namespace at this point.
 		capabilities, err := capability.NewPid(0)
-		bailOnError(err, "error reading the current capabilities sets")
+		bailOnError(err, "Reading the current capabilities sets")
 		if capabilities.Get(capability.EFFECTIVE, capability.CAP_SYS_ADMIN) {
 			return
 		}
 		// Read the set of ID mappings that we're currently using.
 		uidmap, gidmap, err = GetHostIDMappings("")
-		bailOnError(err, "error reading current ID mappings")
+		bailOnError(err, "Reading current ID mappings")
 		// Just reuse them.
 		for i := range uidmap {
 			uidmap[i].HostID = uidmap[i].ContainerID
@@ -463,7 +510,7 @@ func MaybeReexecUsingUserNamespace(evenForRoot bool) {
 	if _, present := os.LookupEnv("BUILDAH_ISOLATION"); !present {
 		if err = os.Setenv("BUILDAH_ISOLATION", "rootless"); err != nil {
 			if err := os.Setenv("BUILDAH_ISOLATION", "rootless"); err != nil {
-				logrus.Errorf("error setting BUILDAH_ISOLATION=rootless in environment: %v", err)
+				logrus.Errorf("Setting BUILDAH_ISOLATION=rootless in environment: %v", err)
 				os.Exit(1)
 			}
 		}
@@ -483,7 +530,31 @@ func MaybeReexecUsingUserNamespace(evenForRoot bool) {
 	cmd.GidMappingsEnableSetgroups = true
 
 	// Finish up.
-	logrus.Debugf("running %+v with environment %+v, UID map %+v, and GID map %+v", cmd.Cmd.Args, os.Environ(), cmd.UidMappings, cmd.GidMappings)
+	logrus.Debugf("Running %+v with environment %+v, UID map %+v, and GID map %+v", cmd.Cmd.Args, os.Environ(), cmd.UidMappings, cmd.GidMappings)
+
+	// Forward SIGHUP, SIGINT, and SIGTERM to our child process.
+	interrupted := make(chan os.Signal, 100)
+	defer func() {
+		signal.Stop(interrupted)
+		close(interrupted)
+	}()
+	cmd.Hook = func(int) error {
+		go func() {
+			for receivedSignal := range interrupted {
+				cmd.Cmd.Process.Signal(receivedSignal)
+			}
+		}()
+		return nil
+	}
+	signal.Notify(interrupted, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
+
+	// Make sure our child process gets SIGKILLed if we exit, for whatever
+	// reason, before it does.
+	if cmd.Cmd.SysProcAttr == nil {
+		cmd.Cmd.SysProcAttr = &syscall.SysProcAttr{}
+	}
+	cmd.Cmd.SysProcAttr.Pdeathsig = syscall.SIGKILL
+
 	ExecRunnable(cmd, nil)
 }
 
@@ -501,18 +572,18 @@ func ExecRunnable(cmd Runnable, cleanup func()) {
 			if exitError.ProcessState.Exited() {
 				if waitStatus, ok := exitError.ProcessState.Sys().(syscall.WaitStatus); ok {
 					if waitStatus.Exited() {
-						logrus.Errorf("%v", exitError)
+						logrus.Debugf("%v", exitError)
 						exit(waitStatus.ExitStatus())
 					}
 					if waitStatus.Signaled() {
-						logrus.Errorf("%v", exitError)
+						logrus.Debugf("%v", exitError)
 						exit(int(waitStatus.Signal()) + 128)
 					}
 				}
 			}
 		}
 		logrus.Errorf("%v", err)
-		logrus.Errorf("(unable to determine exit status)")
+		logrus.Errorf("(Unable to determine exit status)")
 		exit(1)
 	}
 	exit(0)
@@ -523,7 +594,7 @@ func getHostIDMappings(path string) ([]specs.LinuxIDMapping, error) {
 	var mappings []specs.LinuxIDMapping
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error reading ID mappings from %q", path)
+		return nil, errors.Wrapf(err, "Reading ID mappings from %q", path)
 	}
 	defer f.Close()
 	scanner := bufio.NewScanner(f)
@@ -571,7 +642,7 @@ func GetHostIDMappings(pid string) ([]specs.LinuxIDMapping, []specs.LinuxIDMappi
 func GetSubIDMappings(user, group string) ([]specs.LinuxIDMapping, []specs.LinuxIDMapping, error) {
 	mappings, err := idtools.NewIDMappings(user, group)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "error reading subuid mappings for user %q and subgid mappings for group %q", user, group)
+		return nil, nil, errors.Wrapf(err, "Reading subuid mappings for user %q and subgid mappings for group %q", user, group)
 	}
 	var uidmap, gidmap []specs.LinuxIDMapping
 	for _, m := range mappings.UIDs() {

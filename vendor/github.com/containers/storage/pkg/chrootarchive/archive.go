@@ -5,15 +5,24 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
+	"os/user"
 	"path/filepath"
 	"sync"
 
 	"github.com/containers/storage/pkg/archive"
 	"github.com/containers/storage/pkg/idtools"
-	rsystem "github.com/opencontainers/runc/libcontainer/system"
+	"github.com/opencontainers/runc/libcontainer/userns"
 	"github.com/pkg/errors"
 )
+
+func init() {
+	// initialize nss libraries in Glibc so that the dynamic libraries are loaded in the host
+	// environment not in the chroot from untrusted files.
+	_, _ = user.Lookup("storage")
+	_, _ = net.LookupHost("localhost")
+}
 
 // NewArchiver returns a new Archiver which uses chrootarchive.Untar
 func NewArchiver(idMappings *idtools.IDMappings) *archive.Archiver {
@@ -67,7 +76,7 @@ func untarHandler(tarArchive io.Reader, dest string, options *archive.TarOptions
 	}
 	if options == nil {
 		options = &archive.TarOptions{}
-		options.InUserNS = rsystem.RunningInUserNS()
+		options.InUserNS = userns.RunningInUserNS()
 	}
 	if options.ExcludePatterns == nil {
 		options.ExcludePatterns = []string{}
