@@ -1,15 +1,16 @@
 package storage
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/containers/storage/pkg/ioutils"
 	"github.com/containers/storage/pkg/stringid"
+	"github.com/containers/storage/pkg/stringutils"
 	"github.com/containers/storage/pkg/truncindex"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
@@ -135,7 +136,18 @@ type ImageStore interface {
 	// SetNames replaces the list of names associated with an image with the
 	// supplied values.  The values are expected to be valid normalized
 	// named image references.
+	// Deprecated: Prone to race conditions, suggested alternatives are `AddNames` and `RemoveNames`.
 	SetNames(id string, names []string) error
+
+	// AddNames adds the supplied values to the list of names associated with the image with
+	// the specified id. The values are expected to be valid normalized
+	// named image references.
+	AddNames(id string, names []string) error
+
+	// RemoveNames removes the supplied values from the list of names associated with the image with
+	// the specified id.  The values are expected to be valid normalized
+	// named image references.
+	RemoveNames(id string, names []string) error
 
 	// Delete removes the record of the image.
 	Delete(id string) error
@@ -152,6 +164,7 @@ type imageStore struct {
 	byid     map[string]*Image
 	byname   map[string]*Image
 	bydigest map[digest.Digest][]*Image
+	loadMut  sync.Mutex
 }
 
 func copyImage(i *Image) *Image {
@@ -423,43 +436,55 @@ func (r *imageStore) Create(id string, names []string, layer, metadata string, c
 	if created.IsZero() {
 		created = time.Now().UTC()
 	}
-	if err == nil {
-		image = &Image{
-			ID:             id,
-			Digest:         searchableDigest,
-			Digests:        nil,
-			Names:          names,
-			TopLayer:       layer,
-			Metadata:       metadata,
-			BigDataNames:   []string{},
-			BigDataSizes:   make(map[string]int64),
-			BigDataDigests: make(map[string]digest.Digest),
-			Created:        created,
-			Flags:          make(map[string]interface{}),
-		}
-		err := image.recomputeDigests()
-		if err != nil {
-			return nil, errors.Wrapf(err, "error validating digests for new image")
-		}
-		r.images = append(r.images, image)
-		r.idindex.Add(id)
-		r.byid[id] = image
-		for _, name := range names {
-			r.byname[name] = image
-		}
-		for _, digest := range image.Digests {
-			list := r.bydigest[digest]
-			r.bydigest[digest] = append(list, image)
-		}
-		err = r.Save()
-		image = copyImage(image)
+
+	image = &Image{
+		ID:             id,
+		Digest:         searchableDigest,
+		Digests:        nil,
+		Names:          names,
+		TopLayer:       layer,
+		Metadata:       metadata,
+		BigDataNames:   []string{},
+		BigDataSizes:   make(map[string]int64),
+		BigDataDigests: make(map[string]digest.Digest),
+		Created:        created,
+		Flags:          make(map[string]interface{}),
 	}
+	err = image.recomputeDigests()
+	if err != nil {
+		return nil, errors.Wrapf(err, "error validating digests for new image")
+	}
+	r.images = append(r.images, image)
+	r.idindex.Add(id)
+	r.byid[id] = image
+	for _, name := range names {
+		r.byname[name] = image
+	}
+	for _, digest := range image.Digests {
+		list := r.bydigest[digest]
+		r.bydigest[digest] = append(list, image)
+	}
+	err = r.Save()
+	image = copyImage(image)
 	return image, err
 }
 
 func (r *imageStore) addMappedTopLayer(id, layer string) error {
 	if image, ok := r.lookup(id); ok {
 		image.MappedTopLayers = append(image.MappedTopLayers, layer)
+		return r.Save()
+	}
+	return errors.Wrapf(ErrImageUnknown, "error locating image with ID %q", id)
+}
+
+func (r *imageStore) removeMappedTopLayer(id, layer string) error {
+	if image, ok := r.lookup(id); ok {
+		initialLen := len(image.MappedTopLayers)
+		image.MappedTopLayers = stringutils.RemoveFromSlice(image.MappedTopLayers, layer)
+		// No layer was removed.  No need to save.
+		if initialLen == len(image.MappedTopLayers) {
+			return nil
+		}
 		return r.Save()
 	}
 	return errors.Wrapf(ErrImageUnknown, "error locating image with ID %q", id)
@@ -491,26 +516,44 @@ func (i *Image) addNameToHistory(name string) {
 	i.NamesHistory = dedupeNames(append([]string{name}, i.NamesHistory...))
 }
 
+// Deprecated: Prone to race conditions, suggested alternatives are `AddNames` and `RemoveNames`.
 func (r *imageStore) SetNames(id string, names []string) error {
+	return r.updateNames(id, names, setNames)
+}
+
+func (r *imageStore) AddNames(id string, names []string) error {
+	return r.updateNames(id, names, addNames)
+}
+
+func (r *imageStore) RemoveNames(id string, names []string) error {
+	return r.updateNames(id, names, removeNames)
+}
+
+func (r *imageStore) updateNames(id string, names []string, op updateNameOperation) error {
 	if !r.IsReadWrite() {
 		return errors.Wrapf(ErrStoreIsReadOnly, "not allowed to change image name assignments at %q", r.imagespath())
 	}
-	names = dedupeNames(names)
-	if image, ok := r.lookup(id); ok {
-		for _, name := range image.Names {
-			delete(r.byname, name)
-		}
-		for _, name := range names {
-			if otherImage, ok := r.byname[name]; ok {
-				r.removeName(otherImage, name)
-			}
-			r.byname[name] = image
-			image.addNameToHistory(name)
-		}
-		image.Names = names
-		return r.Save()
+	image, ok := r.lookup(id)
+	if !ok {
+		return errors.Wrapf(ErrImageUnknown, "error locating image with ID %q", id)
 	}
-	return errors.Wrapf(ErrImageUnknown, "error locating image with ID %q", id)
+	oldNames := image.Names
+	names, err := applyNameOperation(oldNames, names, op)
+	if err != nil {
+		return err
+	}
+	for _, name := range oldNames {
+		delete(r.byname, name)
+	}
+	for _, name := range names {
+		if otherImage, ok := r.byname[name]; ok {
+			r.removeName(otherImage, name)
+		}
+		r.byname[name] = image
+		image.addNameToHistory(name)
+	}
+	image.Names = names
+	return r.Save()
 }
 
 func (r *imageStore) Delete(id string) error {
@@ -785,4 +828,15 @@ func (r *imageStore) TouchedSince(when time.Time) bool {
 
 func (r *imageStore) Locked() bool {
 	return r.lockfile.Locked()
+}
+
+func (r *imageStore) ReloadIfChanged() error {
+	r.loadMut.Lock()
+	defer r.loadMut.Unlock()
+
+	modified, err := r.Modified()
+	if err == nil && modified {
+		return r.Load()
+	}
+	return err
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/containers/storage/pkg/chrootarchive"
 	"github.com/containers/storage/pkg/idtools"
 	"github.com/containers/storage/pkg/ioutils"
-	rsystem "github.com/opencontainers/runc/libcontainer/system"
+	"github.com/opencontainers/runc/libcontainer/userns"
 	"github.com/sirupsen/logrus"
 )
 
@@ -138,6 +138,7 @@ func (gdw *NaiveDiffDriver) Changes(id string, idMappings *idtools.IDMappings, p
 	if parent != "" {
 		options := MountOpts{
 			MountLabel: mountLabel,
+			Options:    []string{"ro"},
 		}
 		parentFs, err = driver.Get(parent, options)
 		if err != nil {
@@ -170,7 +171,7 @@ func (gdw *NaiveDiffDriver) ApplyDiff(id, parent string, options ApplyDiffOpts) 
 	defer driver.Put(id)
 
 	tarOptions := &archive.TarOptions{
-		InUserNS:          rsystem.RunningInUserNS(),
+		InUserNS:          userns.RunningInUserNS(),
 		IgnoreChownErrors: options.IgnoreChownErrors,
 	}
 	if options.Mappings != nil {
@@ -180,7 +181,7 @@ func (gdw *NaiveDiffDriver) ApplyDiff(id, parent string, options ApplyDiffOpts) 
 	start := time.Now().UTC()
 	logrus.Debug("Start untar layer")
 	if size, err = ApplyUncompressedLayer(layerFs, options.Diff, tarOptions); err != nil {
-		logrus.Errorf("Error while applying layer: %s", err)
+		logrus.Errorf("While applying layer: %s", err)
 		return
 	}
 	logrus.Debugf("Untar time: %vs", time.Now().UTC().Sub(start).Seconds())

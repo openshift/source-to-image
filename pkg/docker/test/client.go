@@ -13,6 +13,7 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockernetwork "github.com/docker/docker/api/types/network"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/net/context"
 )
 
@@ -168,7 +169,7 @@ func (d *FakeDockerClient) ImageBuild(ctx context.Context, buildContext io.Reade
 }
 
 // ContainerCreate creates a new container based in the given configuration.
-func (d *FakeDockerClient) ContainerCreate(ctx context.Context, config *dockercontainer.Config, hostConfig *dockercontainer.HostConfig, networkingConfig *dockernetwork.NetworkingConfig, containerName string) (dockercontainer.ContainerCreateCreatedBody, error) {
+func (d *FakeDockerClient) ContainerCreate(ctx context.Context, config *dockercontainer.Config, hostConfig *dockercontainer.HostConfig, networkingConfig *dockernetwork.NetworkingConfig, platform *v1.Platform, containerName string) (dockercontainer.ContainerCreateCreatedBody, error) {
 	d.Calls = append(d.Calls, "create")
 
 	d.Containers[containerName] = *config

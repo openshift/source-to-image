@@ -5,7 +5,9 @@
 package zstd
 
 import (
+	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"math/bits"
 )
@@ -34,8 +36,12 @@ func (b *bitReader) init(in []byte) error {
 	}
 	b.bitsRead = 64
 	b.value = 0
-	b.fill()
-	b.fill()
+	if len(in) >= 8 {
+		b.fillFastStart()
+	} else {
+		b.fill()
+		b.fill()
+	}
 	b.bitsRead += 8 - uint8(highBits(uint32(v)))
 	return nil
 }
@@ -45,16 +51,23 @@ func (b *bitReader) getBits(n uint8) int {
 	if n == 0 /*|| b.bitsRead >= 64 */ {
 		return 0
 	}
-	return b.getBitsFast(n)
+	return int(b.get32BitsFast(n))
 }
 
-// getBitsFast requires that at least one bit is requested every time.
+// get32BitsFast requires that at least one bit is requested every time.
 // There are no checks if the buffer is filled.
-func (b *bitReader) getBitsFast(n uint8) int {
+func (b *bitReader) get32BitsFast(n uint8) uint32 {
 	const regMask = 64 - 1
 	v := uint32((b.value << (b.bitsRead & regMask)) >> ((regMask + 1 - n) & regMask))
 	b.bitsRead += n
-	return int(v)
+	return v
+}
+
+func (b *bitReader) get16BitsFast(n uint8) uint16 {
+	const regMask = 64 - 1
+	v := uint16((b.value << (b.bitsRead & regMask)) >> ((regMask + 1 - n) & regMask))
+	b.bitsRead += n
+	return v
 }
 
 // fillFast() will make sure at least 32 bits are available.
@@ -63,12 +76,21 @@ func (b *bitReader) fillFast() {
 	if b.bitsRead < 32 {
 		return
 	}
-	// Do single re-slice to avoid bounds checks.
-	v := b.in[b.off-4 : b.off]
+	// 2 bounds checks.
+	v := b.in[b.off-4:]
+	v = v[:4]
 	low := (uint32(v[0])) | (uint32(v[1]) << 8) | (uint32(v[2]) << 16) | (uint32(v[3]) << 24)
 	b.value = (b.value << 32) | uint64(low)
 	b.bitsRead -= 32
 	b.off -= 4
+}
+
+// fillFastStart() assumes the bitreader is empty and there is at least 8 bytes to read.
+func (b *bitReader) fillFastStart() {
+	// Do single re-slice to avoid bounds checks.
+	b.value = binary.LittleEndian.Uint64(b.in[b.off-8:])
+	b.bitsRead = 0
+	b.off -= 8
 }
 
 // fill() will make sure at least 32 bits are available.
@@ -77,7 +99,8 @@ func (b *bitReader) fill() {
 		return
 	}
 	if b.off >= 4 {
-		v := b.in[b.off-4 : b.off]
+		v := b.in[b.off-4:]
+		v = v[:4]
 		low := (uint32(v[0])) | (uint32(v[1]) << 8) | (uint32(v[2]) << 16) | (uint32(v[3]) << 24)
 		b.value = (b.value << 32) | uint64(low)
 		b.bitsRead -= 32
@@ -110,6 +133,9 @@ func (b *bitReader) remain() uint {
 func (b *bitReader) close() error {
 	// Release reference.
 	b.in = nil
+	if !b.finished() {
+		return fmt.Errorf("%d extra bits on block, should be 0", b.remain())
+	}
 	if b.bitsRead > 64 {
 		return io.ErrUnexpectedEOF
 	}

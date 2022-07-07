@@ -1,4 +1,4 @@
-// +build !windows
+// +build !windows,!freebsd
 
 package archive
 
@@ -11,7 +11,6 @@ import (
 
 	"github.com/containers/storage/pkg/idtools"
 	"github.com/containers/storage/pkg/system"
-	rsystem "github.com/opencontainers/runc/libcontainer/system"
 	"golang.org/x/sys/unix"
 )
 
@@ -88,11 +87,6 @@ func minor(device uint64) uint64 {
 // handleTarTypeBlockCharFifo is an OS-specific helper function used by
 // createTarFile to handle the following types of header: Block; Char; Fifo
 func handleTarTypeBlockCharFifo(hdr *tar.Header, path string) error {
-	if rsystem.RunningInUserNS() {
-		// cannot create a device if running in user namespace
-		return nil
-	}
-
 	mode := uint32(hdr.Mode & 07777)
 	switch hdr.Typeflag {
 	case tar.TypeBlock:
@@ -106,15 +100,19 @@ func handleTarTypeBlockCharFifo(hdr *tar.Header, path string) error {
 	return system.Mknod(path, mode, int(system.Mkdev(hdr.Devmajor, hdr.Devminor)))
 }
 
-func handleLChmod(hdr *tar.Header, path string, hdrInfo os.FileInfo) error {
+func handleLChmod(hdr *tar.Header, path string, hdrInfo os.FileInfo, forceMask *os.FileMode) error {
+	permissionsMask := hdrInfo.Mode()
+	if forceMask != nil {
+		permissionsMask = *forceMask
+	}
 	if hdr.Typeflag == tar.TypeLink {
 		if fi, err := os.Lstat(hdr.Linkname); err == nil && (fi.Mode()&os.ModeSymlink == 0) {
-			if err := os.Chmod(path, hdrInfo.Mode()); err != nil {
+			if err := os.Chmod(path, permissionsMask); err != nil {
 				return err
 			}
 		}
 	} else if hdr.Typeflag != tar.TypeSymlink {
-		if err := os.Chmod(path, hdrInfo.Mode()); err != nil {
+		if err := os.Chmod(path, permissionsMask); err != nil {
 			return err
 		}
 	}

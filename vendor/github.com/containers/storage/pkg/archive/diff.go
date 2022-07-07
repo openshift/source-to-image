@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"fmt"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -37,6 +38,7 @@ func UnpackLayer(dest string, layer io.Reader, options *TarOptions) (size int64,
 
 	aufsTempdir := ""
 	aufsHardlinks := make(map[string]*tar.Header)
+	buffer := make([]byte, 1<<20)
 
 	// Iterate through the files in the archive.
 	for {
@@ -105,7 +107,7 @@ func UnpackLayer(dest string, layer io.Reader, options *TarOptions) (size int64,
 					}
 					defer os.RemoveAll(aufsTempdir)
 				}
-				if err := createTarFile(filepath.Join(aufsTempdir, basename), dest, hdr, tr, true, nil, options.InUserNS, options.IgnoreChownErrors); err != nil {
+				if err := createTarFile(filepath.Join(aufsTempdir, basename), dest, hdr, tr, true, nil, options.InUserNS, options.IgnoreChownErrors, options.ForceMask, buffer); err != nil {
 					return 0, err
 				}
 			}
@@ -133,7 +135,7 @@ func UnpackLayer(dest string, layer io.Reader, options *TarOptions) (size int64,
 				if err != nil {
 					return 0, err
 				}
-				err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+				err = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 					if err != nil {
 						if os.IsNotExist(err) {
 							err = nil // parent was deleted
@@ -196,7 +198,7 @@ func UnpackLayer(dest string, layer io.Reader, options *TarOptions) (size int64,
 				return 0, err
 			}
 
-			if err := createTarFile(path, dest, srcHdr, srcData, true, nil, options.InUserNS, options.IgnoreChownErrors); err != nil {
+			if err := createTarFile(path, dest, srcHdr, srcData, true, nil, options.InUserNS, options.IgnoreChownErrors, options.ForceMask, buffer); err != nil {
 				return 0, err
 			}
 

@@ -1,12 +1,13 @@
+//go:build linux && cgo
 // +build linux,cgo
 
 package devmapper
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -101,6 +102,7 @@ type DeviceSet struct {
 
 	// Options
 	dataLoopbackSize      int64
+	metaDataSize          string
 	metaDataLoopbackSize  int64
 	baseFsSize            uint64
 	filesystem            string
@@ -272,7 +274,7 @@ func (devices *DeviceSet) ensureImage(name string, size int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := idtools.MkdirAllAs(dirname, 0700, uid, gid); err != nil && !os.IsExist(err) {
+	if err := idtools.MkdirAllAs(dirname, 0700, uid, gid); err != nil {
 		return "", err
 	}
 
@@ -419,40 +421,35 @@ func (devices *DeviceSet) constructDeviceIDMap() {
 	}
 }
 
-func (devices *DeviceSet) deviceFileWalkFunction(path string, finfo os.FileInfo) error {
+func (devices *DeviceSet) deviceFileWalkFunction(path string, name string) error {
 
 	// Skip some of the meta files which are not device files.
-	if strings.HasSuffix(finfo.Name(), ".migrated") {
+	if strings.HasSuffix(name, ".migrated") {
 		logrus.Debugf("devmapper: Skipping file %s", path)
 		return nil
 	}
 
-	if strings.HasPrefix(finfo.Name(), ".") {
+	if strings.HasPrefix(name, ".") {
 		logrus.Debugf("devmapper: Skipping file %s", path)
 		return nil
 	}
 
-	if finfo.Name() == deviceSetMetaFile {
+	if name == deviceSetMetaFile {
 		logrus.Debugf("devmapper: Skipping file %s", path)
 		return nil
 	}
 
-	if finfo.Name() == transactionMetaFile {
+	if name == transactionMetaFile {
 		logrus.Debugf("devmapper: Skipping file %s", path)
 		return nil
 	}
 
 	logrus.Debugf("devmapper: Loading data for file %s", path)
 
-	hash := finfo.Name()
-	if hash == base {
-		hash = ""
-	}
-
 	// Include deleted devices also as cleanup delete device logic
 	// will go through it and see if there are any deleted devices.
-	if _, err := devices.lookupDevice(hash); err != nil {
-		return fmt.Errorf("devmapper: Error looking up device %s:%v", hash, err)
+	if _, err := devices.lookupDevice(name); err != nil {
+		return fmt.Errorf("devmapper: Error looking up device %s:%v", name, err)
 	}
 
 	return nil
@@ -462,21 +459,21 @@ func (devices *DeviceSet) loadDeviceFilesOnStart() error {
 	logrus.Debug("devmapper: loadDeviceFilesOnStart()")
 	defer logrus.Debug("devmapper: loadDeviceFilesOnStart() END")
 
-	var scan = func(path string, info os.FileInfo, err error) error {
+	var scan = func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			logrus.Debugf("devmapper: Can't walk the file %s", path)
 			return nil
 		}
 
 		// Skip any directories
-		if info.IsDir() {
+		if d.IsDir() {
 			return nil
 		}
 
-		return devices.deviceFileWalkFunction(path, info)
+		return devices.deviceFileWalkFunction(path, d.Name())
 	}
 
-	return filepath.Walk(devices.metadataDir(), scan)
+	return filepath.WalkDir(devices.metadataDir(), scan)
 }
 
 // Should be called with devices.Lock() held.
@@ -1212,7 +1209,11 @@ func (devices *DeviceSet) growFS(info *devInfo) error {
 		return errors.Wrapf(err, "Failed to mount; dmesg: %s", string(dmesg.Dmesg(256)))
 	}
 
-	defer unix.Unmount(fsMountPoint, unix.MNT_DETACH)
+	defer func() {
+		if err := mount.Unmount(fsMountPoint); err != nil {
+			logrus.Warnf("devmapper.growFS cleanup error: %v", err)
+		}
+	}()
 
 	switch devices.BaseDeviceFilesystem {
 	case ext4:
@@ -1544,8 +1545,8 @@ func getDeviceMajorMinor(file *os.File) (uint64, uint64, error) {
 	}
 
 	dev := stat.Rdev
-	majorNum := major(dev)
-	minorNum := minor(dev)
+	majorNum := major(uint64(dev))
+	minorNum := minor(uint64(dev))
 
 	logrus.Debugf("devmapper: Major:Minor for device: %s is:%v:%v", file.Name(), majorNum, minorNum)
 	return majorNum, minorNum, nil
@@ -1701,10 +1702,10 @@ func (devices *DeviceSet) initDevmapper(doInit bool) (retErr error) {
 	if err != nil {
 		return err
 	}
-	if err := idtools.MkdirAs(devices.root, 0700, uid, gid); err != nil && !os.IsExist(err) {
+	if err := idtools.MkdirAs(devices.root, 0700, uid, gid); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(devices.metadataDir(), 0700); err != nil && !os.IsExist(err) {
+	if err := os.MkdirAll(devices.metadataDir(), 0700); err != nil {
 		return err
 	}
 
@@ -1748,7 +1749,7 @@ func (devices *DeviceSet) initDevmapper(doInit bool) (retErr error) {
 	//	- Managed by container storage
 	//	- The target of this device is at major <maj> and minor <min>
 	//	- If <inode> is defined, use that file inside the device as a loopback image. Otherwise use the device itself.
-	devices.devicePrefix = fmt.Sprintf("container-%d:%d-%d", major(st.Dev), minor(st.Dev), st.Ino)
+	devices.devicePrefix = fmt.Sprintf("container-%d:%d-%d", major(uint64(st.Dev)), minor(uint64(st.Dev)), st.Ino)
 	logrus.Debugf("devmapper: Generated prefix: %s", devices.devicePrefix)
 
 	// Check for the existence of the thin-pool device
@@ -2006,14 +2007,7 @@ func (devices *DeviceSet) markForDeferredDeletion(info *devInfo) error {
 }
 
 // Should be called with devices.Lock() held.
-func (devices *DeviceSet) deleteTransaction(info *devInfo, syncDelete bool) error {
-	if err := devices.openTransaction(info.Hash, info.DeviceID); err != nil {
-		logrus.Debugf("devmapper: Error opening transaction hash = %s deviceId = %d", "", info.DeviceID)
-		return err
-	}
-
-	defer devices.closeTransaction()
-
+func (devices *DeviceSet) deleteDeviceNoLock(info *devInfo, syncDelete bool) error {
 	err := devicemapper.DeleteDevice(devices.getPoolDevName(), info.DeviceID)
 	if err != nil {
 		// If syncDelete is true, we want to return error. If deferred
@@ -2076,6 +2070,13 @@ func (devices *DeviceSet) issueDiscard(info *devInfo) error {
 
 // Should be called with devices.Lock() held.
 func (devices *DeviceSet) deleteDevice(info *devInfo, syncDelete bool) error {
+	if err := devices.openTransaction(info.Hash, info.DeviceID); err != nil {
+		logrus.WithField("storage-driver", "devicemapper").Debugf("Error opening transaction hash = %s deviceId = %d", info.Hash, info.DeviceID)
+		return err
+	}
+
+	defer devices.closeTransaction()
+
 	if devices.doBlkDiscard {
 		devices.issueDiscard(info)
 	}
@@ -2095,7 +2096,7 @@ func (devices *DeviceSet) deleteDevice(info *devInfo, syncDelete bool) error {
 		return err
 	}
 
-	if err := devices.deleteTransaction(info, syncDelete); err != nil {
+	if err := devices.deleteDeviceNoLock(info, syncDelete); err != nil {
 		return err
 	}
 
@@ -2225,7 +2226,7 @@ func (devices *DeviceSet) cancelDeferredRemovalIfNeeded(info *devInfo) error {
 	// Cancel deferred remove
 	if err := devices.cancelDeferredRemoval(info); err != nil {
 		// If Error is ErrEnxio. Device is probably already gone. Continue.
-		if errors.Cause(err) != devicemapper.ErrBusy {
+		if errors.Cause(err) != devicemapper.ErrEnxio {
 			return err
 		}
 	}
@@ -2256,6 +2257,38 @@ func (devices *DeviceSet) cancelDeferredRemoval(info *devInfo) error {
 	return err
 }
 
+func (devices *DeviceSet) unmountAndDeactivateAll(dir string) {
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		logrus.Warnf("devmapper: unmountAndDeactivate: %s", err)
+		return
+	}
+
+	for _, d := range files {
+		if !d.IsDir() {
+			continue
+		}
+
+		name := d.Name()
+		fullname := path.Join(dir, name)
+
+		// We use MNT_DETACH here in case it is still busy in some running
+		// container. This means it'll go away from the global scope directly,
+		// and the device will be released when that container dies.
+		if err := mount.Unmount(fullname); err != nil {
+			logrus.Warnf("devmapper.Shutdown error: %s", err)
+		}
+
+		if devInfo, err := devices.lookupDevice(name); err != nil {
+			logrus.Debugf("devmapper: Shutdown lookup device %s, error: %s", name, err)
+		} else {
+			if err := devices.deactivateDevice(devInfo); err != nil {
+				logrus.Debugf("devmapper: Shutdown deactivate %s, error: %s", devInfo.Hash, err)
+			}
+		}
+	}
+}
+
 // Shutdown shuts down the device by unmounting the root.
 func (devices *DeviceSet) Shutdown(home string) error {
 	logrus.Debugf("devmapper: [deviceset %s] Shutdown()", devices.devicePrefix)
@@ -2277,45 +2310,7 @@ func (devices *DeviceSet) Shutdown(home string) error {
 	// will be killed and we will not get a chance to save deviceset
 	// metadata. Hence save this early before trying to deactivate devices.
 	devices.saveDeviceSetMetaData()
-
-	// ignore the error since it's just a best effort to not try to unmount something that's mounted
-	mounts, _ := mount.GetMounts()
-	mounted := make(map[string]bool, len(mounts))
-	for _, mnt := range mounts {
-		mounted[mnt.Mountpoint] = true
-	}
-
-	if err := filepath.Walk(path.Join(home, "mnt"), func(p string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			return nil
-		}
-
-		if mounted[p] {
-			// We use MNT_DETACH here in case it is still busy in some running
-			// container. This means it'll go away from the global scope directly,
-			// and the device will be released when that container dies.
-			if err := unix.Unmount(p, unix.MNT_DETACH); err != nil {
-				logrus.Debugf("devmapper: Shutdown unmounting %s, error: %s", p, err)
-			}
-		}
-
-		if devInfo, err := devices.lookupDevice(path.Base(p)); err != nil {
-			logrus.Debugf("devmapper: Shutdown lookup device %s, error: %s", path.Base(p), err)
-		} else {
-			if err := devices.deactivateDevice(devInfo); err != nil {
-				logrus.Debugf("devmapper: Shutdown deactivate %s , error: %s", devInfo.Hash, err)
-			}
-		}
-
-		return nil
-	}); err != nil && !os.IsNotExist(err) {
-		devices.Unlock()
-		return err
-	}
-
+	devices.unmountAndDeactivateAll(path.Join(home, "mnt"))
 	devices.Unlock()
 
 	info, _ := devices.lookupDeviceWithLock("")
@@ -2419,7 +2414,9 @@ func (devices *DeviceSet) MountDevice(hash, path string, moptions graphdriver.Mo
 
 	if fstype == xfs && devices.xfsNospaceRetries != "" {
 		if err := devices.xfsSetNospaceRetries(info); err != nil {
-			unix.Unmount(path, unix.MNT_DETACH)
+			if err := mount.Unmount(path); err != nil {
+				logrus.Warnf("devmapper.MountDevice cleanup error: %v", err)
+			}
 			devices.deactivateDevice(info)
 			return err
 		}
@@ -2445,10 +2442,24 @@ func (devices *DeviceSet) UnmountDevice(hash, mountPath string) error {
 	defer devices.Unlock()
 
 	logrus.Debugf("devmapper: Unmount(%s)", mountPath)
-	if err := unix.Unmount(mountPath, unix.MNT_DETACH); err != nil {
-		return err
+	if err := mount.Unmount(mountPath); err != nil {
+		if ok, _ := Mounted(mountPath); ok {
+			return err
+		}
 	}
 	logrus.Debug("devmapper: Unmount done")
+
+	// Remove the mountpoint here. Removing the mountpoint (in newer kernels)
+	// will cause all other instances of this mount in other mount namespaces
+	// to be killed (this is an anti-DoS measure that is necessary for things
+	// like devicemapper). This is necessary to avoid cases where a libdm mount
+	// that is present in another namespace will cause subsequent RemoveDevice
+	// operations to fail. We ignore any errors here because this may fail on
+	// older kernels which don't have
+	// torvalds/linux@8ed936b5671bfb33d89bc60bdcc7cf0470ba52fe applied.
+	if err := os.Remove(mountPath); err != nil {
+		logrus.Debugf("devmapper: error doing a remove on unmounted device %s: %v", mountPath, err)
+	}
 
 	return devices.deactivateDevice(info)
 }
@@ -2708,6 +2719,8 @@ func NewDeviceSet(root string, doInit bool, options []string, uidMaps, gidMaps [
 			devices.mountOptions = joinMountOptions(devices.mountOptions, val)
 		case "dm.metadatadev":
 			devices.metadataDevice = val
+		case "dm.metadata_size":
+			devices.metaDataSize = val
 		case "dm.datadev":
 			devices.dataDevice = val
 		case "dm.thinpooldev":
@@ -2743,6 +2756,8 @@ func NewDeviceSet(root string, doInit bool, options []string, uidMaps, gidMaps [
 				return nil, err
 			}
 
+		case "dm.metaDataSize":
+			lvmSetupConfig.MetaDataSize = val
 		case "dm.min_free_space":
 			if !strings.HasSuffix(val, "%") {
 				return nil, fmt.Errorf("devmapper: Option dm.min_free_space requires %% suffix")

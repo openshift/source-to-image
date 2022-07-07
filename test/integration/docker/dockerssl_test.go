@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package docker
@@ -13,6 +14,7 @@ import (
 	"runtime"
 	"testing"
 
+	dockerapi "github.com/docker/docker/api"
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/docker"
 )
@@ -56,7 +58,7 @@ func (s *Server) Close() {
 
 func (s *Server) serveFakeDockerAPIServer() {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/version", func(w http.ResponseWriter, req *http.Request) {
+	mux.HandleFunc("/v"+dockerapi.DefaultVersion+"/version", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
 		w.Write([]byte("{}"))
 	})

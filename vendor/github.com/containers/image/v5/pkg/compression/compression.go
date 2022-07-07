@@ -5,10 +5,10 @@ import (
 	"compress/bzip2"
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"github.com/containers/image/v5/pkg/compression/internal"
 	"github.com/containers/image/v5/pkg/compression/types"
+	"github.com/containers/storage/pkg/chunked/compressor"
 	"github.com/klauspost/pgzip"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -20,19 +20,27 @@ type Algorithm = types.Algorithm
 
 var (
 	// Gzip compression.
-	Gzip = internal.NewAlgorithm("gzip", []byte{0x1F, 0x8B, 0x08}, GzipDecompressor, gzipCompressor)
+	Gzip = internal.NewAlgorithm(types.GzipAlgorithmName, types.GzipAlgorithmName,
+		[]byte{0x1F, 0x8B, 0x08}, GzipDecompressor, gzipCompressor)
 	// Bzip2 compression.
-	Bzip2 = internal.NewAlgorithm("bzip2", []byte{0x42, 0x5A, 0x68}, Bzip2Decompressor, bzip2Compressor)
+	Bzip2 = internal.NewAlgorithm(types.Bzip2AlgorithmName, types.Bzip2AlgorithmName,
+		[]byte{0x42, 0x5A, 0x68}, Bzip2Decompressor, bzip2Compressor)
 	// Xz compression.
-	Xz = internal.NewAlgorithm("Xz", []byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00}, XzDecompressor, xzCompressor)
+	Xz = internal.NewAlgorithm(types.XzAlgorithmName, types.XzAlgorithmName,
+		[]byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00}, XzDecompressor, xzCompressor)
 	// Zstd compression.
-	Zstd = internal.NewAlgorithm("zstd", []byte{0x28, 0xb5, 0x2f, 0xfd}, ZstdDecompressor, zstdCompressor)
+	Zstd = internal.NewAlgorithm(types.ZstdAlgorithmName, types.ZstdAlgorithmName,
+		[]byte{0x28, 0xb5, 0x2f, 0xfd}, ZstdDecompressor, zstdCompressor)
+	// Zstd:chunked compression.
+	ZstdChunked = internal.NewAlgorithm(types.ZstdChunkedAlgorithmName, types.ZstdAlgorithmName, /* Note: InternalUnstableUndocumentedMIMEQuestionMark is not ZstdChunkedAlgorithmName */
+		nil, ZstdDecompressor, compressor.ZstdCompressor)
 
 	compressionAlgorithms = map[string]Algorithm{
-		Gzip.Name():  Gzip,
-		Bzip2.Name(): Bzip2,
-		Xz.Name():    Xz,
-		Zstd.Name():  Zstd,
+		Gzip.Name():        Gzip,
+		Bzip2.Name():       Bzip2,
+		Xz.Name():          Xz,
+		Zstd.Name():        Zstd,
+		ZstdChunked.Name(): ZstdChunked,
 	}
 )
 
@@ -56,7 +64,7 @@ func GzipDecompressor(r io.Reader) (io.ReadCloser, error) {
 
 // Bzip2Decompressor is a DecompressorFunc for the bzip2 compression algorithm.
 func Bzip2Decompressor(r io.Reader) (io.ReadCloser, error) {
-	return ioutil.NopCloser(bzip2.NewReader(r)), nil
+	return io.NopCloser(bzip2.NewReader(r)), nil
 }
 
 // XzDecompressor is a DecompressorFunc for the xz compression algorithm.
@@ -65,11 +73,11 @@ func XzDecompressor(r io.Reader) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ioutil.NopCloser(r), nil
+	return io.NopCloser(r), nil
 }
 
 // gzipCompressor is a CompressorFunc for the gzip compression algorithm.
-func gzipCompressor(r io.Writer, level *int) (io.WriteCloser, error) {
+func gzipCompressor(r io.Writer, metadata map[string]string, level *int) (io.WriteCloser, error) {
 	if level != nil {
 		return pgzip.NewWriterLevel(r, *level)
 	}
@@ -77,21 +85,29 @@ func gzipCompressor(r io.Writer, level *int) (io.WriteCloser, error) {
 }
 
 // bzip2Compressor is a CompressorFunc for the bzip2 compression algorithm.
-func bzip2Compressor(r io.Writer, level *int) (io.WriteCloser, error) {
+func bzip2Compressor(r io.Writer, metadata map[string]string, level *int) (io.WriteCloser, error) {
 	return nil, fmt.Errorf("bzip2 compression not supported")
 }
 
 // xzCompressor is a CompressorFunc for the xz compression algorithm.
-func xzCompressor(r io.Writer, level *int) (io.WriteCloser, error) {
+func xzCompressor(r io.Writer, metadata map[string]string, level *int) (io.WriteCloser, error) {
 	return xz.NewWriter(r)
 }
 
 // CompressStream returns the compressor by its name
 func CompressStream(dest io.Writer, algo Algorithm, level *int) (io.WriteCloser, error) {
-	return internal.AlgorithmCompressor(algo)(dest, level)
+	m := map[string]string{}
+	return internal.AlgorithmCompressor(algo)(dest, m, level)
 }
 
-// DetectCompressionFormat returns a DecompressorFunc if the input is recognized as a compressed format, nil otherwise.
+// CompressStreamWithMetadata returns the compressor by its name.  If the compression
+// generates any metadata, it is written to the provided metadata map.
+func CompressStreamWithMetadata(dest io.Writer, metadata map[string]string, algo Algorithm, level *int) (io.WriteCloser, error) {
+	return internal.AlgorithmCompressor(algo)(dest, metadata, level)
+}
+
+// DetectCompressionFormat returns an Algorithm and DecompressorFunc if the input is recognized as a compressed format, an invalid
+// value and nil otherwise.
 // Because it consumes the start of input, other consumers must use the returned io.Reader instead to also read from the beginning.
 func DetectCompressionFormat(input io.Reader) (Algorithm, DecompressorFunc, io.Reader, error) {
 	buffer := [8]byte{}
@@ -106,7 +122,8 @@ func DetectCompressionFormat(input io.Reader) (Algorithm, DecompressorFunc, io.R
 	var retAlgo Algorithm
 	var decompressor DecompressorFunc
 	for _, algo := range compressionAlgorithms {
-		if bytes.HasPrefix(buffer[:n], internal.AlgorithmPrefix(algo)) {
+		prefix := internal.AlgorithmPrefix(algo)
+		if len(prefix) > 0 && bytes.HasPrefix(buffer[:n], prefix) {
 			logrus.Debugf("Detected compression format %s", algo.Name())
 			retAlgo = algo
 			decompressor = internal.AlgorithmDecompressor(algo)
@@ -134,16 +151,16 @@ func DetectCompression(input io.Reader) (DecompressorFunc, io.Reader, error) {
 func AutoDecompress(stream io.Reader) (io.ReadCloser, bool, error) {
 	decompressor, stream, err := DetectCompression(stream)
 	if err != nil {
-		return nil, false, errors.Wrapf(err, "Error detecting compression")
+		return nil, false, errors.Wrapf(err, "detecting compression")
 	}
 	var res io.ReadCloser
 	if decompressor != nil {
 		res, err = decompressor(stream)
 		if err != nil {
-			return nil, false, errors.Wrapf(err, "Error initializing decompression")
+			return nil, false, errors.Wrapf(err, "initializing decompression")
 		}
 	} else {
-		res = ioutil.NopCloser(stream)
+		res = io.NopCloser(stream)
 	}
 	return res, decompressor != nil, nil
 }

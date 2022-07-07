@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/image"
+	"github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/types"
+	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
 
@@ -37,7 +40,7 @@ func newImage(ctx context.Context, sys *types.SystemContext, ref dockerReference
 
 // SourceRefFullName returns a fully expanded name for the repository this image is in.
 func (i *Image) SourceRefFullName() string {
-	return i.src.ref.ref.Name()
+	return i.src.logicalRef.ref.Name()
 }
 
 // GetRepositoryTags list all tags available in the repository. The tag
@@ -45,7 +48,7 @@ func (i *Image) SourceRefFullName() string {
 // backward-compatible shim method which calls the module-level
 // GetRepositoryTags)
 func (i *Image) GetRepositoryTags(ctx context.Context) ([]string, error) {
-	return GetRepositoryTags(ctx, i.src.c.sys, i.src.ref)
+	return GetRepositoryTags(ctx, i.src.c.sys, i.src.logicalRef)
 }
 
 // GetRepositoryTags list all tags available in the repository. The tag
@@ -65,12 +68,12 @@ func GetRepositoryTags(ctx context.Context, sys *types.SystemContext, ref types.
 	tags := make([]string, 0)
 
 	for {
-		res, err := client.makeRequest(ctx, "GET", path, nil, nil, v2Auth, nil)
+		res, err := client.makeRequest(ctx, http.MethodGet, path, nil, nil, v2Auth, nil)
 		if err != nil {
 			return nil, err
 		}
 		defer res.Body.Close()
-		if err := httpResponseToError(res, "Error fetching tags list"); err != nil {
+		if err := httpResponseToError(res, "fetching tags list"); err != nil {
 			return nil, err
 		}
 
@@ -102,4 +105,49 @@ func GetRepositoryTags(ctx context.Context, sys *types.SystemContext, ref types.
 		}
 	}
 	return tags, nil
+}
+
+// GetDigest returns the image's digest
+// Use this to optimize and avoid use of an ImageSource based on the returned digest;
+// if you are going to use an ImageSource anyway, it’s more efficient to create it first
+// and compute the digest from the value returned by GetManifest.
+// NOTE: Implemented to avoid Docker Hub API limits, and mirror configuration may be
+// ignored (but may be implemented in the future)
+func GetDigest(ctx context.Context, sys *types.SystemContext, ref types.ImageReference) (digest.Digest, error) {
+	dr, ok := ref.(dockerReference)
+	if !ok {
+		return "", errors.Errorf("ref must be a dockerReference")
+	}
+
+	tagOrDigest, err := dr.tagOrDigest()
+	if err != nil {
+		return "", err
+	}
+
+	client, err := newDockerClientFromRef(sys, dr, false, "pull")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to create client")
+	}
+
+	path := fmt.Sprintf(manifestPath, reference.Path(dr.ref), tagOrDigest)
+	headers := map[string][]string{
+		"Accept": manifest.DefaultRequestedManifestMIMETypes,
+	}
+
+	res, err := client.makeRequest(ctx, http.MethodHead, path, headers, nil, v2Auth, nil)
+	if err != nil {
+		return "", err
+	}
+
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return "", errors.Wrapf(registryHTTPResponseToError(res), "reading digest %s in %s", tagOrDigest, dr.ref.Name())
+	}
+
+	dig, err := digest.Parse(res.Header.Get("Docker-Content-Digest"))
+	if err != nil {
+		return "", err
+	}
+
+	return dig, nil
 }

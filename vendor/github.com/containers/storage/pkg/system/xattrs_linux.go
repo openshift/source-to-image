@@ -2,6 +2,7 @@ package system
 
 import (
 	"bytes"
+	"os"
 
 	"golang.org/x/sys/unix"
 )
@@ -12,6 +13,9 @@ const (
 
 	// Operation not supported
 	EOPNOTSUPP unix.Errno = unix.EOPNOTSUPP
+
+	// Value is too small or too large for maximum size allowed
+	EOVERFLOW unix.Errno = unix.EOVERFLOW
 )
 
 // Lgetxattr retrieves the value of the extended attribute identified by attr
@@ -26,7 +30,7 @@ func Lgetxattr(path string, attr string) ([]byte, error) {
 		// Buffer too small, use zero-sized buffer to get the actual size
 		sz, errno = unix.Lgetxattr(path, attr, []byte{})
 		if errno != nil {
-			return nil, errno
+			return nil, &os.PathError{Op: "lgetxattr", Path: path, Err: errno}
 		}
 		dest = make([]byte, sz)
 		sz, errno = unix.Lgetxattr(path, attr, dest)
@@ -36,7 +40,7 @@ func Lgetxattr(path string, attr string) ([]byte, error) {
 	case errno == unix.ENODATA:
 		return nil, nil
 	case errno != nil:
-		return nil, errno
+		return nil, &os.PathError{Op: "lgetxattr", Path: path, Err: errno}
 	}
 
 	return dest[:sz], nil
@@ -45,7 +49,11 @@ func Lgetxattr(path string, attr string) ([]byte, error) {
 // Lsetxattr sets the value of the extended attribute identified by attr
 // and associated with the given path in the file system.
 func Lsetxattr(path string, attr string, data []byte, flags int) error {
-	return unix.Lsetxattr(path, attr, data, flags)
+	if err := unix.Lsetxattr(path, attr, data, flags); err != nil {
+		return &os.PathError{Op: "lsetxattr", Path: path, Err: err}
+	}
+
+	return nil
 }
 
 // Llistxattr lists extended attributes associated with the given path
@@ -58,14 +66,14 @@ func Llistxattr(path string) ([]string, error) {
 		// Buffer too small, use zero-sized buffer to get the actual size
 		sz, errno = unix.Llistxattr(path, []byte{})
 		if errno != nil {
-			return nil, errno
+			return nil, &os.PathError{Op: "llistxattr", Path: path, Err: errno}
 		}
 
 		dest = make([]byte, sz)
 		sz, errno = unix.Llistxattr(path, dest)
 	}
 	if errno != nil {
-		return nil, errno
+		return nil, &os.PathError{Op: "llistxattr", Path: path, Err: errno}
 	}
 
 	var attrs []string

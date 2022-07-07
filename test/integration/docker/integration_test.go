@@ -1,9 +1,11 @@
+//go:build integration
 // +build integration
 
 package docker
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -165,8 +167,8 @@ var (
 )
 
 func getLogLevel() (level int) {
-	for level = 5; level >= 0; level-- {
-		if klog.V(klog.Level(level)) == true {
+	for level = 0; level <= 5; level++ {
+		if klog.V(klog.Level(level)).Enabled() {
 			break
 		}
 	}
@@ -599,7 +601,7 @@ func (i *integrationTest) createContainer(image string) string {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
 	opts := dockertypes.ContainerCreateConfig{Name: "", Config: &dockercontainer.Config{Image: image}}
-	container, err := engineClient.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, opts.Name)
+	container, err := engineClient.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, nil, opts.Name)
 	if err != nil {
 		i.t.Errorf("Couldn't create container from image %s with error %+v", image, err)
 		return ""
@@ -623,8 +625,20 @@ func (i *integrationTest) createContainer(image string) string {
 			return ""
 		}
 	case err := <-errC:
-		i.t.Errorf("Error waiting for container: %v", err)
-		return ""
+		if errors.Is(err, context.DeadlineExceeded) {
+			ctx, cancel := getDefaultContext()
+			defer cancel()
+			inspectInfo, err2 := engineClient.ContainerInspect(ctx, container.ID)
+			if err2 == nil && inspectInfo.State != nil && inspectInfo.State.Status == "exited" {
+				// it must have finished before we tried to wait for a not-exited->exited state change
+				i.t.Logf("timed out waiting for container %q: it had already exited; continuing", container.ID)
+				err = nil
+			}
+		}
+		if err != nil {
+			i.t.Errorf("Error waiting for container: %v", err)
+			return ""
+		}
 	}
 	return container.ID
 }
@@ -633,7 +647,7 @@ func (i *integrationTest) runInContainer(image string, command []string) int {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
 	opts := dockertypes.ContainerCreateConfig{Name: "", Config: &dockercontainer.Config{Image: image, AttachStdout: false, AttachStdin: false, Cmd: command}}
-	container, err := engineClient.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, opts.Name)
+	container, err := engineClient.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, nil, opts.Name)
 	if err != nil {
 		i.t.Errorf("Couldn't create container from image %s err %+v", image, err)
 		return -1
@@ -653,7 +667,20 @@ func (i *integrationTest) runInContainer(image string, command []string) int {
 	case result := <-waitC:
 		exitCode = int(result.StatusCode)
 	case err := <-errC:
-		i.t.Errorf("Couldn't wait for container: %s: %v", container.ID, err)
+		if errors.Is(err, context.DeadlineExceeded) {
+			ctx, cancel := getDefaultContext()
+			defer cancel()
+			inspectInfo, err2 := engineClient.ContainerInspect(ctx, container.ID)
+			if err2 == nil && inspectInfo.State != nil && inspectInfo.State.Status == "exited" {
+				// it must have finished before we tried to wait for a not-exited->exited state change
+				i.t.Logf("timed out waiting for container %q: it had already exited; continuing", container.ID)
+				exitCode = inspectInfo.State.ExitCode
+				err = nil
+			}
+		}
+		if err != nil {
+			i.t.Errorf("Couldn't wait for container: %s: %v", container.ID, err)
+		}
 	}
 	ctx, cancel = getDefaultContext()
 	defer cancel()

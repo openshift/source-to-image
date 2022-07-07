@@ -10,17 +10,21 @@ import (
 
 	graphdriver "github.com/containers/storage/drivers"
 	"github.com/containers/storage/pkg/archive"
+	"github.com/containers/storage/pkg/directory"
 	"github.com/containers/storage/pkg/idtools"
 	"github.com/containers/storage/pkg/parsers"
 	"github.com/containers/storage/pkg/system"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/sirupsen/logrus"
+	"github.com/vbatts/tar-split/tar/storage"
 )
 
 var (
 	// CopyDir defines the copy method to use.
 	CopyDir = dirCopy
 )
+
+const defaultPerms = os.FileMode(0555)
 
 func init() {
 	graphdriver.Register("vfs", Init)
@@ -101,6 +105,21 @@ func (d *Driver) Cleanup() error {
 	return nil
 }
 
+type fileGetNilCloser struct {
+	storage.FileGetter
+}
+
+func (f fileGetNilCloser) Close() error {
+	return nil
+}
+
+// DiffGetter returns a FileGetCloser that can read files from the directory that
+// contains files for the layer differences. Used for direct access for tar-split.
+func (d *Driver) DiffGetter(id string) (graphdriver.FileGetCloser, error) {
+	p := d.dir(id)
+	return fileGetNilCloser{storage.NewPathFileGetter(p)}, nil
+}
+
 // CreateFromTemplate creates a layer with the same contents and parent as another layer.
 func (d *Driver) CreateFromTemplate(id, template string, templateIDMappings *idtools.IDMappings, parent string, parentIDMappings *idtools.IDMappings, opts *graphdriver.CreateOpts, readWrite bool) error {
 	if readWrite {
@@ -150,15 +169,17 @@ func (d *Driver) create(id, parent string, opts *graphdriver.CreateOpts, ro bool
 		}
 	}()
 
+	rootPerms := defaultPerms
 	if parent != "" {
 		st, err := system.Stat(d.dir(parent))
 		if err != nil {
 			return err
 		}
+		rootPerms = os.FileMode(st.Mode())
 		rootIDs.UID = int(st.UID())
 		rootIDs.GID = int(st.GID())
 	}
-	if err := idtools.MkdirAndChown(dir, 0755, rootIDs); err != nil {
+	if err := idtools.MkdirAndChown(dir, rootPerms, rootIDs); err != nil {
 		return err
 	}
 	labelOpts := []string{"level:s0"}
@@ -225,6 +246,12 @@ func (d *Driver) Put(id string) error {
 	// The vfs driver has no runtime resources (e.g. mounts)
 	// to clean up, so we don't need anything here
 	return nil
+}
+
+// ReadWriteDiskUsage returns the disk usage of the writable directory for the ID.
+// For VFS, it queries the directory for this ID.
+func (d *Driver) ReadWriteDiskUsage(id string) (*directory.DiskUsage, error) {
+	return directory.Usage(d.dir(id))
 }
 
 // Exists checks to see if the directory exists for the given id.

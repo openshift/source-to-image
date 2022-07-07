@@ -154,6 +154,9 @@ func (m *manifestSchema2) UpdatedImageNeedsLayerDiffIDs(options types.ManifestUp
 
 // UpdatedImage returns a types.Image modified according to options.
 // This does not change the state of the original Image object.
+// The returned error will be a manifest.ManifestLayerCompressionIncompatibilityError
+// if the CompressionOperation and CompressionAlgorithm specified in one or more
+// options.LayerInfos items is anything other than gzip.
 func (m *manifestSchema2) UpdatedImage(ctx context.Context, options types.ManifestUpdateOptions) (types.Image, error) {
 	copy := manifestSchema2{ // NOTE: This is not a deep copy, it still shares slices etc.
 		src:        m.src,
@@ -286,7 +289,7 @@ func (m *manifestSchema2) convertToManifestSchema1(ctx context.Context, options 
 				// and anyway this blob is so small that it’s easier to just copy it than to worry about figuring out another location where to get it.
 				info, err := dest.PutBlob(ctx, bytes.NewReader(GzippedEmptyLayer), emptyLayerBlobInfo, none.NoCache, false)
 				if err != nil {
-					return nil, errors.Wrap(err, "Error uploading empty layer")
+					return nil, errors.Wrap(err, "uploading empty layer")
 				}
 				if info.Digest != emptyLayerBlobInfo.Digest {
 					return nil, errors.Errorf("Internal error: Uploaded empty layer has digest %#v instead of %s", info.Digest, emptyLayerBlobInfo.Digest)

@@ -2,7 +2,6 @@ package graphdriver
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"os"
 
@@ -51,11 +50,14 @@ func chownByMapsMain() {
 	if len(toHost.UIDs()) == 0 && len(toHost.GIDs()) == 0 {
 		toHost = nil
 	}
+
+	chowner := newLChowner()
+
 	chown := func(path string, info os.FileInfo, _ error) error {
 		if path == "." {
 			return nil
 		}
-		return platformLChown(path, info, toHost, toContainer)
+		return chowner.LChown(path, info, toHost, toContainer)
 	}
 	if err := pwalk.Walk(".", chown); err != nil {
 		fmt.Fprintf(os.Stderr, "error during chown: %v", err)

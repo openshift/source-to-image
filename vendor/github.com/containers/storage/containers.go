@@ -1,11 +1,11 @@
 package storage
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/containers/storage/pkg/idtools"
@@ -84,7 +84,16 @@ type ContainerStore interface {
 
 	// SetNames updates the list of names associated with the container
 	// with the specified ID.
+	// Deprecated: Prone to race conditions, suggested alternatives are `AddNames` and `RemoveNames`.
 	SetNames(id string, names []string) error
+
+	// AddNames adds the supplied values to the list of names associated with the container with
+	// the specified id.
+	AddNames(id string, names []string) error
+
+	// RemoveNames removes the supplied values from the list of names associated with the container with
+	// the specified id.
+	RemoveNames(id string, names []string) error
 
 	// Get retrieves information about a container given an ID or name.
 	Get(id string) (*Container, error)
@@ -114,6 +123,7 @@ type containerStore struct {
 	byid       map[string]*Container
 	bylayer    map[string]*Container
 	byname     map[string]*Container
+	loadMut    sync.Mutex
 }
 
 func copyContainer(c *Container) *Container {
@@ -148,10 +158,20 @@ func (c *Container) ProcessLabel() string {
 }
 
 func (c *Container) MountOpts() []string {
-	if mountOpts, ok := c.Flags["MountOpts"].([]string); ok {
+	switch c.Flags["MountOpts"].(type) {
+	case []string:
+		return c.Flags["MountOpts"].([]string)
+	case []interface{}:
+		var mountOpts []string
+		for _, v := range c.Flags["MountOpts"].([]interface{}) {
+			if flag, ok := v.(string); ok {
+				mountOpts = append(mountOpts, flag)
+			}
+		}
 		return mountOpts
+	default:
+		return nil
 	}
-	return nil
 }
 
 func (r *containerStore) Containers() ([]Container, error) {
@@ -303,12 +323,21 @@ func (r *containerStore) Create(id string, names []string, image, layer, metadat
 	if options.MountOpts != nil {
 		options.Flags["MountOpts"] = append([]string{}, options.MountOpts...)
 	}
+	if options.Volatile {
+		options.Flags["Volatile"] = true
+	}
 	names = dedupeNames(names)
 	for _, name := range names {
 		if _, nameInUse := r.byname[name]; nameInUse {
 			return nil, errors.Wrapf(ErrDuplicateName,
 				fmt.Sprintf("the container name \"%s\" is already in use by \"%s\". You have to remove that container to be able to reuse that name.", name, r.byname[name].ID))
 		}
+	}
+	if err := hasOverlappingRanges(options.UIDMap); err != nil {
+		return nil, err
+	}
+	if err := hasOverlappingRanges(options.GIDMap); err != nil {
+		return nil, err
 	}
 	if err == nil {
 		container = &Container{
@@ -357,22 +386,40 @@ func (r *containerStore) removeName(container *Container, name string) {
 	container.Names = stringSliceWithoutValue(container.Names, name)
 }
 
+// Deprecated: Prone to race conditions, suggested alternatives are `AddNames` and `RemoveNames`.
 func (r *containerStore) SetNames(id string, names []string) error {
-	names = dedupeNames(names)
-	if container, ok := r.lookup(id); ok {
-		for _, name := range container.Names {
-			delete(r.byname, name)
-		}
-		for _, name := range names {
-			if otherContainer, ok := r.byname[name]; ok {
-				r.removeName(otherContainer, name)
-			}
-			r.byname[name] = container
-		}
-		container.Names = names
-		return r.Save()
+	return r.updateNames(id, names, setNames)
+}
+
+func (r *containerStore) AddNames(id string, names []string) error {
+	return r.updateNames(id, names, addNames)
+}
+
+func (r *containerStore) RemoveNames(id string, names []string) error {
+	return r.updateNames(id, names, removeNames)
+}
+
+func (r *containerStore) updateNames(id string, names []string, op updateNameOperation) error {
+	container, ok := r.lookup(id)
+	if !ok {
+		return ErrContainerUnknown
 	}
-	return ErrContainerUnknown
+	oldNames := container.Names
+	names, err := applyNameOperation(oldNames, names, op)
+	if err != nil {
+		return err
+	}
+	for _, name := range oldNames {
+		delete(r.byname, name)
+	}
+	for _, name := range names {
+		if otherContainer, ok := r.byname[name]; ok {
+			r.removeName(otherContainer, name)
+		}
+		r.byname[name] = container
+	}
+	container.Names = names
+	return r.Save()
 }
 
 func (r *containerStore) Delete(id string) error {
@@ -602,4 +649,15 @@ func (r *containerStore) TouchedSince(when time.Time) bool {
 
 func (r *containerStore) Locked() bool {
 	return r.lockfile.Locked()
+}
+
+func (r *containerStore) ReloadIfChanged() error {
+	r.loadMut.Lock()
+	defer r.loadMut.Unlock()
+
+	modified, err := r.Modified()
+	if err == nil && modified {
+		return r.Load()
+	}
+	return err
 }

@@ -75,10 +75,13 @@ func (index *OCI1Index) UpdateInstances(updates []ListUpdate) error {
 func (index *OCI1Index) ChooseInstance(ctx *types.SystemContext) (digest.Digest, error) {
 	wantedPlatforms, err := platform.WantedPlatforms(ctx)
 	if err != nil {
-		return "", errors.Wrapf(err, "error getting platform information %#v", ctx)
+		return "", errors.Wrapf(err, "getting platform information %#v", ctx)
 	}
 	for _, wantedPlatform := range wantedPlatforms {
 		for _, d := range index.Manifests {
+			if d.Platform == nil {
+				continue
+			}
 			imagePlatform := imgspecv1.Platform{
 				Architecture: d.Platform.Architecture,
 				OS:           d.Platform.OS,
@@ -97,7 +100,7 @@ func (index *OCI1Index) ChooseInstance(ctx *types.SystemContext) (digest.Digest,
 			return d.Digest, nil
 		}
 	}
-	return "", fmt.Errorf("no image found in image index for architecture %s, variant %s, OS %s", wantedPlatforms[0].Architecture, wantedPlatforms[0].Variant, wantedPlatforms[0].OS)
+	return "", fmt.Errorf("no image found in image index for architecture %s, variant %q, OS %s", wantedPlatforms[0].Architecture, wantedPlatforms[0].Variant, wantedPlatforms[0].OS)
 }
 
 // Serialize returns the index in a blob format.
@@ -105,7 +108,7 @@ func (index *OCI1Index) ChooseInstance(ctx *types.SystemContext) (digest.Digest,
 func (index *OCI1Index) Serialize() ([]byte, error) {
 	buf, err := json.Marshal(index)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error marshaling OCI1Index %#v", index)
+		return nil, errors.Wrapf(err, "marshaling OCI1Index %#v", index)
 	}
 	return buf, nil
 }
@@ -116,6 +119,7 @@ func OCI1IndexFromComponents(components []imgspecv1.Descriptor, annotations map[
 	index := OCI1Index{
 		imgspecv1.Index{
 			Versioned:   imgspec.Versioned{SchemaVersion: 2},
+			MediaType:   imgspecv1.MediaTypeImageIndex,
 			Manifests:   make([]imgspecv1.Descriptor, len(components)),
 			Annotations: dupStringStringMap(annotations),
 		},
@@ -192,12 +196,17 @@ func OCI1IndexFromManifest(manifest []byte) (*OCI1Index, error) {
 	index := OCI1Index{
 		Index: imgspecv1.Index{
 			Versioned:   imgspec.Versioned{SchemaVersion: 2},
+			MediaType:   imgspecv1.MediaTypeImageIndex,
 			Manifests:   []imgspecv1.Descriptor{},
 			Annotations: make(map[string]string),
 		},
 	}
 	if err := json.Unmarshal(manifest, &index); err != nil {
-		return nil, errors.Wrapf(err, "error unmarshaling OCI1Index %q", string(manifest))
+		return nil, errors.Wrapf(err, "unmarshaling OCI1Index %q", string(manifest))
+	}
+	if err := validateUnambiguousManifestFormat(manifest, imgspecv1.MediaTypeImageIndex,
+		allowedFieldManifests); err != nil {
+		return nil, err
 	}
 	return &index, nil
 }
