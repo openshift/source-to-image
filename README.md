@@ -136,9 +136,10 @@ In this case, the value of `FOO` environment variable will be set to `bar`.
 
 In case you want to use one of the official Dockerfile language stack images for
 your build you don't have do anything extra. S2I is capable of recognizing the
-container image with [ONBUILD](https://docs.docker.com/engine/reference/builder/#/onbuild) instructions and choosing the OnBuild strategy. This
-strategy will trigger all ONBUILD instructions and execute the assemble script
-(if it exists) as the last instruction.
+container image with [ONBUILD](https://docs.docker.com/engine/reference/builder/#/onbuild)
+instructions and choosing the OnBuild strategy. This strategy will trigger all
+ONBUILD instructions and execute the assemble script (if it exists) as the last
+instruction.
 
 Since the ONBUILD images usually don't provide any entrypoint, in order to use
 this build strategy you will have to provide one. You can either include the 'run',
@@ -175,11 +176,11 @@ If a `save-artifacts` script exists, a prior image already exists, and the `--in
 
 ## Installation
 
-##### Using `go get`
+##### Using `go install`
 
-You can install the s2i binary using `go get` which will download the source-to-image code into your `$GOPATH`, build the s2i binary, and install it into your `$GOPATH/bin`.
+You can install the s2i binary using `go install` which will download the source-to-image code to your Go module cache, build the s2i binary, and install it into your `$GOBIN`, or `$GOPATH/bin` if `$GOBIN` is not set, or `$HOME/go/bin` if the GOPATH environment variable is also not set.
 
-```$ go get github.com/openshift/source-to-image/cmd/s2i```
+```$ go install github.com/openshift/source-to-image/cmd/s2i@latest```
 
 ##### For Mac
 
@@ -193,7 +194,7 @@ Go to the [releases](https://github.com/openshift/source-to-image/releases/lates
 
 Unpack the downloaded tar with
 
-```$ tar -xvf release.tar.gz```.
+```$ tar -xvzf release.tar.gz```.
 
 You should now see an executable called s2i.  Either add the location of s2i to your PATH environment variable, or move it to a pre-existing directory in your PATH.
 For example,
@@ -213,13 +214,13 @@ contain "Trojan:Win32/Azden.A!cl".  This appears to be a common false alert for 
 
 ##### From source
 
-Assuming Go and Docker are installed and configured, execute the following commands:
+Assuming Go, Git, and Docker are installed and configured, execute the following commands:
 
 ```
-$ go get github.com/openshift/source-to-image
-$ cd ${GOPATH}/src/github.com/openshift/source-to-image
-$ export PATH=$PATH:${GOPATH}/src/github.com/openshift/source-to-image/_output/local/bin/linux/amd64/
-$ hack/build-go.sh
+$ git clone https://github.com/openshift/source-to-image
+$ cd source-to-image
+$ export PATH=${PATH}:`pwd`/_output/local/bin/`go env GOOS`/`go env GOHOSTARCH`/
+$ ./hack/build-go.sh
 ```
 
 ## Security
@@ -242,7 +243,7 @@ You can start using `s2i` right away (see [releases](https://github.com/openshif
 with the following test sources and publicly available images:
 
 ```
-$ s2i build https://github.com/openshift/ruby-hello-world centos/ruby-25-centos7 test-ruby-app
+$ s2i build https://github.com/openshift/ruby-hello-world registry.redhat.io/ubi8/ruby-27 test-ruby-app
 $ docker run --rm -i -p :8080 -t test-ruby-app
 ```
 
