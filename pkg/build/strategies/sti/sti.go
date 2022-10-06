@@ -32,7 +32,7 @@ import (
 
 const (
 	injectionResultFile = "/tmp/injection-result"
-	rmInjectionsScript  = "/tmp/rm-injections"
+	rmInjectionsScript  = "/var/rm-injections"
 )
 
 var (
