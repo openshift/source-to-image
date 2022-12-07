@@ -2,6 +2,7 @@ package graphdriver
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 
@@ -87,13 +88,13 @@ func ChownPathByMaps(path string, toContainer, toHost *idtools.IDMappings) error
 	cmd.Stdin = bytes.NewReader(config)
 	output, err := cmd.CombinedOutput()
 	if len(output) > 0 && err != nil {
-		return fmt.Errorf("%v: %s", err, string(output))
+		return fmt.Errorf("%s: %w", string(output), err)
 	}
 	if err != nil {
 		return err
 	}
 	if len(output) > 0 {
-		return fmt.Errorf("%s", string(output))
+		return errors.New(string(output))
 	}
 
 	return nil

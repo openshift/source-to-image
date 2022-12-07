@@ -2,9 +2,9 @@ package storage
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -21,14 +21,12 @@ import (
 	"github.com/containers/storage/pkg/idtools"
 	"github.com/containers/storage/pkg/ioutils"
 	"github.com/containers/storage/pkg/parsers"
-	"github.com/containers/storage/pkg/stringid"
 	"github.com/containers/storage/pkg/stringutils"
 	"github.com/containers/storage/pkg/system"
 	"github.com/containers/storage/types"
 	"github.com/hashicorp/go-multierror"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/selinux/go-selinux/label"
-	"github.com/pkg/errors"
 )
 
 type updateNameOperation int
@@ -37,6 +35,13 @@ const (
 	setNames updateNameOperation = iota
 	addNames
 	removeNames
+)
+
+const (
+	volatileFlag     = "Volatile"
+	mountLabelFlag   = "MountLabel"
+	processLabelFlag = "ProcessLabel"
+	mountOptsFlag    = "MountOpts"
 )
 
 var (
@@ -173,6 +178,7 @@ type Store interface {
 	GraphRoot() string
 	GraphDriverName() string
 	GraphOptions() []string
+	PullOptions() map[string]string
 	UIDMap() []idtools.IDMap
 	GIDMap() []idtools.IDMap
 
@@ -410,7 +416,7 @@ type Store interface {
 	SetImageBigData(id, key string, data []byte, digestManifest func([]byte) (digest.Digest, error)) error
 
 	// ListLayerBigData retrieves a list of the (possibly large) chunks of
-	// named data associated with an layer.
+	// named data associated with a layer.
 	ListLayerBigData(id string) ([]string, error)
 
 	// LayerBigData retrieves a (possibly large) chunk of named data
@@ -607,6 +613,7 @@ type store struct {
 	graphRoot       string
 	graphDriverName string
 	graphOptions    []string
+	pullOptions     map[string]string
 	uidMap          []idtools.IDMap
 	gidMap          []idtools.IDMap
 	autoUsernsUser  string
@@ -631,19 +638,24 @@ type store struct {
 // If StoreOptions `options` haven't been fully populated, then DefaultStoreOptions are used.
 //
 // These defaults observe environment variables:
-//  * `STORAGE_DRIVER` for the name of the storage driver to attempt to use
-//  * `STORAGE_OPTS` for the string of options to pass to the driver
+//   - `STORAGE_DRIVER` for the name of the storage driver to attempt to use
+//   - `STORAGE_OPTS` for the string of options to pass to the driver
 //
 // Note that we do some of this work in a child process.  The calling process's
 // main() function needs to import our pkg/reexec package and should begin with
 // something like this in order to allow us to properly start that child
 // process:
-//   if reexec.Init() {
-//       return
-//   }
+//
+//	if reexec.Init() {
+//	    return
+//	}
 func GetStore(options types.StoreOptions) (Store, error) {
+	defaultOpts, err := types.Options()
+	if err != nil {
+		return nil, err
+	}
 	if options.RunRoot == "" && options.GraphRoot == "" && options.GraphDriverName == "" && len(options.GraphDriverOptions) == 0 {
-		options = types.Options()
+		options = defaultOpts
 	}
 
 	if options.GraphRoot != "" {
@@ -674,11 +686,11 @@ func GetStore(options types.StoreOptions) (Store, error) {
 	// if passed a run-root or graph-root alone, the other should be defaulted only error if we have neither.
 	switch {
 	case options.RunRoot == "" && options.GraphRoot == "":
-		return nil, errors.Wrap(ErrIncompleteOptions, "no storage runroot or graphroot specified")
+		return nil, fmt.Errorf("no storage runroot or graphroot specified: %w", ErrIncompleteOptions)
 	case options.GraphRoot == "":
-		options.GraphRoot = types.Options().GraphRoot
+		options.GraphRoot = defaultOpts.GraphRoot
 	case options.RunRoot == "":
-		options.RunRoot = types.Options().RunRoot
+		options.RunRoot = defaultOpts.RunRoot
 	}
 
 	if err := os.MkdirAll(options.RunRoot, 0700); err != nil {
@@ -726,6 +738,7 @@ func GetStore(options types.StoreOptions) (Store, error) {
 		additionalGIDs:  nil,
 		usernsLock:      usernsLock,
 		disableVolatile: options.DisableVolatile,
+		pullOptions:     options.PullOptions,
 	}
 	if err := s.load(); err != nil {
 		return nil, err
@@ -774,6 +787,14 @@ func (s *store) GraphRoot() string {
 
 func (s *store) GraphOptions() []string {
 	return s.graphOptions
+}
+
+func (s *store) PullOptions() map[string]string {
+	cp := make(map[string]string, len(s.pullOptions))
+	for k, v := range s.pullOptions {
+		cp[k] = v
+	}
+	return cp
 }
 
 func (s *store) UIDMap() []idtools.IDMap {
@@ -1005,9 +1026,6 @@ func (s *store) PutLayer(id, parent string, names []string, mountLabel string, w
 	if err := rcstore.ReloadIfChanged(); err != nil {
 		return nil, -1, err
 	}
-	if id == "" {
-		id = stringid.GenerateRandomID()
-	}
 	if options == nil {
 		options = &LayerOptions{}
 	}
@@ -1086,10 +1104,6 @@ func (s *store) CreateLayer(id, parent string, names []string, mountLabel string
 }
 
 func (s *store) CreateImage(id string, names []string, layer, metadata string, options *ImageOptions) (*Image, error) {
-	if id == "" {
-		id = stringid.GenerateRandomID()
-	}
-
 	if layer != "" {
 		lstore, err := s.LayerStore()
 		if err != nil {
@@ -1195,6 +1209,11 @@ func (s *store) imageTopLayerForMapping(image *Image, ristore ROImageStore, crea
 				if layer == nil {
 					layer = cLayer
 					parentLayer = cParentLayer
+					if store != rlstore {
+						// The layer is in another store, so we cannot
+						// create a mapped version of it to the image.
+						createMappedLayer = false
+					}
 				}
 			}
 		}
@@ -1236,13 +1255,13 @@ func (s *store) imageTopLayerForMapping(image *Image, ristore ROImageStore, crea
 		layerOptions.TemplateLayer = layer.ID
 		mappedLayer, _, err := rlstore.Put("", parentLayer, nil, layer.MountLabel, nil, &layerOptions, false, nil, nil)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error creating an ID-mapped copy of layer %q", layer.ID)
+			return nil, fmt.Errorf("creating an ID-mapped copy of layer %q: %w", layer.ID, err)
 		}
 		if err = istore.addMappedTopLayer(image.ID, mappedLayer.ID); err != nil {
 			if err2 := rlstore.Delete(mappedLayer.ID); err2 != nil {
-				err = errors.WithMessage(err, fmt.Sprintf("error deleting layer %q: %v", mappedLayer.ID, err2))
+				err = fmt.Errorf("deleting layer %q: %v: %w", mappedLayer.ID, err2, err)
 			}
-			return nil, errors.Wrapf(err, "error registering ID-mapped layer with image %q", image.ID)
+			return nil, fmt.Errorf("registering ID-mapped layer with image %q: %w", image.ID, err)
 		}
 		layer = mappedLayer
 	}
@@ -1262,9 +1281,6 @@ func (s *store) CreateContainer(id string, names []string, image, layer, metadat
 	rlstore, err := s.LayerStore()
 	if err != nil {
 		return nil, err
-	}
-	if id == "" {
-		id = stringid.GenerateRandomID()
 	}
 
 	var imageTopLayer *Layer
@@ -1321,14 +1337,14 @@ func (s *store) CreateContainer(id string, names []string, image, layer, metadat
 			}
 		}
 		if cimage == nil {
-			return nil, errors.Wrapf(ErrImageUnknown, "error locating image with ID %q", id)
+			return nil, fmt.Errorf("locating image with ID %q: %w", image, ErrImageUnknown)
 		}
 		imageID = cimage.ID
 	}
 
 	if options.AutoUserNs {
 		var err error
-		options.UIDMap, options.GIDMap, err = s.getAutoUserNS(id, &options.AutoUserNsOpts, cimage)
+		options.UIDMap, options.GIDMap, err = s.getAutoUserNS(&options.AutoUserNsOpts, cimage)
 		if err != nil {
 			return nil, err
 		}
@@ -1390,11 +1406,10 @@ func (s *store) CreateContainer(id string, names []string, image, layer, metadat
 	if options.Flags == nil {
 		options.Flags = make(map[string]interface{})
 	}
-	plabel, _ := options.Flags["ProcessLabel"].(string)
-	mlabel, _ := options.Flags["MountLabel"].(string)
-	if (plabel == "" && mlabel != "") ||
-		(plabel != "" && mlabel == "") {
-		return nil, errors.Errorf("ProcessLabel and Mountlabel must either not be specified or both specified")
+	plabel, _ := options.Flags[processLabelFlag].(string)
+	mlabel, _ := options.Flags[mountLabelFlag].(string)
+	if (plabel == "" && mlabel != "") || (plabel != "" && mlabel == "") {
+		return nil, errors.New("ProcessLabel and Mountlabel must either not be specified or both specified")
 	}
 
 	if plabel == "" {
@@ -1402,11 +1417,12 @@ func (s *store) CreateContainer(id string, names []string, image, layer, metadat
 		if err != nil {
 			return nil, err
 		}
-		options.Flags["ProcessLabel"] = processLabel
-		options.Flags["MountLabel"] = mountLabel
+		mlabel = mountLabel
+		options.Flags[processLabelFlag] = processLabel
+		options.Flags[mountLabelFlag] = mountLabel
 	}
 
-	clayer, err := rlstore.Create(layer, imageTopLayer, nil, options.Flags["MountLabel"].(string), options.StorageOpt, layerOptions, true)
+	clayer, err := rlstore.Create(layer, imageTopLayer, nil, mlabel, options.StorageOpt, layerOptions, true)
 	if err != nil {
 		return nil, err
 	}
@@ -1552,7 +1568,7 @@ func (s *store) ListImageBigData(id string) ([]string, error) {
 			return bigDataNames, err
 		}
 	}
-	return nil, errors.Wrapf(ErrImageUnknown, "error locating image with ID %q", id)
+	return nil, fmt.Errorf("locating image with ID %q: %w", id, ErrImageUnknown)
 }
 
 func (s *store) ImageBigDataSize(id, key string) (int64, error) {
@@ -1630,9 +1646,9 @@ func (s *store) ImageBigData(id, key string) ([]byte, error) {
 		}
 	}
 	if foundImage {
-		return nil, errors.Wrapf(os.ErrNotExist, "error locating item named %q for image with ID %q (consider removing the image to resolve the issue)", key, id)
+		return nil, fmt.Errorf("locating item named %q for image with ID %q (consider removing the image to resolve the issue): %w", key, id, os.ErrNotExist)
 	}
-	return nil, errors.Wrapf(ErrImageUnknown, "error locating image with ID %q", id)
+	return nil, fmt.Errorf("locating image with ID %q: %w", id, ErrImageUnknown)
 }
 
 // ListLayerBigData retrieves a list of the (possibly large) chunks of
@@ -1663,9 +1679,9 @@ func (s *store) ListLayerBigData(id string) ([]string, error) {
 		}
 	}
 	if foundLayer {
-		return nil, errors.Wrapf(os.ErrNotExist, "error locating big data for layer with ID %q", id)
+		return nil, fmt.Errorf("locating big data for layer with ID %q: %w", id, os.ErrNotExist)
 	}
-	return nil, errors.Wrapf(ErrLayerUnknown, "error locating layer with ID %q", id)
+	return nil, fmt.Errorf("locating layer with ID %q: %w", id, ErrLayerUnknown)
 }
 
 // LayerBigData retrieves a (possibly large) chunk of named data
@@ -1696,9 +1712,9 @@ func (s *store) LayerBigData(id, key string) (io.ReadCloser, error) {
 		}
 	}
 	if foundLayer {
-		return nil, errors.Wrapf(os.ErrNotExist, "error locating item named %q for layer with ID %q", key, id)
+		return nil, fmt.Errorf("locating item named %q for layer with ID %q: %w", key, id, os.ErrNotExist)
 	}
-	return nil, errors.Wrapf(ErrLayerUnknown, "error locating layer with ID %q", id)
+	return nil, fmt.Errorf("locating layer with ID %q: %w", id, ErrLayerUnknown)
 }
 
 // SetLayerBigData stores a (possibly large) chunk of named data
@@ -1737,11 +1753,11 @@ func (s *store) ImageSize(id string) (int64, error) {
 
 	lstore, err := s.LayerStore()
 	if err != nil {
-		return -1, errors.Wrapf(err, "error loading primary layer store data")
+		return -1, fmt.Errorf("loading primary layer store data: %w", err)
 	}
 	lstores, err := s.ROLayerStores()
 	if err != nil {
-		return -1, errors.Wrapf(err, "error loading additional layer stores")
+		return -1, fmt.Errorf("loading additional layer stores: %w", err)
 	}
 	for _, s := range append([]ROLayerStore{lstore}, lstores...) {
 		store := s
@@ -1755,11 +1771,11 @@ func (s *store) ImageSize(id string) (int64, error) {
 	var imageStore ROBigDataStore
 	istore, err := s.ImageStore()
 	if err != nil {
-		return -1, errors.Wrapf(err, "error loading primary image store data")
+		return -1, fmt.Errorf("loading primary image store data: %w", err)
 	}
 	istores, err := s.ROImageStores()
 	if err != nil {
-		return -1, errors.Wrapf(err, "error loading additional image stores")
+		return -1, fmt.Errorf("loading additional image stores: %w", err)
 	}
 
 	// Look for the image's record.
@@ -1776,7 +1792,7 @@ func (s *store) ImageSize(id string) (int64, error) {
 		}
 	}
 	if image == nil {
-		return -1, errors.Wrapf(ErrImageUnknown, "error locating image with ID %q", id)
+		return -1, fmt.Errorf("locating image with ID %q: %w", id, ErrImageUnknown)
 	}
 
 	// Start with a list of the image's top layers, if it has any.
@@ -1806,7 +1822,7 @@ func (s *store) ImageSize(id string) (int64, error) {
 				}
 			}
 			if layer == nil {
-				return -1, errors.Wrapf(ErrLayerUnknown, "error locating layer with ID %q", layerID)
+				return -1, fmt.Errorf("locating layer with ID %q: %w", layerID, ErrLayerUnknown)
 			}
 			// The UncompressedSize is only valid if there's a digest to go with it.
 			n := layer.UncompressedSize
@@ -1814,7 +1830,7 @@ func (s *store) ImageSize(id string) (int64, error) {
 				// Compute the size.
 				n, err = layerStore.DiffSize("", layer.ID)
 				if err != nil {
-					return -1, errors.Wrapf(err, "size/digest of layer with ID %q could not be calculated", layerID)
+					return -1, fmt.Errorf("size/digest of layer with ID %q could not be calculated: %w", layerID, err)
 				}
 			}
 			// Count this layer.
@@ -1829,12 +1845,12 @@ func (s *store) ImageSize(id string) (int64, error) {
 	// Count big data items.
 	names, err := imageStore.BigDataNames(id)
 	if err != nil {
-		return -1, errors.Wrapf(err, "error reading list of big data items for image %q", id)
+		return -1, fmt.Errorf("reading list of big data items for image %q: %w", id, err)
 	}
 	for _, name := range names {
 		n, err := imageStore.BigDataSize(id, name)
 		if err != nil {
-			return -1, errors.Wrapf(err, "error reading size of big data item %q for image %q", name, id)
+			return -1, fmt.Errorf("reading size of big data item %q for image %q: %w", name, id, err)
 		}
 		size += n
 	}
@@ -1894,24 +1910,24 @@ func (s *store) ContainerSize(id string) (int64, error) {
 		if layer, err = store.Get(container.LayerID); err == nil {
 			size, err = store.DiffSize("", layer.ID)
 			if err != nil {
-				return -1, errors.Wrapf(err, "error determining size of layer with ID %q", layer.ID)
+				return -1, fmt.Errorf("determining size of layer with ID %q: %w", layer.ID, err)
 			}
 			break
 		}
 	}
 	if layer == nil {
-		return -1, errors.Wrapf(ErrLayerUnknown, "error locating layer with ID %q", container.LayerID)
+		return -1, fmt.Errorf("locating layer with ID %q: %w", container.LayerID, ErrLayerUnknown)
 	}
 
 	// Count big data items.
 	names, err := rcstore.BigDataNames(id)
 	if err != nil {
-		return -1, errors.Wrapf(err, "error reading list of big data items for container %q", container.ID)
+		return -1, fmt.Errorf("reading list of big data items for container %q: %w", container.ID, err)
 	}
 	for _, name := range names {
 		n, err := rcstore.BigDataSize(id, name)
 		if err != nil {
-			return -1, errors.Wrapf(err, "error reading size of big data item %q for container %q", name, id)
+			return -1, fmt.Errorf("reading size of big data item %q for container %q: %w", name, id, err)
 		}
 		size += n
 	}
@@ -2329,7 +2345,7 @@ func (s *store) DeleteLayer(id string) error {
 		}
 		for _, layer := range layers {
 			if layer.Parent == id {
-				return errors.Wrapf(ErrLayerHasChildren, "used by layer %v", layer.ID)
+				return fmt.Errorf("used by layer %v: %w", layer.ID, ErrLayerHasChildren)
 			}
 		}
 		images, err := ristore.Images()
@@ -2339,12 +2355,12 @@ func (s *store) DeleteLayer(id string) error {
 
 		for _, image := range images {
 			if image.TopLayer == id {
-				return errors.Wrapf(ErrLayerUsedByImage, "layer %v used by image %v", id, image.ID)
+				return fmt.Errorf("layer %v used by image %v: %w", id, image.ID, ErrLayerUsedByImage)
 			}
 			if stringutils.InSlice(image.MappedTopLayers, id) {
 				// No write access to the image store, fail before the layer is deleted
 				if _, ok := ristore.(*imageStore); !ok {
-					return errors.Wrapf(ErrLayerUsedByImage, "layer %v used by image %v", id, image.ID)
+					return fmt.Errorf("layer %v used by image %v: %w", id, image.ID, ErrLayerUsedByImage)
 				}
 			}
 		}
@@ -2354,11 +2370,11 @@ func (s *store) DeleteLayer(id string) error {
 		}
 		for _, container := range containers {
 			if container.LayerID == id {
-				return errors.Wrapf(ErrLayerUsedByContainer, "layer %v used by container %v", id, container.ID)
+				return fmt.Errorf("layer %v used by container %v: %w", id, container.ID, ErrLayerUsedByContainer)
 			}
 		}
 		if err := rlstore.Delete(id); err != nil {
-			return errors.Wrapf(err, "delete layer %v", id)
+			return fmt.Errorf("delete layer %v: %w", id, err)
 		}
 
 		// The check here is used to avoid iterating the images if we don't need to.
@@ -2367,7 +2383,7 @@ func (s *store) DeleteLayer(id string) error {
 			for _, image := range images {
 				if stringutils.InSlice(image.MappedTopLayers, id) {
 					if err = istore.removeMappedTopLayer(image.ID, id); err != nil {
-						return errors.Wrapf(err, "remove mapped top layer %v from image %v", id, image.ID)
+						return fmt.Errorf("remove mapped top layer %v from image %v: %w", id, image.ID, err)
 					}
 				}
 			}
@@ -2422,7 +2438,7 @@ func (s *store) DeleteImage(id string, commit bool) (layers []string, err error)
 			aContainerByImage[container.ImageID] = container.ID
 		}
 		if container, ok := aContainerByImage[id]; ok {
-			return nil, errors.Wrapf(ErrImageUsedByContainer, "Image used by %v", container)
+			return nil, fmt.Errorf("image used by %v: %w", container, ErrImageUsedByContainer)
 		}
 		images, err := ristore.Images()
 		if err != nil {
@@ -2781,8 +2797,10 @@ func (s *store) Mount(id, mountLabel string) (string, error) {
 		options.GidMaps = container.GIDMap
 		options.Options = container.MountOpts()
 		if !s.disableVolatile {
-			if v, found := container.Flags["Volatile"]; found {
-				options.Volatile = v.(bool)
+			if v, found := container.Flags[volatileFlag]; found {
+				if b, ok := v.(bool); ok {
+					options.Volatile = b
+				}
 			}
 		}
 	}
@@ -3040,7 +3058,7 @@ func (s *store) layersByMappedDigest(m func(ROLayerStore, digest.Digest) ([]Laye
 		}
 		storeLayers, err := m(store, d)
 		if err != nil {
-			if errors.Cause(err) != ErrLayerUnknown {
+			if !errors.Is(err, ErrLayerUnknown) {
 				return nil, err
 			}
 			continue
@@ -3055,14 +3073,14 @@ func (s *store) layersByMappedDigest(m func(ROLayerStore, digest.Digest) ([]Laye
 
 func (s *store) LayersByCompressedDigest(d digest.Digest) ([]Layer, error) {
 	if err := d.Validate(); err != nil {
-		return nil, errors.Wrapf(err, "error looking for compressed layers matching digest %q", d)
+		return nil, fmt.Errorf("looking for compressed layers matching digest %q: %w", d, err)
 	}
 	return s.layersByMappedDigest(func(r ROLayerStore, d digest.Digest) ([]Layer, error) { return r.LayersByCompressedDigest(d) }, d)
 }
 
 func (s *store) LayersByUncompressedDigest(d digest.Digest) ([]Layer, error) {
 	if err := d.Validate(); err != nil {
-		return nil, errors.Wrapf(err, "error looking for layers matching digest %q", d)
+		return nil, fmt.Errorf("looking for layers matching digest %q: %w", d, err)
 	}
 	return s.layersByMappedDigest(func(r ROLayerStore, d digest.Digest) ([]Layer, error) { return r.LayersByUncompressedDigest(d) }, d)
 }
@@ -3342,7 +3360,7 @@ func (s *store) Image(id string) (*Image, error) {
 			return image, nil
 		}
 	}
-	return nil, errors.Wrapf(ErrImageUnknown, "error locating image with ID %q", id)
+	return nil, fmt.Errorf("locating image with ID %q: %w", id, ErrImageUnknown)
 }
 
 func (s *store) ImagesByTopLayer(id string) ([]*Image, error) {
@@ -3400,7 +3418,7 @@ func (s *store) ImagesByDigest(d digest.Digest) ([]*Image, error) {
 			return nil, err
 		}
 		imageList, err := store.ByDigest(d)
-		if err != nil && errors.Cause(err) != ErrImageUnknown {
+		if err != nil && !errors.Is(err, ErrImageUnknown) {
 			return nil, err
 		}
 		images = append(images, imageList...)
@@ -3532,7 +3550,7 @@ func (s *store) FromContainerDirectory(id, file string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ioutil.ReadFile(filepath.Join(dir, file))
+	return os.ReadFile(filepath.Join(dir, file))
 }
 
 func (s *store) SetContainerRunDirectoryFile(id, file string, data []byte) error {
@@ -3552,7 +3570,7 @@ func (s *store) FromContainerRunDirectory(id, file string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ioutil.ReadFile(filepath.Join(dir, file))
+	return os.ReadFile(filepath.Join(dir, file))
 }
 
 func (s *store) Shutdown(force bool) ([]string, error) {
@@ -3596,7 +3614,7 @@ func (s *store) Shutdown(force bool) ([]string, error) {
 		}
 	}
 	if len(mounted) > 0 && err == nil {
-		err = errors.Wrap(ErrLayerUsedByContainer, "A layer is mounted")
+		err = fmt.Errorf("a layer is mounted: %w", ErrLayerUsedByContainer)
 	}
 	if err == nil {
 		err = s.graphDriver.Cleanup()
@@ -3710,7 +3728,10 @@ func ReloadConfigurationFile(configFile string, storeOptions *types.StoreOptions
 
 // GetDefaultMountOptions returns the default mountoptions defined in container/storage
 func GetDefaultMountOptions() ([]string, error) {
-	defaultStoreOptions := types.Options()
+	defaultStoreOptions, err := types.Options()
+	if err != nil {
+		return nil, err
+	}
 	return GetMountOptions(defaultStoreOptions.GraphDriverName, defaultStoreOptions.GraphDriverOptions)
 }
 
