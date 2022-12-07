@@ -77,7 +77,7 @@ func CreateLocalGitDirectoryWithSubmodule() (string, error) {
 		return "", err
 	}
 
-	err = cr.RunWithOptions(cmd.CommandOpts{Dir: dir}, "git", "submodule", "add", submodule, "submodule")
+	err = cr.RunWithOptions(cmd.CommandOpts{Dir: dir}, "git", "-c", "protocol.file.allow=always", "submodule", "add", submodule, "submodule")
 	if err != nil {
 		return "", err
 	}
