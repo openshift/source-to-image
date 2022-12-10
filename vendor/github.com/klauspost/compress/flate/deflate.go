@@ -84,24 +84,23 @@ type advancedState struct {
 	length         int
 	offset         int
 	maxInsertIndex int
+	chainHead      int
+	hashOffset     int
 
-	// Input hash chains
-	// hashHead[hashValue] contains the largest inputIndex with the specified hash value
-	// If hashHead[hashValue] is within the current window, then
-	// hashPrev[hashHead[hashValue] & windowMask] contains the previous index
-	// with the same hash value.
-	chainHead  int
-	hashHead   [hashSize]uint32
-	hashPrev   [windowSize]uint32
-	hashOffset int
+	ii uint16 // position of last match, intended to overflow to reset.
 
 	// input window: unprocessed data is window[index:windowEnd]
 	index          int
 	estBitsPerByte int
 	hashMatch      [maxMatchLength + minMatchLength]uint32
 
-	hash uint32
-	ii   uint16 // position of last match, intended to overflow to reset.
+	// Input hash chains
+	// hashHead[hashValue] contains the largest inputIndex with the specified hash value
+	// If hashHead[hashValue] is within the current window, then
+	// hashPrev[hashHead[hashValue] & windowMask] contains the previous index
+	// with the same hash value.
+	hashHead [hashSize]uint32
+	hashPrev [windowSize]uint32
 }
 
 type compressor struct {
@@ -132,7 +131,8 @@ func (d *compressor) fillDeflate(b []byte) int {
 	s := d.state
 	if s.index >= 2*windowSize-(minMatchLength+maxMatchLength) {
 		// shift the window by windowSize
-		copy(d.window[:], d.window[windowSize:2*windowSize])
+		//copy(d.window[:], d.window[windowSize:2*windowSize])
+		*(*[windowSize]byte)(d.window) = *(*[windowSize]byte)(d.window[windowSize:])
 		s.index -= windowSize
 		d.windowEnd -= windowSize
 		if d.blockStart >= windowSize {
@@ -259,7 +259,6 @@ func (d *compressor) fillWindow(b []byte) {
 			// Set the head of the hash chain to us.
 			s.hashHead[newH] = uint32(di + s.hashOffset)
 		}
-		s.hash = newH
 	}
 	// Update window information.
 	d.windowEnd += n
@@ -375,6 +374,12 @@ func hash4(b []byte) uint32 {
 	return hash4u(binary.LittleEndian.Uint32(b), hashBits)
 }
 
+// hash4 returns the hash of u to fit in a hash table with h bits.
+// Preferably h should be a constant and should always be <32.
+func hash4u(u uint32, h uint8) uint32 {
+	return (u * prime4bytes) >> (32 - h)
+}
+
 // bulkHash4 will compute hashes using the same
 // algorithm as hash4
 func bulkHash4(b []byte, dst []uint32) {
@@ -403,7 +408,6 @@ func (d *compressor) initDeflate() {
 	s.hashOffset = 1
 	s.length = minMatchLength - 1
 	s.offset = 0
-	s.hash = 0
 	s.chainHead = -1
 }
 
@@ -432,9 +436,6 @@ func (d *compressor) deflateLazy() {
 	}
 
 	s.maxInsertIndex = d.windowEnd - (minMatchLength - 1)
-	if s.index < s.maxInsertIndex {
-		s.hash = hash4(d.window[s.index:])
-	}
 
 	for {
 		if sanity && s.index > d.windowEnd {
@@ -466,11 +467,11 @@ func (d *compressor) deflateLazy() {
 		}
 		if s.index < s.maxInsertIndex {
 			// Update the hash
-			s.hash = hash4(d.window[s.index:])
-			ch := s.hashHead[s.hash&hashMask]
+			hash := hash4(d.window[s.index:])
+			ch := s.hashHead[hash]
 			s.chainHead = int(ch)
 			s.hashPrev[s.index&windowMask] = ch
-			s.hashHead[s.hash&hashMask] = uint32(s.index + s.hashOffset)
+			s.hashHead[hash] = uint32(s.index + s.hashOffset)
 		}
 		prevLength := s.length
 		prevOffset := s.offset
@@ -503,7 +504,7 @@ func (d *compressor) deflateLazy() {
 				end += prevIndex
 				idx := prevIndex + prevLength - (4 - checkOff)
 				h := hash4(d.window[idx:])
-				ch2 := int(s.hashHead[h&hashMask]) - s.hashOffset - prevLength + (4 - checkOff)
+				ch2 := int(s.hashHead[h]) - s.hashOffset - prevLength + (4 - checkOff)
 				if ch2 > minIndex {
 					length := matchLen(d.window[prevIndex:end], d.window[ch2:])
 					// It seems like a pure length metric is best.
@@ -547,7 +548,6 @@ func (d *compressor) deflateLazy() {
 					// Set the head of the hash chain to us.
 					s.hashHead[newH] = uint32(di + s.hashOffset)
 				}
-				s.hash = newH
 			}
 
 			s.index = newIndex
@@ -793,7 +793,6 @@ func (d *compressor) reset(w io.Writer) {
 		d.tokens.Reset()
 		s.length = minMatchLength - 1
 		s.offset = 0
-		s.hash = 0
 		s.ii = 0
 		s.maxInsertIndex = 0
 	}

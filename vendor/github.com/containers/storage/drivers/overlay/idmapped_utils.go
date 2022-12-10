@@ -5,13 +5,11 @@ package overlay
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"syscall"
 	"unsafe"
 
 	"github.com/containers/storage/pkg/idtools"
-	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -21,17 +19,6 @@ type attr struct {
 	propagation uint64
 	userNs      uint64
 }
-
-const (
-	// _MOUNT_ATTR_IDMAP - Idmap mount to @userns_fd in struct mount_attr
-	_MOUNT_ATTR_IDMAP = 0x00100000 //nolint:golint
-
-	// _OPEN_TREE_CLONE - Clone the source path mount
-	_OPEN_TREE_CLONE = 0x00000001 //nolint:golint
-
-	// _MOVE_MOUNT_F_EMPTY_PATH - Move the path referenced by the fd
-	_MOVE_MOUNT_F_EMPTY_PATH = 0x00000004 //nolint:golint
-)
 
 // openTree is a wrapper for the open_tree syscall
 func openTree(path string, flags int) (fd int, err error) {
@@ -62,7 +49,7 @@ func moveMount(fdTree int, target string) (err error) {
 		return err
 	}
 
-	flags := _MOVE_MOUNT_F_EMPTY_PATH
+	flags := unix.MOVE_MOUNT_F_EMPTY_PATH
 
 	_, _, e1 := syscall.Syscall6(uintptr(unix.SYS_MOVE_MOUNT),
 		uintptr(fdTree), uintptr(unsafe.Pointer(_p1)),
@@ -95,18 +82,18 @@ func createIDMappedMount(source, target string, pid int) error {
 	path := fmt.Sprintf("/proc/%d/ns/user", pid)
 	userNsFile, err := os.Open(path)
 	if err != nil {
-		return errors.Wrapf(err, "unable to get user ns file descriptor for %q", path)
+		return fmt.Errorf("unable to get user ns file descriptor for %q: %w", path, err)
 	}
 
 	var attr attr
-	attr.attrSet = _MOUNT_ATTR_IDMAP
+	attr.attrSet = unix.MOUNT_ATTR_IDMAP
 	attr.attrClr = 0
 	attr.propagation = 0
 	attr.userNs = uint64(userNsFile.Fd())
 
 	defer userNsFile.Close()
 
-	targetDirFd, err := openTree(source, _OPEN_TREE_CLONE|unix.AT_RECURSIVE)
+	targetDirFd, err := openTree(source, unix.OPEN_TREE_CLONE)
 	if err != nil {
 		return err
 	}
@@ -133,7 +120,7 @@ func createUsernsProcess(uidMaps []idtools.IDMap, gidMaps []idtools.IDMap) (int,
 		_ = unix.Prctl(unix.PR_SET_PDEATHSIG, uintptr(unix.SIGKILL), 0, 0, 0)
 		// just wait for the SIGKILL
 		for {
-			syscall.Syscall6(uintptr(unix.SYS_PAUSE), 0, 0, 0, 0, 0, 0)
+			syscall.Pause()
 		}
 	}
 	cleanupFunc := func() {
@@ -145,7 +132,7 @@ func createUsernsProcess(uidMaps []idtools.IDMap, gidMaps []idtools.IDMap) (int,
 		for _, m := range idmap {
 			mappings = mappings + fmt.Sprintf("%d %d %d\n", m.ContainerID, m.HostID, m.Size)
 		}
-		return ioutil.WriteFile(fmt.Sprintf("/proc/%d/%s", pid, fname), []byte(mappings), 0600)
+		return os.WriteFile(fmt.Sprintf("/proc/%d/%s", pid, fname), []byte(mappings), 0600)
 	}
 	if err := writeMappings("uid_map", uidMaps); err != nil {
 		cleanupFunc()

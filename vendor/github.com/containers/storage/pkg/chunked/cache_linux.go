@@ -3,9 +3,9 @@ package chunked
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"sort"
 	"strconv"
@@ -19,7 +19,6 @@ import (
 	"github.com/containers/storage/pkg/ioutils"
 	jsoniter "github.com/json-iterator/go"
 	digest "github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -117,7 +116,7 @@ func (c *layersCache) load() error {
 				continue
 			}
 			logrus.Warningf("Error reading cache file for layer %q: %v", r.ID, err)
-		} else if errors.Cause(err) != os.ErrNotExist {
+		} else if !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 
@@ -128,7 +127,7 @@ func (c *layersCache) load() error {
 		}
 		defer manifestReader.Close()
 
-		manifest, err := ioutil.ReadAll(manifestReader)
+		manifest, err := io.ReadAll(manifestReader)
 		if err != nil {
 			return fmt.Errorf("open manifest file for layer %q: %w", r.ID, err)
 		}
@@ -334,7 +333,7 @@ func writeCache(manifest []byte, id string, dest setBigData) (*metadata, error) 
 	}()
 	defer pipeReader.Close()
 
-	counter := ioutils.NewWriteCounter(ioutil.Discard)
+	counter := ioutils.NewWriteCounter(io.Discard)
 
 	r := io.TeeReader(pipeReader, counter)
 
