@@ -5,14 +5,14 @@
 #
 FROM registry.redhat.io/ubi8/ubi
 
-ENV VERSION=1.12.5 \
+ENV VERSION=1.18 \
     GOARM=5 \
     GOPATH=/go \
     GOROOT=/usr/local/go \
     S2I_VERSION_FILE=/go/src/github.com/openshift/source-to-image/sti-version-defs
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
-RUN yum install -y gcc zip && \
+RUN yum install -y git gcc zip && \
     yum clean all && \
     curl https://storage.googleapis.com/golang/go$VERSION.linux-amd64.tar.gz | tar -C /usr/local -xzf - && \
     touch /sti-build-image && \
