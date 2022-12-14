@@ -34,8 +34,8 @@ readonly S2I_CROSS_COMPILE_PLATFORMS=(
   linux/386
   linux/ppc64le
   linux/s390x
-  linux/aarch64
-  darwin/aarch64
+  #linux/aarch64
+  #darwin/aarch64
 )
 readonly S2I_CROSS_COMPILE_TARGETS=(
   cmd/s2i
