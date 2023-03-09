@@ -54,9 +54,14 @@ func (f *File) Download(config *api.Config) (*git.SourceInfo, error) {
 		return nil, lerr
 	}
 
+	isIgnored := func(path string) bool {
+		_, ok := filesToIgnore[path]
+		return ok
+	}
+
 	if copySrc != config.WorkingSourceDir {
 		f.KeepSymlinks(config.KeepSymlinks)
-		err := f.CopyContents(copySrc, config.WorkingSourceDir, filesToIgnore)
+		err = f.CopyContents(copySrc, config.WorkingSourceDir, isIgnored)
 		if err != nil {
 			return nil, err
 		}
