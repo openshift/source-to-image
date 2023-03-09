@@ -55,14 +55,22 @@ func (f *File) Download(config *api.Config) (*git.SourceInfo, error) {
 		return nil, lerr
 	}
 
-	exclude, err := regexp.Compile(config.ExcludeRegExp)
-	if err != nil {
-		return nil, err
-	}
+	var isIgnored func(path string) bool
 
-	isIgnored := func(path string) bool {
-		_, ok := filesToIgnore[path]
-		return ok || exclude.MatchString(path)
+	if config.ExcludeRegExp != "" {
+		exclude, err := regexp.Compile(config.ExcludeRegExp)
+		if err != nil {
+			return nil, err
+		}
+		isIgnored = func(path string) bool {
+			_, ok := filesToIgnore[path]
+			return ok || exclude.MatchString(path)
+		}
+	} else {
+		isIgnored = func(path string) bool {
+			_, ok := filesToIgnore[path]
+			return ok
+		}
 	}
 
 	if copySrc != config.WorkingSourceDir {
