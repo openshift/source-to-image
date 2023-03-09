@@ -38,6 +38,7 @@ fi
 
 OUTPUT_COVERAGE=${OUTPUT_COVERAGE-}
 
+
 if [[ -n "${OUTPUT_COVERAGE}" ]]; then
   # Iterate over packages to run coverage
   test_packages=( $test_packages )
