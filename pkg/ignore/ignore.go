@@ -3,6 +3,7 @@ package ignore
 import (
 	"bufio"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -57,18 +58,61 @@ func (b *DockerIgnorer) Ignore(config *api.Config) error {
 // .s2iignore file
 func (b *DockerIgnorer) GetListOfFilesToIgnore(workingDir string) (map[string]string, error) {
 	path := filepath.Join(workingDir, constants.IgnoreFile)
-	file, err := os.Open(path)
+	m, err := NewMatcher(path)
+	if err != nil {
+		return nil, err
+	}
+
+	filesToDel := make(map[string]string)
+	err = filepath.Walk(workingDir, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return nil // ignore error
+		}
+
+		rp, err := filepath.Rel(workingDir, path)
+		if err != nil {
+			return err
+		}
+
+		if rp == "." {
+			return nil
+		}
+
+		if m.Match(rp) {
+			filesToDel[path] = path
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return filesToDel, nil
+}
+
+type fileSpec struct {
+	glob    string
+	inverse bool
+}
+
+type Matcher struct {
+	specs []fileSpec
+}
+
+func NewMatcher(s2iIgnorePath string) (Matcher, error) {
+	file, err := os.Open(s2iIgnorePath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			log.Errorf("Ignore processing, problem opening %s because of %v\n", path, err)
-			return nil, err
+			log.Errorf("Ignore processing, problem opening %s because of %v\n", s2iIgnorePath, err)
+			return Matcher{}, err
 		}
 		log.V(4).Info(".s2iignore file does not exist")
-		return nil, nil
+		return Matcher{}, nil
 	}
 	defer file.Close()
 
-	filesToDel := make(map[string]string)
+	var specs []fileSpec
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		filespec := strings.Trim(scanner.Text(), " ")
@@ -84,53 +128,30 @@ func (b *DockerIgnorer) GetListOfFilesToIgnore(workingDir string) (map[string]st
 		log.V(4).Infof(".s2iignore lists a file spec of %s \n", filespec)
 
 		if strings.HasPrefix(filespec, "!") {
-			//remove any existing files to del that the override covers
-			// and patterns later on that undo this take precedence
-
-			// first, remove ! ... note, replace ! with */ did not have
-			// expected effect with filepath.Match
 			filespec = strings.Replace(filespec, "!", "", 1)
-
-			// iterate through and determine ones to leave in
-			dontDel := []string{}
-			for candidate := range filesToDel {
-				compare := filepath.Join(workingDir, filespec)
-				log.V(5).Infof("For %s  and %s see if it matches the spec  %s which means that we leave in\n", filespec, candidate, compare)
-				leaveIn, _ := filepath.Match(compare, candidate)
-				if leaveIn {
-					log.V(5).Infof("Not removing %s \n", candidate)
-					dontDel = append(dontDel, candidate)
-				} else {
-					log.V(5).Infof("No match for %s and %s \n", filespec, candidate)
-				}
-			}
-
-			// now remove any matches from files to delete list
-			for _, leaveIn := range dontDel {
-				delete(filesToDel, leaveIn)
-			}
+			specs = append(specs, fileSpec{
+				glob:    filespec,
+				inverse: true,
+			})
 			continue
 		}
 
-		globspec := filepath.Join(workingDir, filespec)
-		log.V(4).Infof("using globspec %s \n", globspec)
-		list, gerr := filepath.Glob(globspec)
-		if gerr != nil {
-			log.V(4).Infof("Glob failed with %v \n", gerr)
-		} else {
-			for _, globresult := range list {
-				log.V(5).Infof("Glob result %s \n", globresult)
-				filesToDel[globresult] = globresult
-
-			}
-		}
-
+		specs = append(specs, fileSpec{glob: filespec})
 	}
 
 	if err := scanner.Err(); err != nil && err != io.EOF {
 		log.Errorf("Problem processing .s2iignore %v \n", err)
-		return nil, err
+		return Matcher{}, err
 	}
+	return Matcher{specs: specs}, nil
+}
 
-	return filesToDel, nil
+func (m Matcher) Match(path string) bool {
+	var matches bool
+	for _, spec := range m.specs {
+		if ok, _ := filepath.Match(spec.glob, path); ok {
+			matches = !spec.inverse
+		}
+	}
+	return matches
 }

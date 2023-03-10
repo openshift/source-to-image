@@ -49,28 +49,24 @@ func (f *File) Download(config *api.Config) (*git.SourceInfo, error) {
 		return nil, RecursiveCopyError{error: fmt.Errorf("recursive copy requested, source directory %q contains the target directory %q", copySrc, config.WorkingSourceDir)}
 	}
 
-	di := ignore.DockerIgnorer{}
-	filesToIgnore, lerr := di.GetListOfFilesToIgnore(copySrc)
-	if lerr != nil {
-		return nil, lerr
+	m, err := ignore.NewMatcher(filepath.Join(copySrc, constants.IgnoreFile))
+	if err != nil {
+		return nil, fmt.Errorf("cannot proces ignore file: %w", err)
 	}
 
-	var isIgnored func(path string) bool
-
+	excludeRegExp := "$^"
 	if config.ExcludeRegExp != "" {
-		exclude, err := regexp.Compile(config.ExcludeRegExp)
-		if err != nil {
-			return nil, err
-		}
-		isIgnored = func(path string) bool {
-			_, ok := filesToIgnore[path]
-			return ok || exclude.MatchString(path)
-		}
-	} else {
-		isIgnored = func(path string) bool {
-			_, ok := filesToIgnore[path]
-			return ok
-		}
+		excludeRegExp = config.ExcludeRegExp
+	}
+
+	e, err := regexp.Compile(excludeRegExp)
+	if err != nil {
+		return nil, fmt.Errorf("cannot compile file exclusion re: %w", err)
+	}
+
+	isIgnored := func(path string) bool {
+		rp, _ := filepath.Rel(copySrc, path)
+		return m.Match(rp) || e.MatchString(rp)
 	}
 
 	if copySrc != config.WorkingSourceDir {
