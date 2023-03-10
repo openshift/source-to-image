@@ -3,6 +3,7 @@ package file
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/api/constants"
@@ -54,9 +55,27 @@ func (f *File) Download(config *api.Config) (*git.SourceInfo, error) {
 		return nil, lerr
 	}
 
+	var isIgnored func(path string) bool
+
+	if config.ExcludeRegExp != "" {
+		exclude, err := regexp.Compile(config.ExcludeRegExp)
+		if err != nil {
+			return nil, err
+		}
+		isIgnored = func(path string) bool {
+			_, ok := filesToIgnore[path]
+			return ok || exclude.MatchString(path)
+		}
+	} else {
+		isIgnored = func(path string) bool {
+			_, ok := filesToIgnore[path]
+			return ok
+		}
+	}
+
 	if copySrc != config.WorkingSourceDir {
 		f.KeepSymlinks(config.KeepSymlinks)
-		err := f.CopyContents(copySrc, config.WorkingSourceDir, filesToIgnore)
+		err = f.CopyContents(copySrc, config.WorkingSourceDir, isIgnored)
 		if err != nil {
 			return nil, err
 		}

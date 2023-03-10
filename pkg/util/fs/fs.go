@@ -26,8 +26,8 @@ type FileSystem interface {
 	MkdirAllWithPermissions(dirname string, perm os.FileMode) error
 	Mkdir(dirname string) error
 	Exists(file string) bool
-	Copy(sourcePath, targetPath string, filesToIgnore map[string]string) error
-	CopyContents(sourcePath, targetPath string, filesToIgnore map[string]string) error
+	Copy(sourcePath, targetPath string, isIgnored func(path string) bool) error
+	CopyContents(sourcePath, targetPath string, isIgnored func(path string) bool) error
 	RemoveDirectory(dir string) error
 	CreateWorkingDirectory() (string, error)
 	Open(file string) (io.ReadCloser, error)
@@ -184,8 +184,8 @@ func (h *fs) Exists(file string) bool {
 // If the source is a directory, then the destination has to be a directory and
 // we copy the content of the source directory to destination directory
 // recursively.
-func (h *fs) Copy(source string, dest string, filesToIgnore map[string]string) (err error) {
-	return doCopy(h, source, dest, filesToIgnore)
+func (h *fs) Copy(source string, dest string, isIgnored func(path string) bool) (err error) {
+	return doCopy(h, source, dest, isIgnored)
 }
 
 // KeepSymlinks configures fs to copy symlinks from src as symlinks to dst.
@@ -227,7 +227,7 @@ func handleSymlink(h FileSystem, source, dest string) (bool, error) {
 	return false, nil
 }
 
-func doCopy(h FileSystem, source, dest string, filesToIgnore map[string]string) error {
+func doCopy(h FileSystem, source, dest string, isIgnored func(path string) bool) error {
 	if handled, err := handleSymlink(h, source, dest); handled || err != nil {
 		return err
 	}
@@ -242,13 +242,13 @@ func doCopy(h FileSystem, source, dest string, filesToIgnore map[string]string) 
 	}
 
 	if sourceinfo.IsDir() {
-		_, ok := filesToIgnore[source]
+		ok := isIgnored != nil && isIgnored(source)
 		if ok {
 			log.V(5).Infof("Directory %q ignored", source)
 			return nil
 		}
 		log.V(5).Infof("D %q -> %q", source, dest)
-		return h.CopyContents(source, dest, filesToIgnore)
+		return h.CopyContents(source, dest, isIgnored)
 	}
 
 	destinfo, _ := h.Stat(dest)
@@ -260,7 +260,7 @@ func doCopy(h FileSystem, source, dest string, filesToIgnore map[string]string) 
 		return err
 	}
 	defer destfile.Close()
-	_, ok := filesToIgnore[source]
+	ok := isIgnored != nil && isIgnored(source)
 	if ok {
 		log.V(5).Infof("File %q ignored", source)
 		return nil
@@ -279,7 +279,7 @@ func doCopy(h FileSystem, source, dest string, filesToIgnore map[string]string) 
 // The source directory itself will not be copied, only its content. If you
 // want this behavior, the destination must include the source directory name.
 // It will skip any files provided in filesToIgnore from being copied
-func (h *fs) CopyContents(src string, dest string, filesToIgnore map[string]string) (err error) {
+func (h *fs) CopyContents(src, dest string, isIgnored func(path string) bool) (err error) {
 	sourceinfo, err := h.Stat(src)
 	if err != nil {
 		return err
@@ -300,7 +300,7 @@ func (h *fs) CopyContents(src string, dest string, filesToIgnore map[string]stri
 	for _, obj := range objects {
 		source := filepath.Join(src, obj.Name())
 		destination := filepath.Join(dest, obj.Name())
-		if err := h.Copy(source, destination, filesToIgnore); err != nil {
+		if err := h.Copy(source, destination, isIgnored); err != nil {
 			return err
 		}
 	}
