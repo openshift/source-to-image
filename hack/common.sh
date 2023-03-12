@@ -28,14 +28,15 @@ readonly S2I_GO_PACKAGE=github.com/openshift/source-to-image
 readonly S2I_GOPATH="${S2I_OUTPUT}/go"
 
 readonly S2I_CROSS_COMPILE_PLATFORMS=(
-  linux/amd64
   darwin/amd64
-  windows/amd64
+  darwin/arm64
   linux/386
+  linux/amd64
+  linux/arm64
   linux/ppc64le
   linux/s390x
-  linux/arm64
-  darwin/arm64
+  windows/amd64
+  windows/arm64
 )
 readonly S2I_CROSS_COMPILE_TARGETS=(
   cmd/s2i
@@ -268,7 +269,7 @@ s2i::build::place_bins() {
       local -a binaries=()
       for binary in "${targets[@]}"; do
         binary=$(basename $binary)
-        if [[ $platform == "windows/amd64" ]]; then
+        if [[ $platform =~ ^windows ]]; then
           binaries+=("${binary}.exe")
         else
           binaries+=("${binary}")
