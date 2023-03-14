@@ -294,7 +294,7 @@ s2i::build::place_bins() {
 
       # Create binary copies where specified.
       local suffix=""
-      if [[ $platform == "windows/amd64" ]]; then
+      if [[ $platform =~ ^windows ]]; then
         suffix=".exe"
       fi
       for linkname in "${S2I_BINARY_SYMLINKS[@]}"; do
@@ -306,20 +306,40 @@ s2i::build::place_bins() {
 
       # Create the release archive.
       local platform_segment="${platform//\//-}"
-      if [[ $platform == "windows/amd64" ]]; then
+      if [[ $platform =~ ^windows ]]; then
         local archive_name="${S2I_RELEASE_ARCHIVE}-${S2I_GIT_VERSION}-${S2I_GIT_COMMIT}-${platform_segment}.zip"
-        echo "++ Creating ${archive_name}"
+        echo "++ Creating archive ${archive_name}"
         for file in "${S2I_BINARY_RELEASE_WINDOWS[@]}"; do
           zip "${S2I_LOCAL_RELEASEPATH}/${archive_name}" -qj "${release_binpath}/${file}"
         done
+        pushd "${S2I_LOCAL_RELEASEPATH}" > /dev/null
+        echo "++ Generating sha512sum for ${archive_name}"
+        sha512sum "${archive_name}" >> "SHA512-SUMS.txt"
+        popd  > /dev/null
       else
         local archive_name="${S2I_RELEASE_ARCHIVE}-${S2I_GIT_VERSION}-${S2I_GIT_COMMIT}-${platform_segment}.tar.gz"
-        echo "++ Creating ${archive_name}"
+        echo "++ Creating archive ${archive_name}"
         tar -czf "${S2I_LOCAL_RELEASEPATH}/${archive_name}" -C "${release_binpath}" .
+        pushd "${S2I_LOCAL_RELEASEPATH}"  > /dev/null
+        echo "++ Generating sha512sum for ${archive_name}"
+        sha512sum "${archive_name}" >> "SHA512-SUMS.txt"
+        popd  > /dev/null
       fi
       rm -rf "${release_binpath}"
     done
+    if [[ -d "${S2I_LOCAL_RELEASEPATH}" ]]; then
+      pushd "${S2I_LOCAL_RELEASEPATH}"  > /dev/null
+      echo "++ Verifying sha512sums for archives"
+      if ! sha512sum -c "SHA512-SUMS.txt"; then
+        echo "!! Unable to verify sha512sum for archives"
+        exit 1
+      else
+        echo "++ Verified sha512sums for archives"
+      fi
+      popd  > /dev/null
+    fi
   )
+
 }
 
 # s2i::build::make_binary_symlinks makes symlinks for the sti
@@ -328,7 +348,7 @@ s2i::build::make_binary_symlinks() {
   platform=$(s2i::build::host_platform)
   if [[ -f "${S2I_OUTPUT_BINPATH}/${platform}/s2i" ]]; then
     for linkname in "${S2I_BINARY_SYMLINKS[@]}"; do
-      if [[ $platform == "windows/amd64" ]]; then
+      if [[ $platform =~ ^windows ]]; then
         cp "${S2I_OUTPUT_BINPATH}/${platform}/s2i.exe" "${S2I_OUTPUT_BINPATH}/${platform}/${linkname}.exe"
       else
         ln -sf s2i "${S2I_OUTPUT_BINPATH}/${platform}/${linkname}"
