@@ -287,12 +287,7 @@ func (h *fs) CopyContents(src, dest string, isIgnored func(path string) bool) (e
 	if err = os.MkdirAll(dest, sourceinfo.Mode()); err != nil {
 		return err
 	}
-	directory, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer directory.Close()
-	objects, err := directory.Readdir(-1)
+	objects, err := os.ReadDir(src)
 	if err != nil {
 		return err
 	}
