@@ -23,9 +23,11 @@ func (t *TimeoutError) Error() string {
 // case that the execution time of the function exceeded the provided duration.
 // The provided function is passed the timer in case it wishes to reset it.  If
 // so, the following pattern must be used:
-// if !timer.Stop() {
-//   return &TimeoutError{}
-// }
+//
+//	if !timer.Stop() {
+//	  return &TimeoutError{}
+//	}
+//
 // timer.Reset(timeout)
 func TimeoutAfter(t time.Duration, errorMsg string, f func(*time.Timer) error) error {
 	c := make(chan error, 1)
