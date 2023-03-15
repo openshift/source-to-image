@@ -19,9 +19,11 @@ import (
 type TomlConfig struct {
 	Storage struct {
 		Driver              string            `toml:"driver,omitempty"`
+		DriverPriority      []string          `toml:"driver_priority,omitempty"`
 		RunRoot             string            `toml:"runroot,omitempty"`
 		GraphRoot           string            `toml:"graphroot,omitempty"`
 		RootlessStoragePath string            `toml:"rootless_storage_path,omitempty"`
+		TransientStore      bool              `toml:"transient_store,omitempty"`
 		Options             cfg.OptionsConfig `toml:"options,omitempty"`
 	} `toml:"storage"`
 }
@@ -35,6 +37,14 @@ const (
 var (
 	defaultStoreOptionsOnce    sync.Once
 	loadDefaultStoreOptionsErr error
+	once                       sync.Once
+	storeOptions               StoreOptions
+	storeError                 error
+	defaultConfigFileSet       bool
+	// defaultConfigFile path to the system wide storage.conf file
+	defaultConfigFile = SystemConfigFile
+	// DefaultStoreOptions is a reasonable default set of options.
+	defaultStoreOptions StoreOptions
 )
 
 func loadDefaultStoreOptions() {
@@ -167,13 +177,28 @@ func defaultStoreOptionsIsolated(rootless bool, rootlessUID int, storageConf str
 	return storageOpts, nil
 }
 
-// DefaultStoreOptions returns the default storage ops for containers
-func DefaultStoreOptions(rootless bool, rootlessUID int) (StoreOptions, error) {
+// loadStoreOptions returns the default storage ops for containers
+func loadStoreOptions(rootless bool, rootlessUID int) (StoreOptions, error) {
 	storageConf, err := DefaultConfigFile(rootless && rootlessUID != 0)
 	if err != nil {
 		return defaultStoreOptions, err
 	}
 	return defaultStoreOptionsIsolated(rootless, rootlessUID, storageConf)
+}
+
+// UpdateOptions should be called iff container engine recieved a SIGHUP,
+// otherwise use DefaultStoreOptions
+func UpdateStoreOptions(rootless bool, rootlessUID int) (StoreOptions, error) {
+	storeOptions, storeError = loadStoreOptions(rootless, rootlessUID)
+	return storeOptions, storeError
+}
+
+// DefaultStoreOptions returns the default storage ops for containers
+func DefaultStoreOptions(rootless bool, rootlessUID int) (StoreOptions, error) {
+	once.Do(func() {
+		storeOptions, storeError = loadStoreOptions(rootless, rootlessUID)
+	})
+	return storeOptions, storeError
 }
 
 // StoreOptions is used for passing initialization options to GetStore(), for
@@ -189,10 +214,16 @@ type StoreOptions struct {
 	// RootlessStoragePath is the storage path for rootless users
 	// default $HOME/.local/share/containers/storage
 	RootlessStoragePath string `toml:"rootless_storage_path"`
-	// GraphDriverName is the underlying storage driver that we'll be
-	// using.  It only needs to be specified the first time a Store is
-	// initialized for a given RunRoot and GraphRoot.
+	// If the driver is not specified, the best suited driver will be picked
+	// either from GraphDriverPriority, if specified, or from the platform
+	// dependent priority list (in that order).
 	GraphDriverName string `json:"driver,omitempty"`
+	// GraphDriverPriority is a list of storage drivers that will be tried
+	// to initialize the Store for a given RunRoot and GraphRoot unless a
+	// GraphDriverName is set.
+	// This list can be used to define a custom order in which the drivers
+	// will be tried.
+	GraphDriverPriority []string `json:"driver-priority,omitempty"`
 	// GraphDriverOptions are driver-specific options.
 	GraphDriverOptions []string `json:"driver-options,omitempty"`
 	// UIDMap and GIDMap are used for setting up a container's root filesystem
@@ -211,6 +242,8 @@ type StoreOptions struct {
 	PullOptions map[string]string `toml:"pull_options"`
 	// DisableVolatile doesn't allow volatile mounts when it is set.
 	DisableVolatile bool `json:"disable-volatile,omitempty"`
+	// If transient, don't persist containers over boot (stores db in runroot)
+	TransientStore bool `json:"transient_store,omitempty"`
 }
 
 // isRootlessDriver returns true if the given storage driver is valid for containers running as non root
@@ -267,7 +300,11 @@ func getRootlessStorageOpts(rootlessUID int, systemOpts StoreOptions) (StoreOpti
 		}
 	}
 	if opts.GraphDriverName == "" {
-		opts.GraphDriverName = "vfs"
+		if len(systemOpts.GraphDriverPriority) == 0 {
+			opts.GraphDriverName = "vfs"
+		} else {
+			opts.GraphDriverPriority = systemOpts.GraphDriverPriority
+		}
 	}
 
 	if os.Getenv("STORAGE_OPTS") != "" {
@@ -336,7 +373,7 @@ func ReloadConfigurationFile(configFile string, storeOptions *StoreOptions) erro
 		}
 	} else {
 		if !os.IsNotExist(err) {
-			fmt.Printf("Failed to read %s %v\n", configFile, err.Error())
+			logrus.Warningf("Failed to read %s %v\n", configFile, err.Error())
 			return err
 		}
 	}
@@ -354,8 +391,9 @@ func ReloadConfigurationFile(configFile string, storeOptions *StoreOptions) erro
 		logrus.Warnf("Switching default driver from overlay2 to the equivalent overlay driver")
 		storeOptions.GraphDriverName = overlayDriver
 	}
-	if storeOptions.GraphDriverName == "" {
-		logrus.Errorf("The storage 'driver' option must be set in %s to guarantee proper operation", configFile)
+	storeOptions.GraphDriverPriority = config.Storage.DriverPriority
+	if storeOptions.GraphDriverName == "" && len(storeOptions.GraphDriverPriority) == 0 {
+		logrus.Warnf("The storage 'driver' option should be set in %s. A driver was picked automatically.", configFile)
 	}
 	if config.Storage.RunRoot != "" {
 		storeOptions.RunRoot = config.Storage.RunRoot
@@ -399,7 +437,7 @@ func ReloadConfigurationFile(configFile string, storeOptions *StoreOptions) erro
 	if config.Storage.Options.RemapUser != "" && config.Storage.Options.RemapGroup != "" {
 		mappings, err := idtools.NewIDMappings(config.Storage.Options.RemapUser, config.Storage.Options.RemapGroup)
 		if err != nil {
-			fmt.Printf("Error initializing ID mappings for %s:%s %v\n", config.Storage.Options.RemapUser, config.Storage.Options.RemapGroup, err)
+			logrus.Warningf("Error initializing ID mappings for %s:%s %v\n", config.Storage.Options.RemapUser, config.Storage.Options.RemapGroup, err)
 			return err
 		}
 		storeOptions.UIDMap = mappings.UIDs()
@@ -429,6 +467,7 @@ func ReloadConfigurationFile(configFile string, storeOptions *StoreOptions) erro
 	}
 
 	storeOptions.DisableVolatile = config.Storage.Options.DisableVolatile
+	storeOptions.TransientStore = config.Storage.TransientStore
 
 	storeOptions.GraphDriverOptions = append(storeOptions.GraphDriverOptions, cfg.GetGraphDriverOptions(storeOptions.GraphDriverName, config.Storage.Options)...)
 
