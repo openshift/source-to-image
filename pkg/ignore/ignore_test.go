@@ -185,9 +185,9 @@ func TestBasicDelKeepMix(t *testing.T) {
 /*
 Per the docker user guide, with a docker ignore list of:
 
-    LICENSE.*
-    !LICENSE.md
-    *.md
+	LICENSE.*
+	!LICENSE.md
+	*.md
 
 LICENSE.MD will NOT be kept, as *.md overrides !LICENSE.md
 */
