@@ -32,7 +32,16 @@ verify: build
 	hack/verify-gofmt.sh
 	hack/verify-deps.sh
 	hack/verify-bash-completion.sh
+	hack/verify-imports.sh
 .PHONY: verify
+
+imports: ## Organize imports in go files using goio. Example: make imports
+	go run ./vendor/github.com/go-imports-organizer/goio
+.PHONY: imports
+
+verify-imports: ## Run import verifications. Example: make verify-imports
+	hack/verify-imports.sh
+.PHONY: verify-imports
 
 # Build and run unit tests
 #

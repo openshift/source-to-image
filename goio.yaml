@@ -1,0 +1,28 @@
+# How the Red Hat OpenShift organization (github.com/openshift) organizes their imports
+# See https://github.com/go-imports-organizer/goio/blob/main/README.md for more information
+excludes:
+  - matchtype: name
+    regexp: ^\.git$
+  - matchtype: name
+    regexp: ^vendor$
+groups:
+  - description: standard
+    matchorder: 3
+    regexp:
+      - ^[a-zA-Z0-9\/]+$
+  - description: kubernetes
+    matchorder: 1
+    regexp:
+      - ^k8s\.io
+  - description: openshift
+    matchorder: 2
+    regexp:
+      - ^github\.com\/openshift
+  - description: other
+    matchorder: 4
+    regexp:
+      - '[a-zA-Z0-9]+\.[a-zA-Z0-9]+/'
+  - description: module
+    matchorder: 0
+    regexp:
+      - "%{module}%"

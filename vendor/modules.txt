@@ -200,6 +200,17 @@ github.com/docker/go-units
 # github.com/ghodss/yaml v1.0.0
 ## explicit
 github.com/ghodss/yaml
+# github.com/go-imports-organizer/goio v1.3.1
+## explicit; go 1.19
+github.com/go-imports-organizer/goio
+github.com/go-imports-organizer/goio/pkg/api/v1alpha1
+github.com/go-imports-organizer/goio/pkg/config
+github.com/go-imports-organizer/goio/pkg/excludes
+github.com/go-imports-organizer/goio/pkg/groups
+github.com/go-imports-organizer/goio/pkg/imports
+github.com/go-imports-organizer/goio/pkg/module
+github.com/go-imports-organizer/goio/pkg/sorter
+github.com/go-imports-organizer/goio/pkg/version
 # github.com/go-logr/logr v1.2.3
 ## explicit; go 1.16
 github.com/go-logr/logr
@@ -340,8 +351,11 @@ go.opencensus.io/internal
 go.opencensus.io/trace
 go.opencensus.io/trace/internal
 go.opencensus.io/trace/tracestate
-# golang.org/x/mod v0.8.0
+# golang.org/x/mod v0.9.0
 ## explicit; go 1.17
+golang.org/x/mod/internal/lazyregexp
+golang.org/x/mod/modfile
+golang.org/x/mod/module
 golang.org/x/mod/semver
 # golang.org/x/net v0.8.0
 ## explicit; go 1.17
@@ -414,6 +428,9 @@ google.golang.org/protobuf/runtime/protoimpl
 # gopkg.in/yaml.v2 v2.4.0
 ## explicit; go 1.15
 gopkg.in/yaml.v2
+# gopkg.in/yaml.v3 v3.0.1
+## explicit
+gopkg.in/yaml.v3
 # k8s.io/klog/v2 v2.90.1
 ## explicit; go 1.13
 k8s.io/klog/v2
