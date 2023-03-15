@@ -53,7 +53,7 @@ var (
 
 // init registers the windows graph drivers to the register.
 func init() {
-	graphdriver.Register("windowsfilter", InitFilter)
+	graphdriver.MustRegister("windowsfilter", InitFilter)
 	// DOCKER_WINDOWSFILTER_NOREEXEC allows for inline processing which makes
 	// debugging issues in the re-exec codepath significantly easier.
 	if os.Getenv("DOCKER_WINDOWSFILTER_NOREEXEC") != "" {
@@ -183,6 +183,11 @@ func (d *Driver) Exists(id string) bool {
 		return false
 	}
 	return result
+}
+
+// List layers (not including additional image stores)
+func (d *Driver) ListLayers() ([]string, error) {
+	return nil, graphdriver.ErrNotSupported
 }
 
 // CreateFromTemplate creates a layer with the same contents and parent as another layer.

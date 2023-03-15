@@ -33,7 +33,7 @@ type zfsOptions struct {
 const defaultPerms = os.FileMode(0555)
 
 func init() {
-	graphdriver.Register("zfs", Init)
+	graphdriver.MustRegister("zfs", Init)
 }
 
 // Logger returns a zfs logger implementation.
@@ -57,12 +57,12 @@ func Init(base string, opt graphdriver.Options) (graphdriver.Driver, error) {
 		return nil, fmt.Errorf("the 'zfs' command is not available: %w", graphdriver.ErrPrerequisites)
 	}
 
-	file, err := os.OpenFile("/dev/zfs", os.O_RDWR, 0600)
+	file, err := unix.Open("/dev/zfs", unix.O_RDWR, 0600)
 	if err != nil {
 		logger.Debugf("cannot open /dev/zfs: %v", err)
 		return nil, fmt.Errorf("could not open /dev/zfs: %v: %w", err, graphdriver.ErrPrerequisites)
 	}
-	defer file.Close()
+	defer unix.Close(file)
 
 	options, err := parseOptions(opt.DriverOptions)
 	if err != nil {
@@ -504,6 +504,11 @@ func (d *Driver) Exists(id string) bool {
 	d.Lock()
 	defer d.Unlock()
 	return d.filesystemsCache[d.zfsPath(id)]
+}
+
+// List layers (not including additional image stores)
+func (d *Driver) ListLayers() ([]string, error) {
+	return nil, graphdriver.ErrNotSupported
 }
 
 // AdditionalImageStores returns additional image stores supported by the driver
