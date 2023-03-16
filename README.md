@@ -1,11 +1,9 @@
+[![Go Reference](https://pkg.go.dev/badge/github.com/openshift/source-to-image.svg)](https://pkg.go.dev/github.com/openshift/source-to-image)
+[![License](https://img.shields.io/github/license/openshift/source-to-image.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
+
 # Source-To-Image (S2I)
 
 ## Overview
-
-[![Go Report Card](https://goreportcard.com/badge/github.com/openshift/source-to-image)](https://goreportcard.com/report/github.com/openshift/source-to-image)
-[![GoDoc](https://godoc.org/github.com/openshift/source-to-image?status.png)](https://godoc.org/github.com/openshift/source-to-image)
-[![Travis](https://travis-ci.org/openshift/source-to-image.svg?branch=master)](https://travis-ci.org/openshift/source-to-image)
-[![License](https://img.shields.io/github/license/openshift/source-to-image.svg)](https://www.apache.org/licenses/LICENSE-2.0.html)
 
 Source-to-Image (S2I) is a toolkit and workflow for building reproducible container images from source code. S2I produces
 ready-to-run images by injecting source code into a container image and letting the container prepare that source code for execution. By creating self-assembling **builder images**, you can version and control your build environments exactly like you use container images to version your runtime environments.
