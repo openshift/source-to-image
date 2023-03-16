@@ -30,19 +30,18 @@ all build:
 #   make verify
 verify: build
 	hack/verify-gofmt.sh
-	hack/verify-golint.sh
-	hack/verify-govet.sh
 	hack/verify-deps.sh
 	hack/verify-bash-completion.sh
+	hack/verify-imports.sh
 .PHONY: verify
 
-# Install travis dependencies
-#
-# Example:
-#   make install-travis
-install-travis:
-	hack/install-tools.sh
-.PHONY: install-travis
+imports: ## Organize imports in go files using goio. Example: make imports
+	go run ./vendor/github.com/go-imports-organizer/goio
+.PHONY: imports
+
+verify-imports: ## Run import verifications. Example: make verify-imports
+	hack/verify-imports.sh
+.PHONY: verify-imports
 
 # Build and run unit tests
 #
@@ -101,8 +100,3 @@ release: clean
 	hack/build-release.sh
 	hack/extract-release.sh
 .PHONY: release
-
-# Update dependencies
-update-deps:
-	hack/update-deps.sh
-.PHONY: update-deps

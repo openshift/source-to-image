@@ -1,0 +1,20 @@
+excludes:
+  - matchtype: name
+    regexp: ^\.git$
+  - matchtype: name
+    regexp: ^vendor$
+  - matchtype: name
+    regexp: ^testdata$
+groups:
+  - description: standard
+    matchorder: 1
+    regexp:
+      - ^[a-zA-Z0-9\/]+$
+  - description: other
+    matchorder: 2
+    regexp:
+      - '[a-zA-Z0-9]+\.[a-zA-Z0-9]+/'
+  - description: module
+    matchorder: 0
+    regexp:
+      - "%{module}%"

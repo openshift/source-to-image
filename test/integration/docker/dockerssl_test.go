@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	dockerapi "github.com/docker/docker/api"
+
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/docker"
 )

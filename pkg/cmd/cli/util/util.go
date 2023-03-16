@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
+	log "k8s.io/klog/v2"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-
-	log "k8s.io/klog/v2"
 
 	"github.com/openshift/source-to-image/pkg/api"
 )

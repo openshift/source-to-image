@@ -18,12 +18,12 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/klog/v2"
+
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerapi "github.com/docker/docker/client"
 	"golang.org/x/net/context"
-
-	"k8s.io/klog/v2"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/build"
