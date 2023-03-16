@@ -1,6 +1,6 @@
 module github.com/openshift/source-to-image
 
-go 1.18
+go 1.19
 
 require (
 	github.com/containers/image/v5 v5.24.2

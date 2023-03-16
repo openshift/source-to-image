@@ -1,8 +1,11 @@
 reviewers:
-  - adambkaplan
+  - apoorvajagtap
   - coreydaley
-  - gabemontero
+  - divyansh42
+  - jkhelil
+  - mbharatk
+  - otaviof
 approvers:
-  - adambkaplan
-  - bparees
   - coreydaley
+  - jkhelil
+  - otaviof

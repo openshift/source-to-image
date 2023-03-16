@@ -35,9 +35,16 @@ s2i::build::save_version_vars "${S2I_ROOT}/sti-version-defs"
 echo "++ Building release ${S2I_GIT_VERSION}"
 
 # Perform the build and release in podman or docker.
-$buildCmd run --rm -it -e RELEASE_LDFLAGS="-w -s" \
+if [[ "$(go env GOHOSTOS)" == "darwin" ]]; then
+    $buildCmd run --rm -it -e RELEASE_LDFLAGS="-w -s" \
+  -v "${S2I_ROOT}":/go/src/github.com/openshift/source-to-image \
+  openshift/sti-release
+  else
+    $buildCmd run --rm -it -e RELEASE_LDFLAGS="-w -s" \
   -v "${S2I_ROOT}":/go/src/github.com/openshift/source-to-image:z \
   openshift/sti-release
+  fi
+
 echo "${S2I_GIT_COMMIT}" > "${S2I_LOCAL_RELEASEPATH}/.commit"
 
 ret=$?; ENDTIME=$(date +%s); echo "$0 took $((ENDTIME - STARTTIME)) seconds"; exit "$ret"
