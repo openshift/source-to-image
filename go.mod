@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/containers/image/v5 v5.24.2
 	github.com/docker/distribution v2.8.1+incompatible
-	github.com/docker/docker v23.0.1+incompatible
+	github.com/docker/docker v23.0.3+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/go-imports-organizer/goio v1.3.1
 	github.com/moby/buildkit v0.11.4
