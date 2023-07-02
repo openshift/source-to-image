@@ -5,16 +5,15 @@ A customizable imports organizer for the Go programming language
 * [Summary](#summary)
 * [Command Line Tool](#command-line-tool)
 * [CI/CD Integration](#ci-cd-integration)
-* [Configuration](#configuration)
+* [Configuration File](#configuration-file)
 * [Profiling](#profiling)
 
 # <a name='summary'></a>Summary
 `goio` is a fully customizable Go imports organizer. The configuration
-is project based and is stored in a `goio.yaml` file in the root of your
+is project based and is stored in a `goio.yaml` file, e.g. in the root of your
 module's project folder alongside the `go.mod` file. For consistency
-the `goio.yaml` file should be committed to your projects vcs.
-
-
+the `goio.yaml` file should be committed to your projects vcs. If no `goio.yaml`
+file is found, `goio` will try to find one walking up the directory tree.
 
 # <a name='command-line-tool'></a>Command Line Tool
 

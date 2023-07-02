@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2022, Sylabs Inc. All rights reserved.
+// Copyright (c) 2018-2023, Sylabs Inc. All rights reserved.
 // Copyright (c) 2017, SingularityWare, LLC. All rights reserved.
 // Copyright (c) 2017, Yannick Cote <yhcote@gmail.com> All rights reserved.
 // This software is licensed under a 3-clause BSD license. Please consult the
@@ -69,7 +69,7 @@ func (f *FileImage) writeDataObject(i int, di DescriptorInput, t time.Time) erro
 
 	// If this is a primary partition, verify there isn't another primary partition, and update the
 	// architecture in the global header.
-	if p, ok := di.opts.extra.(partition); ok && p.Parttype == PartPrimSys {
+	if p, ok := di.opts.md.(partition); ok && p.Parttype == PartPrimSys {
 		if ds, err := f.GetDescriptors(WithPartitionType(PartPrimSys)); err == nil && len(ds) > 0 {
 			return errPrimaryPartition
 		}
@@ -251,7 +251,7 @@ func createContainer(rw ReadWriter, co createOpts) (*FileImage, error) {
 // By default, the image ID is set to a randomly generated value. To override this, consider using
 // OptCreateDeterministic or OptCreateWithID.
 //
-// By default, the image creation time is set to time.Now(). To override this, consider using
+// By default, the image creation time is set to the current time. To override this, consider using
 // OptCreateDeterministic or OptCreateWithTime.
 //
 // By default, the image will support a maximum of 48 descriptors. To change this, consider using
@@ -296,7 +296,7 @@ func CreateContainer(rw ReadWriter, opts ...CreateOpt) (*FileImage, error) {
 // By default, the image ID is set to a randomly generated value. To override this, consider using
 // OptCreateDeterministic or OptCreateWithID.
 //
-// By default, the image creation time is set to time.Now(). To override this, consider using
+// By default, the image creation time is set to the current time. To override this, consider using
 // OptCreateDeterministic or OptCreateWithTime.
 //
 // By default, the image will support a maximum of 48 descriptors. To change this, consider using
@@ -393,11 +393,13 @@ func OptAddWithTime(t time.Time) AddOpt {
 
 // AddObject adds a new data object and its descriptor into the specified SIF file.
 //
-// By default, the image modification time is set to the current time. To override this, consider
-// using OptAddDeterministic or OptAddWithTime.
+// By default, the image modification time is set to the current time for non-deterministic images,
+// and unset otherwise. To override this, consider using OptAddDeterministic or OptAddWithTime.
 func (f *FileImage) AddObject(di DescriptorInput, opts ...AddOpt) error {
-	ao := addOpts{
-		t: time.Now(),
+	ao := addOpts{}
+
+	if !f.isDeterministic() {
+		ao.t = time.Now()
 	}
 
 	for _, opt := range opts {
@@ -449,11 +451,7 @@ func (f *FileImage) isLast(d *rawDescriptor) bool {
 func (f *FileImage) truncateAt(d *rawDescriptor) error {
 	start := d.Offset + d.Size - d.SizeWithPadding
 
-	if err := f.rw.Truncate(start); err != nil {
-		return err
-	}
-
-	return nil
+	return f.rw.Truncate(start)
 }
 
 // deleteOpts accumulates object deletion options.
@@ -506,11 +504,14 @@ var errCompactNotImplemented = errors.New("compact not implemented for non-last 
 // To zero the data region of the deleted object, use OptDeleteZero. To compact the file following
 // object deletion, use OptDeleteCompact.
 //
-// By default, the image modification time is set to time.Now(). To override this, consider using
-// OptDeleteDeterministic or OptDeleteWithTime.
+// By default, the image modification time is set to the current time for non-deterministic images,
+// and unset otherwise. To override this, consider using OptDeleteDeterministic or
+// OptDeleteWithTime.
 func (f *FileImage) DeleteObject(id uint32, opts ...DeleteOpt) error {
-	do := deleteOpts{
-		t: time.Now(),
+	do := deleteOpts{}
+
+	if !f.isDeterministic() {
+		do.t = time.Now()
 	}
 
 	for _, opt := range opts {
@@ -596,11 +597,14 @@ var (
 
 // SetPrimPart sets the specified system partition to be the primary one.
 //
-// By default, the image/object modification times are set to time.Now(). To override this,
-// consider using OptSetDeterministic or OptSetWithTime.
+// By default, the image/object modification times are set to the current time for
+// non-deterministic images, and unset otherwise. To override this, consider using
+// OptSetDeterministic or OptSetWithTime.
 func (f *FileImage) SetPrimPart(id uint32, opts ...SetOpt) error {
-	so := setOpts{
-		t: time.Now(),
+	so := setOpts{}
+
+	if !f.isDeterministic() {
+		so.t = time.Now()
 	}
 
 	for _, opt := range opts {
@@ -618,58 +622,52 @@ func (f *FileImage) SetPrimPart(id uint32, opts ...SetOpt) error {
 		return fmt.Errorf("%w", errNotPartition)
 	}
 
-	fs, pt, arch, err := descr.getPartitionMetadata()
-	if err != nil {
+	var p partition
+	if err := descr.getExtra(binaryUnmarshaler{&p}); err != nil {
 		return fmt.Errorf("%w", err)
 	}
 
 	// if already primary system partition, nothing to do
-	if pt == PartPrimSys {
+	if p.Parttype == PartPrimSys {
 		return nil
 	}
 
-	if pt != PartSystem {
+	if p.Parttype != PartSystem {
 		return fmt.Errorf("%w", errNotSystem)
 	}
 
-	olddescr, err := f.getDescriptor(WithPartitionType(PartPrimSys))
-	if err != nil && !errors.Is(err, ErrObjectNotFound) {
-		return fmt.Errorf("%w", err)
-	}
-
-	f.h.Arch = getSIFArch(arch)
-
-	extra := partition{
-		Fstype:   fs,
-		Parttype: PartPrimSys,
-	}
-	copy(extra.Arch[:], arch)
-
-	if err := descr.setExtra(extra); err != nil {
-		return fmt.Errorf("%w", err)
-	}
-
-	if olddescr != nil {
-		oldfs, _, oldarch, err := olddescr.getPartitionMetadata()
-		if err != nil {
+	// If there is currently a primary system partition, update it.
+	if d, err := f.getDescriptor(WithPartitionType(PartPrimSys)); err == nil {
+		var p partition
+		if err := d.getExtra(binaryUnmarshaler{&p}); err != nil {
 			return fmt.Errorf("%w", err)
 		}
 
-		oldextra := partition{
-			Fstype:   oldfs,
-			Parttype: PartSystem,
-			Arch:     getSIFArch(oldarch),
-		}
+		p.Parttype = PartSystem
 
-		if err := olddescr.setExtra(oldextra); err != nil {
+		if err := d.setExtra(p); err != nil {
 			return fmt.Errorf("%w", err)
 		}
+
+		d.ModifiedAt = so.t.Unix()
+	} else if !errors.Is(err, ErrObjectNotFound) {
+		return fmt.Errorf("%w", err)
 	}
+
+	// Update the descriptor of the new primary system partition.
+	p.Parttype = PartPrimSys
+
+	if err := descr.setExtra(p); err != nil {
+		return fmt.Errorf("%w", err)
+	}
+
+	descr.ModifiedAt = so.t.Unix()
 
 	if err := f.writeDescriptors(); err != nil {
 		return fmt.Errorf("%w", err)
 	}
 
+	f.h.Arch = p.Arch
 	f.h.ModifiedAt = so.t.Unix()
 
 	if err := f.writeHeader(); err != nil {

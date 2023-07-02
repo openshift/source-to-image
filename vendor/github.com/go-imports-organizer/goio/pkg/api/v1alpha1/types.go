@@ -48,7 +48,7 @@ type Group struct {
 	MatchOrder int `yaml:"matchorder"`
 	// Description is a friendly name for the group
 	Description string `yaml:"description"`
-	// RegExp is the Regular Expression that is used to match against
+	// RegExp is the Regular Expression that is used to match against the imports Path.Value
 	RegExp []string `yaml:"regexp"`
 }
 

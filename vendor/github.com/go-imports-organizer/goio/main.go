@@ -76,8 +76,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Find a goio.yaml file in the current directory or any parent directory
+	path, found, err := findFile(currentDir, "goio.yaml")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error occurred finding configuration file goio.yaml: %v\n", err)
+		os.Exit(1)
+	}
+	if !found {
+		fmt.Fprint(os.Stderr, "error occurred finding configuration file goio.yaml\n")
+		os.Exit(1)
+	}
+
 	// Load the configuration from the goio.yaml file
-	conf, err := config.Load("goio.yaml")
+	conf, err := config.Load(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error occurred loading configuration file: %s\n", err.Error())
 		os.Exit(1)
@@ -182,5 +193,21 @@ func main() {
 			fmt.Fprintf(os.Stderr, "could not write memory profile: %s", err.Error())
 			os.Exit(1)
 		}
+	}
+}
+
+func findFile(path, fileName string) (string, bool, error) {
+	for {
+		_, err := os.Stat(filepath.Join(path, fileName))
+		if err == nil {
+			return filepath.Join(path, fileName), true, nil
+		}
+		if !os.IsNotExist(err) {
+			return "", false, err
+		}
+		if path == "/" {
+			return "", false, nil
+		}
+		path = filepath.Dir(path)
 	}
 }
