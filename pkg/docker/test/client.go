@@ -130,9 +130,9 @@ func (d *FakeDockerClient) CopyFromContainer(ctx context.Context, container, src
 }
 
 // ContainerWait pauses execution until a container exits.
-func (d *FakeDockerClient) ContainerWait(ctx context.Context, containerID string, condition dockercontainer.WaitCondition) (<-chan dockercontainer.ContainerWaitOKBody, <-chan error) {
+func (d *FakeDockerClient) ContainerWait(ctx context.Context, containerID string, condition dockercontainer.WaitCondition) (<-chan dockercontainer.WaitResponse, <-chan error) {
 	d.WaitContainerID = containerID
-	resultC := make(chan dockercontainer.ContainerWaitOKBody)
+	resultC := make(chan dockercontainer.WaitResponse)
 	errC := make(chan error, 1)
 
 	go func() {
@@ -141,7 +141,7 @@ func (d *FakeDockerClient) ContainerWait(ctx context.Context, containerID string
 			return
 		}
 
-		resultC <- dockercontainer.ContainerWaitOKBody{StatusCode: int64(d.WaitContainerResult)}
+		resultC <- dockercontainer.WaitResponse{StatusCode: int64(d.WaitContainerResult)}
 	}()
 
 	return resultC, errC
@@ -169,11 +169,11 @@ func (d *FakeDockerClient) ImageBuild(ctx context.Context, buildContext io.Reade
 }
 
 // ContainerCreate creates a new container based in the given configuration.
-func (d *FakeDockerClient) ContainerCreate(ctx context.Context, config *dockercontainer.Config, hostConfig *dockercontainer.HostConfig, networkingConfig *dockernetwork.NetworkingConfig, platform *v1.Platform, containerName string) (dockercontainer.ContainerCreateCreatedBody, error) {
+func (d *FakeDockerClient) ContainerCreate(ctx context.Context, config *dockercontainer.Config, hostConfig *dockercontainer.HostConfig, networkingConfig *dockernetwork.NetworkingConfig, platform *v1.Platform, containerName string) (dockercontainer.CreateResponse, error) {
 	d.Calls = append(d.Calls, "create")
 
 	d.Containers[containerName] = *config
-	return dockercontainer.ContainerCreateCreatedBody{}, nil
+	return dockercontainer.CreateResponse{}, nil
 }
 
 // ContainerInspect returns the container information.

@@ -122,12 +122,12 @@ type Docker interface {
 type Client interface {
 	ContainerAttach(ctx context.Context, container string, options dockertypes.ContainerAttachOptions) (dockertypes.HijackedResponse, error)
 	ContainerCommit(ctx context.Context, container string, options dockertypes.ContainerCommitOptions) (dockertypes.IDResponse, error)
-	ContainerCreate(ctx context.Context, config *dockercontainer.Config, hostConfig *dockercontainer.HostConfig, networkingConfig *dockernetwork.NetworkingConfig, platform *v1.Platform, containerName string) (dockercontainer.ContainerCreateCreatedBody, error)
+	ContainerCreate(ctx context.Context, config *dockercontainer.Config, hostConfig *dockercontainer.HostConfig, networkingConfig *dockernetwork.NetworkingConfig, platform *v1.Platform, containerName string) (dockercontainer.CreateResponse, error)
 	ContainerInspect(ctx context.Context, container string) (dockertypes.ContainerJSON, error)
 	ContainerRemove(ctx context.Context, container string, options dockertypes.ContainerRemoveOptions) error
 	ContainerStart(ctx context.Context, container string, options dockertypes.ContainerStartOptions) error
 	ContainerKill(ctx context.Context, container, signal string) error
-	ContainerWait(ctx context.Context, container string, condition dockercontainer.WaitCondition) (<-chan dockercontainer.ContainerWaitOKBody, <-chan error)
+	ContainerWait(ctx context.Context, container string, condition dockercontainer.WaitCondition) (<-chan dockercontainer.WaitResponse, <-chan error)
 	CopyToContainer(ctx context.Context, container, path string, content io.Reader, opts dockertypes.CopyToContainerOptions) error
 	CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, dockertypes.ContainerPathStat, error)
 	ImageBuild(ctx context.Context, buildContext io.Reader, options dockertypes.ImageBuildOptions) (dockertypes.ImageBuildResponse, error)
@@ -809,7 +809,7 @@ func determineCommandBaseDir(opts RunContainerOptions, imageMetadata *api.Image,
 }
 
 // dumpContainerInfo dumps information about a running container (port/IP/etc).
-func dumpContainerInfo(container dockercontainer.ContainerCreateCreatedBody, d *stiDocker, image string) {
+func dumpContainerInfo(container dockercontainer.CreateResponse, d *stiDocker, image string) {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
 

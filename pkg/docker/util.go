@@ -14,8 +14,8 @@ import (
 	"strings"
 
 	"github.com/docker/distribution/reference"
-	cliconfig "github.com/docker/docker/cli/config"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/homedir"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/api/constants"
@@ -37,6 +37,18 @@ var (
 // example in the .dockercfg file
 type AuthConfigurations struct {
 	Configs map[string]api.AuthConfig
+}
+
+// Dir returns the path to the configuration directory as specified by the DOCKER_CONFIG environment variable.
+// If DOCKER_CONFIG is unset, Dir returns ~/.docker .
+// Dir ignores XDG_CONFIG_HOME (same as the docker client).
+// TODO: this was copied from github.com/docker/docker/cli/config@v23.0.6
+func Dir() string {
+	configDir := os.Getenv("DOCKER_CONFIG")
+	if len(configDir) == 0 {
+		configDir = filepath.Join(homedir.Get(), ".docker")
+	}
+	return configDir
 }
 
 type dockerConfig struct {
@@ -427,7 +439,7 @@ func GetDefaultDockerConfig() *api.DockerConfig {
 
 	certPath := os.Getenv("DOCKER_CERT_PATH")
 	if certPath == "" {
-		certPath = cliconfig.Dir()
+		certPath = Dir()
 	}
 
 	cfg.CertFile = filepath.Join(certPath, "cert.pem")
