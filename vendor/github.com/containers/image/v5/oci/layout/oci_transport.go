@@ -100,7 +100,7 @@ func (ref ociReference) Transport() types.ImageTransport {
 // StringWithinTransport returns a string representation of the reference, which MUST be such that
 // reference.Transport().ParseReference(reference.StringWithinTransport()) returns an equivalent reference.
 // NOTE: The returned string is not promised to be equal to the original input to ParseReference;
-// e.g. default attribute values omitted by the user may be filled in in the return value, or vice versa.
+// e.g. default attribute values omitted by the user may be filled in the return value, or vice versa.
 // WARNING: Do not use the return value in the UI to describe an image, it does not contain the Transport().Name() prefix.
 func (ref ociReference) StringWithinTransport() string {
 	return fmt.Sprintf("%s:%s", ref.dir, ref.image)
@@ -188,13 +188,17 @@ func (ref ociReference) getManifestDescriptor() (imgspecv1.Descriptor, error) {
 		return index.Manifests[0], nil
 	} else {
 		// if image specified, look through all manifests for a match
+		var unsupportedMIMETypes []string
 		for _, md := range index.Manifests {
-			if md.MediaType != imgspecv1.MediaTypeImageManifest && md.MediaType != imgspecv1.MediaTypeImageIndex {
-				continue
-			}
 			if refName, ok := md.Annotations[imgspecv1.AnnotationRefName]; ok && refName == ref.image {
-				return md, nil
+				if md.MediaType == imgspecv1.MediaTypeImageManifest || md.MediaType == imgspecv1.MediaTypeImageIndex {
+					return md, nil
+				}
+				unsupportedMIMETypes = append(unsupportedMIMETypes, md.MediaType)
 			}
+		}
+		if len(unsupportedMIMETypes) != 0 {
+			return imgspecv1.Descriptor{}, fmt.Errorf("reference %q matches unsupported manifest MIME types %q", ref.image, unsupportedMIMETypes)
 		}
 	}
 	return imgspecv1.Descriptor{}, ImageNotFoundError{ref}

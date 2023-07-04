@@ -4,8 +4,6 @@ import (
 	"os"
 	"testing"
 
-	cliconfig "github.com/docker/docker/cli/config"
-
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/api/constants"
 	"github.com/openshift/source-to-image/pkg/util/user"
@@ -229,7 +227,7 @@ func TestGetDefaultDockerConfig(t *testing.T) {
 			envTLS:       "",
 
 			expectedHost:      "unix:///var/run/docker.sock",
-			expectedCertFile:  cliconfig.Dir() + "/cert.pem",
+			expectedCertFile:  Dir() + "/cert.pem",
 			expectedTLSVerify: false,
 			expectedTLS:       false,
 		},

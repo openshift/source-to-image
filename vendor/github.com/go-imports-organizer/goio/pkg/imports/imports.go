@@ -204,19 +204,21 @@ func Format(files *chan string, wg *sync.WaitGroup, groupRegExpMatchers []v1alph
 			if !bytes.Equal(oldFile, out) {
 				fmt.Fprintf(os.Stdout, "%s is not organized \n", path)
 			}
+
+		} else {
+			info, err = os.Stat(path)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "unable to stat %q: %s", path, err.Error())
+				continue
+			}
+			if !info.ModTime().Equal(oldModTime) {
+				fmt.Fprintf(os.Stderr, "%s was modified while formatting, cowardly refusing to overwrite", path)
+				continue
+			}
+			if err = os.WriteFile(path, out, info.Mode()); err != nil {
+				fmt.Fprintf(os.Stderr, "unable to write to path %q, %s", path, err.Error())
+			}
 		}
 
-		info, err = os.Stat(path)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "unable to stat %q: %s", path, err.Error())
-			continue
-		}
-		if !info.ModTime().Equal(oldModTime) {
-			fmt.Fprintf(os.Stderr, "%s was modified while formatting, cowardly refusing to overwrite", path)
-			continue
-		}
-		if err = os.WriteFile(path, out, info.Mode()); err != nil {
-			fmt.Fprintf(os.Stderr, "unable to write to path %q, %s", path, err.Error())
-		}
 	}
 }
