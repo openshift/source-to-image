@@ -106,7 +106,7 @@ func manageConfigImageLabelsBuildImageName(ctx context.Context, cfg *api.Config)
 		return err
 	}
 
-	cfg.BuilderImage = ref.DockerReference().Name()
+	cfg.BuilderImage = ref.DockerReference().String()
 
 	if cfg.BuilderImageLabels, err = getImageLabels(ctx, ref); err != nil {
 		return err
