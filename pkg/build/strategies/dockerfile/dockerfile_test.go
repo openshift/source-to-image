@@ -94,12 +94,9 @@ func TestGetImageScriptsDir(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
-		output, hasScripts := getImageScriptsDir(tc.Config)
+		output := getImageScriptsDir(tc.Config)
 		if output != tc.ExpectedDir {
 			t.Errorf("Expected image scripts dir %s to be %s", output, tc.ExpectedDir)
-		}
-		if hasScripts != tc.HasAllScripts {
-			t.Errorf("Expected has all scripts indicator:\n%v\nto be: %v", hasScripts, tc.HasAllScripts)
 		}
 	}
 }
