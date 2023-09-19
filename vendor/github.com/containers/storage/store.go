@@ -142,6 +142,7 @@ type Store interface {
 	// settings that were passed to GetStore() when the object was created.
 	RunRoot() string
 	GraphRoot() string
+	ImageStore() string
 	TransientStore() bool
 	GraphDriverName() string
 	GraphOptions() []string
@@ -862,6 +863,10 @@ func (s *store) GraphRoot() string {
 	return s.graphRoot
 }
 
+func (s *store) ImageStore() string {
+	return s.imageStoreDir
+}
+
 func (s *store) TransientStore() bool {
 	return s.transientStore
 }
@@ -1459,6 +1464,7 @@ func (s *store) PutLayer(id, parent string, names []string, mountLabel string, w
 	layerOptions := LayerOptions{
 		OriginalDigest:     options.OriginalDigest,
 		UncompressedDigest: options.UncompressedDigest,
+		Flags:              options.Flags,
 	}
 	if s.canUseShifting(uidMap, gidMap) {
 		layerOptions.IDMappingOptions = types.IDMappingOptions{HostUIDMapping: true, HostGIDMapping: true, UIDMap: nil, GIDMap: nil}

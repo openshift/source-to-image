@@ -53,11 +53,15 @@ func (index *OCI1IndexPublic) Instances() []digest.Digest {
 func (index *OCI1IndexPublic) Instance(instanceDigest digest.Digest) (ListUpdate, error) {
 	for _, manifest := range index.Manifests {
 		if manifest.Digest == instanceDigest {
-			return ListUpdate{
+			ret := ListUpdate{
 				Digest:    manifest.Digest,
 				Size:      manifest.Size,
 				MediaType: manifest.MediaType,
-			}, nil
+			}
+			ret.ReadOnly.Platform = manifest.Platform
+			ret.ReadOnly.Annotations = manifest.Annotations
+			ret.ReadOnly.CompressionAlgorithmNames = annotationsToCompressionAlgorithmNames(manifest.Annotations)
+			return ret, nil
 		}
 	}
 	return ListUpdate{}, fmt.Errorf("unable to find instance %s in OCI1Index", instanceDigest)
@@ -78,14 +82,29 @@ func (index *OCI1IndexPublic) UpdateInstances(updates []ListUpdate) error {
 	return index.editInstances(editInstances)
 }
 
-func addCompressionAnnotations(compressionAlgorithms []compression.Algorithm, annotationsMap map[string]string) {
+func annotationsToCompressionAlgorithmNames(annotations map[string]string) []string {
+	result := make([]string, 0, 1)
+	if annotations[OCI1InstanceAnnotationCompressionZSTD] == OCI1InstanceAnnotationCompressionZSTDValue {
+		result = append(result, compression.ZstdAlgorithmName)
+	}
+	// No compression was detected, hence assume instance has default compression `Gzip`
+	if len(result) == 0 {
+		result = append(result, compression.GzipAlgorithmName)
+	}
+	return result
+}
+
+func addCompressionAnnotations(compressionAlgorithms []compression.Algorithm, annotationsMap *map[string]string) {
 	// TODO: This should also delete the algorithm if map already contains an algorithm and compressionAlgorithm
 	// list has a different algorithm. To do that, we would need to modify the callers to always provide a reliable
 	// and full compressionAlghorithms list.
+	if *annotationsMap == nil && len(compressionAlgorithms) > 0 {
+		*annotationsMap = map[string]string{}
+	}
 	for _, algo := range compressionAlgorithms {
 		switch algo.Name() {
 		case compression.ZstdAlgorithmName:
-			annotationsMap[OCI1InstanceAnnotationCompressionZSTD] = OCI1InstanceAnnotationCompressionZSTDValue
+			(*annotationsMap)[OCI1InstanceAnnotationCompressionZSTD] = OCI1InstanceAnnotationCompressionZSTDValue
 		default:
 			continue
 		}
@@ -130,13 +149,13 @@ func (index *OCI1IndexPublic) editInstances(editInstances []ListEdit) error {
 					maps.Copy(index.Manifests[targetIndex].Annotations, editInstance.UpdateAnnotations)
 				}
 			}
-			addCompressionAnnotations(editInstance.UpdateCompressionAlgorithms, index.Manifests[targetIndex].Annotations)
+			addCompressionAnnotations(editInstance.UpdateCompressionAlgorithms, &index.Manifests[targetIndex].Annotations)
 		case ListOpAdd:
 			annotations := map[string]string{}
 			if editInstance.AddAnnotations != nil {
 				annotations = maps.Clone(editInstance.AddAnnotations)
 			}
-			addCompressionAnnotations(editInstance.AddCompressionAlgorithms, annotations)
+			addCompressionAnnotations(editInstance.AddCompressionAlgorithms, &annotations)
 			addedEntries = append(addedEntries, imgspecv1.Descriptor{
 				MediaType:   editInstance.AddMediaType,
 				Size:        editInstance.AddSize,
@@ -151,8 +170,19 @@ func (index *OCI1IndexPublic) editInstances(editInstances []ListEdit) error {
 		index.Manifests = append(index.Manifests, addedEntries...)
 	}
 	if len(addedEntries) != 0 || updatedAnnotations {
-		slices.SortStableFunc(index.Manifests, func(a, b imgspecv1.Descriptor) bool {
-			return !instanceIsZstd(a) && instanceIsZstd(b)
+		slices.SortStableFunc(index.Manifests, func(a, b imgspecv1.Descriptor) int {
+			// FIXME? With Go 1.21 and cmp.Compare available, turn instanceIsZstd into an integer score that can be compared, and generalizes
+			// into more algorithms?
+			aZstd := instanceIsZstd(a)
+			bZstd := instanceIsZstd(b)
+			switch {
+			case aZstd == bZstd:
+				return 0
+			case !aZstd: // Implies bZstd
+				return -1
+			default: // aZstd && !bZstd
+				return 1
+			}
 		})
 	}
 	return nil
@@ -209,13 +239,7 @@ func (index *OCI1IndexPublic) chooseInstance(ctx *types.SystemContext, preferGzi
 	for manifestIndex, d := range index.Manifests {
 		candidate := instanceCandidate{platformIndex: math.MaxInt, manifestPosition: manifestIndex, isZstd: instanceIsZstd(d), digest: d.Digest}
 		if d.Platform != nil {
-			imagePlatform := imgspecv1.Platform{
-				Architecture: d.Platform.Architecture,
-				OS:           d.Platform.OS,
-				OSVersion:    d.Platform.OSVersion,
-				OSFeatures:   slices.Clone(d.Platform.OSFeatures),
-				Variant:      d.Platform.Variant,
-			}
+			imagePlatform := ociPlatformClone(*d.Platform)
 			platformIndex := slices.IndexFunc(wantedPlatforms, func(wantedPlatform imgspecv1.Platform) bool {
 				return platform.MatchesPlatform(imagePlatform, wantedPlatform)
 			})
@@ -269,13 +293,8 @@ func OCI1IndexPublicFromComponents(components []imgspecv1.Descriptor, annotation
 	for i, component := range components {
 		var platform *imgspecv1.Platform
 		if component.Platform != nil {
-			platform = &imgspecv1.Platform{
-				Architecture: component.Platform.Architecture,
-				OS:           component.Platform.OS,
-				OSVersion:    component.Platform.OSVersion,
-				OSFeatures:   slices.Clone(component.Platform.OSFeatures),
-				Variant:      component.Platform.Variant,
-			}
+			platformCopy := ociPlatformClone(*component.Platform)
+			platform = &platformCopy
 		}
 		m := imgspecv1.Descriptor{
 			MediaType:   component.MediaType,
@@ -312,22 +331,15 @@ func (index *OCI1IndexPublic) ToSchema2List() (*Schema2ListPublic, error) {
 				Architecture: runtime.GOARCH,
 			}
 		}
-		converted := Schema2ManifestDescriptor{
+		components = append(components, Schema2ManifestDescriptor{
 			Schema2Descriptor{
 				MediaType: manifest.MediaType,
 				Size:      manifest.Size,
 				Digest:    manifest.Digest,
 				URLs:      slices.Clone(manifest.URLs),
 			},
-			Schema2PlatformSpec{
-				OS:           platform.OS,
-				Architecture: platform.Architecture,
-				OSFeatures:   slices.Clone(platform.OSFeatures),
-				OSVersion:    platform.OSVersion,
-				Variant:      platform.Variant,
-			},
-		}
-		components = append(components, converted)
+			schema2PlatformSpecFromOCIPlatform(*platform),
+		})
 	}
 	s2 := Schema2ListPublicFromComponents(components)
 	return s2, nil
@@ -400,4 +412,33 @@ func OCI1IndexFromManifest(manifest []byte) (*OCI1Index, error) {
 		return nil, err
 	}
 	return oci1IndexFromPublic(public), nil
+}
+
+// ociPlatformClone returns an independent copy of p.
+func ociPlatformClone(p imgspecv1.Platform) imgspecv1.Platform {
+	// The only practical way in Go to give read-only access to an array is to copy it.
+	// The only practical way in Go to copy a deep structure is to either do it manually field by field,
+	// or to use reflection (incl. a round-trip through JSON, which uses reflection).
+	//
+	// The combination of the two is just sad, and leads to code like this, which will
+	// need to be updated with every new Platform field.
+	return imgspecv1.Platform{
+		Architecture: p.Architecture,
+		OS:           p.OS,
+		OSVersion:    p.OSVersion,
+		OSFeatures:   slices.Clone(p.OSFeatures),
+		Variant:      p.Variant,
+	}
+}
+
+// schema2PlatformSpecFromOCIPlatform converts an OCI platform p to the schema2 structure.
+func schema2PlatformSpecFromOCIPlatform(p imgspecv1.Platform) Schema2PlatformSpec {
+	return Schema2PlatformSpec{
+		Architecture: p.Architecture,
+		OS:           p.OS,
+		OSVersion:    p.OSVersion,
+		OSFeatures:   slices.Clone(p.OSFeatures),
+		Variant:      p.Variant,
+		Features:     nil,
+	}
 }
