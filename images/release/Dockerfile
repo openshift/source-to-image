@@ -5,7 +5,7 @@
 #
 FROM registry.redhat.io/ubi8/ubi
 
-ENV VERSION=1.18 \
+ENV VERSION=1.20 \
     GOARM=5 \
     GOPATH=/go \
     GOROOT=/usr/local/go \
