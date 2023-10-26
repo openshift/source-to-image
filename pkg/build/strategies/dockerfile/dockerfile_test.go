@@ -28,8 +28,7 @@ func TestGetImageScriptsDir(t *testing.T) {
 			Config: &api.Config{
 				ScriptsURL: "image:///usr/some/dir",
 			},
-			ExpectedDir:   "/usr/some/dir",
-			HasAllScripts: true,
+			ExpectedDir: "/usr/some/dir",
 		},
 		{
 			Config: &api.Config{
@@ -61,8 +60,7 @@ func TestGetImageScriptsDir(t *testing.T) {
 				ScriptsURL:      "image:///usr/some/dir",
 				ImageScriptsURL: "image:///usr/other/dir",
 			},
-			ExpectedDir:   "/usr/some/dir",
-			HasAllScripts: true,
+			ExpectedDir: "/usr/some/dir",
 		},
 		{
 			Config: &api.Config{
@@ -70,8 +68,7 @@ func TestGetImageScriptsDir(t *testing.T) {
 					constants.ScriptsURLLabel: "image:///usr/some/dir",
 				},
 			},
-			ExpectedDir:   "/usr/some/dir",
-			HasAllScripts: true,
+			ExpectedDir: "/usr/some/dir",
 		},
 		{
 			Config: &api.Config{
@@ -80,8 +77,7 @@ func TestGetImageScriptsDir(t *testing.T) {
 					constants.DeprecatedScriptsURLLabel: "image:///usr/other/dir",
 				},
 			},
-			ExpectedDir:   "/usr/some/dir",
-			HasAllScripts: true,
+			ExpectedDir: "/usr/some/dir",
 		},
 		{
 			Config: &api.Config{
@@ -89,17 +85,13 @@ func TestGetImageScriptsDir(t *testing.T) {
 					constants.DeprecatedScriptsURLLabel: "image:///usr/some/dir",
 				},
 			},
-			ExpectedDir:   "/usr/some/dir",
-			HasAllScripts: true,
+			ExpectedDir: "/usr/some/dir",
 		},
 	}
 	for _, tc := range cases {
-		output, hasScripts := getImageScriptsDir(tc.Config)
+		output, _ := getImageScriptsDir(tc.Config, &(Dockerfile{}))
 		if output != tc.ExpectedDir {
 			t.Errorf("Expected image scripts dir %s to be %s", output, tc.ExpectedDir)
-		}
-		if hasScripts != tc.HasAllScripts {
-			t.Errorf("Expected has all scripts indicator:\n%v\nto be: %v", hasScripts, tc.HasAllScripts)
 		}
 	}
 }
