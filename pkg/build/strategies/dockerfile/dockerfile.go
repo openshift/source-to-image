@@ -127,8 +127,11 @@ func (builder *Dockerfile) CreateDockerfile(config *api.Config) error {
 	artifactsDestDir := filepath.Join(getDestination(config), "artifacts")
 	artifactsTar := sanitize(filepath.ToSlash(filepath.Join(defaultDestination, "artifacts.tar")))
 	// hasAllScripts indicates that we blindly trust all scripts are provided in the image scripts dir
-	imageScriptsDir := getImageScriptsDir(config)
-	providedScripts := scanScripts(filepath.Join(config.WorkingDir, builder.uploadScriptsDir))
+	imageScriptsDir, hasAllScripts := getImageScriptsDir(config)
+	var providedScripts map[string]bool
+	if !hasAllScripts {
+		providedScripts = scanScripts(filepath.Join(config.WorkingDir, builder.uploadScriptsDir))
+	}
 
 	if config.Incremental {
 		imageTag := util.FirstNonEmpty(config.IncrementalFromTag, config.Tag)
@@ -421,18 +424,18 @@ func getDestination(config *api.Config) string {
 
 // getImageScriptsDir returns the directory containing the builder image scripts and a bool
 // indicating that the directory is expected to contain all s2i scripts
-func getImageScriptsDir(config *api.Config) string {
+func getImageScriptsDir(config *api.Config) (string, bool) {
 	if strings.HasPrefix(config.ScriptsURL, "image://") {
-		return strings.TrimPrefix(config.ScriptsURL, "image://")
+		return strings.TrimPrefix(config.ScriptsURL, "image://"), true
 	}
 	scriptsURL, _ := util.AdjustConfigWithImageLabels(config)
 	if strings.HasPrefix(scriptsURL, "image://") {
-		return strings.TrimPrefix(scriptsURL, "image://")
+		return strings.TrimPrefix(scriptsURL, "image://"), true
 	}
 	if strings.HasPrefix(config.ImageScriptsURL, "image://") {
-		return strings.TrimPrefix(config.ImageScriptsURL, "image://")
+		return strings.TrimPrefix(config.ImageScriptsURL, "image://"), false
 	}
-	return defaultScriptsDir
+	return defaultScriptsDir, false
 }
 
 // scanScripts returns a map of provided s2i scripts
