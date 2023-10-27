@@ -2,6 +2,7 @@ package docker
 
 import (
 	"archive/tar"
+	"bufio"
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
@@ -995,7 +996,14 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 		if signal == syscall.SIGQUIT {
 			buf := make([]byte, 1<<16)
 			runtime.Stack(buf, true)
-			fmt.Printf("%s", buf)
+			f, err := os.Create("/var/log/s2i_docker_stack_trace.log")
+			if err != nil {
+				return
+			}
+			defer f.Close()
+			w := bufio.NewWriter(f)
+			w.Write(buf)
+			w.Flush()
 		}
 		os.Exit(2)
 	}

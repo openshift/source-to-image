@@ -139,7 +139,7 @@ type FileURLReader struct{}
 func (*FileURLReader) Read(url *url.URL) (io.ReadCloser, error) {
 	// for some reason url.Host may contain information about the ./ or ../ when
 	// specifying relative path, thus using that value as well
-	return os.Open(filepath.Join(url.Host, url.Path))
+	return os.Open(filepath.Clean(filepath.Join(url.Host, url.Path)))
 }
 
 // ImageReader just returns information the URL is from inside the image
