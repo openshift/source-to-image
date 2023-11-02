@@ -418,8 +418,8 @@ func getDestination(config *api.Config) string {
 	return destination
 }
 
-// getImageScriptsDir returns the directory containing the builder image scripts and a bool
-// indicating that the directory is expected to contain all s2i scripts
+// getImageScriptsDir returns the default directory which should contain the builder image scripts
+// as well as a map of booleans identifying  individual scripts provided in the repository as overrides
 func getImageScriptsDir(config *api.Config, builder *Dockerfile) (string, map[string]bool) {
 
 	// 1st priority is the command line parameter (pointing to an image, overrides it all)
