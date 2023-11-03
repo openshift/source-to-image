@@ -127,11 +127,7 @@ func (builder *Dockerfile) CreateDockerfile(config *api.Config) error {
 	artifactsDestDir := filepath.Join(getDestination(config), "artifacts")
 	artifactsTar := sanitize(filepath.ToSlash(filepath.Join(defaultDestination, "artifacts.tar")))
 	// hasAllScripts indicates that we blindly trust all scripts are provided in the image scripts dir
-	imageScriptsDir, hasAllScripts := getImageScriptsDir(config)
-	var providedScripts map[string]bool
-	if !hasAllScripts {
-		providedScripts = scanScripts(filepath.Join(config.WorkingDir, builder.uploadScriptsDir))
-	}
+	imageScriptsDir, providedScripts := getImageScriptsDir(config, builder)
 
 	if config.Incremental {
 		imageTag := util.FirstNonEmpty(config.IncrementalFromTag, config.Tag)
@@ -422,20 +418,29 @@ func getDestination(config *api.Config) string {
 	return destination
 }
 
-// getImageScriptsDir returns the directory containing the builder image scripts and a bool
-// indicating that the directory is expected to contain all s2i scripts
-func getImageScriptsDir(config *api.Config) (string, bool) {
+// getImageScriptsDir returns the default directory which should contain the builder image scripts
+// as well as a map of booleans identifying  individual scripts provided in the repository as overrides
+func getImageScriptsDir(config *api.Config, builder *Dockerfile) (string, map[string]bool) {
+
+	// 1st priority is the command line parameter (pointing to an image, overrides it all)
 	if strings.HasPrefix(config.ScriptsURL, "image://") {
-		return strings.TrimPrefix(config.ScriptsURL, "image://"), true
+		return strings.TrimPrefix(config.ScriptsURL, "image://"), make(map[string]bool)
 	}
+
+	// 2nd priority (the source code repository), collect the locations
+	providedScripts := scanScripts(filepath.Join(config.WorkingDir, builder.uploadScriptsDir))
+
+	// 3rd priority (the builder image), collect the locations
 	scriptsURL, _ := util.AdjustConfigWithImageLabels(config)
 	if strings.HasPrefix(scriptsURL, "image://") {
-		return strings.TrimPrefix(scriptsURL, "image://"), true
+		return strings.TrimPrefix(scriptsURL, "image://"), providedScripts
 	}
 	if strings.HasPrefix(config.ImageScriptsURL, "image://") {
-		return strings.TrimPrefix(config.ImageScriptsURL, "image://"), false
+		return strings.TrimPrefix(config.ImageScriptsURL, "image://"), providedScripts
 	}
-	return defaultScriptsDir, false
+
+	// If all else fails, use the default scripts dir
+	return defaultScriptsDir, providedScripts
 }
 
 // scanScripts returns a map of provided s2i scripts
