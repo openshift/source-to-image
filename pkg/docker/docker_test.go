@@ -12,6 +12,7 @@ import (
 
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/registry"
 	dockerstrslice "github.com/docker/docker/api/types/strslice"
 
 	"github.com/openshift/source-to-image/pkg/api/constants"
@@ -31,7 +32,7 @@ func TestContainerName(t *testing.T) {
 func getDocker(client Client) *stiDocker {
 	return &stiDocker{
 		client:   client,
-		pullAuth: dockertypes.AuthConfig{},
+		pullAuth: registry.AuthConfig{},
 	}
 }
 
