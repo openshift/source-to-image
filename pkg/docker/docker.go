@@ -22,6 +22,7 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockernetwork "github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/registry"
 	dockerapi "github.com/docker/docker/client"
 	dockermessage "github.com/docker/docker/pkg/jsonmessage"
 	dockerstdcopy "github.com/docker/docker/pkg/stdcopy"
@@ -140,7 +141,7 @@ type Client interface {
 
 type stiDocker struct {
 	client   Client
-	pullAuth dockertypes.AuthConfig
+	pullAuth registry.AuthConfig
 }
 
 // InspectImage returns the image information and its raw representation.
@@ -238,12 +239,19 @@ func (rco RunContainerOptions) asDockerHostConfig() dockercontainer.HostConfig {
 	return hostConfig
 }
 
+type configWrapper struct {
+	*dockercontainer.Config
+	Name             string
+	HostConfig       *dockercontainer.HostConfig
+	NetworkingConfig *dockernetwork.NetworkingConfig
+}
+
 // asDockerCreateContainerOptions converts a RunContainerOptions into a
 // ContainerCreateConfig understood by the docker client
-func (rco RunContainerOptions) asDockerCreateContainerOptions() dockertypes.ContainerCreateConfig {
+func (rco RunContainerOptions) asDockerCreateContainerOptions() configWrapper {
 	config := rco.asDockerConfig()
 	hostConfig := rco.asDockerHostConfig()
-	return dockertypes.ContainerCreateConfig{
+	return configWrapper{
 		Name:       containerName(rco.Image),
 		Config:     &config,
 		HostConfig: &hostConfig,
@@ -310,14 +318,24 @@ func NewEngineAPIClient(config *api.DockerConfig) (*dockerapi.Client, error) {
 			},
 		}
 	}
-	return dockerapi.NewClient(config.Endpoint, os.Getenv("DOCKER_API_VERSION"), httpClient, nil)
+	// Create a new docker client with the provided host endpoint and HTTP Client.
+	// By default, this client will negotiate the Docker API version to use with the backend engine on the first request.
+	// The API version to use can be fixed by setting the DOCKER_API_VERSION environment variable.
+	// See https://pkg.go.dev/github.com/docker/docker/client#WithAPIVersionNegotiation and
+	// https://pkg.go.dev/github.com/docker/docker/client#WithVersionFromEnv for more information
+	return dockerapi.NewClientWithOpts(
+		dockerapi.WithHost(config.Endpoint),
+		dockerapi.WithHTTPClient(httpClient),
+		dockerapi.WithAPIVersionNegotiation(),
+		dockerapi.WithVersionFromEnv(),
+	)
 }
 
 // New creates a new implementation of the STI Docker interface
 func New(client Client, auth api.AuthConfig) Docker {
 	return &stiDocker{
 		client: client,
-		pullAuth: dockertypes.AuthConfig{
+		pullAuth: registry.AuthConfig{
 			Username:      auth.Username,
 			Password:      auth.Password,
 			Email:         auth.Email,
@@ -510,7 +528,7 @@ func (d *stiDocker) CheckImage(name string) (*api.Image, error) {
 	return nil, nil
 }
 
-func base64EncodeAuth(auth dockertypes.AuthConfig) (string, error) {
+func base64EncodeAuth(auth registry.AuthConfig) (string, error) {
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(auth); err != nil {
 		return "", err
