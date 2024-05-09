@@ -37,11 +37,11 @@ echo "++ Building release ${S2I_GIT_VERSION}"
 # Perform the build and release in podman or docker.
 if [[ "$(go env GOHOSTOS)" == "darwin" ]]; then
     $buildCmd run --rm -it -e RELEASE_LDFLAGS="-w -s" \
-  -v "${S2I_ROOT}":/go/src/github.com/openshift/source-to-image \
+  -v "${S2I_ROOT}":/opt/app-root/src/source-to-image \
   openshift/sti-release
   else
     $buildCmd run --rm -it -e RELEASE_LDFLAGS="-w -s" \
-  -v "${S2I_ROOT}":/go/src/github.com/openshift/source-to-image:z \
+  -v "${S2I_ROOT}":/opt/app-root/src/source-to-image:z \
   openshift/sti-release
   fi
 

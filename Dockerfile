@@ -1,24 +1,20 @@
-FROM openshift/origin-release:golang-1.20 AS builder
+FROM registry.redhat.io/ubi9/go-toolset:1.20.12 AS builder
 
 ENV S2I_GIT_VERSION="" \
     S2I_GIT_MAJOR="" \
     S2I_GIT_MINOR=""
 
-
-WORKDIR /tmp/source-to-image
 COPY . .
 
-USER root
-
-RUN make && cp _output/local/bin/linux/$(go env GOARCH)/s2i _output/local/go/bin/s2i
+RUN CGO_ENABLED=0 go build -a -ldflags="-s -w" -o /tmp/s2i ./cmd/s2i
 
 #
 # Runner Image
 #
 
-FROM registry.redhat.io/ubi8/ubi
+FROM registry.redhat.io/ubi9/ubi-minimal:9.4
 
-COPY --from=builder /tmp/source-to-image/_output/local/go/bin/s2i  /usr/local/bin/s2i
+COPY --from=builder /tmp/s2i /usr/local/bin/s2i
 
 USER 1001
 
