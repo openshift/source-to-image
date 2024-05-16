@@ -3,22 +3,14 @@
 #
 # The standard name for this image is openshift/sti-release
 #
-FROM registry.redhat.io/ubi8/ubi
+FROM registry.redhat.io/ubi9/go-toolset:1.20.12 AS builder
 
-ENV VERSION=1.20 \
-    GOARM=5 \
-    GOPATH=/go \
-    GOROOT=/usr/local/go \
-    S2I_VERSION_FILE=/go/src/github.com/openshift/source-to-image/sti-version-defs
-ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
+USER root
+ENV S2I_VERSION_FILE=/opt/app-root/src/source-to-image/sti-version-defs
 
-RUN yum install -y git gcc zip && \
-    yum clean all && \
-    curl https://storage.googleapis.com/golang/go$VERSION.linux-amd64.tar.gz | tar -C /usr/local -xzf - && \
-    touch /sti-build-image && \
-    mkdir -p /go/src/github.com/openshift/source-to-image
+RUN mkdir -p /opt/app-root/src/source-to-image
 
-WORKDIR /go/src/github.com/openshift/source-to-image
-VOLUME ["/go/src/github.com/openshift/source-to-image"]
+WORKDIR /opt/app-root/src/source-to-image
+VOLUME ["/opt/app-root/src/source-to-image"]
 # Expect source to be mounted in
 CMD ["./hack/build-cross.sh"]

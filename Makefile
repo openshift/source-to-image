@@ -12,6 +12,9 @@ OUT_DIR = _output
 
 export GOFLAGS
 
+VERSION = latest
+CONTAINER_ENGINE = podman
+
 # Build code.
 #
 # Args:
@@ -23,6 +26,9 @@ export GOFLAGS
 all build:
 	hack/build-go.sh
 .PHONY: all build
+
+build-container:
+	${CONTAINER_ENGINE} build -t localhost/source-to-image/s2i:${VERSION} .
 
 # Verify if code is properly organized.
 #
@@ -97,6 +103,6 @@ clean:
 # Example:
 #   make release
 release: clean
-	hack/build-release.sh
+	S2I_BUILD_CMD="${CONTAINER_ENGINE}" hack/build-release.sh
 	hack/extract-release.sh
 .PHONY: release
