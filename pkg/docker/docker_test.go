@@ -78,7 +78,7 @@ func TestCommitContainer(t *testing.T) {
 			ContainerID: tst.containerID,
 			Repository:  tst.containerTag,
 		}
-		param := dockertypes.ContainerCommitOptions{
+		param := dockercontainer.CommitOptions{
 			Reference: tst.containerTag,
 		}
 		resp := dockertypes.IDResponse{
