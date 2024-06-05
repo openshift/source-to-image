@@ -4,8 +4,8 @@ go 1.20
 
 require (
 	github.com/containers/image/v5 v5.29.0
-	github.com/docker/distribution v2.8.3+incompatible
-	github.com/docker/docker v25.0.3+incompatible
+	github.com/distribution/reference v0.5.0
+	github.com/docker/docker v26.1.3+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/go-imports-organizer/goio v1.3.3
 	github.com/moby/buildkit v0.12.4
@@ -30,7 +30,7 @@ require (
 	github.com/containers/ocicrypt v1.1.9 // indirect
 	github.com/containers/storage v1.51.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
-	github.com/distribution/reference v0.5.0 // indirect
+	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.8.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
@@ -52,6 +52,7 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-shellwords v1.0.12 // indirect
 	github.com/mistifyio/go-zfs/v3 v3.0.1 // indirect
+	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/sys/mountinfo v0.7.1 // indirect
 	github.com/moby/term v0.5.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect

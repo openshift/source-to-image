@@ -12,6 +12,7 @@ import (
 
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	dockernetwork "github.com/docker/docker/api/types/network"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/net/context"
@@ -79,7 +80,7 @@ type FakeDockerClient struct {
 	WaitContainerErrInspectJSON dockertypes.ContainerJSON
 
 	ContainerCommitID       string
-	ContainerCommitOptions  dockertypes.ContainerCommitOptions
+	ContainerCommitOptions  dockercontainer.CommitOptions
 	ContainerCommitResponse dockertypes.IDResponse
 	ContainerCommitErr      error
 
@@ -148,14 +149,14 @@ func (d *FakeDockerClient) ContainerWait(ctx context.Context, containerID string
 }
 
 // ContainerCommit applies changes into a container and creates a new tagged image.
-func (d *FakeDockerClient) ContainerCommit(ctx context.Context, container string, options dockertypes.ContainerCommitOptions) (dockertypes.IDResponse, error) {
+func (d *FakeDockerClient) ContainerCommit(ctx context.Context, container string, options dockercontainer.CommitOptions) (dockertypes.IDResponse, error) {
 	d.ContainerCommitID = container
 	d.ContainerCommitOptions = options
 	return d.ContainerCommitResponse, d.ContainerCommitErr
 }
 
 // ContainerAttach attaches a connection to a container in the server.
-func (d *FakeDockerClient) ContainerAttach(ctx context.Context, container string, options dockertypes.ContainerAttachOptions) (dockertypes.HijackedResponse, error) {
+func (d *FakeDockerClient) ContainerAttach(ctx context.Context, container string, options dockercontainer.AttachOptions) (dockertypes.HijackedResponse, error) {
 	d.Calls = append(d.Calls, "attach")
 	return dockertypes.HijackedResponse{Conn: FakeConn{}, Reader: bufio.NewReader(&bytes.Buffer{})}, nil
 }
@@ -183,7 +184,7 @@ func (d *FakeDockerClient) ContainerInspect(ctx context.Context, containerID str
 }
 
 // ContainerRemove kills and removes a container from the docker host.
-func (d *FakeDockerClient) ContainerRemove(ctx context.Context, containerID string, options dockertypes.ContainerRemoveOptions) error {
+func (d *FakeDockerClient) ContainerRemove(ctx context.Context, containerID string, options dockercontainer.RemoveOptions) error {
 	d.Calls = append(d.Calls, "remove")
 
 	if _, exists := d.Containers[containerID]; exists {
@@ -199,7 +200,7 @@ func (d *FakeDockerClient) ContainerKill(ctx context.Context, containerID, signa
 }
 
 // ContainerStart sends a request to the docker daemon to start a container.
-func (d *FakeDockerClient) ContainerStart(ctx context.Context, containerID string, options dockertypes.ContainerStartOptions) error {
+func (d *FakeDockerClient) ContainerStart(ctx context.Context, containerID string, options dockercontainer.StartOptions) error {
 	d.Calls = append(d.Calls, "start")
 	return nil
 }
@@ -216,14 +217,14 @@ func (d *FakeDockerClient) ImagePull(ctx context.Context, ref string, options do
 }
 
 // ImageRemove removes an image from the docker host.
-func (d *FakeDockerClient) ImageRemove(ctx context.Context, imageID string, options dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDeleteResponseItem, error) {
+func (d *FakeDockerClient) ImageRemove(ctx context.Context, imageID string, options dockertypes.ImageRemoveOptions) ([]image.DeleteResponse, error) {
 	d.Calls = append(d.Calls, "remove_image")
 
 	if _, exists := d.Images[imageID]; exists {
 		delete(d.Images, imageID)
-		return []dockertypes.ImageDeleteResponseItem{}, nil
+		return []image.DeleteResponse{}, nil
 	}
-	return []dockertypes.ImageDeleteResponseItem{}, errors.New("image does not exist")
+	return []image.DeleteResponse{}, errors.New("image does not exist")
 }
 
 // ServerVersion returns information of the docker client and server host.

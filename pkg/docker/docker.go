@@ -21,6 +21,7 @@ import (
 
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	dockernetwork "github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/registry"
 	dockerapi "github.com/docker/docker/client"
@@ -122,12 +123,12 @@ type Docker interface {
 
 // Client contains all methods used when interacting directly with docker engine-api
 type Client interface {
-	ContainerAttach(ctx context.Context, container string, options dockertypes.ContainerAttachOptions) (dockertypes.HijackedResponse, error)
-	ContainerCommit(ctx context.Context, container string, options dockertypes.ContainerCommitOptions) (dockertypes.IDResponse, error)
+	ContainerAttach(ctx context.Context, container string, options dockercontainer.AttachOptions) (dockertypes.HijackedResponse, error)
+	ContainerCommit(ctx context.Context, container string, options dockercontainer.CommitOptions) (dockertypes.IDResponse, error)
 	ContainerCreate(ctx context.Context, config *dockercontainer.Config, hostConfig *dockercontainer.HostConfig, networkingConfig *dockernetwork.NetworkingConfig, platform *v1.Platform, containerName string) (dockercontainer.CreateResponse, error)
 	ContainerInspect(ctx context.Context, container string) (dockertypes.ContainerJSON, error)
-	ContainerRemove(ctx context.Context, container string, options dockertypes.ContainerRemoveOptions) error
-	ContainerStart(ctx context.Context, container string, options dockertypes.ContainerStartOptions) error
+	ContainerRemove(ctx context.Context, container string, options dockercontainer.RemoveOptions) error
+	ContainerStart(ctx context.Context, container string, options dockercontainer.StartOptions) error
 	ContainerKill(ctx context.Context, container, signal string) error
 	ContainerWait(ctx context.Context, container string, condition dockercontainer.WaitCondition) (<-chan dockercontainer.WaitResponse, <-chan error)
 	CopyToContainer(ctx context.Context, container, path string, content io.Reader, opts dockertypes.CopyToContainerOptions) error
@@ -135,7 +136,7 @@ type Client interface {
 	ImageBuild(ctx context.Context, buildContext io.Reader, options dockertypes.ImageBuildOptions) (dockertypes.ImageBuildResponse, error)
 	ImageInspectWithRaw(ctx context.Context, image string) (dockertypes.ImageInspect, []byte, error)
 	ImagePull(ctx context.Context, ref string, options dockertypes.ImagePullOptions) (io.ReadCloser, error)
-	ImageRemove(ctx context.Context, image string, options dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDeleteResponseItem, error)
+	ImageRemove(ctx context.Context, image string, options dockertypes.ImageRemoveOptions) ([]image.DeleteResponse, error)
 	ServerVersion(ctx context.Context) (dockertypes.Version, error)
 }
 
@@ -260,8 +261,8 @@ func (rco RunContainerOptions) asDockerCreateContainerOptions() configWrapper {
 
 // asDockerAttachToContainerOptions converts a RunContainerOptions into a
 // ContainerAttachOptions understood by the docker client
-func (rco RunContainerOptions) asDockerAttachToContainerOptions() dockertypes.ContainerAttachOptions {
-	return dockertypes.ContainerAttachOptions{
+func (rco RunContainerOptions) asDockerAttachToContainerOptions() dockercontainer.AttachOptions {
+	return dockercontainer.AttachOptions{
 		Stdin:  rco.Stdin != nil,
 		Stdout: rco.Stdout != nil,
 		Stderr: rco.Stderr != nil,
@@ -631,7 +632,7 @@ func updateImageWithInspect(image *api.Image, inspect *dockertypes.ImageInspect)
 func (d *stiDocker) RemoveContainer(id string) error {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	opts := dockertypes.ContainerRemoveOptions{
+	opts := dockercontainer.RemoveOptions{
 		RemoveVolumes: true,
 	}
 	return d.client.ContainerRemove(ctx, id, opts)
@@ -1040,7 +1041,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 		log.V(2).Infof("Starting container %q ...", container.ID)
 		ctx, cancel = getDefaultContext()
 		defer cancel()
-		err = d.client.ContainerStart(ctx, container.ID, dockertypes.ContainerStartOptions{})
+		err = d.client.ContainerStart(ctx, container.ID, dockercontainer.StartOptions{})
 		if err != nil {
 			return err
 		}
@@ -1115,7 +1116,7 @@ func (d *stiDocker) GetImageID(name string) (string, error) {
 // CommitContainer commits a container to an image with a specific tag.
 // The new image ID is returned
 func (d *stiDocker) CommitContainer(opts CommitContainerOptions) (string, error) {
-	dockerOpts := dockertypes.ContainerCommitOptions{
+	dockerOpts := dockercontainer.CommitOptions{
 		Reference: opts.Repository,
 	}
 	if opts.Command != nil || opts.Entrypoint != nil {
