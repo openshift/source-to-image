@@ -36,7 +36,7 @@ spec:
         - name: name
           value: show-sbom
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-show-sbom:0.1@sha256:69edfd6862a1837e21325146c1c52acda29838d8eead837a74ed40e91d54cb97
+          value: quay.io/konflux-ci/tekton-catalog/task-show-sbom:0.1@sha256:bb6de6584cc47524ac69d2fb0bc310e546696b707e4052a465966e2446e33a15
         - name: kind
           value: task
         resolver: bundles
@@ -55,7 +55,7 @@ spec:
         - name: name
           value: summary
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-summary:0.2@sha256:4b0563bcb5a070b9f7a783bfb831941d4fe5fa42bbb732a63c63f8f7936d4467
+          value: quay.io/konflux-ci/tekton-catalog/task-summary:0.2@sha256:fc1b0a4efc83c91cd4a24020daabb874b3f33a87c34cd157cda0b7e6d4b7779a
         - name: kind
           value: task
         resolver: bundles
@@ -166,7 +166,7 @@ spec:
         - name: name
           value: git-clone
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-git-clone:0.1@sha256:d5883ad208f2080a6e0225377c05941e29b46bddfbfa0f74f618ca365b0687da
+          value: quay.io/konflux-ci/tekton-catalog/task-git-clone:0.1@sha256:9ea6101d110d96dd95216ee5fb73213c394ee62280f2bf1d61bb460f56dac027
         - name: kind
           value: task
         resolver: bundles
@@ -233,7 +233,7 @@ spec:
         - name: name
           value: buildah
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-buildah:0.1@sha256:0cb9100452e9640adbda75a6e23d2cc9c76d2408cbcf3183543b2a7582e39f02
+          value: quay.io/konflux-ci/tekton-catalog/task-buildah:0.1@sha256:045cf147a1562de2ab5dd00301899d099c3d8c0fbaeba9406b7dd3605da3f4a0
         - name: kind
           value: task
         resolver: bundles
@@ -331,7 +331,7 @@ spec:
         - name: name
           value: ecosystem-cert-preflight-checks
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-ecosystem-cert-preflight-checks:0.1@sha256:d56dc78e0699771ef6960eef1618b8068bd1b32557a8eed118453b0316772d7d
+          value: quay.io/konflux-ci/tekton-catalog/task-ecosystem-cert-preflight-checks:0.1@sha256:8838d3e1628dbe61f4851b3640d2e3a9a3079d3ff3da955f4a3e4c2c95a013df
         - name: kind
           value: task
         resolver: bundles
