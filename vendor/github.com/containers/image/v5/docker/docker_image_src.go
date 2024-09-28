@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -38,8 +39,8 @@ type dockerImageSource struct {
 	impl.DoesNotAffectLayerInfosForCopy
 	stubs.ImplementsGetBlobAt
 
-	logicalRef  dockerReference // The reference the user requested.
-	physicalRef dockerReference // The actual reference we are accessing (possibly a mirror)
+	logicalRef  dockerReference // The reference the user requested. This must satisfy !isUnknownDigest
+	physicalRef dockerReference // The actual reference we are accessing (possibly a mirror). This must satisfy !isUnknownDigest
 	c           *dockerClient
 	// State
 	cachedManifest         []byte // nil if not loaded yet
@@ -48,7 +49,12 @@ type dockerImageSource struct {
 
 // newImageSource creates a new ImageSource for the specified image reference.
 // The caller must call .Close() on the returned ImageSource.
+// The caller must ensure !ref.isUnknownDigest.
 func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerReference) (*dockerImageSource, error) {
+	if ref.isUnknownDigest {
+		return nil, fmt.Errorf("reading images from docker: reference %q without a tag or digest is not supported", ref.StringWithinTransport())
+	}
+
 	registryConfig, err := loadRegistryConfiguration(sys)
 	if err != nil {
 		return nil, err
@@ -121,7 +127,7 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 // The caller must call .Close() on the returned ImageSource.
 func newImageSourceAttempt(ctx context.Context, sys *types.SystemContext, logicalRef dockerReference, pullSource sysregistriesv2.PullSource,
 	registryConfig *registryConfiguration) (*dockerImageSource, error) {
-	physicalRef, err := newReference(pullSource.Reference)
+	physicalRef, err := newReference(pullSource.Reference, false)
 	if err != nil {
 		return nil, err
 	}
@@ -189,6 +195,9 @@ func simplifyContentType(contentType string) string {
 // this never happens if the primary manifest is not a manifest list (e.g. if the source never returns manifest lists).
 func (s *dockerImageSource) GetManifest(ctx context.Context, instanceDigest *digest.Digest) ([]byte, string, error) {
 	if instanceDigest != nil {
+		if err := instanceDigest.Validate(); err != nil { // Make sure instanceDigest.String() does not contain any unexpected characters
+			return nil, "", err
+		}
 		return s.fetchManifest(ctx, instanceDigest.String())
 	}
 	err := s.ensureManifestIsLoaded(ctx)
@@ -198,6 +207,8 @@ func (s *dockerImageSource) GetManifest(ctx context.Context, instanceDigest *dig
 	return s.cachedManifest, s.cachedManifestMIMEType, nil
 }
 
+// fetchManifest fetches a manifest for tagOrDigest.
+// The caller is responsible for ensuring tagOrDigest uses the expected format.
 func (s *dockerImageSource) fetchManifest(ctx context.Context, tagOrDigest string) ([]byte, string, error) {
 	return s.c.fetchManifest(ctx, s.physicalRef, tagOrDigest)
 }
@@ -250,9 +261,15 @@ func splitHTTP200ResponseToPartial(streams chan io.ReadCloser, errs chan error, 
 			}
 			currentOffset += toSkip
 		}
+		var reader io.Reader
+		if c.Length == math.MaxUint64 {
+			reader = body
+		} else {
+			reader = io.LimitReader(body, int64(c.Length))
+		}
 		s := signalCloseReader{
 			closed:        make(chan struct{}),
-			stream:        io.NopCloser(io.LimitReader(body, int64(c.Length))),
+			stream:        io.NopCloser(reader),
 			consumeStream: true,
 		}
 		streams <- s
@@ -333,12 +350,24 @@ func parseMediaType(contentType string) (string, map[string]string, error) {
 // The specified chunks must be not overlapping and sorted by their offset.
 // The readers must be fully consumed, in the order they are returned, before blocking
 // to read the next chunk.
+// If the Length for the last chunk is set to math.MaxUint64, then it
+// fully fetches the remaining data from the offset to the end of the blob.
 func (s *dockerImageSource) GetBlobAt(ctx context.Context, info types.BlobInfo, chunks []private.ImageSourceChunk) (chan io.ReadCloser, chan error, error) {
 	headers := make(map[string][]string)
 
 	rangeVals := make([]string, 0, len(chunks))
+	lastFound := false
 	for _, c := range chunks {
-		rangeVals = append(rangeVals, fmt.Sprintf("%d-%d", c.Offset, c.Offset+c.Length-1))
+		if lastFound {
+			return nil, nil, fmt.Errorf("internal error: another chunk requested after an util-EOF chunk")
+		}
+		// If the Length is set to -1, then request anything after the specified offset.
+		if c.Length == math.MaxUint64 {
+			lastFound = true
+			rangeVals = append(rangeVals, fmt.Sprintf("%d-", c.Offset))
+		} else {
+			rangeVals = append(rangeVals, fmt.Sprintf("%d-%d", c.Offset, c.Offset+c.Length-1))
+		}
 	}
 
 	headers["Range"] = []string{fmt.Sprintf("bytes=%s", strings.Join(rangeVals, ","))}
@@ -347,6 +376,9 @@ func (s *dockerImageSource) GetBlobAt(ctx context.Context, info types.BlobInfo, 
 		return nil, nil, fmt.Errorf("external URLs not supported with GetBlobAt")
 	}
 
+	if err := info.Digest.Validate(); err != nil { // Make sure info.Digest.String() does not contain any unexpected characters
+		return nil, nil, err
+	}
 	path := fmt.Sprintf(blobsPath, reference.Path(s.physicalRef.ref), info.Digest.String())
 	logrus.Debugf("Downloading %s", path)
 	res, err := s.c.makeRequest(ctx, http.MethodGet, path, headers, nil, v2Auth, nil)
@@ -457,7 +489,10 @@ func (s *dockerImageSource) getSignaturesFromLookaside(ctx context.Context, inst
 			return nil, fmt.Errorf("server provided %d signatures, assuming that's unreasonable and a server error", maxLookasideSignatures)
 		}
 
-		sigURL := lookasideStorageURL(s.c.signatureBase, manifestDigest, i)
+		sigURL, err := lookasideStorageURL(s.c.signatureBase, manifestDigest, i)
+		if err != nil {
+			return nil, err
+		}
 		signature, missing, err := s.getOneSignature(ctx, sigURL)
 		if err != nil {
 			return nil, err
@@ -591,6 +626,10 @@ func (s *dockerImageSource) getSignaturesFromSigstoreAttachments(ctx context.Con
 
 // deleteImage deletes the named image from the registry, if supported.
 func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerReference) error {
+	if ref.isUnknownDigest {
+		return fmt.Errorf("Docker reference without a tag or digest cannot be deleted")
+	}
+
 	registryConfig, err := loadRegistryConfiguration(sys)
 	if err != nil {
 		return err
@@ -651,7 +690,10 @@ func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerRefere
 	}
 
 	for i := 0; ; i++ {
-		sigURL := lookasideStorageURL(c.signatureBase, manifestDigest, i)
+		sigURL, err := lookasideStorageURL(c.signatureBase, manifestDigest, i)
+		if err != nil {
+			return err
+		}
 		missing, err := c.deleteOneSignature(sigURL)
 		if err != nil {
 			return err

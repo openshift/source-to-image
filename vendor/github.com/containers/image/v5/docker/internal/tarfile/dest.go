@@ -111,11 +111,19 @@ func (d *Destination) PutBlobWithOptions(ctx context.Context, stream io.Reader, 
 			return private.UploadedBlob{}, fmt.Errorf("reading Config file stream: %w", err)
 		}
 		d.config = buf
-		if err := d.archive.sendFileLocked(d.archive.configPath(inputInfo.Digest), inputInfo.Size, bytes.NewReader(buf)); err != nil {
+		configPath, err := d.archive.configPath(inputInfo.Digest)
+		if err != nil {
+			return private.UploadedBlob{}, err
+		}
+		if err := d.archive.sendFileLocked(configPath, inputInfo.Size, bytes.NewReader(buf)); err != nil {
 			return private.UploadedBlob{}, fmt.Errorf("writing Config file: %w", err)
 		}
 	} else {
-		if err := d.archive.sendFileLocked(d.archive.physicalLayerPath(inputInfo.Digest), inputInfo.Size, stream); err != nil {
+		layerPath, err := d.archive.physicalLayerPath(inputInfo.Digest)
+		if err != nil {
+			return private.UploadedBlob{}, err
+		}
+		if err := d.archive.sendFileLocked(layerPath, inputInfo.Size, stream); err != nil {
 			return private.UploadedBlob{}, err
 		}
 	}
@@ -129,7 +137,7 @@ func (d *Destination) PutBlobWithOptions(ctx context.Context, stream io.Reader, 
 // If the blob has been successfully reused, returns (true, info, nil).
 // If the transport can not reuse the requested blob, TryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 func (d *Destination) TryReusingBlobWithOptions(ctx context.Context, info types.BlobInfo, options private.TryReusingBlobOptions) (bool, private.ReusedBlob, error) {
-	if !impl.OriginalBlobMatchesRequiredCompression(options) {
+	if !impl.OriginalCandidateMatchesTryReusingBlobOptions(options) {
 		return false, private.ReusedBlob{}, nil
 	}
 	if err := d.archive.lock(); err != nil {

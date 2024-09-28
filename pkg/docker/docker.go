@@ -135,8 +135,8 @@ type Client interface {
 	CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, dockertypes.ContainerPathStat, error)
 	ImageBuild(ctx context.Context, buildContext io.Reader, options dockertypes.ImageBuildOptions) (dockertypes.ImageBuildResponse, error)
 	ImageInspectWithRaw(ctx context.Context, image string) (dockertypes.ImageInspect, []byte, error)
-	ImagePull(ctx context.Context, ref string, options dockertypes.ImagePullOptions) (io.ReadCloser, error)
-	ImageRemove(ctx context.Context, image string, options dockertypes.ImageRemoveOptions) ([]image.DeleteResponse, error)
+	ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error)
+	ImageRemove(ctx context.Context, image string, options image.RemoveOptions) ([]image.DeleteResponse, error)
 	ServerVersion(ctx context.Context) (dockertypes.Version, error)
 }
 
@@ -550,7 +550,7 @@ func (d *stiDocker) PullImage(name string) (*api.Image, error) {
 
 	for retries := 0; retries <= DefaultPullRetryCount; retries++ {
 		err = util.TimeoutAfter(DefaultDockerTimeout, fmt.Sprintf("pulling image %q", name), func(timer *time.Timer) error {
-			resp, pullErr := d.client.ImagePull(context.Background(), name, dockertypes.ImagePullOptions{RegistryAuth: base64Auth})
+			resp, pullErr := d.client.ImagePull(context.Background(), name, image.PullOptions{RegistryAuth: base64Auth})
 			if pullErr != nil {
 				return pullErr
 			}
@@ -1142,7 +1142,7 @@ func (d *stiDocker) CommitContainer(opts CommitContainerOptions) (string, error)
 func (d *stiDocker) RemoveImage(imageID string) error {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	_, err := d.client.ImageRemove(ctx, imageID, dockertypes.ImageRemoveOptions{})
+	_, err := d.client.ImageRemove(ctx, imageID, image.RemoveOptions{})
 	return err
 }
 

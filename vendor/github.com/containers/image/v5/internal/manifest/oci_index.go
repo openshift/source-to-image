@@ -3,8 +3,10 @@ package manifest
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"runtime"
+	"slices"
 
 	platform "github.com/containers/image/v5/internal/pkg/platform"
 	compression "github.com/containers/image/v5/pkg/compression/types"
@@ -12,8 +14,6 @@ import (
 	"github.com/opencontainers/go-digest"
 	imgspec "github.com/opencontainers/image-spec/specs-go"
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 )
 
 const (
@@ -61,6 +61,7 @@ func (index *OCI1IndexPublic) Instance(instanceDigest digest.Digest) (ListUpdate
 			ret.ReadOnly.Platform = manifest.Platform
 			ret.ReadOnly.Annotations = manifest.Annotations
 			ret.ReadOnly.CompressionAlgorithmNames = annotationsToCompressionAlgorithmNames(manifest.Annotations)
+			ret.ReadOnly.ArtifactType = manifest.ArtifactType
 			return ret, nil
 		}
 	}
@@ -102,7 +103,7 @@ func addCompressionAnnotations(compressionAlgorithms []compression.Algorithm, an
 		*annotationsMap = map[string]string{}
 	}
 	for _, algo := range compressionAlgorithms {
-		switch algo.Name() {
+		switch algo.BaseVariantName() {
 		case compression.ZstdAlgorithmName:
 			(*annotationsMap)[OCI1InstanceAnnotationCompressionZSTD] = OCI1InstanceAnnotationCompressionZSTDValue
 		default:
@@ -157,11 +158,13 @@ func (index *OCI1IndexPublic) editInstances(editInstances []ListEdit) error {
 			}
 			addCompressionAnnotations(editInstance.AddCompressionAlgorithms, &annotations)
 			addedEntries = append(addedEntries, imgspecv1.Descriptor{
-				MediaType:   editInstance.AddMediaType,
-				Size:        editInstance.AddSize,
-				Digest:      editInstance.AddDigest,
-				Platform:    editInstance.AddPlatform,
-				Annotations: annotations})
+				MediaType:    editInstance.AddMediaType,
+				ArtifactType: editInstance.AddArtifactType,
+				Size:         editInstance.AddSize,
+				Digest:       editInstance.AddDigest,
+				Platform:     editInstance.AddPlatform,
+				Annotations:  annotations,
+			})
 		default:
 			return fmt.Errorf("internal error: invalid operation: %d", editInstance.ListOperation)
 		}
@@ -257,7 +260,7 @@ func (index *OCI1IndexPublic) chooseInstance(ctx *types.SystemContext, preferGzi
 	if bestMatch != nil {
 		return bestMatch.digest, nil
 	}
-	return "", fmt.Errorf("no image found in image index for architecture %s, variant %q, OS %s", wantedPlatforms[0].Architecture, wantedPlatforms[0].Variant, wantedPlatforms[0].OS)
+	return "", fmt.Errorf("no image found in image index for architecture %q, variant %q, OS %q", wantedPlatforms[0].Architecture, wantedPlatforms[0].Variant, wantedPlatforms[0].OS)
 }
 
 func (index *OCI1Index) ChooseInstanceByCompression(ctx *types.SystemContext, preferGzip types.OptionalBool) (digest.Digest, error) {
@@ -299,12 +302,13 @@ func OCI1IndexPublicFromComponents(components []imgspecv1.Descriptor, annotation
 			platform = &platformCopy
 		}
 		m := imgspecv1.Descriptor{
-			MediaType:   component.MediaType,
-			Size:        component.Size,
-			Digest:      component.Digest,
-			URLs:        slices.Clone(component.URLs),
-			Annotations: maps.Clone(component.Annotations),
-			Platform:    platform,
+			MediaType:    component.MediaType,
+			ArtifactType: component.ArtifactType,
+			Size:         component.Size,
+			Digest:       component.Digest,
+			URLs:         slices.Clone(component.URLs),
+			Annotations:  maps.Clone(component.Annotations),
+			Platform:     platform,
 		}
 		index.Manifests[i] = m
 	}

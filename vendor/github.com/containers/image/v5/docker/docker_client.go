@@ -18,6 +18,7 @@ import (
 
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/iolimits"
+	"github.com/containers/image/v5/internal/multierr"
 	"github.com/containers/image/v5/internal/set"
 	"github.com/containers/image/v5/internal/useragent"
 	"github.com/containers/image/v5/manifest"
@@ -25,6 +26,7 @@ import (
 	"github.com/containers/image/v5/pkg/sysregistriesv2"
 	"github.com/containers/image/v5/pkg/tlsclientconfig"
 	"github.com/containers/image/v5/types"
+	"github.com/containers/storage/pkg/fileutils"
 	"github.com/containers/storage/pkg/homedir"
 	"github.com/docker/distribution/registry/api/errcode"
 	v2 "github.com/docker/distribution/registry/api/v2"
@@ -186,7 +188,7 @@ func dockerCertDir(sys *types.SystemContext, hostPort string) (string, error) {
 		}
 
 		fullCertDirPath = filepath.Join(hostCertDir, hostPort)
-		_, err := os.Stat(fullCertDirPath)
+		err := fileutils.Exists(fullCertDirPath)
 		if err == nil {
 			break
 		}
@@ -497,8 +499,8 @@ func (c *dockerClient) resolveRequestURL(path string) (*url.URL, error) {
 // Checks if the auth headers in the response contain an indication of a failed
 // authorizdation because of an "insufficient_scope" error. If that's the case,
 // returns the required scope to be used for fetching a new token.
-func needsRetryWithUpdatedScope(err error, res *http.Response) (bool, *authScope) {
-	if err == nil && res.StatusCode == http.StatusUnauthorized {
+func needsRetryWithUpdatedScope(res *http.Response) (bool, *authScope) {
+	if res.StatusCode == http.StatusUnauthorized {
 		challenges := parseAuthHeader(res.Header)
 		for _, challenge := range challenges {
 			if challenge.Scheme == "bearer" {
@@ -557,6 +559,9 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method stri
 	attempts := 0
 	for {
 		res, err := c.makeRequestToResolvedURLOnce(ctx, method, requestURL, headers, stream, streamLen, auth, extraScope)
+		if err != nil {
+			return nil, err
+		}
 		attempts++
 
 		// By default we use pre-defined scopes per operation. In
@@ -572,27 +577,29 @@ func (c *dockerClient) makeRequestToResolvedURL(ctx context.Context, method stri
 		// We also cannot retry with a body (stream != nil) as stream
 		// was already read
 		if attempts == 1 && stream == nil && auth != noAuth {
-			if retry, newScope := needsRetryWithUpdatedScope(err, res); retry {
+			if retry, newScope := needsRetryWithUpdatedScope(res); retry {
 				logrus.Debug("Detected insufficient_scope error, will retry request with updated scope")
+				res.Body.Close()
 				// Note: This retry ignores extraScope. That’s, strictly speaking, incorrect, but we don’t currently
 				// expect the insufficient_scope errors to happen for those callers. If that changes, we can add support
 				// for more than one extra scope.
 				res, err = c.makeRequestToResolvedURLOnce(ctx, method, requestURL, headers, stream, streamLen, auth, newScope)
+				if err != nil {
+					return nil, err
+				}
 				extraScope = newScope
 			}
 		}
-		if res == nil || res.StatusCode != http.StatusTooManyRequests || // Only retry on StatusTooManyRequests, success or other failure is returned to caller immediately
+
+		if res.StatusCode != http.StatusTooManyRequests || // Only retry on StatusTooManyRequests, success or other failure is returned to caller immediately
 			stream != nil || // We can't retry with a body (which is not restartable in the general case)
 			attempts == backoffNumIterations {
-			return res, err
+			return res, nil
 		}
 		// close response body before retry or context done
 		res.Body.Close()
 
-		delay = parseRetryAfter(res, delay)
-		if delay > backoffMaxDelay {
-			delay = backoffMaxDelay
-		}
+		delay = min(parseRetryAfter(res, delay), backoffMaxDelay)
 		logrus.Debugf("Too many requests to %s: sleeping for %f seconds before next attempt", requestURL.Redacted(), delay.Seconds())
 		select {
 		case <-ctx.Done():
@@ -671,10 +678,14 @@ func parseRegistryWarningHeader(header string) string {
 
 	// warning-value = warn-code SP warn-agent SP warn-text	[ SP warn-date ]
 	// distribution-spec requires warn-code=299, warn-agent="-", warn-date missing
-	if !strings.HasPrefix(header, expectedPrefix) || !strings.HasSuffix(header, expectedSuffix) {
+	header, ok := strings.CutPrefix(header, expectedPrefix)
+	if !ok {
 		return ""
 	}
-	header = header[len(expectedPrefix) : len(header)-len(expectedSuffix)]
+	header, ok = strings.CutSuffix(header, expectedSuffix)
+	if !ok {
+		return ""
+	}
 
 	// ”Recipients that process the value of a quoted-string MUST handle a quoted-pair
 	// as if it were replaced by the octet following the backslash.”, so let’s do that…
@@ -952,6 +963,8 @@ func (c *dockerClient) detectProperties(ctx context.Context) error {
 	return c.detectPropertiesError
 }
 
+// fetchManifest fetches a manifest for (the repo of ref) + tagOrDigest.
+// The caller is responsible for ensuring tagOrDigest uses the expected format.
 func (c *dockerClient) fetchManifest(ctx context.Context, ref dockerReference, tagOrDigest string) ([]byte, string, error) {
 	path := fmt.Sprintf(manifestPath, reference.Path(ref.ref), tagOrDigest)
 	headers := map[string][]string{
@@ -978,13 +991,10 @@ func (c *dockerClient) fetchManifest(ctx context.Context, ref dockerReference, t
 // This function can return nil reader when no url is supported by this function. In this case, the caller
 // should fallback to fetch the non-external blob (i.e. pull from the registry).
 func (c *dockerClient) getExternalBlob(ctx context.Context, urls []string) (io.ReadCloser, int64, error) {
-	var (
-		resp *http.Response
-		err  error
-	)
 	if len(urls) == 0 {
 		return nil, 0, errors.New("internal error: getExternalBlob called with no URLs")
 	}
+	var remoteErrors []error
 	for _, u := range urls {
 		blobURL, err := url.Parse(u)
 		if err != nil || (blobURL.Scheme != "http" && blobURL.Scheme != "https") {
@@ -993,24 +1003,24 @@ func (c *dockerClient) getExternalBlob(ctx context.Context, urls []string) (io.R
 		// NOTE: we must not authenticate on additional URLs as those
 		//       can be abused to leak credentials or tokens.  Please
 		//       refer to CVE-2020-15157 for more information.
-		resp, err = c.makeRequestToResolvedURL(ctx, http.MethodGet, blobURL, nil, nil, -1, noAuth, nil)
-		if err == nil {
-			if resp.StatusCode != http.StatusOK {
-				err = fmt.Errorf("error fetching external blob from %q: %d (%s)", u, resp.StatusCode, http.StatusText(resp.StatusCode))
-				logrus.Debug(err)
-				resp.Body.Close()
-				continue
-			}
-			break
+		resp, err := c.makeRequestToResolvedURL(ctx, http.MethodGet, blobURL, nil, nil, -1, noAuth, nil)
+		if err != nil {
+			remoteErrors = append(remoteErrors, err)
+			continue
 		}
+		if resp.StatusCode != http.StatusOK {
+			err := fmt.Errorf("error fetching external blob from %q: %d (%s)", u, resp.StatusCode, http.StatusText(resp.StatusCode))
+			remoteErrors = append(remoteErrors, err)
+			logrus.Debug(err)
+			resp.Body.Close()
+			continue
+		}
+		return resp.Body, getBlobSize(resp), nil
 	}
-	if resp == nil && err == nil {
+	if remoteErrors == nil {
 		return nil, 0, nil // fallback to non-external blob
 	}
-	if err != nil {
-		return nil, 0, err
-	}
-	return resp.Body, getBlobSize(resp), nil
+	return nil, 0, fmt.Errorf("failed fetching external blob from all urls: %w", multierr.Format("", ", ", "", remoteErrors))
 }
 
 func getBlobSize(resp *http.Response) int64 {
@@ -1034,6 +1044,9 @@ func (c *dockerClient) getBlob(ctx context.Context, ref dockerReference, info ty
 		}
 	}
 
+	if err := info.Digest.Validate(); err != nil { // Make sure info.Digest.String() does not contain any unexpected characters
+		return nil, 0, err
+	}
 	path := fmt.Sprintf(blobsPath, reference.Path(ref.ref), info.Digest.String())
 	logrus.Debugf("Downloading %s", path)
 	res, err := c.makeRequest(ctx, http.MethodGet, path, nil, nil, v2Auth, nil)
@@ -1084,6 +1097,11 @@ func isManifestUnknownError(err error) bool {
 	if errors.As(err, &e) && e.ErrorCode() == errcode.ErrorCodeUnknown && e.Message == "Not Found" {
 		return true
 	}
+	// Harbor v2.10.2
+	if errors.As(err, &e) && e.ErrorCode() == errcode.ErrorCodeUnknown && strings.Contains(strings.ToLower(e.Message), "not found") {
+		return true
+	}
+
 	// opencontainers/distribution-spec does not require the errcode.Error payloads to be used,
 	// but specifies that the HTTP status must be 404.
 	var unexpected *unexpectedHTTPResponseError
@@ -1097,7 +1115,10 @@ func isManifestUnknownError(err error) bool {
 // digest in ref.
 // It returns (nil, nil) if the manifest does not exist.
 func (c *dockerClient) getSigstoreAttachmentManifest(ctx context.Context, ref dockerReference, digest digest.Digest) (*manifest.OCI1, error) {
-	tag := sigstoreAttachmentTag(digest)
+	tag, err := sigstoreAttachmentTag(digest)
+	if err != nil {
+		return nil, err
+	}
 	sigstoreRef, err := reference.WithTag(reference.TrimNamed(ref.ref), tag)
 	if err != nil {
 		return nil, err
@@ -1130,6 +1151,9 @@ func (c *dockerClient) getSigstoreAttachmentManifest(ctx context.Context, ref do
 // getExtensionsSignatures returns signatures from the X-Registry-Supports-Signatures API extension,
 // using the original data structures.
 func (c *dockerClient) getExtensionsSignatures(ctx context.Context, ref dockerReference, manifestDigest digest.Digest) (*extensionSignatureList, error) {
+	if err := manifestDigest.Validate(); err != nil { // Make sure manifestDigest.String() does not contain any unexpected characters
+		return nil, err
+	}
 	path := fmt.Sprintf(extensionsSignaturePath, reference.Path(ref.ref), manifestDigest)
 	res, err := c.makeRequest(ctx, http.MethodGet, path, nil, nil, v2Auth, nil)
 	if err != nil {
@@ -1153,8 +1177,11 @@ func (c *dockerClient) getExtensionsSignatures(ctx context.Context, ref dockerRe
 }
 
 // sigstoreAttachmentTag returns a sigstore attachment tag for the specified digest.
-func sigstoreAttachmentTag(d digest.Digest) string {
-	return strings.Replace(d.String(), ":", "-", 1) + ".sig"
+func sigstoreAttachmentTag(d digest.Digest) (string, error) {
+	if err := d.Validate(); err != nil { // Make sure d.String() doesn’t contain any unexpected characters
+		return "", err
+	}
+	return strings.Replace(d.String(), ":", "-", 1) + ".sig", nil
 }
 
 // Close removes resources associated with an initialized dockerClient, if any.
