@@ -2,6 +2,7 @@
 /.atom-build.yml
 /.project
 /.vagrant
+/.idea
 cmd/s2i/debug
 *~
 
