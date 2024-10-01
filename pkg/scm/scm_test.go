@@ -1,7 +1,6 @@
 package scm
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -17,7 +16,7 @@ func TestDownloaderForSource(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(gitLocalDir)
-	localDir, _ := ioutil.TempDir(os.TempDir(), "localdir-s2i-test")
+	localDir, _ := os.MkdirTemp(os.TempDir(), "localdir-s2i-test")
 	defer os.RemoveAll(localDir)
 
 	tc := map[*git.URL]string{

@@ -206,7 +206,7 @@ func (d *FakeDockerClient) ContainerStart(ctx context.Context, containerID strin
 }
 
 // ImagePull requests the docker host to pull an image from a remote registry.
-func (d *FakeDockerClient) ImagePull(ctx context.Context, ref string, options dockertypes.ImagePullOptions) (io.ReadCloser, error) {
+func (d *FakeDockerClient) ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error) {
 	d.Calls = append(d.Calls, "pull")
 
 	if d.PullFail != nil {
@@ -217,7 +217,7 @@ func (d *FakeDockerClient) ImagePull(ctx context.Context, ref string, options do
 }
 
 // ImageRemove removes an image from the docker host.
-func (d *FakeDockerClient) ImageRemove(ctx context.Context, imageID string, options dockertypes.ImageRemoveOptions) ([]image.DeleteResponse, error) {
+func (d *FakeDockerClient) ImageRemove(ctx context.Context, imageID string, options image.RemoveOptions) ([]image.DeleteResponse, error) {
 	d.Calls = append(d.Calls, "remove_image")
 
 	if _, exists := d.Images[imageID]; exists {
