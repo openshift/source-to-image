@@ -6,7 +6,7 @@ ENV S2I_GIT_VERSION="1.4.0" \
 
 COPY . .
 
-RUN CGO_ENABLED=0 go build -a -ldflags="-s -w" -o /tmp/s2i ./cmd/s2i
+RUN CGO_ENABLED=0 GO111MODULE=on go build -a -mod=vendor -ldflags="-s -w" -o /tmp/s2i ./cmd/s2i
 
 #
 # Runner Image
@@ -25,7 +25,6 @@ LABEL \
     description="Source-to-Image is a builder image" \
     summary="Source-to-Image is a builder image" \
     version="1.4.0" \
-    architecture="${GOARCH}" \
     vendor="Red Hat, Inc." \
     com.redhat.component="source-to-image-container" \
     maintainer="openshift-builds@redhat.com" \
