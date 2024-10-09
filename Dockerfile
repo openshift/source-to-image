@@ -1,6 +1,6 @@
 FROM registry.redhat.io/ubi8/go-toolset:1.21 AS builder
 
-ENV S2I_GIT_VERSION="1.4.0" \
+ENV S2I_GIT_VERSION="1.4.1" \
     S2I_GIT_MAJOR="1" \
     S2I_GIT_MINOR="4"
 
@@ -24,7 +24,7 @@ LABEL \
     name="source-to-image/source-to-image" \
     description="Source-to-Image is a builder image" \
     summary="Source-to-Image is a builder image" \
-    version="1.4.0" \
+    version="1.4.1" \
     vendor="Red Hat, Inc." \
     com.redhat.component="source-to-image-container" \
     maintainer="openshift-builds@redhat.com" \
