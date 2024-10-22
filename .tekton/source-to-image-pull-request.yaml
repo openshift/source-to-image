@@ -15,7 +15,7 @@ metadata:
     appstudio.openshift.io/component: source-to-image
     pipelines.appstudio.openshift.io/type: build
   name: source-to-image-on-pull-request
-  namespace: rh-openshift-builds-tenant
+  namespace: ocp-tools-s2i-tenant
 spec:
   params:
   - name: git-url
@@ -23,7 +23,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/rh-openshift-builds-tenant/source-to-image/source-to-image:on-pr-{{revision}}
+    value: quay.io/redhat-user-workloads/ocp-tools-s2i-tenant/source-to-image:on-pr-{{revision}}
   - name: image-expires-after
     value: 5d
   - name: dockerfile
@@ -77,11 +77,11 @@ spec:
       description: Skip checks against built image
       name: skip-checks
       type: string
-    - default: "true"
+    - default: "false"
       description: Execute the build with network isolation
       name: hermetic
       type: string
-    - default: '{"packages": [{"type": "gomod"}], "flags": ["gomod-vendor-check"]}'
+    - default: ""
       description: Build dependencies to be prefetched by Cachi2
       name: prefetch-input
       type: string
@@ -89,7 +89,7 @@ spec:
       description: Image tag expiration time, time values could be something like
         1h, 2d, 3w for hours, days, and weeks, respectively.
       name: image-expires-after
-    - default: "true"
+    - default: "false"
       description: Build a source image.
       name: build-source-image
       type: string
@@ -107,9 +107,6 @@ spec:
       type: string
     - default:
       - linux/x86_64
-      - linux/arm64
-      - linux/ppc64le
-      - linux/s390x
       description: List of platforms to build the container images on. The available
         set of values is determined by the configuration of the multi-platform-controller.
       name: build-platforms
@@ -455,6 +452,28 @@ spec:
         - name: kind
           value: task
         resolver: bundles
+    - name: rpms-signature-scan
+      params:
+      - name: image-url
+        value: $(tasks.build-image-index.results.IMAGE_URL)
+      - name: image-digest
+        value: $(tasks.build-image-index.results.IMAGE_DIGEST)
+      runAfter:
+      - build-image-index
+      taskRef:
+        params:
+        - name: name
+          value: rpms-signature-scan
+        - name: bundle
+          value: quay.io/konflux-ci/tekton-catalog/task-rpms-signature-scan:0.2@sha256:7aa4d3c95e2b963e82fdda392f7cb3d61e3dab035416cf4a3a34e43cf3c9c9b8
+        - name: kind
+          value: task
+        resolver: bundles
+      when:
+      - input: $(params.skip-checks)
+        operator: in
+        values:
+        - "false"
     workspaces:
     - name: git-auth
       optional: true
