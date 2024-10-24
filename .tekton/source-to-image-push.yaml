@@ -237,7 +237,7 @@ spec:
         - name: name
           value: buildah-remote-oci-ta
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-buildah-remote-oci-ta:0.2@sha256:8ed78460031bcd939a14dde337ce6dfdd8ed67be44a8f58e4013449016000dcc
+          value: quay.io/konflux-ci/tekton-catalog/task-buildah-remote-oci-ta:0.2@sha256:87e8a77c297b7172eadd15a3f6c1478525633d2fdbf15771b21529c221530082
         - name: kind
           value: task
         resolver: bundles
@@ -384,7 +384,7 @@ spec:
         - name: name
           value: sast-snyk-check-oci-ta
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-sast-snyk-check-oci-ta:0.2@sha256:7e99a122bc9e84fd9fb29062e825d3345177337d2448dcb50324f86ec5560c7a
+          value: quay.io/konflux-ci/tekton-catalog/task-sast-snyk-check-oci-ta:0.3@sha256:aa3071c40b89fe6b44104e1ba30e48eb44497b41b788494283103182e55f1876
         - name: kind
           value: task
         resolver: bundles
