@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi8/go-toolset:1.21 AS builder
+FROM registry.redhat.io/ubi8/go-toolset:1.22 AS builder
 
 ENV S2I_GIT_VERSION="1.4.1" \
     S2I_GIT_MAJOR="1" \
