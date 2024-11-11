@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi8/go-toolset:1.21 AS builder
+FROM registry.redhat.io/ubi8/go-toolset:1.21.13-1.1727869850 AS builder
 
 ENV S2I_GIT_VERSION="1.4.1" \
     S2I_GIT_MAJOR="1" \
@@ -12,7 +12,7 @@ RUN CGO_ENABLED=0 GO111MODULE=on go build -a -mod=vendor -ldflags="-s -w" -o /tm
 # Runner Image
 #
 
-FROM registry.redhat.io/ubi8/ubi-minimal:8.10
+FROM registry.redhat.io/ubi8/ubi-minimal:8.10-1130
 
 COPY --from=builder /tmp/s2i /usr/local/bin/s2i
 
