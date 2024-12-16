@@ -6,7 +6,7 @@ ENV S2I_GIT_VERSION="1.4.1" \
 
 COPY . .
 
-RUN CGO_ENABLED=0 GO111MODULE=on go build -a -mod=vendor -ldflags="-s -w" -o /tmp/s2i ./cmd/s2i
+RUN CGO_ENABLED=1 GO111MODULE=on go build -a -mod=vendor -ldflags="-s -w" -o /tmp/s2i ./cmd/s2i
 
 #
 # Runner Image
