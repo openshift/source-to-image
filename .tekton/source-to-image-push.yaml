@@ -26,6 +26,18 @@ spec:
     value: quay.io/redhat-user-workloads/ocp-tools-s2i-tenant/source-to-image:{{revision}}
   - name: dockerfile
     value: Dockerfile
+  - name: build-source-image
+    value: "true"
+  - name: hermetic
+    value: "true"
+  - name: build-platforms
+    value:
+      - linux/x86_64
+      - linux/arm64
+      - linux/ppc64le
+      - linux/s390x
+  - name: prefetch-input
+    value: '{"packages": [{"type": "gomod"}]}'
   pipelineSpec:
     description: |
       This pipeline is ideal for building multi-arch container images from a Containerfile while maintaining trust after pipeline customization.
@@ -79,7 +91,7 @@ spec:
       description: Execute the build with network isolation
       name: hermetic
       type: string
-    - default: '{"packages": [{"type": "gomod"}], "flags": ["gomod-vendor-check"]}'
+    - default: ""
       description: Build dependencies to be prefetched by Cachi2
       name: prefetch-input
       type: string
@@ -105,9 +117,6 @@ spec:
       type: string
     - default:
       - linux/x86_64
-      - linux/arm64
-      - linux/ppc64le
-      - linux/s390x
       description: List of platforms to build the container images on. The available
         set of values is determined by the configuration of the multi-platform-controller.
       name: build-platforms
