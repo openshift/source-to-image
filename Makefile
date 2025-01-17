@@ -30,11 +30,16 @@ all build:
 build-container:
 	${CONTAINER_ENGINE} build -t localhost/source-to-image/s2i:${VERSION} .
 
+# Build cross-compiled binaries.
+build-cross:
+	hack/build-cross.sh
+.PHONY: build-cross
+
 # Verify if code is properly organized.
 #
 # Example:
 #   make verify
-verify: build
+verify: build-cross
 	hack/verify-gofmt.sh
 	hack/verify-deps.sh
 	hack/verify-bash-completion.sh
