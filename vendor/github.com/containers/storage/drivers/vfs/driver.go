@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	graphdriver "github.com/containers/storage/drivers"
+	"github.com/containers/storage/internal/dedup"
 	"github.com/containers/storage/pkg/archive"
 	"github.com/containers/storage/pkg/directory"
 	"github.com/containers/storage/pkg/fileutils"
@@ -33,12 +34,10 @@ func Init(home string, options graphdriver.Options) (graphdriver.Driver, error) 
 	d := &Driver{
 		name:       "vfs",
 		home:       home,
-		idMappings: idtools.NewIDMappingsFromMaps(options.UIDMaps, options.GIDMaps),
 		imageStore: options.ImageStore,
 	}
 
-	rootIDs := d.idMappings.RootPair()
-	if err := idtools.MkdirAllAndChown(filepath.Join(home, "dir"), 0o700, rootIDs); err != nil {
+	if err := os.MkdirAll(filepath.Join(home, "dir"), 0o700); err != nil {
 		return nil, err
 	}
 	for _, option := range options.DriverOptions {
@@ -79,7 +78,6 @@ type Driver struct {
 	name              string
 	home              string
 	additionalHomes   []string
-	idMappings        *idtools.IDMappings
 	ignoreChownErrors bool
 	naiveDiff         graphdriver.DiffDriver
 	updater           graphdriver.LayerIDMapUpdater
@@ -152,14 +150,21 @@ func (d *Driver) create(id, parent string, opts *graphdriver.CreateOpts, ro bool
 		return fmt.Errorf("--storage-opt is not supported for vfs")
 	}
 
-	idMappings := d.idMappings
+	var uidMaps []idtools.IDMap
+	var gidMaps []idtools.IDMap
+
 	if opts != nil && opts.IDMappings != nil {
-		idMappings = opts.IDMappings
+		uidMaps = opts.IDMappings.UIDs()
+		gidMaps = opts.IDMappings.GIDs()
+	}
+
+	rootUID, rootGID, err := idtools.GetRootUIDGID(uidMaps, gidMaps)
+	if err != nil {
+		return err
 	}
 
 	dir := d.dir2(id, ro)
-	rootIDs := idMappings.RootPair()
-	if err := idtools.MkdirAllAndChown(filepath.Dir(dir), 0o700, rootIDs); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dir), 0o700); err != nil {
 		return err
 	}
 
@@ -174,21 +179,24 @@ func (d *Driver) create(id, parent string, opts *graphdriver.CreateOpts, ro bool
 		rootPerms = os.FileMode(0o700)
 	}
 
+	idPair := idtools.IDPair{UID: rootUID, GID: rootGID}
 	if parent != "" {
 		st, err := system.Stat(d.dir(parent))
 		if err != nil {
 			return err
 		}
 		rootPerms = os.FileMode(st.Mode())
-		rootIDs.UID = int(st.UID())
-		rootIDs.GID = int(st.GID())
+		idPair.UID = int(st.UID())
+		idPair.GID = int(st.GID())
 	}
-	if err := idtools.MkdirAndChown(dir, rootPerms, rootIDs); err != nil {
+	if err := idtools.MkdirAllAndChownNew(dir, rootPerms, idPair); err != nil {
 		return err
 	}
 	labelOpts := []string{"level:s0"}
 	if _, mountLabel, err := label.InitLabels(labelOpts); err == nil {
-		label.SetFileLabel(dir, mountLabel)
+		if err := label.SetFileLabel(dir, mountLabel); err != nil {
+			logrus.Debugf("Set %s label to %q file ended with error: %v", mountLabel, dir, err)
+		}
 	}
 	if parent != "" {
 		parentDir, err := d.Get(parent, graphdriver.MountOpts{})
@@ -340,4 +348,20 @@ func (d *Driver) Diff(id string, idMappings *idtools.IDMappings, parent string, 
 // relative to its base filesystem directory.
 func (d *Driver) DiffSize(id string, idMappings *idtools.IDMappings, parent string, parentMappings *idtools.IDMappings, mountLabel string) (size int64, err error) {
 	return d.naiveDiff.DiffSize(id, idMappings, parent, parentMappings, mountLabel)
+}
+
+// Dedup performs deduplication of the driver's storage.
+func (d *Driver) Dedup(req graphdriver.DedupArgs) (graphdriver.DedupResult, error) {
+	var dirs []string
+	for _, layer := range req.Layers {
+		dir := d.dir2(layer, false)
+		if err := fileutils.Exists(dir); err == nil {
+			dirs = append(dirs, dir)
+		}
+	}
+	r, err := dedup.DedupDirs(dirs, req.Options)
+	if err != nil {
+		return graphdriver.DedupResult{}, err
+	}
+	return graphdriver.DedupResult{Deduped: r.Deduped}, nil
 }

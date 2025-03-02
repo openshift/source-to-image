@@ -1,5 +1,4 @@
-//go:build linux || solaris || darwin || freebsd
-// +build linux solaris darwin freebsd
+//go:build !windows
 
 package lockfile
 
