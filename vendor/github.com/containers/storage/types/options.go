@@ -344,15 +344,15 @@ func getRootlessStorageOpts(systemOpts StoreOptions) (StoreOptions, error) {
 			dirEntries, err := os.ReadDir(opts.GraphRoot)
 			if err == nil {
 				for _, entry := range dirEntries {
-					if strings.HasSuffix(entry.Name(), "-images") {
-						opts.GraphDriverName = strings.TrimSuffix(entry.Name(), "-images")
+					if name, ok := strings.CutSuffix(entry.Name(), "-images"); ok {
+						opts.GraphDriverName = name
 						break
 					}
 				}
 			}
 
 			if opts.GraphDriverName == "" {
-				if canUseRootlessOverlay(opts.GraphRoot, opts.RunRoot) {
+				if canUseRootlessOverlay() {
 					opts.GraphDriverName = overlayDriver
 				} else {
 					opts.GraphDriverName = "vfs"
@@ -481,33 +481,6 @@ func ReloadConfigurationFile(configFile string, storeOptions *StoreOptions) erro
 	if config.Storage.Options.MountOpt != "" {
 		storeOptions.GraphDriverOptions = append(storeOptions.GraphDriverOptions, fmt.Sprintf("%s.mountopt=%s", config.Storage.Driver, config.Storage.Options.MountOpt))
 	}
-
-	uidmap, err := idtools.ParseIDMap([]string{config.Storage.Options.RemapUIDs}, "remap-uids")
-	if err != nil {
-		return err
-	}
-	gidmap, err := idtools.ParseIDMap([]string{config.Storage.Options.RemapGIDs}, "remap-gids")
-	if err != nil {
-		return err
-	}
-
-	if config.Storage.Options.RemapUser != "" && config.Storage.Options.RemapGroup == "" {
-		config.Storage.Options.RemapGroup = config.Storage.Options.RemapUser
-	}
-	if config.Storage.Options.RemapGroup != "" && config.Storage.Options.RemapUser == "" {
-		config.Storage.Options.RemapUser = config.Storage.Options.RemapGroup
-	}
-	if config.Storage.Options.RemapUser != "" && config.Storage.Options.RemapGroup != "" {
-		mappings, err := idtools.NewIDMappings(config.Storage.Options.RemapUser, config.Storage.Options.RemapGroup)
-		if err != nil {
-			logrus.Warningf("Error initializing ID mappings for %s:%s %v\n", config.Storage.Options.RemapUser, config.Storage.Options.RemapGroup, err)
-			return err
-		}
-		uidmap = mappings.UIDs()
-		gidmap = mappings.GIDs()
-	}
-	storeOptions.UIDMap = uidmap
-	storeOptions.GIDMap = gidmap
 	storeOptions.RootAutoNsUser = config.Storage.Options.RootAutoUsernsUser
 	if config.Storage.Options.AutoUsernsMinSize > 0 {
 		storeOptions.AutoNsMinSize = config.Storage.Options.AutoUsernsMinSize
