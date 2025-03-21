@@ -9,7 +9,7 @@ require (
 	github.com/docker/go-connections v0.5.0
 	github.com/go-imports-organizer/goio v1.3.3
 	github.com/moby/buildkit v0.16.0
-	github.com/opencontainers/image-spec v1.1.0
+	github.com/opencontainers/image-spec v1.1.1
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/net v0.35.0
