@@ -1,6 +1,7 @@
 package sysregistriesv2
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -247,6 +248,11 @@ type V2RegistriesConf struct {
 	// and error if stdout is not a TTY * "disabled": do not prompt and
 	// potentially use all unqualified-search registries
 	ShortNameMode string `toml:"short-name-mode"`
+
+	// AdditionalLayerStoreAuthHelper is a helper binary that receives
+	// registry credentials pass them to Additional Layer Store for
+	// registry authentication. These credentials are only collected when pulling (not pushing).
+	AdditionalLayerStoreAuthHelper string `toml:"additional-layer-store-auth-helper"`
 
 	shortNameAliasConf
 
@@ -739,6 +745,11 @@ func tryUpdatingCache(ctx *types.SystemContext, wrapper configWrapper) (*parsedC
 		// Enforce v2 format for drop-in-configs.
 		dropIn, err := loadConfigFile(path, true)
 		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				// file must have been removed between the directory listing
+				// and the open call, ignore that as it is a expected race
+				continue
+			}
 			return nil, fmt.Errorf("loading drop-in registries configuration %q: %w", path, err)
 		}
 		config.updateWithConfigurationFrom(dropIn)
@@ -823,6 +834,16 @@ func CredentialHelpers(sys *types.SystemContext) ([]string, error) {
 		return nil, err
 	}
 	return config.partialV2.CredentialHelpers, nil
+}
+
+// AdditionalLayerStoreAuthHelper returns the helper for passing registry
+// credentials to Additional Layer Store.
+func AdditionalLayerStoreAuthHelper(sys *types.SystemContext) (string, error) {
+	config, err := getConfig(sys)
+	if err != nil {
+		return "", err
+	}
+	return config.partialV2.AdditionalLayerStoreAuthHelper, nil
 }
 
 // refMatchingSubdomainPrefix returns the length of ref
@@ -1049,6 +1070,11 @@ func (c *parsedConfig) updateWithConfigurationFrom(updates *parsedConfig) {
 	// We don’t maintain c.partialV2.ShortNameMode.
 	if updates.shortNameMode != types.ShortNameModeInvalid {
 		c.shortNameMode = updates.shortNameMode
+	}
+
+	// == Merge AdditionalLayerStoreAuthHelper:
+	if updates.partialV2.AdditionalLayerStoreAuthHelper != "" {
+		c.partialV2.AdditionalLayerStoreAuthHelper = updates.partialV2.AdditionalLayerStoreAuthHelper
 	}
 
 	// == Merge aliasCache:

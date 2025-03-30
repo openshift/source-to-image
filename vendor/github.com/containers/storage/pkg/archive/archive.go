@@ -70,12 +70,15 @@ type (
 	}
 )
 
+const PaxSchilyXattr = "SCHILY.xattr."
+
 const (
 	tarExt  = "tar"
 	solaris = "solaris"
 	windows = "windows"
 	darwin  = "darwin"
 	freebsd = "freebsd"
+	linux   = "linux"
 )
 
 var xattrsToIgnore = map[string]interface{}{
@@ -169,10 +172,17 @@ func DetectCompression(source []byte) Compression {
 }
 
 // DecompressStream decompresses the archive and returns a ReaderCloser with the decompressed archive.
-func DecompressStream(archive io.Reader) (io.ReadCloser, error) {
+func DecompressStream(archive io.Reader) (_ io.ReadCloser, Err error) {
 	p := pools.BufioReader32KPool
 	buf := p.Get(archive)
 	bs, err := buf.Peek(10)
+
+	defer func() {
+		if Err != nil {
+			p.Put(buf)
+		}
+	}()
+
 	if err != nil && err != io.EOF {
 		// Note: we'll ignore any io.EOF error because there are some odd
 		// cases where the layer.tar file will be empty (zero bytes) and
@@ -189,6 +199,12 @@ func DecompressStream(archive io.Reader) (io.ReadCloser, error) {
 		readBufWrapper := p.NewReadCloserWrapper(buf, buf)
 		return readBufWrapper, nil
 	case Gzip:
+		cleanup := func() {
+			p.Put(buf)
+		}
+		if rc, canUse := tryProcFilter([]string{"pigz", "-d"}, buf, cleanup); canUse {
+			return rc, nil
+		}
 		gzReader, err := gzip.NewReader(buf)
 		if err != nil {
 			return nil, err
@@ -207,6 +223,12 @@ func DecompressStream(archive io.Reader) (io.ReadCloser, error) {
 		readBufWrapper := p.NewReadCloserWrapper(buf, xzReader)
 		return readBufWrapper, nil
 	case Zstd:
+		cleanup := func() {
+			p.Put(buf)
+		}
+		if rc, canUse := tryProcFilter([]string{"zstd", "-d"}, buf, cleanup); canUse {
+			return rc, nil
+		}
 		return zstdReader(buf)
 	default:
 		return nil, fmt.Errorf("unsupported compression format %s", (&compression).Extension())
@@ -214,9 +236,16 @@ func DecompressStream(archive io.Reader) (io.ReadCloser, error) {
 }
 
 // CompressStream compresses the dest with specified compression algorithm.
-func CompressStream(dest io.Writer, compression Compression) (io.WriteCloser, error) {
+func CompressStream(dest io.Writer, compression Compression) (_ io.WriteCloser, Err error) {
 	p := pools.BufioWriter32KPool
 	buf := p.Get(dest)
+
+	defer func() {
+		if Err != nil {
+			p.Put(buf)
+		}
+	}()
+
 	switch compression {
 	case Uncompressed:
 		writeBufWrapper := p.NewWriteCloserWrapper(buf, buf)
@@ -391,28 +420,28 @@ func FileInfoHeader(name string, fi os.FileInfo, link string) (*tar.Header, erro
 	return hdr, nil
 }
 
-// ReadSecurityXattrToTarHeader reads security.capability, security,image
+// readSecurityXattrToTarHeader reads security.capability, security,image
 // xattrs from filesystem to a tar header
-func ReadSecurityXattrToTarHeader(path string, hdr *tar.Header) error {
-	if hdr.Xattrs == nil {
-		hdr.Xattrs = make(map[string]string)
+func readSecurityXattrToTarHeader(path string, hdr *tar.Header) error {
+	if hdr.PAXRecords == nil {
+		hdr.PAXRecords = make(map[string]string)
 	}
 	for _, xattr := range []string{"security.capability", "security.ima"} {
 		capability, err := system.Lgetxattr(path, xattr)
-		if err != nil && !errors.Is(err, system.EOPNOTSUPP) && err != system.ErrNotSupportedPlatform {
+		if err != nil && !errors.Is(err, system.ENOTSUP) && err != system.ErrNotSupportedPlatform {
 			return fmt.Errorf("failed to read %q attribute from %q: %w", xattr, path, err)
 		}
 		if capability != nil {
-			hdr.Xattrs[xattr] = string(capability)
+			hdr.PAXRecords[PaxSchilyXattr+xattr] = string(capability)
 		}
 	}
 	return nil
 }
 
-// ReadUserXattrToTarHeader reads user.* xattr from filesystem to a tar header
-func ReadUserXattrToTarHeader(path string, hdr *tar.Header) error {
+// readUserXattrToTarHeader reads user.* xattr from filesystem to a tar header
+func readUserXattrToTarHeader(path string, hdr *tar.Header) error {
 	xattrs, err := system.Llistxattr(path)
-	if err != nil && !errors.Is(err, system.EOPNOTSUPP) && err != system.ErrNotSupportedPlatform {
+	if err != nil && !errors.Is(err, system.ENOTSUP) && err != system.ErrNotSupportedPlatform {
 		return err
 	}
 	for _, key := range xattrs {
@@ -425,10 +454,10 @@ func ReadUserXattrToTarHeader(path string, hdr *tar.Header) error {
 				}
 				return err
 			}
-			if hdr.Xattrs == nil {
-				hdr.Xattrs = make(map[string]string)
+			if hdr.PAXRecords == nil {
+				hdr.PAXRecords = make(map[string]string)
 			}
-			hdr.Xattrs[key] = string(value)
+			hdr.PAXRecords[PaxSchilyXattr+key] = string(value)
 		}
 	}
 	return nil
@@ -516,10 +545,10 @@ func (ta *tarAppender) addTarFile(path, name string) error {
 	if err != nil {
 		return err
 	}
-	if err := ReadSecurityXattrToTarHeader(path, hdr); err != nil {
+	if err := readSecurityXattrToTarHeader(path, hdr); err != nil {
 		return err
 	}
-	if err := ReadUserXattrToTarHeader(path, hdr); err != nil {
+	if err := readUserXattrToTarHeader(path, hdr); err != nil {
 		return err
 	}
 	if err := ReadFileFlagsToTarHeader(path, hdr); err != nil {
@@ -627,12 +656,20 @@ func createTarFile(path, extractDir string, hdr *tar.Header, reader io.Reader, L
 	// so use hdrInfo.Mode() (they differ for e.g. setuid bits)
 	hdrInfo := hdr.FileInfo()
 
+	typeFlag := hdr.Typeflag
 	mask := hdrInfo.Mode()
+
+	// update also the implementation of ForceMask in pkg/chunked
 	if forceMask != nil {
 		mask = *forceMask
+		// If we have a forceMask, force the real type to either be a directory,
+		// a link, or a regular file.
+		if typeFlag != tar.TypeDir && typeFlag != tar.TypeSymlink && typeFlag != tar.TypeLink {
+			typeFlag = tar.TypeReg
+		}
 	}
 
-	switch hdr.Typeflag {
+	switch typeFlag {
 	case tar.TypeDir:
 		// Create directory unless it exists as a directory already.
 		// In that case we just want to merge the two
@@ -642,7 +679,7 @@ func createTarFile(path, extractDir string, hdr *tar.Header, reader io.Reader, L
 			}
 		}
 
-	case tar.TypeReg, tar.TypeRegA:
+	case tar.TypeReg:
 		// Source is regular file. We use system.OpenFileSequential to use sequential
 		// file access to avoid depleting the standby list on Windows.
 		// On Linux, this equates to a regular os.OpenFile
@@ -700,13 +737,6 @@ func createTarFile(path, extractDir string, hdr *tar.Header, reader io.Reader, L
 		return fmt.Errorf("unhandled tar header type %d", hdr.Typeflag)
 	}
 
-	if forceMask != nil && (hdr.Typeflag != tar.TypeSymlink || runtime.GOOS == "darwin") {
-		value := fmt.Sprintf("%d:%d:0%o", hdr.Uid, hdr.Gid, hdrInfo.Mode()&0o7777)
-		if err := system.Lsetxattr(path, idtools.ContainersOverrideXattr, []byte(value), 0); err != nil {
-			return err
-		}
-	}
-
 	// Lchown is not supported on Windows.
 	if Lchown && runtime.GOOS != windows {
 		if chownOpts == nil {
@@ -753,23 +783,39 @@ func createTarFile(path, extractDir string, hdr *tar.Header, reader io.Reader, L
 	}
 
 	var errs []string
-	for key, value := range hdr.Xattrs {
-		if _, found := xattrsToIgnore[key]; found {
+	for key, value := range hdr.PAXRecords {
+		xattrKey, ok := strings.CutPrefix(key, PaxSchilyXattr)
+		if !ok {
 			continue
 		}
-		if err := system.Lsetxattr(path, key, []byte(value), 0); err != nil {
-			if errors.Is(err, syscall.ENOTSUP) || (inUserns && errors.Is(err, syscall.EPERM)) {
-				// We ignore errors here because not all graphdrivers support
-				// xattrs *cough* old versions of AUFS *cough*. However only
-				// ENOTSUP should be emitted in that case, otherwise we still
-				// bail.  We also ignore EPERM errors if we are running in a
-				// user namespace.
+		if _, found := xattrsToIgnore[xattrKey]; found {
+			continue
+		}
+		if err := system.Lsetxattr(path, xattrKey, []byte(value), 0); err != nil {
+			if errors.Is(err, system.ENOTSUP) || (inUserns && errors.Is(err, syscall.EPERM)) {
+				// Ignore specific error cases:
+				// - ENOTSUP: Expected for graphdrivers lacking extended attribute support:
+				//   - Legacy AUFS versions
+				//   - FreeBSD with unsupported namespaces (trusted, security)
+				// - EPERM: Expected when operating within a user namespace
+				// All other errors will cause a failure.
 				errs = append(errs, err.Error())
 				continue
 			}
 			return err
 		}
+	}
 
+	if forceMask != nil && (typeFlag == tar.TypeReg || typeFlag == tar.TypeDir || runtime.GOOS == "darwin") {
+		value := idtools.Stat{
+			IDs:   idtools.IDPair{UID: hdr.Uid, GID: hdr.Gid},
+			Mode:  hdrInfo.Mode(),
+			Major: int(hdr.Devmajor),
+			Minor: int(hdr.Devminor),
+		}
+		if err := idtools.SetContainersOverrideXattr(path, value); err != nil {
+			return err
+		}
 	}
 
 	// We defer setting flags on directories until the end of
@@ -1113,9 +1159,14 @@ loop:
 		}
 	}
 
-	if options.ForceMask != nil && rootHdr != nil {
-		value := fmt.Sprintf("%d:%d:0%o", rootHdr.Uid, rootHdr.Gid, rootHdr.Mode)
-		if err := system.Lsetxattr(dest, idtools.ContainersOverrideXattr, []byte(value), 0); err != nil {
+	if options.ForceMask != nil {
+		value := idtools.Stat{Mode: os.ModeDir | os.FileMode(0o755)}
+		if rootHdr != nil {
+			value.IDs.UID = rootHdr.Uid
+			value.IDs.GID = rootHdr.Gid
+			value.Mode = os.ModeDir | os.FileMode(rootHdr.Mode)
+		}
+		if err := idtools.SetContainersOverrideXattr(dest, value); err != nil {
 			return err
 		}
 	}
@@ -1337,9 +1388,9 @@ func remapIDs(readIDMappings, writeIDMappings *idtools.IDMappings, chownOpts *id
 			}
 		} else if runtime.GOOS == darwin {
 			uid, gid = hdr.Uid, hdr.Gid
-			if xstat, ok := hdr.Xattrs[idtools.ContainersOverrideXattr]; ok {
+			if xstat, ok := hdr.PAXRecords[PaxSchilyXattr+idtools.ContainersOverrideXattr]; ok {
 				attrs := strings.Split(string(xstat), ":")
-				if len(attrs) == 3 {
+				if len(attrs) >= 3 {
 					val, err := strconv.ParseUint(attrs[0], 10, 32)
 					if err != nil {
 						uid = int(val)

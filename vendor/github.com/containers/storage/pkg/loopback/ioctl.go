@@ -1,5 +1,4 @@
-//go:build linux && cgo
-// +build linux,cgo
+//go:build linux
 
 package loopback
 

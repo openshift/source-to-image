@@ -60,7 +60,7 @@ func OCI1FromManifest(manifestBlob []byte) (*OCI1, error) {
 	if err := json.Unmarshal(manifestBlob, &oci1); err != nil {
 		return nil, err
 	}
-	if err := manifest.ValidateUnambiguousManifestFormat(manifestBlob, imgspecv1.MediaTypeImageIndex,
+	if err := manifest.ValidateUnambiguousManifestFormat(manifestBlob, imgspecv1.MediaTypeImageManifest,
 		manifest.AllowedFieldConfig|manifest.AllowedFieldLayers); err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (m *OCI1) ConfigInfo() types.BlobInfo {
 // The Digest field is guaranteed to be provided; Size may be -1.
 // WARNING: The list may contain duplicates, and they are semantically relevant.
 func (m *OCI1) LayerInfos() []LayerInfo {
-	blobs := []LayerInfo{}
+	blobs := make([]LayerInfo, 0, len(m.Layers))
 	for _, layer := range m.Layers {
 		blobs = append(blobs, LayerInfo{
 			BlobInfo:   BlobInfoFromOCI1Descriptor(layer),

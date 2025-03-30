@@ -1,5 +1,4 @@
 //go:build cgo
-// +build cgo
 
 package copy
 
@@ -17,7 +16,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,13 +48,13 @@ func CopyRegularToFile(srcPath string, dstFile *os.File, fileinfo os.FileInfo, c
 	defer srcFile.Close()
 
 	if *copyWithFileClone {
-		_, _, err = unix.Syscall(unix.SYS_IOCTL, dstFile.Fd(), C.FICLONE, srcFile.Fd())
-		if err == nil {
+		_, _, errno := unix.Syscall(unix.SYS_IOCTL, dstFile.Fd(), C.FICLONE, srcFile.Fd())
+		if errno == 0 {
 			return nil
 		}
 
 		*copyWithFileClone = false
-		if err == unix.EXDEV {
+		if errno == unix.EXDEV {
 			*copyWithFileRange = false
 		}
 	}
@@ -108,7 +106,7 @@ func legacyCopy(srcFile io.Reader, dstFile io.Writer) error {
 
 func copyXattr(srcPath, dstPath, attr string) error {
 	data, err := system.Lgetxattr(srcPath, attr)
-	if err != nil && !errors.Is(err, unix.EOPNOTSUPP) {
+	if err != nil && !errors.Is(err, system.ENOTSUP) {
 		return err
 	}
 	if data != nil {
@@ -200,11 +198,9 @@ func DirCopy(srcDir, dstDir string, copyMode Mode, copyXattrs bool) error {
 			}
 
 		case mode&os.ModeSocket != 0:
-			s, err := net.Listen("unix", dstPath)
-			if err != nil {
+			if err := unix.Mknod(dstPath, stat.Mode, int(stat.Rdev)); err != nil {
 				return err
 			}
-			s.Close()
 
 		case mode&os.ModeDevice != 0:
 			if unshare.IsRootless() {
@@ -283,7 +279,7 @@ func doCopyXattrs(srcPath, dstPath string) error {
 	}
 
 	xattrs, err := system.Llistxattr(srcPath)
-	if err != nil && !errors.Is(err, unix.EOPNOTSUPP) {
+	if err != nil && !errors.Is(err, system.ENOTSUP) {
 		return err
 	}
 

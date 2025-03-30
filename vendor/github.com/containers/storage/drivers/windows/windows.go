@@ -764,8 +764,8 @@ func writeLayerFromTar(r io.Reader, w hcsshim.LayerWriter, root string) (int64, 
 	buf := bufio.NewWriter(nil)
 	for err == nil {
 		base := path.Base(hdr.Name)
-		if strings.HasPrefix(base, archive.WhiteoutPrefix) {
-			name := path.Join(path.Dir(hdr.Name), base[len(archive.WhiteoutPrefix):])
+		if rm, ok := strings.CutPrefix(base, archive.WhiteoutPrefix); ok {
+			name := path.Join(path.Dir(hdr.Name), rm)
 			err = w.Remove(filepath.FromSlash(name))
 			if err != nil {
 				return 0, err
@@ -973,6 +973,11 @@ func (d *Driver) DiffGetter(id string) (graphdriver.FileGetCloser, error) {
 // AdditionalImageStores returns additional image stores supported by the driver
 func (d *Driver) AdditionalImageStores() []string {
 	return nil
+}
+
+// Dedup performs deduplication of the driver's storage.
+func (d *Driver) Dedup(req graphdriver.DedupArgs) (graphdriver.DedupResult, error) {
+	return graphdriver.DedupResult{}, nil
 }
 
 // UpdateLayerIDMap changes ownerships in the layer's filesystem tree from

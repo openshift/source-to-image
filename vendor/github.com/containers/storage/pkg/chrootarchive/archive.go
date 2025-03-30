@@ -47,7 +47,7 @@ func Untar(tarArchive io.Reader, dest string, options *archive.TarOptions) error
 // This should be used to prevent a potential attacker from manipulating `dest`
 // such that it would provide access to files outside of `dest` through things
 // like symlinks. Normally `ResolveSymlinksInScope` would handle this, however
-// sanitizing symlinks in this manner is inherrently racey:
+// sanitizing symlinks in this manner is inherently racey:
 // ref: CVE-2018-15664
 func UntarWithRoot(tarArchive io.Reader, dest string, options *archive.TarOptions, root string) error {
 	return untarHandler(tarArchive, dest, options, true, root)
@@ -83,6 +83,12 @@ func untarHandler(tarArchive io.Reader, dest string, options *archive.TarOptions
 		}
 	}
 
+	destVal, err := newUnpackDestination(root, dest)
+	if err != nil {
+		return err
+	}
+	defer destVal.Close()
+
 	r := tarArchive
 	if decompress {
 		decompressedArchive, err := archive.DecompressStream(tarArchive)
@@ -93,7 +99,7 @@ func untarHandler(tarArchive io.Reader, dest string, options *archive.TarOptions
 		r = decompressedArchive
 	}
 
-	return invokeUnpack(r, dest, options, root)
+	return invokeUnpack(r, destVal, options)
 }
 
 // Tar tars the requested path while chrooted to the specified root.

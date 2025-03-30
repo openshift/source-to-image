@@ -12,30 +12,42 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-// nextAligned finds the next offset that satisfies alignment.
-func nextAligned(offset int64, alignment int) int64 {
-	align64 := uint64(alignment)
-	offset64 := uint64(offset)
+var errAlignmentOverflow = errors.New("integer overflow when calculating alignment")
 
-	if align64 != 0 && offset64%align64 != 0 {
-		offset64 = (offset64 & ^(align64 - 1)) + align64
+// nextAligned finds the next offset that satisfies alignment.
+func nextAligned(offset int64, alignment int) (int64, error) {
+	align64 := int64(alignment)
+
+	if align64 <= 0 || offset%align64 == 0 {
+		return offset, nil
 	}
 
-	return int64(offset64)
+	align64 -= offset % align64
+
+	if (math.MaxInt64 - offset) < align64 {
+		return 0, errAlignmentOverflow
+	}
+
+	return offset + align64, nil
 }
 
 // writeDataObjectAt writes the data object described by di to ws, using time t, recording details
 // in d. The object is written at the first position that satisfies the alignment requirements
 // described by di following offsetUnaligned.
 func writeDataObjectAt(ws io.WriteSeeker, offsetUnaligned int64, di DescriptorInput, t time.Time, d *rawDescriptor) error { //nolint:lll
-	offset, err := ws.Seek(nextAligned(offsetUnaligned, di.opts.alignment), io.SeekStart)
+	offset, err := nextAligned(offsetUnaligned, di.opts.alignment)
 	if err != nil {
+		return err
+	}
+
+	if _, err := ws.Seek(offset, io.SeekStart); err != nil {
 		return err
 	}
 
@@ -72,6 +84,7 @@ func (f *FileImage) calculatedDataSize() int64 {
 var (
 	errInsufficientCapacity = errors.New("insufficient descriptor capacity to add data object(s) to image")
 	errPrimaryPartition     = errors.New("image already contains a primary partition")
+	errObjectIDOverflow     = errors.New("object ID would overflow")
 )
 
 // writeDataObject writes the data object described by di to f, using time t, recording details in
@@ -79,6 +92,11 @@ var (
 func (f *FileImage) writeDataObject(i int, di DescriptorInput, t time.Time) error {
 	if i >= len(f.rds) {
 		return errInsufficientCapacity
+	}
+
+	// We derive the ID from i, so make sure the ID will not overflow.
+	if int64(i) >= math.MaxUint32 {
+		return errObjectIDOverflow
 	}
 
 	// If this is a primary partition, verify there isn't another primary partition, and update the
@@ -92,7 +110,7 @@ func (f *FileImage) writeDataObject(i int, di DescriptorInput, t time.Time) erro
 	}
 
 	d := &f.rds[i]
-	d.ID = uint32(i) + 1
+	d.ID = uint32(i) + 1 //nolint:gosec // Overflow handled above.
 
 	f.h.DataSize = f.calculatedDataSize()
 
@@ -213,8 +231,16 @@ func OptCreateWithCloseOnUnload(b bool) CreateOpt {
 	}
 }
 
+var errDescriptorCapacityNotSupported = errors.New("descriptor capacity not supported")
+
 // createContainer creates a new SIF container file in rw, according to opts.
 func createContainer(rw ReadWriter, co createOpts) (*FileImage, error) {
+	// The supported number of descriptors is limited by the unsigned 32-bit ID field in each
+	// rawDescriptor.
+	if co.descriptorCapacity >= math.MaxUint32 {
+		return nil, errDescriptorCapacityNotSupported
+	}
+
 	rds := make([]rawDescriptor, co.descriptorCapacity)
 	rdsSize := int64(binary.Size(rds))
 
