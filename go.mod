@@ -67,7 +67,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/sylabs/sif/v2 v2.18.0 // indirect
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
-	github.com/tchap/go-patricia/v2 v2.3.1 // indirect
+	github.com/tchap/go-patricia/v2 v2.3.2 // indirect
 	github.com/ulikunitz/xz v0.5.12 // indirect
 	github.com/vbatts/tar-split v0.11.6 // indirect
 	go.opencensus.io v0.24.0 // indirect
