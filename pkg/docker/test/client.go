@@ -115,7 +115,7 @@ func (d *FakeDockerClient) ImageInspectWithRaw(ctx context.Context, imageID stri
 }
 
 // CopyToContainer copies content into the container filesystem.
-func (d *FakeDockerClient) CopyToContainer(ctx context.Context, container, path string, content io.Reader, opts dockertypes.CopyToContainerOptions) error {
+func (d *FakeDockerClient) CopyToContainer(ctx context.Context, container, path string, content io.Reader, opts dockercontainer.CopyToContainerOptions) error {
 	d.CopyToContainerID = container
 	d.CopyToContainerPath = path
 	d.CopyToContainerContent = content
@@ -124,10 +124,10 @@ func (d *FakeDockerClient) CopyToContainer(ctx context.Context, container, path 
 
 // CopyFromContainer gets the content from the container and returns it as a Reader
 // to manipulate it in the host. It's up to the caller to close the reader.
-func (d *FakeDockerClient) CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, dockertypes.ContainerPathStat, error) {
+func (d *FakeDockerClient) CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, dockercontainer.PathStat, error) {
 	d.CopyFromContainerID = container
 	d.CopyFromContainerPath = srcPath
-	return ioutil.NopCloser(bytes.NewReader([]byte(""))), dockertypes.ContainerPathStat{}, d.CopyFromContainerErr
+	return ioutil.NopCloser(bytes.NewReader([]byte(""))), dockercontainer.PathStat{}, d.CopyFromContainerErr
 }
 
 // ContainerWait pauses execution until a container exits.

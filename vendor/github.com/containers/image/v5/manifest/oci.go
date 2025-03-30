@@ -60,7 +60,7 @@ func OCI1FromManifest(manifestBlob []byte) (*OCI1, error) {
 	if err := json.Unmarshal(manifestBlob, &oci1); err != nil {
 		return nil, err
 	}
-	if err := manifest.ValidateUnambiguousManifestFormat(manifestBlob, imgspecv1.MediaTypeImageIndex,
+	if err := manifest.ValidateUnambiguousManifestFormat(manifestBlob, imgspecv1.MediaTypeImageManifest,
 		manifest.AllowedFieldConfig|manifest.AllowedFieldLayers); err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (m *OCI1) ConfigInfo() types.BlobInfo {
 // The Digest field is guaranteed to be provided; Size may be -1.
 // WARNING: The list may contain duplicates, and they are semantically relevant.
 func (m *OCI1) LayerInfos() []LayerInfo {
-	blobs := []LayerInfo{}
+	blobs := make([]LayerInfo, 0, len(m.Layers))
 	for _, layer := range m.Layers {
 		blobs = append(blobs, LayerInfo{
 			BlobInfo:   BlobInfoFromOCI1Descriptor(layer),
@@ -166,10 +166,11 @@ func (m *OCI1) UpdateLayerInfos(layerInfos []types.BlobInfo) error {
 // getEncryptedMediaType will return the mediatype to its encrypted counterpart and return
 // an error if the mediatype does not support encryption
 func getEncryptedMediaType(mediatype string) (string, error) {
-	if slices.Contains(strings.Split(mediatype, "+")[1:], "encrypted") {
+	parts := strings.Split(mediatype, "+")
+	if slices.Contains(parts[1:], "encrypted") {
 		return "", fmt.Errorf("unsupported mediaType: %q already encrypted", mediatype)
 	}
-	unsuffixedMediatype := strings.Split(mediatype, "+")[0]
+	unsuffixedMediatype := parts[0]
 	switch unsuffixedMediatype {
 	case DockerV2Schema2LayerMediaType, imgspecv1.MediaTypeImageLayer,
 		imgspecv1.MediaTypeImageLayerNonDistributable: //nolint:staticcheck // NonDistributable layers are deprecated, but we want to continue to support manipulating pre-existing images.

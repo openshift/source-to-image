@@ -5,10 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"math/bits"
 	"os"
 	"path"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -24,7 +27,6 @@ import (
 	"github.com/containers/storage/pkg/system"
 	"github.com/containers/storage/pkg/tarlog"
 	"github.com/containers/storage/pkg/truncindex"
-	multierror "github.com/hashicorp/go-multierror"
 	"github.com/klauspost/pgzip"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -45,11 +47,13 @@ const (
 
 type layerLocations uint8
 
-// The backing store is split in two json files, one (the volatile)
-// that is written without fsync() meaning it isn't as robust to
-// unclean shutdown
+// The backing store is split in three json files.
+// The volatile store is written without fsync() meaning it isn't as robust to unclean shutdown.
+// Optionally, an image store can be configured to store RO layers.
+// The stable store is used for the remaining layers that don't go into the other stores.
 const (
 	stableLayerLocation layerLocations = 1 << iota
+	imageStoreLayerLocation
 	volatileLayerLocation
 
 	numLayerLocationIndex = iota
@@ -57,6 +61,10 @@ const (
 
 func layerLocationFromIndex(index int) layerLocations {
 	return 1 << index
+}
+
+func indexFromLayerLocation(location layerLocations) int {
+	return bits.TrailingZeros(uint(location))
 }
 
 // A Layer is a record of a copy-on-write layer that's stored by the lower
@@ -134,9 +142,12 @@ type Layer struct {
 	TOCDigest digest.Digest `json:"toc-digest,omitempty"`
 
 	// UncompressedSize is the length of the blob that was last passed to
-	// ApplyDiff() or create(), after we decompressed it.  If
-	// UncompressedDigest is not set, this should be treated as if it were
-	// an uninitialized value.
+	// ApplyDiff() or create(), after we decompressed it.
+	//
+	//   - If UncompressedDigest is set, this must be set to a valid value.
+	//   - Otherwise, if TOCDigest is set, this is either valid or -1.
+	//   - If neither of this digests is set, this should be treated as if it were
+	//     an uninitialized value.
 	UncompressedSize int64 `json:"diff-size,omitempty"`
 
 	// CompressionType is the type of compression which we detected on the blob
@@ -150,7 +161,7 @@ type Layer struct {
 	GIDs []uint32 `json:"gidset,omitempty"`
 
 	// Flags is arbitrary data about the layer.
-	Flags map[string]interface{} `json:"flags,omitempty"`
+	Flags map[string]any `json:"flags,omitempty"`
 
 	// UIDMap and GIDMap are used for setting up a layer's contents
 	// for use inside of a user namespace where UID mapping is being used.
@@ -160,8 +171,8 @@ type Layer struct {
 	// ReadOnly is true if this layer resides in a read-only layer store.
 	ReadOnly bool `json:"-"`
 
-	// volatileStore is true if the container is from the volatile json file
-	volatileStore bool `json:"-"`
+	// location is the location of the store where the layer is present.
+	location layerLocations `json:"-"`
 
 	// BigDataNames is a list of names of data items that we keep for the
 	// convenience of the caller.  They can be large, and are only in
@@ -312,9 +323,8 @@ type rwLayerStore interface {
 	// applies its changes to a specified layer.
 	ApplyDiff(to string, diff io.Reader) (int64, error)
 
-	// ApplyDiffWithDiffer applies the changes through the differ callback function.
-	// If to is the empty string, then a staging directory is created by the driver.
-	ApplyDiffWithDiffer(to string, options *drivers.ApplyDiffWithDifferOpts, differ drivers.Differ) (*drivers.DriverWithDifferOutput, error)
+	// applyDiffWithDifferNoLock applies the changes through the differ callback function.
+	applyDiffWithDifferNoLock(options *drivers.ApplyDiffWithDifferOpts, differ drivers.Differ) (*drivers.DriverWithDifferOutput, error)
 
 	// CleanupStagingDirectory cleanups the staging directory.  It can be used to cleanup the staging directory on errors
 	CleanupStagingDirectory(stagingDirectory string) error
@@ -332,6 +342,9 @@ type rwLayerStore interface {
 
 	// Clean up unreferenced layers
 	GarbageCollect() error
+
+	// Dedup deduplicates layers in the store.
+	dedup(drivers.DedupArgs) (drivers.DedupResult, error)
 }
 
 type multipleLockFile struct {
@@ -424,18 +437,10 @@ type layerStore struct {
 	driver drivers.Driver
 }
 
-// The caller must hold r.inProcessLock for reading.
-func layerLocation(l *Layer) layerLocations {
-	if l.volatileStore {
-		return volatileLayerLocation
-	}
-	return stableLayerLocation
-}
-
 func copyLayer(l *Layer) *Layer {
 	return &Layer{
 		ID:                 l.ID,
-		Names:              copyStringSlice(l.Names),
+		Names:              copySlicePreferringNil(l.Names),
 		Parent:             l.Parent,
 		Metadata:           l.Metadata,
 		MountLabel:         l.MountLabel,
@@ -449,13 +454,13 @@ func copyLayer(l *Layer) *Layer {
 		TOCDigest:          l.TOCDigest,
 		CompressionType:    l.CompressionType,
 		ReadOnly:           l.ReadOnly,
-		volatileStore:      l.volatileStore,
-		BigDataNames:       copyStringSlice(l.BigDataNames),
-		Flags:              copyStringInterfaceMap(l.Flags),
-		UIDMap:             copyIDMap(l.UIDMap),
-		GIDMap:             copyIDMap(l.GIDMap),
-		UIDs:               copyUint32Slice(l.UIDs),
-		GIDs:               copyUint32Slice(l.GIDs),
+		location:           l.location,
+		BigDataNames:       copySlicePreferringNil(l.BigDataNames),
+		Flags:              copyMapPreferringNil(l.Flags),
+		UIDMap:             copySlicePreferringNil(l.UIDMap),
+		GIDMap:             copySlicePreferringNil(l.GIDMap),
+		UIDs:               copySlicePreferringNil(l.UIDs),
+		GIDs:               copySlicePreferringNil(l.GIDs),
 	}
 }
 
@@ -651,8 +656,12 @@ func (r *layerStore) layersModified() (lockfile.LastWrite, bool, error) {
 	// If the layers.json file or container-layers.json has been
 	// modified manually, then we have to reload the storage in
 	// any case.
-	for locationIndex := 0; locationIndex < numLayerLocationIndex; locationIndex++ {
-		info, err := os.Stat(r.jsonPath[locationIndex])
+	for locationIndex := range numLayerLocationIndex {
+		rpath := r.jsonPath[locationIndex]
+		if rpath == "" {
+			continue
+		}
+		info, err := os.Stat(rpath)
 		if err != nil && !os.IsNotExist(err) {
 			return lockfile.LastWrite{}, false, fmt.Errorf("stat layers file: %w", err)
 		}
@@ -785,9 +794,12 @@ func (r *layerStore) load(lockedForWriting bool) (bool, error) {
 	layers := []*Layer{}
 	ids := make(map[string]*Layer)
 
-	for locationIndex := 0; locationIndex < numLayerLocationIndex; locationIndex++ {
+	for locationIndex := range numLayerLocationIndex {
 		location := layerLocationFromIndex(locationIndex)
 		rpath := r.jsonPath[locationIndex]
+		if rpath == "" {
+			continue
+		}
 		info, err := os.Stat(rpath)
 		if err != nil {
 			if !os.IsNotExist(err) {
@@ -814,9 +826,7 @@ func (r *layerStore) load(lockedForWriting bool) (bool, error) {
 				continue // skip invalid duplicated layer
 			}
 			// Remember where the layer came from
-			if location == volatileLayerLocation {
-				layer.volatileStore = true
-			}
+			layer.location = location
 			layers = append(layers, layer)
 			ids[layer.ID] = layer
 		}
@@ -837,7 +847,7 @@ func (r *layerStore) load(lockedForWriting bool) (bool, error) {
 			if conflict, ok := names[name]; ok {
 				r.removeName(conflict, name)
 				errorToResolveBySaving = ErrDuplicateLayerNames
-				modifiedLocations |= layerLocation(conflict)
+				modifiedLocations |= conflict.location
 			}
 			names[name] = layers[n]
 		}
@@ -909,22 +919,31 @@ func (r *layerStore) load(lockedForWriting bool) (bool, error) {
 		// user of this storage area marked for deletion but didn't manage to
 		// actually delete.
 		var incompleteDeletionErrors error // = nil
+		var layersToDelete []*Layer
 		for _, layer := range r.layers {
 			if layer.Flags == nil {
-				layer.Flags = make(map[string]interface{})
+				layer.Flags = make(map[string]any)
 			}
 			if layerHasIncompleteFlag(layer) {
-				logrus.Warnf("Found incomplete layer %#v, deleting it", layer.ID)
-				err := r.deleteInternal(layer.ID)
-				if err != nil {
-					// Don't return the error immediately, because deleteInternal does not saveLayers();
-					// Even if deleting one incomplete layer fails, call saveLayers() so that other possible successfully
-					// deleted incomplete layers have their metadata correctly removed.
-					incompleteDeletionErrors = multierror.Append(incompleteDeletionErrors,
-						fmt.Errorf("deleting layer %#v: %w", layer.ID, err))
-				}
-				modifiedLocations |= layerLocation(layer)
+				// Important: Do not call r.deleteInternal() here. It modifies r.layers
+				// which causes unexpected side effects while iterating over r.layers here.
+				// The range loop has no idea that the underlying elements where shifted
+				// around.
+				layersToDelete = append(layersToDelete, layer)
 			}
+		}
+		// Now actually delete the layers
+		for _, layer := range layersToDelete {
+			logrus.Warnf("Found incomplete layer %q, deleting it", layer.ID)
+			err := r.deleteInternal(layer.ID)
+			if err != nil {
+				// Don't return the error immediately, because deleteInternal does not saveLayers();
+				// Even if deleting one incomplete layer fails, call saveLayers() so that other possible successfully
+				// deleted incomplete layers have their metadata correctly removed.
+				incompleteDeletionErrors = errors.Join(incompleteDeletionErrors,
+					fmt.Errorf("deleting layer %#v: %w", layer.ID, err))
+			}
+			modifiedLocations |= layer.location
 		}
 		if err := r.saveLayers(modifiedLocations); err != nil {
 			return false, err
@@ -993,7 +1012,7 @@ func (r *layerStore) save(saveLocations layerLocations) error {
 // The caller must hold r.lockfile locked for writing.
 // The caller must hold r.inProcessLock for WRITING.
 func (r *layerStore) saveFor(modifiedLayer *Layer) error {
-	return r.save(layerLocation(modifiedLayer))
+	return r.save(modifiedLayer.location)
 }
 
 // The caller must hold r.lockfile locked for writing.
@@ -1012,18 +1031,21 @@ func (r *layerStore) saveLayers(saveLocations layerLocations) error {
 	}
 	r.lastWrite = lw
 
-	for locationIndex := 0; locationIndex < numLayerLocationIndex; locationIndex++ {
+	for locationIndex := range numLayerLocationIndex {
 		location := layerLocationFromIndex(locationIndex)
 		if location&saveLocations == 0 {
 			continue
 		}
 		rpath := r.jsonPath[locationIndex]
+		if rpath == "" {
+			return fmt.Errorf("internal error: no path for location %v", location)
+		}
 		if err := os.MkdirAll(filepath.Dir(rpath), 0o700); err != nil {
 			return err
 		}
 		subsetLayers := make([]*Layer, 0, len(r.layers))
 		for _, layer := range r.layers {
-			if layerLocation(layer) == location {
+			if layer.location == location {
 				subsetLayers = append(subsetLayers, layer)
 			}
 		}
@@ -1123,12 +1145,17 @@ func (s *store) newLayerStore(rundir, layerdir, imagedir string, driver drivers.
 	if transient {
 		volatileDir = rundir
 	}
+	layersImageDir := ""
+	if imagedir != "" {
+		layersImageDir = filepath.Join(imagedir, "layers.json")
+	}
 	rlstore := layerStore{
 		lockfile:       newMultipleLockFile(lockFiles...),
 		mountsLockfile: mountsLockfile,
 		rundir:         rundir,
 		jsonPath: [numLayerLocationIndex]string{
 			filepath.Join(layerdir, "layers.json"),
+			layersImageDir,
 			filepath.Join(volatileDir, "volatile-layers.json"),
 		},
 		layerdir: layerdir,
@@ -1166,6 +1193,7 @@ func newROLayerStore(rundir string, layerdir string, driver drivers.Driver) (roL
 		rundir:         rundir,
 		jsonPath: [numLayerLocationIndex]string{
 			filepath.Join(layerdir, "layers.json"),
+			"",
 			filepath.Join(layerdir, "volatile-layers.json"),
 		},
 		layerdir: layerdir,
@@ -1213,8 +1241,8 @@ func (r *layerStore) Size(name string) (int64, error) {
 	// We use the presence of a non-empty digest as an indicator that the size value was intentionally set, and that
 	// a zero value is not just present because it was never set to anything else (which can happen if the layer was
 	// created by a version of this library that didn't keep track of digest and size information).
-	if layer.TOCDigest != "" || layer.UncompressedDigest != "" {
-		return layer.UncompressedSize, nil
+	if layer.UncompressedDigest != "" || layer.TOCDigest != "" {
+		return layer.UncompressedSize, nil // This may return -1 if only TOCDigest is set
 	}
 	return -1, nil
 }
@@ -1233,7 +1261,7 @@ func (r *layerStore) ClearFlag(id string, flag string) error {
 }
 
 // Requires startWriting.
-func (r *layerStore) SetFlag(id string, flag string, value interface{}) error {
+func (r *layerStore) SetFlag(id string, flag string, value any) error {
 	if !r.lockfile.IsReadWrite() {
 		return fmt.Errorf("not allowed to set flags on layers at %q: %w", r.layerdir, ErrStoreIsReadOnly)
 	}
@@ -1242,7 +1270,7 @@ func (r *layerStore) SetFlag(id string, flag string, value interface{}) error {
 		return ErrLayerUnknown
 	}
 	if layer.Flags == nil {
-		layer.Flags = make(map[string]interface{})
+		layer.Flags = make(map[string]any)
 	}
 	layer.Flags[flag] = value
 	return r.saveFor(layer)
@@ -1314,6 +1342,17 @@ func (r *layerStore) PutAdditionalLayer(id string, parentLayer *Layer, names []s
 	return copyLayer(layer), nil
 }
 
+func (r *layerStore) pickStoreLocation(volatile, writeable bool) layerLocations {
+	switch {
+	case volatile:
+		return volatileLayerLocation
+	case !writeable && r.jsonPath[indexFromLayerLocation(imageStoreLayerLocation)] != "":
+		return imageStoreLayerLocation
+	default:
+		return stableLayerLocation
+	}
+}
+
 // Requires startWriting.
 func (r *layerStore) create(id string, parentLayer *Layer, names []string, mountLabel string, options map[string]string, moreOptions *LayerOptions, writeable bool, diff io.Reader, slo *stagedLayerOptions) (layer *Layer, size int64, err error) {
 	if moreOptions == nil {
@@ -1372,7 +1411,7 @@ func (r *layerStore) create(id string, parentLayer *Layer, names []string, mount
 		templateCompressedDigest, templateCompressedSize = templateLayer.CompressedDigest, templateLayer.CompressedSize
 		templateUncompressedDigest, templateUncompressedSize = templateLayer.UncompressedDigest, templateLayer.UncompressedSize
 		templateCompressionType = templateLayer.CompressionType
-		templateUIDs, templateGIDs = append([]uint32{}, templateLayer.UIDs...), append([]uint32{}, templateLayer.GIDs...)
+		templateUIDs, templateGIDs = slices.Clone(templateLayer.UIDs), slices.Clone(templateLayer.GIDs)
 		templateTSdata, err = os.ReadFile(r.tspath(templateLayer.ID))
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return nil, -1, err
@@ -1402,11 +1441,11 @@ func (r *layerStore) create(id string, parentLayer *Layer, names []string, mount
 		CompressionType:    templateCompressionType,
 		UIDs:               templateUIDs,
 		GIDs:               templateGIDs,
-		Flags:              copyStringInterfaceMap(moreOptions.Flags),
-		UIDMap:             copyIDMap(moreOptions.UIDMap),
-		GIDMap:             copyIDMap(moreOptions.GIDMap),
+		Flags:              newMapFrom(moreOptions.Flags),
+		UIDMap:             copySlicePreferringNil(moreOptions.UIDMap),
+		GIDMap:             copySlicePreferringNil(moreOptions.GIDMap),
 		BigDataNames:       []string{},
-		volatileStore:      moreOptions.Volatile,
+		location:           r.pickStoreLocation(moreOptions.Volatile, writeable),
 	}
 	layer.Flags[incompleteFlag] = true
 
@@ -1564,19 +1603,9 @@ func (r *layerStore) Mount(id string, options drivers.MountOpts) (string, error)
 	// - r.layers[].MountPoint (directly and via loadMounts / saveMounts)
 	// - r.bymount (via loadMounts / saveMounts)
 
-	// check whether options include ro option
-	hasReadOnlyOpt := func(opts []string) bool {
-		for _, item := range opts {
-			if item == "ro" {
-				return true
-			}
-		}
-		return false
-	}
-
 	// You are not allowed to mount layers from readonly stores if they
 	// are not mounted read/only.
-	if !r.lockfile.IsReadWrite() && !hasReadOnlyOpt(options.Options) {
+	if !r.lockfile.IsReadWrite() && !slices.Contains(options.Options, "ro") {
 		return "", fmt.Errorf("not allowed to update mount locations for layers at %q: %w", r.mountspath(), ErrStoreIsReadOnly)
 	}
 	r.mountsLockfile.Lock()
@@ -1836,14 +1865,7 @@ func (r *layerStore) setBigData(layer *Layer, key string, data io.Reader) error 
 		return fmt.Errorf("closing bigdata file for the layer: %w", err)
 	}
 
-	addName := true
-	for _, name := range layer.BigDataNames {
-		if name == key {
-			addName = false
-			break
-		}
-	}
-	if addName {
+	if !slices.Contains(layer.BigDataNames, key) {
 		layer.BigDataNames = append(layer.BigDataNames, key)
 		return r.saveFor(layer)
 	}
@@ -1856,7 +1878,7 @@ func (r *layerStore) BigDataNames(id string) ([]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("locating layer with ID %q to retrieve bigdata names: %w", id, ErrImageUnknown)
 	}
-	return copyStringSlice(layer.BigDataNames), nil
+	return copySlicePreferringNil(layer.BigDataNames), nil
 }
 
 // Requires startReading or startWriting.
@@ -1909,7 +1931,7 @@ func (r *layerStore) deleteInternal(id string) error {
 	// Ensure that if we are interrupted, the layer will be cleaned up.
 	if !layerHasIncompleteFlag(layer) {
 		if layer.Flags == nil {
-			layer.Flags = make(map[string]interface{})
+			layer.Flags = make(map[string]any)
 		}
 		layer.Flags[incompleteFlag] = true
 		if err := r.saveFor(layer); err != nil {
@@ -1938,32 +1960,13 @@ func (r *layerStore) deleteInternal(id string) error {
 		delete(r.bymount, layer.MountPoint)
 	}
 	r.deleteInDigestMap(id)
-	toDeleteIndex := -1
-	for i, candidate := range r.layers {
-		if candidate.ID == id {
-			toDeleteIndex = i
-			break
-		}
-	}
-	if toDeleteIndex != -1 {
-		// delete the layer at toDeleteIndex
-		if toDeleteIndex == len(r.layers)-1 {
-			r.layers = r.layers[:len(r.layers)-1]
-		} else {
-			r.layers = append(r.layers[:toDeleteIndex], r.layers[toDeleteIndex+1:]...)
-		}
-	}
-	if mountLabel != "" {
-		var found bool
-		for _, candidate := range r.layers {
-			if candidate.MountLabel == mountLabel {
-				found = true
-				break
-			}
-		}
-		if !found {
-			selinux.ReleaseLabel(mountLabel)
-		}
+	r.layers = slices.DeleteFunc(r.layers, func(candidate *Layer) bool {
+		return candidate.ID == id
+	})
+	if mountLabel != "" && !slices.ContainsFunc(r.layers, func(candidate *Layer) bool {
+		return candidate.MountLabel == mountLabel
+	}) {
+		selinux.ReleaseLabel(mountLabel)
 	}
 	return nil
 }
@@ -1971,21 +1974,15 @@ func (r *layerStore) deleteInternal(id string) error {
 // Requires startWriting.
 func (r *layerStore) deleteInDigestMap(id string) {
 	for digest, layers := range r.bycompressedsum {
-		for i, layerID := range layers {
-			if layerID == id {
-				layers = append(layers[:i], layers[i+1:]...)
-				r.bycompressedsum[digest] = layers
-				break
-			}
+		if i := slices.Index(layers, id); i != -1 {
+			layers = slices.Delete(layers, i, i+1)
+			r.bycompressedsum[digest] = layers
 		}
 	}
 	for digest, layers := range r.byuncompressedsum {
-		for i, layerID := range layers {
-			if layerID == id {
-				layers = append(layers[:i], layers[i+1:]...)
-				r.byuncompressedsum[digest] = layers
-				break
-			}
+		if i := slices.Index(layers, id); i != -1 {
+			layers = slices.Delete(layers, i, i+1)
+			r.byuncompressedsum[digest] = layers
 		}
 	}
 }
@@ -2095,6 +2092,9 @@ func (r *layerStore) layerMappings(layer *Layer) *idtools.IDMappings {
 }
 
 // Requires startReading or startWriting.
+//
+// NOTE: Overlay’s implementation assumes use of an exclusive lock over the primary layer store,
+// see drivers/overlay.Driver.getMergedDir.
 func (r *layerStore) Changes(from, to string) ([]archive.Change, error) {
 	from, to, fromLayer, toLayer, err := r.findParentAndLayer(from, to)
 	if err != nil {
@@ -2161,6 +2161,9 @@ func writeCompressedDataGoroutine(pwriter *io.PipeWriter, compressor io.WriteClo
 }
 
 // Requires startReading or startWriting.
+//
+// NOTE: Overlay’s implementation assumes use of an exclusive lock over the primary layer store,
+// see drivers/overlay.Driver.getMergedDir.
 func (r *layerStore) Diff(from, to string, options *DiffOptions) (io.ReadCloser, error) {
 	var metadata storage.Unpacker
 
@@ -2276,33 +2279,33 @@ func (r *layerStore) Diff(from, to string, options *DiffOptions) (io.ReadCloser,
 	// but they modify in-memory state.
 	fgetter, err := r.newFileGetter(to)
 	if err != nil {
-		errs := multierror.Append(nil, fmt.Errorf("creating file-getter: %w", err))
+		errs := fmt.Errorf("creating file-getter: %w", err)
 		if err := decompressor.Close(); err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("closing decompressor: %w", err))
+			errs = errors.Join(errs, fmt.Errorf("closing decompressor: %w", err))
 		}
 		if err := tsfile.Close(); err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("closing tarstream headers: %w", err))
+			errs = errors.Join(errs, fmt.Errorf("closing tarstream headers: %w", err))
 		}
-		return nil, errs.ErrorOrNil()
+		return nil, errs
 	}
 
 	tarstream := asm.NewOutputTarStream(fgetter, metadata)
 	rc := ioutils.NewReadCloserWrapper(tarstream, func() error {
-		var errs *multierror.Error
+		var errs error
 		if err := decompressor.Close(); err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("closing decompressor: %w", err))
+			errs = errors.Join(errs, fmt.Errorf("closing decompressor: %w", err))
 		}
 		if err := tsfile.Close(); err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("closing tarstream headers: %w", err))
+			errs = errors.Join(errs, fmt.Errorf("closing tarstream headers: %w", err))
 		}
 		if err := tarstream.Close(); err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("closing reconstructed tarstream: %w", err))
+			errs = errors.Join(errs, fmt.Errorf("closing reconstructed tarstream: %w", err))
 		}
 		if err := fgetter.Close(); err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("closing file-getter: %w", err))
+			errs = errors.Join(errs, fmt.Errorf("closing file-getter: %w", err))
 		}
 		if errs != nil {
-			return errs.ErrorOrNil()
+			return errs
 		}
 		return nil
 	})
@@ -2472,16 +2475,12 @@ func (r *layerStore) applyDiffWithOptions(to string, layerOptions *LayerOptions,
 	for uid := range uidLog {
 		layer.UIDs = append(layer.UIDs, uid)
 	}
-	sort.Slice(layer.UIDs, func(i, j int) bool {
-		return layer.UIDs[i] < layer.UIDs[j]
-	})
+	slices.Sort(layer.UIDs)
 	layer.GIDs = make([]uint32, 0, len(gidLog))
 	for gid := range gidLog {
 		layer.GIDs = append(layer.GIDs, gid)
 	}
-	sort.Slice(layer.GIDs, func(i, j int) bool {
-		return layer.GIDs[i] < layer.GIDs[j]
-	})
+	slices.Sort(layer.GIDs)
 
 	err = r.saveFor(layer)
 
@@ -2529,23 +2528,23 @@ func (r *layerStore) applyDiffFromStagingDirectory(id string, diffOutput *driver
 	layer.GIDs = diffOutput.GIDs
 	updateDigestMap(&r.byuncompressedsum, layer.UncompressedDigest, diffOutput.UncompressedDigest, layer.ID)
 	layer.UncompressedDigest = diffOutput.UncompressedDigest
-	updateDigestMap(&r.bytocsum, diffOutput.TOCDigest, diffOutput.TOCDigest, layer.ID)
+	updateDigestMap(&r.bycompressedsum, layer.CompressedDigest, diffOutput.CompressedDigest, layer.ID)
+	layer.CompressedDigest = diffOutput.CompressedDigest
+	updateDigestMap(&r.bytocsum, layer.TOCDigest, diffOutput.TOCDigest, layer.ID)
 	layer.TOCDigest = diffOutput.TOCDigest
 	layer.UncompressedSize = diffOutput.Size
 	layer.Metadata = diffOutput.Metadata
 	if options != nil && options.Flags != nil {
 		if layer.Flags == nil {
-			layer.Flags = make(map[string]interface{})
+			layer.Flags = make(map[string]any)
 		}
-		for k, v := range options.Flags {
-			layer.Flags[k] = v
-		}
+		maps.Copy(layer.Flags, options.Flags)
 	}
 	if err = r.saveFor(layer); err != nil {
 		return err
 	}
 
-	if len(diffOutput.TarSplit) != 0 {
+	if diffOutput.TarSplit != nil {
 		tsdata := bytes.Buffer{}
 		compressor, err := pgzip.NewWriterLevel(&tsdata, pgzip.BestSpeed)
 		if err != nil {
@@ -2577,37 +2576,14 @@ func (r *layerStore) applyDiffFromStagingDirectory(id string, diffOutput *driver
 	return err
 }
 
-// Requires startWriting.
-func (r *layerStore) ApplyDiffWithDiffer(to string, options *drivers.ApplyDiffWithDifferOpts, differ drivers.Differ) (*drivers.DriverWithDifferOutput, error) {
+// It must be called without any c/storage locks held to allow differ to make c/storage calls.
+func (r *layerStore) applyDiffWithDifferNoLock(options *drivers.ApplyDiffWithDifferOpts, differ drivers.Differ) (*drivers.DriverWithDifferOutput, error) {
 	ddriver, ok := r.driver.(drivers.DriverWithDiffer)
 	if !ok {
 		return nil, ErrNotSupported
 	}
 
-	if to == "" {
-		output, err := ddriver.ApplyDiffWithDiffer("", "", options, differ)
-		return &output, err
-	}
-
-	layer, ok := r.lookup(to)
-	if !ok {
-		return nil, ErrLayerUnknown
-	}
-	if options == nil {
-		options = &drivers.ApplyDiffWithDifferOpts{
-			ApplyDiffOpts: drivers.ApplyDiffOpts{
-				Mappings:   r.layerMappings(layer),
-				MountLabel: layer.MountLabel,
-			},
-		}
-	}
-	output, err := ddriver.ApplyDiffWithDiffer(layer.ID, layer.Parent, options, differ)
-	if err != nil {
-		return nil, err
-	}
-	layer.UIDs = output.UIDs
-	layer.GIDs = output.GIDs
-	err = r.saveFor(layer)
+	output, err := ddriver.ApplyDiffWithDiffer(options, differ)
 	return &output, err
 }
 
@@ -2645,6 +2621,11 @@ func (r *layerStore) LayersByUncompressedDigest(d digest.Digest) ([]Layer, error
 // Requires startReading or startWriting.
 func (r *layerStore) LayersByTOCDigest(d digest.Digest) ([]Layer, error) {
 	return r.layersByDigestMap(r.bytocsum, d)
+}
+
+// Requires startWriting.
+func (r *layerStore) dedup(req drivers.DedupArgs) (drivers.DedupResult, error) {
+	return r.driver.Dedup(req)
 }
 
 func closeAll(closes ...func() error) (rErr error) {

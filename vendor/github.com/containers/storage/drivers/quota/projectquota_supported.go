@@ -1,5 +1,4 @@
 //go:build linux && !exclude_disk_quota && cgo
-// +build linux,!exclude_disk_quota,cgo
 
 //
 // projectquota.go - implements XFS project quota controls
@@ -173,6 +172,11 @@ func NewControl(basePath string) (*Control, error) {
 		return nil, err
 	}
 
+	// Clear inherit flag from top-level directory if necessary.
+	if err := stripProjectInherit(basePath); err != nil {
+		return nil, err
+	}
+
 	//
 	// get first project id to be used for next container
 	//
@@ -186,7 +190,8 @@ func NewControl(basePath string) (*Control, error) {
 }
 
 // SetQuota - assign a unique project id to directory and set the quota limits
-// for that project id
+// for that project id.
+// targetPath must exist, must be a directory, and must be empty.
 func (q *Control) SetQuota(targetPath string, quota Quota) error {
 	var projectID uint32
 	value, ok := q.quotas.Load(targetPath)
@@ -196,10 +201,20 @@ func (q *Control) SetQuota(targetPath string, quota Quota) error {
 	if !ok {
 		projectID = q.nextProjectID
 
+		// The directory we are setting an ID on must be empty, as
+		// the ID will not be propagated to pre-existing subdirectories.
+		dents, err := os.ReadDir(targetPath)
+		if err != nil {
+			return fmt.Errorf("reading directory %s: %w", targetPath, err)
+		}
+		if len(dents) > 0 {
+			return fmt.Errorf("can only set project ID on empty directories, %s is not empty", targetPath)
+		}
+
 		//
 		// assign project id to new container directory
 		//
-		err := setProjectID(targetPath, projectID)
+		err = setProjectID(targetPath, projectID)
 		if err != nil {
 			return err
 		}
@@ -350,6 +365,8 @@ func setProjectID(targetPath string, projectID uint32) error {
 	}
 	defer closeDir(dir)
 
+	logrus.Debugf("Setting quota project ID %d on %s", projectID, targetPath)
+
 	var fsx C.struct_fsxattr
 	_, _, errno := unix.Syscall(unix.SYS_IOCTL, getDirFd(dir), C.FS_IOC_FSGETXATTR,
 		uintptr(unsafe.Pointer(&fsx)))
@@ -364,6 +381,36 @@ func setProjectID(targetPath string, projectID uint32) error {
 		return fmt.Errorf("failed to set projid for %s: %w", targetPath, errno)
 	}
 
+	return nil
+}
+
+// stripProjectInherit strips the project inherit flag from a directory.
+// Used on the top-level directory to ensure project IDs are only inherited for
+// files in directories we set quotas on - not the directories we want to set
+// the quotas on, as that would make everything use the same project ID.
+func stripProjectInherit(targetPath string) error {
+	dir, err := openDir(targetPath)
+	if err != nil {
+		return err
+	}
+	defer closeDir(dir)
+
+	var fsx C.struct_fsxattr
+	_, _, errno := unix.Syscall(unix.SYS_IOCTL, getDirFd(dir), C.FS_IOC_FSGETXATTR,
+		uintptr(unsafe.Pointer(&fsx)))
+	if errno != 0 {
+		return fmt.Errorf("failed to get xfs attrs for %s: %w", targetPath, errno)
+	}
+	if fsx.fsx_xflags&C.FS_XFLAG_PROJINHERIT != 0 {
+		// Flag is set, need to clear it.
+		logrus.Debugf("Clearing PROJINHERIT flag from directory %s", targetPath)
+		fsx.fsx_xflags = fsx.fsx_xflags &^ C.FS_XFLAG_PROJINHERIT
+		_, _, errno = unix.Syscall(unix.SYS_IOCTL, getDirFd(dir), C.FS_IOC_FSSETXATTR,
+			uintptr(unsafe.Pointer(&fsx)))
+		if errno != 0 {
+			return fmt.Errorf("failed to clear PROJINHERIT for %s: %w", targetPath, errno)
+		}
+	}
 	return nil
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/containers/image/v5/internal/imagedestination"
 	"github.com/containers/image/v5/internal/imagedestination/impl"
@@ -14,6 +15,7 @@ import (
 	"github.com/containers/storage/pkg/archive"
 	"github.com/containers/storage/pkg/idtools"
 	digest "github.com/opencontainers/go-digest"
+	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 )
 
@@ -103,6 +105,14 @@ func (d *ociArchiveImageDestination) SupportsPutBlobPartial() bool {
 	return d.unpackedDest.SupportsPutBlobPartial()
 }
 
+// NoteOriginalOCIConfig provides the config of the image, as it exists on the source, BUT converted to OCI format,
+// or an error obtaining that value (e.g. if the image is an artifact and not a container image).
+// The destination can use it in its TryReusingBlob/PutBlob implementations
+// (otherwise it only obtains the final config after all layers are written).
+func (d *ociArchiveImageDestination) NoteOriginalOCIConfig(ociConfig *imgspecv1.Image, configErr error) error {
+	return d.unpackedDest.NoteOriginalOCIConfig(ociConfig, configErr)
+}
+
 // PutBlobWithOptions writes contents of stream and returns data representing the result.
 // inputInfo.Digest can be optionally provided if known; if provided, and stream is read to the end without error, the digest MUST match the stream contents.
 // inputInfo.Size is the expected length of stream, if known.
@@ -117,8 +127,9 @@ func (d *ociArchiveImageDestination) PutBlobWithOptions(ctx context.Context, str
 // PutBlobPartial attempts to create a blob using the data that is already present
 // at the destination. chunkAccessor is accessed in a non-sequential way to retrieve the missing chunks.
 // It is available only if SupportsPutBlobPartial().
-// Even if SupportsPutBlobPartial() returns true, the call can fail, in which case the caller
-// should fall back to PutBlobWithOptions.
+// Even if SupportsPutBlobPartial() returns true, the call can fail.
+// If the call fails with ErrFallbackToOrdinaryLayerDownload, the caller can fall back to PutBlobWithOptions.
+// The fallback _must not_ be done otherwise.
 func (d *ociArchiveImageDestination) PutBlobPartial(ctx context.Context, chunkAccessor private.BlobChunkAccessor, srcInfo types.BlobInfo, options private.PutBlobPartialOptions) (private.UploadedBlob, error) {
 	return d.unpackedDest.PutBlobPartial(ctx, chunkAccessor, srcInfo, options)
 }
@@ -149,13 +160,12 @@ func (d *ociArchiveImageDestination) PutSignaturesWithFormat(ctx context.Context
 	return d.unpackedDest.PutSignaturesWithFormat(ctx, signatures, instanceDigest)
 }
 
-// Commit marks the process of storing the image as successful and asks for the image to be persisted
-// unparsedToplevel contains data about the top-level manifest of the source (which may be a single-arch image or a manifest list
-// if PutManifest was only called for the single-arch image with instanceDigest == nil), primarily to allow lookups by the
-// original manifest list digest, if desired.
-// after the directory is made, it is tarred up into a file and the directory is deleted
-func (d *ociArchiveImageDestination) Commit(ctx context.Context, unparsedToplevel types.UnparsedImage) error {
-	if err := d.unpackedDest.Commit(ctx, unparsedToplevel); err != nil {
+// CommitWithOptions marks the process of storing the image as successful and asks for the image to be persisted.
+// WARNING: This does not have any transactional semantics:
+// - Uploaded data MAY be visible to others before CommitWithOptions() is called
+// - Uploaded data MAY be removed or MAY remain around if Close() is called without CommitWithOptions() (i.e. rollback is allowed but not guaranteed)
+func (d *ociArchiveImageDestination) CommitWithOptions(ctx context.Context, options private.CommitOptions) error {
+	if err := d.unpackedDest.CommitWithOptions(ctx, options); err != nil {
 		return fmt.Errorf("storing image %q: %w", d.ref.image, err)
 	}
 
@@ -163,16 +173,19 @@ func (d *ociArchiveImageDestination) Commit(ctx context.Context, unparsedTopleve
 	src := d.tempDirRef.tempDirectory
 	// path to save tarred up file
 	dst := d.ref.resolvedFile
-	return tarDirectory(src, dst)
+	return tarDirectory(src, dst, options.Timestamp)
 }
 
 // tar converts the directory at src and saves it to dst
-func tarDirectory(src, dst string) error {
+// if contentModTimes is non-nil, tar header entries times are set to this
+func tarDirectory(src, dst string, contentModTimes *time.Time) (retErr error) {
 	// input is a stream of bytes from the archive of the directory at path
 	input, err := archive.TarWithOptions(src, &archive.TarOptions{
 		Compression: archive.Uncompressed,
 		// Don’t include the data about the user account this code is running under.
 		ChownOpts: &idtools.IDPair{UID: 0, GID: 0},
+		// override tar header timestamps
+		Timestamp: contentModTimes,
 	})
 	if err != nil {
 		return fmt.Errorf("retrieving stream of bytes from %q: %w", src, err)
@@ -184,7 +197,14 @@ func tarDirectory(src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("creating tar file %q: %w", dst, err)
 	}
-	defer outFile.Close()
+
+	// since we are writing to this file, make sure we handle errors
+	defer func() {
+		closeErr := outFile.Close()
+		if retErr == nil {
+			retErr = closeErr
+		}
+	}()
 
 	// copies the contents of the directory to the tar file
 	// TODO: This can take quite some time, and should ideally be cancellable using a context.Context.

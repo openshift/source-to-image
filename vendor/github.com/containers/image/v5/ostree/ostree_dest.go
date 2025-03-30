@@ -143,16 +143,24 @@ func (d *ostreeImageDestination) PutBlobWithOptions(ctx context.Context, stream 
 		return private.UploadedBlob{}, err
 	}
 
+	digester, stream := putblobdigest.DigestIfCanonicalUnknown(stream, inputInfo)
+
 	blobPath := filepath.Join(tmpDir, "content")
 	blobFile, err := os.Create(blobPath)
 	if err != nil {
 		return private.UploadedBlob{}, err
 	}
-	defer blobFile.Close()
-
-	digester, stream := putblobdigest.DigestIfCanonicalUnknown(stream, inputInfo)
-	// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
-	size, err := io.Copy(blobFile, stream)
+	size, err := func() (_ int64, retErr error) { // A scope for defer
+		// since we are writing to this file, make sure we handle errors
+		defer func() {
+			closeErr := blobFile.Close()
+			if retErr == nil {
+				retErr = closeErr
+			}
+		}()
+		// TODO: This can take quite some time, and should ideally be cancellable using ctx.Done().
+		return io.Copy(blobFile, stream)
+	}()
 	if err != nil {
 		return private.UploadedBlob{}, err
 	}
@@ -247,9 +255,15 @@ func (d *ostreeImageDestination) ostreeCommit(repo *otbuiltin.Repo, branch strin
 	return err
 }
 
-func generateTarSplitMetadata(output *bytes.Buffer, file string) (digest.Digest, int64, error) {
+func generateTarSplitMetadata(output *bytes.Buffer, file string) (_ digest.Digest, _ int64, retErr error) {
 	mfz := pgzip.NewWriter(output)
-	defer mfz.Close()
+	// since we are writing to this, make sure we handle errors
+	defer func() {
+		closeErr := mfz.Close()
+		if retErr == nil {
+			retErr = closeErr
+		}
+	}()
 	metaPacker := storage.NewJSONPacker(mfz)
 
 	stream, err := os.OpenFile(file, os.O_RDONLY, 0)
@@ -435,7 +449,11 @@ func (d *ostreeImageDestination) PutSignaturesWithFormat(ctx context.Context, si
 	return nil
 }
 
-func (d *ostreeImageDestination) Commit(context.Context, types.UnparsedImage) error {
+// CommitWithOptions marks the process of storing the image as successful and asks for the image to be persisted.
+// WARNING: This does not have any transactional semantics:
+// - Uploaded data MAY be visible to others before CommitWithOptions() is called
+// - Uploaded data MAY be removed or MAY remain around if Close() is called without CommitWithOptions() (i.e. rollback is allowed but not guaranteed)
+func (d *ostreeImageDestination) CommitWithOptions(ctx context.Context, options private.CommitOptions) error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 

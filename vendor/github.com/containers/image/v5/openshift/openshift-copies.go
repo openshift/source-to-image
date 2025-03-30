@@ -365,7 +365,7 @@ func validateClusterInfo(clusterName string, clusterInfo clientcmdCluster) []err
 	if len(clusterInfo.CertificateAuthority) != 0 {
 		err := validateFileIsReadable(clusterInfo.CertificateAuthority)
 		if err != nil {
-			validationErrors = append(validationErrors, fmt.Errorf("unable to read certificate-authority %v for %v due to %v", clusterInfo.CertificateAuthority, clusterName, err))
+			validationErrors = append(validationErrors, fmt.Errorf("unable to read certificate-authority %v for %v due to %w", clusterInfo.CertificateAuthority, clusterName, err))
 		}
 	}
 
@@ -403,13 +403,13 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdAuthInfo) []error {
 		if len(authInfo.ClientCertificate) != 0 {
 			err := validateFileIsReadable(authInfo.ClientCertificate)
 			if err != nil {
-				validationErrors = append(validationErrors, fmt.Errorf("unable to read client-cert %v for %v due to %v", authInfo.ClientCertificate, authInfoName, err))
+				validationErrors = append(validationErrors, fmt.Errorf("unable to read client-cert %v for %v due to %w", authInfo.ClientCertificate, authInfoName, err))
 			}
 		}
 		if len(authInfo.ClientKey) != 0 {
 			err := validateFileIsReadable(authInfo.ClientKey)
 			if err != nil {
-				validationErrors = append(validationErrors, fmt.Errorf("unable to read client-key %v for %v due to %v", authInfo.ClientKey, authInfoName, err))
+				validationErrors = append(validationErrors, fmt.Errorf("unable to read client-key %v for %v due to %w", authInfo.ClientKey, authInfoName, err))
 			}
 		}
 	}
@@ -571,8 +571,7 @@ func (rules *clientConfigLoadingRules) Load() (*clientcmdConfig, error) {
 	// merge all of the struct values in the reverse order so that priority is given correctly
 	// errors are not added to the list the second time
 	nonMapConfig := clientcmdNewConfig()
-	for i := len(kubeconfigs) - 1; i >= 0; i-- {
-		kubeconfig := kubeconfigs[i]
+	for _, kubeconfig := range slices.Backward(kubeconfigs) {
 		if err := mergo.MergeWithOverwrite(nonMapConfig, kubeconfig); err != nil {
 			return nil, err
 		}
@@ -921,7 +920,7 @@ func tlsCacheGet(config *restConfig) (http.RoundTripper, error) {
 // TLSConfigFor returns a tls.Config that will provide the transport level security defined
 // by the provided Config. Will return nil if no transport level security is requested.
 func tlsConfigFor(c *restConfig) (*tls.Config, error) {
-	if !(c.HasCA() || c.HasCertAuth() || c.Insecure) {
+	if !c.HasCA() && !c.HasCertAuth() && !c.Insecure {
 		return nil, nil
 	}
 	if c.HasCA() && c.Insecure {

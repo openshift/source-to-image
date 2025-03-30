@@ -41,6 +41,7 @@ import (
 type dockerImageDestination struct {
 	impl.Compat
 	impl.PropertyMethodsInitialize
+	stubs.IgnoresOriginalOCIConfig
 	stubs.NoPutBlobPartialInitialize
 
 	ref dockerReference
@@ -242,8 +243,12 @@ func (d *dockerImageDestination) blobExists(ctx context.Context, repo reference.
 	defer res.Body.Close()
 	switch res.StatusCode {
 	case http.StatusOK:
+		size, err := getBlobSize(res)
+		if err != nil {
+			return false, -1, fmt.Errorf("determining size of blob %s in %s: %w", digest, repo.Name(), err)
+		}
 		logrus.Debugf("... already exists")
-		return true, getBlobSize(res), nil
+		return true, size, nil
 	case http.StatusUnauthorized:
 		logrus.Debugf("... not authorized")
 		return false, -1, fmt.Errorf("checking whether a blob %s exists in %s: %w", digest, repo.Name(), registryHTTPResponseToError(res))
@@ -332,6 +337,7 @@ func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, 
 		return false, private.ReusedBlob{}, errors.New("Can not check for a blob with unknown digest")
 	}
 
+	originalCandidateKnownToBeMissing := false
 	if impl.OriginalCandidateMatchesTryReusingBlobOptions(options) {
 		// First, check whether the blob happens to already exist at the destination.
 		haveBlob, reusedInfo, err := d.tryReusingExactBlob(ctx, info, options.Cache)
@@ -341,9 +347,17 @@ func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, 
 		if haveBlob {
 			return true, reusedInfo, nil
 		}
+		originalCandidateKnownToBeMissing = true
 	} else {
 		logrus.Debugf("Ignoring exact blob match, compression %s does not match required %s or MIME types %#v",
 			optionalCompressionName(options.OriginalCompression), optionalCompressionName(options.RequiredCompression), options.PossibleManifestFormats)
+		// We can get here with a blob detected to be zstd when the user wants a zstd:chunked.
+		// In that case we keep originalCandiateKnownToBeMissing = false, so that if we find
+		// a BIC entry for this blob, we do use that entry and return a zstd:chunked entry
+		// with the BIC’s annotations.
+		// This is not quite correct, it only works if the BIC also contains an acceptable _location_.
+		// Ideally, we could look up just the compression algorithm/annotations for info.digest,
+		// and use it even if no location candidate exists and the original dandidate is present.
 	}
 
 	// Then try reusing blobs from other locations.
@@ -361,8 +375,6 @@ func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, 
 				logrus.Debugf("Error parsing BlobInfoCache location reference: %s", err)
 				continue
 			}
-		}
-		if !candidate.UnknownLocation {
 			if candidate.CompressionAlgorithm != nil {
 				logrus.Debugf("Trying to reuse blob with cached digest %s compressed with %s in destination repo %s", candidate.Digest.String(), candidate.CompressionAlgorithm.Name(), candidateRepo.Name())
 			} else {
@@ -389,7 +401,8 @@ func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, 
 			// for it in the current repo.
 			candidateRepo = reference.TrimNamed(d.ref.ref)
 		}
-		if candidateRepo.Name() == d.ref.ref.Name() && candidate.Digest == info.Digest {
+		if originalCandidateKnownToBeMissing &&
+			candidateRepo.Name() == d.ref.ref.Name() && candidate.Digest == info.Digest {
 			logrus.Debug("... Already tried the primary destination")
 			continue
 		}
@@ -429,10 +442,12 @@ func (d *dockerImageDestination) TryReusingBlobWithOptions(ctx context.Context, 
 		options.Cache.RecordKnownLocation(d.ref.Transport(), bicTransportScope(d.ref), candidate.Digest, newBICLocationReference(d.ref))
 
 		return true, private.ReusedBlob{
-			Digest:               candidate.Digest,
-			Size:                 size,
-			CompressionOperation: candidate.CompressionOperation,
-			CompressionAlgorithm: candidate.CompressionAlgorithm}, nil
+			Digest:                 candidate.Digest,
+			Size:                   size,
+			CompressionOperation:   candidate.CompressionOperation,
+			CompressionAlgorithm:   candidate.CompressionAlgorithm,
+			CompressionAnnotations: candidate.CompressionAnnotations,
+		}, nil
 	}
 
 	return false, private.ReusedBlob{}, nil
@@ -913,13 +928,10 @@ func (d *dockerImageDestination) putSignaturesToAPIExtension(ctx context.Context
 	return nil
 }
 
-// Commit marks the process of storing the image as successful and asks for the image to be persisted.
-// unparsedToplevel contains data about the top-level manifest of the source (which may be a single-arch image or a manifest list
-// if PutManifest was only called for the single-arch image with instanceDigest == nil), primarily to allow lookups by the
-// original manifest list digest, if desired.
+// CommitWithOptions marks the process of storing the image as successful and asks for the image to be persisted.
 // WARNING: This does not have any transactional semantics:
-// - Uploaded data MAY be visible to others before Commit() is called
-// - Uploaded data MAY be removed or MAY remain around if Close() is called without Commit() (i.e. rollback is allowed but not guaranteed)
-func (d *dockerImageDestination) Commit(context.Context, types.UnparsedImage) error {
+// - Uploaded data MAY be visible to others before CommitWithOptions() is called
+// - Uploaded data MAY be removed or MAY remain around if Close() is called without CommitWithOptions() (i.e. rollback is allowed but not guaranteed)
+func (d *dockerImageDestination) CommitWithOptions(ctx context.Context, options private.CommitOptions) error {
 	return nil
 }

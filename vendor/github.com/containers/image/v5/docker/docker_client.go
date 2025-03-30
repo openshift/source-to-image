@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -42,7 +43,6 @@ const (
 	dockerRegistry   = "registry-1.docker.io"
 
 	resolvedPingV2URL       = "%s://%s/v2/"
-	resolvedPingV1URL       = "%s://%s/v1/_ping"
 	tagsPath                = "/v2/%s/tags/list"
 	manifestPath            = "/v2/%s/manifests/%s"
 	blobsPath               = "/v2/%s/blobs/%s"
@@ -86,11 +86,9 @@ type extensionSignatureList struct {
 	Signatures []extensionSignature `json:"signatures"`
 }
 
+// bearerToken records a cached token we can use to authenticate.
 type bearerToken struct {
-	Token          string    `json:"token"`
-	AccessToken    string    `json:"access_token"`
-	ExpiresIn      int       `json:"expires_in"`
-	IssuedAt       time.Time `json:"issued_at"`
+	token          string
 	expirationTime time.Time
 }
 
@@ -146,25 +144,6 @@ const (
 	// no authentication, works for both v1 and v2.
 	noAuth
 )
-
-func newBearerTokenFromJSONBlob(blob []byte) (*bearerToken, error) {
-	token := new(bearerToken)
-	if err := json.Unmarshal(blob, &token); err != nil {
-		return nil, err
-	}
-	if token.Token == "" {
-		token.Token = token.AccessToken
-	}
-	if token.ExpiresIn < minimumTokenLifetimeSeconds {
-		token.ExpiresIn = minimumTokenLifetimeSeconds
-		logrus.Debugf("Increasing token expiration to: %d seconds", token.ExpiresIn)
-	}
-	if token.IssuedAt.IsZero() {
-		token.IssuedAt = time.Now().UTC()
-	}
-	token.expirationTime = token.IssuedAt.Add(time.Duration(token.ExpiresIn) * time.Second)
-	return token, nil
-}
 
 // dockerCertDir returns a path to a directory to be consumed by tlsclientconfig.SetupCertificates() depending on ctx and hostPort.
 func dockerCertDir(sys *types.SystemContext, hostPort string) (string, error) {
@@ -497,12 +476,11 @@ func (c *dockerClient) resolveRequestURL(path string) (*url.URL, error) {
 }
 
 // Checks if the auth headers in the response contain an indication of a failed
-// authorizdation because of an "insufficient_scope" error. If that's the case,
+// authorization because of an "insufficient_scope" error. If that's the case,
 // returns the required scope to be used for fetching a new token.
 func needsRetryWithUpdatedScope(res *http.Response) (bool, *authScope) {
 	if res.StatusCode == http.StatusUnauthorized {
-		challenges := parseAuthHeader(res.Header)
-		for _, challenge := range challenges {
+		for challenge := range iterateAuthHeader(res.Header) {
 			if challenge.Scheme == "bearer" {
 				if errmsg, ok := challenge.Parameters["error"]; ok && errmsg == "insufficient_scope" {
 					if scope, ok := challenge.Parameters["scope"]; ok && scope != "" {
@@ -774,7 +752,7 @@ func (c *dockerClient) setupRequestAuth(req *http.Request, extraScope *authScope
 					token = *t
 					c.tokenCache.Store(cacheKey, token)
 				}
-				registryToken = token.Token
+				registryToken = token.token
 			}
 			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", registryToken))
 			return nil
@@ -827,12 +805,7 @@ func (c *dockerClient) getBearerTokenOAuth2(ctx context.Context, challenge chall
 		return nil, err
 	}
 
-	tokenBlob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxAuthTokenBodySize)
-	if err != nil {
-		return nil, err
-	}
-
-	return newBearerTokenFromJSONBlob(tokenBlob)
+	return newBearerTokenFromHTTPResponseBody(res)
 }
 
 func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge,
@@ -878,12 +851,50 @@ func (c *dockerClient) getBearerToken(ctx context.Context, challenge challenge,
 	if err := httpResponseToError(res, "Requesting bearer token"); err != nil {
 		return nil, err
 	}
-	tokenBlob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxAuthTokenBodySize)
+
+	return newBearerTokenFromHTTPResponseBody(res)
+}
+
+// newBearerTokenFromHTTPResponseBody parses a http.Response to obtain a bearerToken.
+// The caller is still responsible for ensuring res.Body is closed.
+func newBearerTokenFromHTTPResponseBody(res *http.Response) (*bearerToken, error) {
+	blob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxAuthTokenBodySize)
 	if err != nil {
 		return nil, err
 	}
 
-	return newBearerTokenFromJSONBlob(tokenBlob)
+	var token struct {
+		Token          string    `json:"token"`
+		AccessToken    string    `json:"access_token"`
+		ExpiresIn      int       `json:"expires_in"`
+		IssuedAt       time.Time `json:"issued_at"`
+		expirationTime time.Time
+	}
+	if err := json.Unmarshal(blob, &token); err != nil {
+		const bodySampleLength = 50
+		bodySample := blob
+		if len(bodySample) > bodySampleLength {
+			bodySample = bodySample[:bodySampleLength]
+		}
+		return nil, fmt.Errorf("decoding bearer token (last URL %q, body start %q): %w", res.Request.URL.Redacted(), string(bodySample), err)
+	}
+
+	bt := &bearerToken{
+		token: token.Token,
+	}
+	if bt.token == "" {
+		bt.token = token.AccessToken
+	}
+
+	if token.ExpiresIn < minimumTokenLifetimeSeconds {
+		token.ExpiresIn = minimumTokenLifetimeSeconds
+		logrus.Debugf("Increasing token expiration to: %d seconds", token.ExpiresIn)
+	}
+	if token.IssuedAt.IsZero() {
+		token.IssuedAt = time.Now().UTC()
+	}
+	bt.expirationTime = token.IssuedAt.Add(time.Duration(token.ExpiresIn) * time.Second)
+	return bt, nil
 }
 
 // detectPropertiesHelper performs the work of detectProperties which executes
@@ -896,6 +907,10 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 	}
 	tr := tlsclientconfig.NewTransport()
 	tr.TLSClientConfig = c.tlsClientConfig
+	// if set DockerProxyURL explicitly, use the DockerProxyURL instead of system proxy
+	if c.sys != nil && c.sys.DockerProxyURL != nil {
+		tr.Proxy = http.ProxyURL(c.sys.DockerProxyURL)
+	}
 	c.client = &http.Client{Transport: tr}
 
 	ping := func(scheme string) error {
@@ -913,7 +928,7 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
 			return registryHTTPResponseToError(resp)
 		}
-		c.challenges = parseAuthHeader(resp.Header)
+		c.challenges = slices.Collect(iterateAuthHeader(resp.Header))
 		c.scheme = scheme
 		c.supportsSignatures = resp.Header.Get("X-Registry-Supports-Signatures") == "1"
 		return nil
@@ -924,34 +939,6 @@ func (c *dockerClient) detectPropertiesHelper(ctx context.Context) error {
 	}
 	if err != nil {
 		err = fmt.Errorf("pinging container registry %s: %w", c.registry, err)
-		if c.sys != nil && c.sys.DockerDisableV1Ping {
-			return err
-		}
-		// best effort to understand if we're talking to a V1 registry
-		pingV1 := func(scheme string) bool {
-			pingURL, err := url.Parse(fmt.Sprintf(resolvedPingV1URL, scheme, c.registry))
-			if err != nil {
-				return false
-			}
-			resp, err := c.makeRequestToResolvedURL(ctx, http.MethodGet, pingURL, nil, nil, -1, noAuth, nil)
-			if err != nil {
-				logrus.Debugf("Ping %s err %s (%#v)", pingURL.Redacted(), err.Error(), err)
-				return false
-			}
-			defer resp.Body.Close()
-			logrus.Debugf("Ping %s status %d", pingURL.Redacted(), resp.StatusCode)
-			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusUnauthorized {
-				return false
-			}
-			return true
-		}
-		isV1 := pingV1("https")
-		if !isV1 && c.tlsClientConfig.InsecureSkipVerify {
-			isV1 = pingV1("http")
-		}
-		if isV1 {
-			err = ErrV1NotSupported
-		}
 	}
 	return err
 }
@@ -1009,13 +996,18 @@ func (c *dockerClient) getExternalBlob(ctx context.Context, urls []string) (io.R
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
-			err := fmt.Errorf("error fetching external blob from %q: %d (%s)", u, resp.StatusCode, http.StatusText(resp.StatusCode))
+			err := fmt.Errorf("error fetching external blob from %q: %w", u, newUnexpectedHTTPStatusError(resp))
 			remoteErrors = append(remoteErrors, err)
 			logrus.Debug(err)
 			resp.Body.Close()
 			continue
 		}
-		return resp.Body, getBlobSize(resp), nil
+
+		size, err := getBlobSize(resp)
+		if err != nil {
+			size = -1
+		}
+		return resp.Body, size, nil
 	}
 	if remoteErrors == nil {
 		return nil, 0, nil // fallback to non-external blob
@@ -1023,12 +1015,20 @@ func (c *dockerClient) getExternalBlob(ctx context.Context, urls []string) (io.R
 	return nil, 0, fmt.Errorf("failed fetching external blob from all urls: %w", multierr.Format("", ", ", "", remoteErrors))
 }
 
-func getBlobSize(resp *http.Response) int64 {
-	size, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64)
-	if err != nil {
-		size = -1
+func getBlobSize(resp *http.Response) (int64, error) {
+	hdrs := resp.Header.Values("Content-Length")
+	if len(hdrs) == 0 {
+		return -1, errors.New(`Missing "Content-Length" header in response`)
 	}
-	return size
+	hdr := hdrs[0] // Equivalent to resp.Header.Get(…)
+	size, err := strconv.ParseInt(hdr, 10, 64)
+	if err != nil { // Go’s response reader should already reject such values.
+		return -1, err
+	}
+	if size < 0 { // '-' is not a valid character in Content-Length, so negative values are invalid. Go’s response reader should already reject such values.
+		return -1, fmt.Errorf(`Invalid negative "Content-Length" %q`, hdr)
+	}
+	return size, nil
 }
 
 // getBlob returns a stream for the specified blob in ref, and the blob’s size (or -1 if unknown).
@@ -1059,7 +1059,10 @@ func (c *dockerClient) getBlob(ctx context.Context, ref dockerReference, info ty
 		return nil, 0, fmt.Errorf("fetching blob: %w", err)
 	}
 	cache.RecordKnownLocation(ref.Transport(), bicTransportScope(ref), info.Digest, newBICLocationReference(ref))
-	blobSize := getBlobSize(res)
+	blobSize, err := getBlobSize(res)
+	if err != nil {
+		blobSize = -1
+	}
 
 	reconnectingReader, err := newBodyReader(ctx, c, path, res.Body)
 	if err != nil {
@@ -1073,6 +1076,15 @@ func (c *dockerClient) getBlob(ctx context.Context, ref dockerReference, info ty
 func (c *dockerClient) getOCIDescriptorContents(ctx context.Context, ref dockerReference, desc imgspecv1.Descriptor, maxSize int, cache types.BlobInfoCache) ([]byte, error) {
 	// Note that this copies all kinds of attachments: attestations, and whatever else is there,
 	// not just signatures. We leave the signature consumers to decide based on the MIME type.
+
+	if err := desc.Digest.Validate(); err != nil { // .Algorithm() might panic without this check
+		return nil, fmt.Errorf("invalid digest %q: %w", desc.Digest.String(), err)
+	}
+	digestAlgorithm := desc.Digest.Algorithm()
+	if !digestAlgorithm.Available() {
+		return nil, fmt.Errorf("invalid digest %q: unsupported digest algorithm %q", desc.Digest.String(), digestAlgorithm.String())
+	}
+
 	reader, _, err := c.getBlob(ctx, ref, manifest.BlobInfoFromOCI1Descriptor(desc), cache)
 	if err != nil {
 		return nil, err
@@ -1081,6 +1093,10 @@ func (c *dockerClient) getOCIDescriptorContents(ctx context.Context, ref dockerR
 	payload, err := iolimits.ReadAtMost(reader, maxSize)
 	if err != nil {
 		return nil, fmt.Errorf("reading blob %s in %s: %w", desc.Digest.String(), ref.ref.Name(), err)
+	}
+	actualDigest := digestAlgorithm.FromBytes(payload)
+	if actualDigest != desc.Digest {
+		return nil, fmt.Errorf("digest mismatch, expected %q, got %q", desc.Digest.String(), actualDigest.String())
 	}
 	return payload, nil
 }

@@ -131,8 +131,8 @@ type Client interface {
 	ContainerStart(ctx context.Context, container string, options dockercontainer.StartOptions) error
 	ContainerKill(ctx context.Context, container, signal string) error
 	ContainerWait(ctx context.Context, container string, condition dockercontainer.WaitCondition) (<-chan dockercontainer.WaitResponse, <-chan error)
-	CopyToContainer(ctx context.Context, container, path string, content io.Reader, opts dockertypes.CopyToContainerOptions) error
-	CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, dockertypes.ContainerPathStat, error)
+	CopyToContainer(ctx context.Context, container, path string, content io.Reader, opts dockercontainer.CopyToContainerOptions) error
+	CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, dockercontainer.PathStat, error)
 	ImageBuild(ctx context.Context, buildContext io.Reader, options dockertypes.ImageBuildOptions) (dockertypes.ImageBuildResponse, error)
 	ImageInspectWithRaw(ctx context.Context, image string) (dockertypes.ImageInspect, []byte, error)
 	ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error)
@@ -409,7 +409,7 @@ func (d *stiDocker) UploadToContainerWithTarWriter(fs fs.FileSystem, src, dest, 
 	log.V(3).Infof("Uploading %q to %q ...", src, destPath)
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	err := d.client.CopyToContainer(ctx, container, destPath, r, dockertypes.CopyToContainerOptions{})
+	err := d.client.CopyToContainer(ctx, container, destPath, r, dockercontainer.CopyToContainerOptions{})
 	if err != nil {
 		log.V(0).Infof("error: Uploading to container failed: %v", err)
 	}

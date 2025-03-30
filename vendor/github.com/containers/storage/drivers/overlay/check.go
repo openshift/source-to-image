@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 package overlay
 
@@ -260,10 +259,14 @@ func supportsIdmappedLowerLayers(home string) (bool, error) {
 	}
 	defer cleanupFunc()
 
-	if err := idmap.CreateIDMappedMount(lowerDir, lowerMappedDir, int(pid)); err != nil {
+	if err := idmap.CreateIDMappedMount(lowerDir, lowerMappedDir, pid); err != nil {
 		return false, fmt.Errorf("create mapped mount: %w", err)
 	}
-	defer unix.Unmount(lowerMappedDir, unix.MNT_DETACH)
+	defer func() {
+		if err := unix.Unmount(lowerMappedDir, unix.MNT_DETACH); err != nil {
+			logrus.Warnf("Unmount %q: %v", lowerMappedDir, err)
+		}
+	}()
 
 	opts := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s", lowerMappedDir, upperDir, workDir)
 	flags := uintptr(0)
