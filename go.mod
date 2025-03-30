@@ -10,8 +10,8 @@ require (
 	github.com/go-imports-organizer/goio v1.3.3
 	github.com/moby/buildkit v0.16.0
 	github.com/opencontainers/image-spec v1.1.1
-	github.com/spf13/cobra v1.8.1
-	github.com/spf13/pflag v1.0.5
+	github.com/spf13/cobra v1.9.1
+	github.com/spf13/pflag v1.0.6
 	golang.org/x/net v0.35.0
 	k8s.io/klog/v2 v2.130.1
 )
