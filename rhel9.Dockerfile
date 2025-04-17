@@ -1,5 +1,4 @@
-FROM registry.access.redhat.com/ubi8/go-toolset@sha256:be796155c0908cd48375bf1f7150036bcd3ad415dfb6cae135f1cf184d61964c AS builder
-
+FROM registry.access.redhat.com/ubi8/go-toolset:1.22 AS builder
 ENV S2I_GIT_VERSION="1.5.0" \
     S2I_GIT_MAJOR="1" \
     S2I_GIT_MINOR="5"
@@ -11,7 +10,7 @@ COPY . .
 RUN CGO_ENABLED=1 GO111MODULE=on go build -a -mod=vendor -ldflags="-s -w" -tags="strictfipsruntime exclude_graphdriver_btrfs" -o /tmp/s2i ./cmd/s2i
 
 
-FROM registry.access.redhat.com/ubi8@sha256:37cdac4ec130a64050d6df4e1f2ef3f53868bea55d11f623d141f139ee342bd8
+FROM registry.redhat.io/ubi9/ubi-minimal:9.6
 
 COPY --from=builder /tmp/s2i /usr/local/bin/s2i
 
@@ -20,10 +19,10 @@ USER 1001
 ENTRYPOINT [ "/usr/local/bin/s2i" ]
 
 LABEL \
-    name="source-to-image/source-to-image" \
+    name="source-to-image/source-to-image-rhel9" \
     description="Source-to-Image is a builder image" \
     summary="Source-to-Image is a builder image" \
-    version="1.5.0" \
+    version="1.6.0" \
     vendor="Red Hat, Inc." \
     com.redhat.component="source-to-image-container" \
     maintainer="openshift-builds@redhat.com" \
