@@ -1,0 +1,62 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  annotations:
+    build.appstudio.openshift.io/repo: https://github.com/openshift/source-to-image?rev={{revision}}
+    build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
+    build.appstudio.redhat.com/target_branch: '{{target_branch}}'
+    pipelinesascode.tekton.dev/max-keep-runs: "3"
+    pipelinesascode.tekton.dev/on-cel-expression: |
+      event == "pull_request" &&
+      target_branch == "master"
+      (
+        files.all.exists(x, x.matches('cmd/|pkg/')) ||
+        files.all.exists(x, x.matches('go.mod|go.sum|rhel8.Dockerfile')) ||
+        files.all.exists(x, x.matches('.tekton/source-to-image-rhel8-pull-request.yaml'))
+      )
+  creationTimestamp: null
+  labels:
+    appstudio.openshift.io/application: source-to-image
+    appstudio.openshift.io/component: source-to-image-rhel8
+    pipelines.appstudio.openshift.io/type: build
+  name: source-to-image-rhel8-on-pull-request
+  namespace: ocp-tools-s2i-tenant
+spec:
+  params:
+  - name: git-url
+    value: '{{source_url}}'
+  - name: revision
+    value: '{{revision}}'
+  - name: output-image
+    value: quay.io/redhat-user-workloads/ocp-tools-s2i-tenant/source-to-image-rhel8:on-pr-{{revision}}
+  - name: image-expires-after
+    value: 5d
+  - name: dockerfile
+    value: rhel8.Dockerfile
+  - name: build-source-image
+    value: "true"
+  - name: hermetic
+    value: "true"
+  - name: build-platforms
+    value:
+    - linux/x86_64
+    - linux/arm64
+  - name: prefetch-input
+    value: '{"packages": [{"type": "gomod"}]}'
+  pipelineRef:
+    resolver: git
+    params:
+    - name: url
+      value: https://github.com/redhat-openshift-builds/release.git
+    - name: revision
+      value: main
+    - name: pathInRepo
+      value: /pipelines/konflux-build-multi-platform.yaml
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-source-to-image-rhel8
+  workspaces:
+  - name: git-auth
+    secret:
+      secretName: '{{ git_auth_secret }}'
+status: {}
