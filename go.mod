@@ -7,7 +7,7 @@ require (
 	github.com/distribution/reference v0.6.0
 	github.com/docker/docker v27.3.1+incompatible
 	github.com/docker/go-connections v0.5.0
-	github.com/go-imports-organizer/goio v1.3.3
+	github.com/go-imports-organizer/goio v1.5.0
 	github.com/moby/buildkit v0.16.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/spf13/cobra v1.9.1
@@ -76,7 +76,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.28.0 // indirect
 	go.opentelemetry.io/otel/trace v1.28.0 // indirect
 	golang.org/x/exp v0.0.0-20240613232115-7f521ea00fb8 // indirect
-	golang.org/x/mod v0.18.0 // indirect
+	golang.org/x/mod v0.21.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240930140551-af27646dc61f // indirect
