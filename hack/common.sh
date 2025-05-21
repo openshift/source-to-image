@@ -21,6 +21,7 @@ S2I_OUTPUT_BINPATH="${S2I_OUTPUT}/bin"
 S2I_OUTPUT_PKGDIR="${S2I_OUTPUT}/pkgdir"
 S2I_LOCAL_BINPATH="${S2I_OUTPUT}/go/bin"
 S2I_LOCAL_RELEASEPATH="${S2I_OUTPUT}/releases"
+S2I_BUILD_TAGS="${S2I_BUILD_TAGS:-}"
 RELEASE_LDFLAGS=${RELEASE_LDFLAGS:-""}
 
 
@@ -97,6 +98,7 @@ s2i::build::build_binaries() {
       CGO_ENABLED=0 go install "${goflags[@]:+${goflags[@]}}" \
           -pkgdir "${S2I_OUTPUT_PKGDIR}" \
           -ldflags "${version_ldflags} ${RELEASE_LDFLAGS}" \
+          -tags "${S2I_BUILD_TAGS}" \
           -mod vendor \
           "${binaries[@]}"
       s2i::build::unset_platform_envs "${platform}"

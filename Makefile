@@ -11,6 +11,7 @@
 OUT_DIR = _output
 
 export GOFLAGS
+export S2I_BUILD_TAGS = "exclude_graphdriver_btrfs"
 
 VERSION = latest
 CONTAINER_ENGINE = podman

@@ -9,7 +9,7 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: |
       event == "pull_request" &&
-      target_branch == "master"
+      target_branch == "master" &&
       (
         files.all.exists(x, x.matches('cmd/|pkg/')) ||
         files.all.exists(x, x.matches('go.mod|go.sum|rhel8.Dockerfile')) ||
