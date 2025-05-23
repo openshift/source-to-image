@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -69,7 +70,7 @@ func (c changesByPath) Swap(i, j int)      { c[j], c[i] = c[i], c[j] }
 // files, we handle this by comparing for exact times, *or* same
 // second count and either a or b having exactly 0 nanoseconds
 func sameFsTime(a, b time.Time) bool {
-	return a == b ||
+	return a.Equal(b) ||
 		(a.Unix() == b.Unix() &&
 			(a.Nanosecond() == 0 || b.Nanosecond() == 0))
 }
@@ -97,8 +98,7 @@ func aufsDeletedFile(root, path string, fi os.FileInfo) (string, error) {
 	f := filepath.Base(path)
 
 	// If there is a whiteout, then the file was removed
-	if strings.HasPrefix(f, WhiteoutPrefix) {
-		originalFile := f[len(WhiteoutPrefix):]
+	if originalFile, ok := strings.CutPrefix(f, WhiteoutPrefix); ok {
 		return filepath.Join(filepath.Dir(path), originalFile), nil
 	}
 
@@ -270,6 +270,7 @@ type FileInfo struct {
 	capability []byte
 	added      bool
 	xattrs     map[string]string
+	target     string
 }
 
 // LookUp looks up the file information of a file.
@@ -319,9 +320,7 @@ func (info *FileInfo) addChanges(oldInfo *FileInfo, changes *[]Change) {
 	// otherwise any previous delete/change is considered recursive
 	oldChildren := make(map[string]*FileInfo)
 	if oldInfo != nil && info.isDir() {
-		for k, v := range oldInfo.children {
-			oldChildren[k] = v
-		}
+		maps.Copy(oldChildren, oldInfo.children)
 	}
 
 	for name, newChild := range info.children {
@@ -338,6 +337,7 @@ func (info *FileInfo) addChanges(oldInfo *FileInfo, changes *[]Change) {
 			// back mtime
 			if statDifferent(oldStat, oldInfo, newStat, info) ||
 				!bytes.Equal(oldChild.capability, newChild.capability) ||
+				oldChild.target != newChild.target ||
 				!reflect.DeepEqual(oldChild.xattrs, newChild.xattrs) {
 				change := Change{
 					Path: newChild.path(),
@@ -392,6 +392,7 @@ func newRootFileInfo(idMappings *idtools.IDMappings) *FileInfo {
 		name:       string(os.PathSeparator),
 		idMappings: idMappings,
 		children:   make(map[string]*FileInfo),
+		target:     "",
 	}
 	return root
 }
@@ -451,7 +452,7 @@ func ChangesSize(newDir string, changes []Change) int64 {
 func ExportChanges(dir string, changes []Change, uidMaps, gidMaps []idtools.IDMap) (io.ReadCloser, error) {
 	reader, writer := io.Pipe()
 	go func() {
-		ta := newTarAppender(idtools.NewIDMappingsFromMaps(uidMaps, gidMaps), writer, nil)
+		ta := newTarWriter(idtools.NewIDMappingsFromMaps(uidMaps, gidMaps), writer, nil, nil)
 
 		// this buffer is needed for the duration of this piped stream
 		defer pools.BufioWriter32KPool.Put(ta.Buffer)
@@ -480,7 +481,7 @@ func ExportChanges(dir string, changes []Change, uidMaps, gidMaps []idtools.IDMa
 				}
 			} else {
 				path := filepath.Join(dir, change.Path)
-				if err := ta.addTarFile(path, change.Path[1:]); err != nil {
+				if err := ta.addFile(path, change.Path[1:]); err != nil {
 					logrus.Debugf("Can't add file %s to tar: %s", path, err)
 				}
 			}

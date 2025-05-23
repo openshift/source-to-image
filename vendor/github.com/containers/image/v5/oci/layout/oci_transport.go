@@ -12,6 +12,7 @@ import (
 	"github.com/containers/image/v5/directory/explicitfilepath"
 	"github.com/containers/image/v5/docker/reference"
 	"github.com/containers/image/v5/internal/image"
+	"github.com/containers/image/v5/internal/manifest"
 	"github.com/containers/image/v5/oci/internal"
 	"github.com/containers/image/v5/transports"
 	"github.com/containers/image/v5/types"
@@ -61,22 +62,31 @@ type ociReference struct {
 	// (But in general, we make no attempt to be completely safe against concurrent hostile filesystem modifications.)
 	dir         string // As specified by the user. May be relative, contain symlinks, etc.
 	resolvedDir string // Absolute path with no symlinks, at least at the time of its creation. Primarily used for policy namespaces.
-	// If image=="", it means the "only image" in the index.json is used in the case it is a source
-	// for destinations, the image name annotation "image.ref.name" is not added to the index.json
+	// If image=="" && sourceIndex==-1, it means the "only image" in the index.json is used in the case it is a source
+	// for destinations, the image name annotation "image.ref.name" is not added to the index.json.
+	//
+	// Must not be set if sourceIndex is set (the value is not -1).
 	image string
+	// If not -1, a zero-based index of an image in the manifest index. Valid only for sources.
+	// Must not be set if image is set.
+	sourceIndex int
 }
 
 // ParseReference converts a string, which should not start with the ImageTransport.Name prefix, into an OCI ImageReference.
 func ParseReference(reference string) (types.ImageReference, error) {
-	dir, image := internal.SplitPathAndImage(reference)
-	return NewReference(dir, image)
+	dir, image, index, err := internal.ParseReferenceIntoElements(reference)
+	if err != nil {
+		return nil, err
+	}
+	return newReference(dir, image, index)
 }
 
-// NewReference returns an OCI reference for a directory and a image.
+// newReference returns an OCI reference for a directory, and an image name annotation or sourceIndex.
 //
+// If sourceIndex==-1, the index will not be valid to point out the source image, only image will be used.
 // We do not expose an API supplying the resolvedDir; we could, but recomputing it
 // is generally cheap enough that we prefer being confident about the properties of resolvedDir.
-func NewReference(dir, image string) (types.ImageReference, error) {
+func newReference(dir, image string, sourceIndex int) (types.ImageReference, error) {
 	resolved, err := explicitfilepath.ResolvePathToFullyExplicit(dir)
 	if err != nil {
 		return nil, err
@@ -90,7 +100,26 @@ func NewReference(dir, image string) (types.ImageReference, error) {
 		return nil, err
 	}
 
-	return ociReference{dir: dir, resolvedDir: resolved, image: image}, nil
+	if sourceIndex != -1 && sourceIndex < 0 {
+		return nil, fmt.Errorf("Invalid oci: layout reference: index @%d must not be negative", sourceIndex)
+	}
+	if sourceIndex != -1 && image != "" {
+		return nil, fmt.Errorf("Invalid oci: layout reference: cannot use both an image %s and a source index @%d", image, sourceIndex)
+	}
+	return ociReference{dir: dir, resolvedDir: resolved, image: image, sourceIndex: sourceIndex}, nil
+}
+
+// NewIndexReference returns an OCI reference for a path and a zero-based source manifest index.
+func NewIndexReference(dir string, sourceIndex int) (types.ImageReference, error) {
+	if sourceIndex < 0 {
+		return nil, fmt.Errorf("invalid call to NewIndexReference with negative index %d", sourceIndex)
+	}
+	return newReference(dir, "", sourceIndex)
+}
+
+// NewReference returns an OCI reference for a directory and an optional image name annotation (if not "").
+func NewReference(dir, image string) (types.ImageReference, error) {
+	return newReference(dir, image, -1)
 }
 
 func (ref ociReference) Transport() types.ImageTransport {
@@ -103,7 +132,10 @@ func (ref ociReference) Transport() types.ImageTransport {
 // e.g. default attribute values omitted by the user may be filled in the return value, or vice versa.
 // WARNING: Do not use the return value in the UI to describe an image, it does not contain the Transport().Name() prefix.
 func (ref ociReference) StringWithinTransport() string {
-	return fmt.Sprintf("%s:%s", ref.dir, ref.image)
+	if ref.sourceIndex == -1 {
+		return fmt.Sprintf("%s:%s", ref.dir, ref.image)
+	}
+	return fmt.Sprintf("%s:@%d", ref.dir, ref.sourceIndex)
 }
 
 // DockerReference returns a Docker reference associated with this reference
@@ -187,19 +219,23 @@ func (ref ociReference) getManifestDescriptor() (imgspecv1.Descriptor, int, erro
 		return imgspecv1.Descriptor{}, -1, err
 	}
 
-	if ref.image == "" {
-		// return manifest if only one image is in the oci directory
-		if len(index.Manifests) != 1 {
-			// ask user to choose image when more than one image in the oci directory
-			return imgspecv1.Descriptor{}, -1, ErrMoreThanOneImage
+	switch {
+	case ref.image != "" && ref.sourceIndex != -1: // Coverage: newReference refuses to create such references.
+		return imgspecv1.Descriptor{}, -1, fmt.Errorf("Internal error: Cannot have both ref %s and source index @%d",
+			ref.image, ref.sourceIndex)
+
+	case ref.sourceIndex != -1:
+		if ref.sourceIndex >= len(index.Manifests) {
+			return imgspecv1.Descriptor{}, -1, fmt.Errorf("index %d is too large, only %d entries available", ref.sourceIndex, len(index.Manifests))
 		}
-		return index.Manifests[0], 0, nil
-	} else {
+		return index.Manifests[ref.sourceIndex], ref.sourceIndex, nil
+
+	case ref.image != "":
 		// if image specified, look through all manifests for a match
 		var unsupportedMIMETypes []string
 		for i, md := range index.Manifests {
 			if refName, ok := md.Annotations[imgspecv1.AnnotationRefName]; ok && refName == ref.image {
-				if md.MediaType == imgspecv1.MediaTypeImageManifest || md.MediaType == imgspecv1.MediaTypeImageIndex {
+				if md.MediaType == imgspecv1.MediaTypeImageManifest || md.MediaType == imgspecv1.MediaTypeImageIndex || md.MediaType == manifest.DockerV2Schema2MediaType || md.MediaType == manifest.DockerV2ListMediaType {
 					return md, i, nil
 				}
 				unsupportedMIMETypes = append(unsupportedMIMETypes, md.MediaType)
@@ -208,8 +244,16 @@ func (ref ociReference) getManifestDescriptor() (imgspecv1.Descriptor, int, erro
 		if len(unsupportedMIMETypes) != 0 {
 			return imgspecv1.Descriptor{}, -1, fmt.Errorf("reference %q matches unsupported manifest MIME types %q", ref.image, unsupportedMIMETypes)
 		}
+		return imgspecv1.Descriptor{}, -1, ImageNotFoundError{ref}
+
+	default:
+		// return manifest if only one image is in the oci directory
+		if len(index.Manifests) != 1 {
+			// ask user to choose image when more than one image in the oci directory
+			return imgspecv1.Descriptor{}, -1, ErrMoreThanOneImage
+		}
+		return index.Manifests[0], 0, nil
 	}
-	return imgspecv1.Descriptor{}, -1, ImageNotFoundError{ref}
 }
 
 // LoadManifestDescriptor loads the manifest descriptor to be used to retrieve the image name

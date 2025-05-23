@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -35,9 +35,9 @@ type bodyReader struct {
 
 	body            io.ReadCloser // The currently open connection we use to read data, or nil if there is nothing to read from / close.
 	lastRetryOffset int64         // -1 if N/A
-	lastRetryTime   time.Time     // time.Time{} if N/A
+	lastRetryTime   time.Time     // IsZero() if N/A
 	offset          int64         // Current offset within the blob
-	lastSuccessTime time.Time     // time.Time{} if N/A
+	lastSuccessTime time.Time     // IsZero() if N/A
 }
 
 // newBodyReader creates a bodyReader for request path in c.
@@ -158,7 +158,7 @@ func (br *bodyReader) Read(p []byte) (int, error) {
 			logrus.Debugf("Error closing blob body: %v", err) // … and ignore err otherwise
 		}
 		br.body = nil
-		time.Sleep(1*time.Second + time.Duration(rand.Intn(100_000))*time.Microsecond) // Some jitter so that a failure blip doesn’t cause a deterministic stampede
+		time.Sleep(1*time.Second + rand.N(100_000*time.Microsecond)) // Some jitter so that a failure blip doesn’t cause a deterministic stampede
 
 		headers := map[string][]string{
 			"Range": {fmt.Sprintf("bytes=%d-", br.offset)},
@@ -197,7 +197,7 @@ func (br *bodyReader) Read(p []byte) (int, error) {
 		consumedBody = true
 		br.body = res.Body
 		br.lastRetryOffset = br.offset
-		br.lastRetryTime = time.Time{}
+		br.lastRetryTime = time.Now()
 		return n, nil
 
 	default:
@@ -207,9 +207,9 @@ func (br *bodyReader) Read(p []byte) (int, error) {
 }
 
 // millisecondsSinceOptional is like currentTime.Sub(tm).Milliseconds, but it returns a floating-point value.
-// If tm is time.Time{}, it returns math.NaN()
+// If tm.IsZero(), it returns math.NaN()
 func millisecondsSinceOptional(currentTime time.Time, tm time.Time) float64 {
-	if tm == (time.Time{}) {
+	if tm.IsZero() {
 		return math.NaN()
 	}
 	return float64(currentTime.Sub(tm).Nanoseconds()) / 1_000_000.0
@@ -229,7 +229,7 @@ func (br *bodyReader) errorIfNotReconnecting(originalErr error, redactedURL stri
 		logrus.Infof("Reading blob body from %s failed (%v), reconnecting after %d bytes…", redactedURL, originalErr, progress)
 		return nil
 	}
-	if br.lastRetryTime == (time.Time{}) {
+	if br.lastRetryTime.IsZero() {
 		logrus.Infof("Reading blob body from %s failed (%v), reconnecting (first reconnection)…", redactedURL, originalErr)
 		return nil
 	}

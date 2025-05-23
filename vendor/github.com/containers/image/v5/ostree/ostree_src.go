@@ -151,9 +151,9 @@ func openRepo(path string) (*C.struct_OstreeRepo, error) {
 	var cerr *C.GError
 	cpath := C.CString(path)
 	defer C.free(unsafe.Pointer(cpath))
-	pathc := C.g_file_new_for_path(cpath)
-	defer C.g_object_unref(C.gpointer(pathc))
-	repo := C.ostree_repo_new(pathc)
+	file := C.g_file_new_for_path(cpath)
+	defer C.g_object_unref(C.gpointer(file))
+	repo := C.ostree_repo_new(file)
 	r := glib.GoBool(glib.GBoolean(C.ostree_repo_open(repo, nil, &cerr)))
 	if !r {
 		C.g_object_unref(C.gpointer(repo))
@@ -250,9 +250,7 @@ func newOSTreePathFileGetter(repo *C.struct_OstreeRepo, commit string) (*ostreeP
 
 func (o ostreePathFileGetter) Get(filename string) (io.ReadCloser, error) {
 	var file *C.GFile
-	if strings.HasPrefix(filename, "./") {
-		filename = filename[2:]
-	}
+	filename, _ = strings.CutPrefix(filename, "./")
 	cfilename := C.CString(filename)
 	defer C.free(unsafe.Pointer(cfilename))
 

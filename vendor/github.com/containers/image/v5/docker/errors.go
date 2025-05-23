@@ -12,6 +12,7 @@ import (
 var (
 	// ErrV1NotSupported is returned when we're trying to talk to a
 	// docker V1 registry.
+	// Deprecated: The V1 container registry detection is no longer performed, so this error is never returned.
 	ErrV1NotSupported = errors.New("can't talk to a V1 container registry")
 	// ErrTooManyRequests is returned when the status code returned is 429
 	ErrTooManyRequests = errors.New("too many requests to registry")
@@ -39,10 +40,10 @@ func httpResponseToError(res *http.Response, context string) error {
 		err := registryHTTPResponseToError(res)
 		return ErrUnauthorizedForCredentials{Err: err}
 	default:
-		if context != "" {
-			context += ": "
+		if context == "" {
+			return newUnexpectedHTTPStatusError(res)
 		}
-		return fmt.Errorf("%sinvalid status code from registry %d (%s)", context, res.StatusCode, http.StatusText(res.StatusCode))
+		return fmt.Errorf("%s: %w", context, newUnexpectedHTTPStatusError(res))
 	}
 }
 

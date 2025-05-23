@@ -14,7 +14,7 @@ import (
 
 func expandEnvPath(path string, rootlessUID int) (string, error) {
 	var err error
-	path = strings.Replace(path, "$UID", strconv.Itoa(rootlessUID), -1)
+	path = strings.ReplaceAll(path, "$UID", strconv.Itoa(rootlessUID))
 	path = os.ExpandEnv(path)
 	newpath, err := filepath.EvalSymlinks(path)
 	if err != nil {
@@ -61,12 +61,15 @@ func reloadConfigurationFileIfNeeded(configFile string, storeOptions *StoreOptio
 	}
 
 	mtime := fi.ModTime()
-	if prevReloadConfig.storeOptions != nil && prevReloadConfig.mod == mtime && prevReloadConfig.configFile == configFile {
+	if prevReloadConfig.storeOptions != nil && mtime.Equal(prevReloadConfig.mod) && prevReloadConfig.configFile == configFile {
 		*storeOptions = *prevReloadConfig.storeOptions
 		return
 	}
 
-	ReloadConfigurationFile(configFile, storeOptions)
+	if err := ReloadConfigurationFile(configFile, storeOptions); err != nil {
+		logrus.Warningf("Failed to reload %q %v\n", configFile, err)
+		return
+	}
 
 	prevReloadConfig.storeOptions = storeOptions
 	prevReloadConfig.mod = mtime

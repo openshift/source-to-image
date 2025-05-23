@@ -1,15 +1,19 @@
+//go:build unix
+
 package dump
 
 import (
 	"bufio"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"path/filepath"
-	"strings"
+	"reflect"
 	"time"
-	"unicode"
 
-	"github.com/containers/storage/pkg/chunked/internal"
+	"github.com/containers/storage/pkg/chunked/internal/minimal"
+	storagePath "github.com/containers/storage/pkg/chunked/internal/path"
+	"github.com/opencontainers/go-digest"
 	"golang.org/x/sys/unix"
 )
 
@@ -20,20 +24,26 @@ const (
 	ESCAPE_LONE_DASH
 )
 
-func escaped(val string, escape int) string {
+func escaped(val []byte, escape int) string {
 	noescapeSpace := escape&NOESCAPE_SPACE != 0
 	escapeEqual := escape&ESCAPE_EQUAL != 0
 	escapeLoneDash := escape&ESCAPE_LONE_DASH != 0
 
-	length := len(val)
-
-	if escapeLoneDash && val == "-" {
+	if escapeLoneDash && len(val) == 1 && val[0] == '-' {
 		return fmt.Sprintf("\\x%.2x", val[0])
 	}
 
+	// This is intended to match the C isprint API with LC_CTYPE=C
+	isprint := func(c byte) bool {
+		return c >= 32 && c < 127
+	}
+	// This is intended to match the C isgraph API with LC_CTYPE=C
+	isgraph := func(c byte) bool {
+		return c > 32 && c < 127
+	}
+
 	var result string
-	for i := 0; i < length; i++ {
-		c := val[i]
+	for _, c := range val {
 		hexEscape := false
 		var special string
 
@@ -50,9 +60,9 @@ func escaped(val string, escape int) string {
 			hexEscape = escapeEqual
 		default:
 			if noescapeSpace {
-				hexEscape = !unicode.IsPrint(rune(c))
+				hexEscape = !isprint(c)
 			} else {
-				hexEscape = !unicode.IsPrint(rune(c)) || unicode.IsSpace(rune(c))
+				hexEscape = !isgraph(c)
 			}
 		}
 
@@ -67,8 +77,8 @@ func escaped(val string, escape int) string {
 	return result
 }
 
-func escapedOptional(val string, escape int) string {
-	if val == "" {
+func escapedOptional(val []byte, escape int) string {
+	if len(val) == 0 {
 		return "-"
 	}
 	return escaped(val, escape)
@@ -76,17 +86,17 @@ func escapedOptional(val string, escape int) string {
 
 func getStMode(mode uint32, typ string) (uint32, error) {
 	switch typ {
-	case internal.TypeReg, internal.TypeLink:
+	case minimal.TypeReg, minimal.TypeLink:
 		mode |= unix.S_IFREG
-	case internal.TypeChar:
+	case minimal.TypeChar:
 		mode |= unix.S_IFCHR
-	case internal.TypeBlock:
+	case minimal.TypeBlock:
 		mode |= unix.S_IFBLK
-	case internal.TypeDir:
+	case minimal.TypeDir:
 		mode |= unix.S_IFDIR
-	case internal.TypeFifo:
+	case minimal.TypeFifo:
 		mode |= unix.S_IFIFO
-	case internal.TypeSymlink:
+	case minimal.TypeSymlink:
 		mode |= unix.S_IFLNK
 	default:
 		return 0, fmt.Errorf("unknown type %s", typ)
@@ -94,26 +104,37 @@ func getStMode(mode uint32, typ string) (uint32, error) {
 	return mode, nil
 }
 
-func sanitizeName(name string) string {
-	path := filepath.Clean(name)
-	if path == "." {
-		path = "/"
-	} else if path[0] != '/' {
-		path = "/" + path
+func dumpNode(out io.Writer, added map[string]*minimal.FileMetadata, links map[string]int, verityDigests map[string]string, entry *minimal.FileMetadata) error {
+	path := storagePath.CleanAbsPath(entry.Name)
+
+	parent := filepath.Dir(path)
+	if _, found := added[parent]; !found && path != "/" {
+		parentEntry := &minimal.FileMetadata{
+			Name: parent,
+			Type: minimal.TypeDir,
+			Mode: 0o755,
+		}
+		if err := dumpNode(out, added, links, verityDigests, parentEntry); err != nil {
+			return err
+		}
+
 	}
-	return path
-}
+	if e, found := added[path]; found {
+		// if the entry was already added, make sure it has the same data
+		if !reflect.DeepEqual(*e, *entry) {
+			return fmt.Errorf("entry %q already added with different data", path)
+		}
+		return nil
+	}
+	added[path] = entry
 
-func dumpNode(out io.Writer, links map[string]int, verityDigests map[string]string, entry *internal.FileMetadata) error {
-	path := sanitizeName(entry.Name)
-
-	if _, err := fmt.Fprint(out, escaped(path, ESCAPE_STANDARD)); err != nil {
+	if _, err := fmt.Fprint(out, escaped([]byte(path), ESCAPE_STANDARD)); err != nil {
 		return err
 	}
 
 	nlinks := links[entry.Name] + links[entry.Linkname] + 1
 	link := ""
-	if entry.Type == internal.TypeLink {
+	if entry.Type == minimal.TypeLink {
 		link = "@"
 	}
 
@@ -139,19 +160,24 @@ func dumpNode(out io.Writer, links map[string]int, verityDigests map[string]stri
 
 	var payload string
 	if entry.Linkname != "" {
-		if entry.Type == internal.TypeSymlink {
+		if entry.Type == minimal.TypeSymlink {
 			payload = entry.Linkname
 		} else {
-			payload = sanitizeName(entry.Linkname)
+			payload = storagePath.CleanAbsPath(entry.Linkname)
 		}
-	} else {
-		if len(entry.Digest) > 10 {
-			d := strings.Replace(entry.Digest, "sha256:", "", 1)
-			payload = d[:2] + "/" + d[2:]
+	} else if entry.Digest != "" {
+		d, err := digest.Parse(entry.Digest)
+		if err != nil {
+			return fmt.Errorf("invalid digest %q for %q: %w", entry.Digest, entry.Name, err)
 		}
+		path, err := storagePath.RegularFilePathForValidatedDigest(d)
+		if err != nil {
+			return fmt.Errorf("determining physical file path for %q: %w", entry.Name, err)
+		}
+		payload = path
 	}
 
-	if _, err := fmt.Fprintf(out, escapedOptional(payload, ESCAPE_LONE_DASH)); err != nil {
+	if _, err := fmt.Fprint(out, escapedOptional([]byte(payload), ESCAPE_LONE_DASH)); err != nil {
 		return err
 	}
 
@@ -165,14 +191,18 @@ func dumpNode(out io.Writer, links map[string]int, verityDigests map[string]stri
 		return err
 	}
 	digest := verityDigests[payload]
-	if _, err := fmt.Fprintf(out, escapedOptional(digest, ESCAPE_LONE_DASH)); err != nil {
+	if _, err := fmt.Fprint(out, escapedOptional([]byte(digest), ESCAPE_LONE_DASH)); err != nil {
 		return err
 	}
 
-	for k, v := range entry.Xattrs {
-		name := escaped(k, ESCAPE_EQUAL)
-		value := escaped(v, ESCAPE_EQUAL)
+	for k, vEncoded := range entry.Xattrs {
+		v, err := base64.StdEncoding.DecodeString(vEncoded)
+		if err != nil {
+			return fmt.Errorf("decode xattr %q: %w", k, err)
+		}
+		name := escaped([]byte(k), ESCAPE_EQUAL)
 
+		value := escaped(v, ESCAPE_EQUAL)
 		if _, err := fmt.Fprintf(out, " %s=%s", name, value); err != nil {
 			return err
 		}
@@ -184,8 +214,8 @@ func dumpNode(out io.Writer, links map[string]int, verityDigests map[string]stri
 }
 
 // GenerateDump generates a dump of the TOC in the same format as `composefs-info dump`
-func GenerateDump(tocI interface{}, verityDigests map[string]string) (io.Reader, error) {
-	toc, ok := tocI.(*internal.TOC)
+func GenerateDump(tocI any, verityDigests map[string]string) (io.Reader, error) {
+	toc, ok := tocI.(*minimal.TOC)
 	if !ok {
 		return nil, fmt.Errorf("invalid TOC type")
 	}
@@ -201,24 +231,25 @@ func GenerateDump(tocI interface{}, verityDigests map[string]string) (io.Reader,
 		}()
 
 		links := make(map[string]int)
+		added := make(map[string]*minimal.FileMetadata)
 		for _, e := range toc.Entries {
 			if e.Linkname == "" {
 				continue
 			}
-			if e.Type == internal.TypeSymlink {
+			if e.Type == minimal.TypeSymlink {
 				continue
 			}
 			links[e.Linkname] = links[e.Linkname] + 1
 		}
 
-		if len(toc.Entries) == 0 || (sanitizeName(toc.Entries[0].Name) != "/") {
-			root := &internal.FileMetadata{
+		if len(toc.Entries) == 0 {
+			root := &minimal.FileMetadata{
 				Name: "/",
-				Type: internal.TypeDir,
+				Type: minimal.TypeDir,
 				Mode: 0o755,
 			}
 
-			if err := dumpNode(w, links, verityDigests, root); err != nil {
+			if err := dumpNode(w, added, links, verityDigests, root); err != nil {
 				pipeW.CloseWithError(err)
 				closed = true
 				return
@@ -226,10 +257,10 @@ func GenerateDump(tocI interface{}, verityDigests map[string]string) (io.Reader,
 		}
 
 		for _, e := range toc.Entries {
-			if e.Type == internal.TypeChunk {
+			if e.Type == minimal.TypeChunk {
 				continue
 			}
-			if err := dumpNode(w, links, verityDigests, &e); err != nil {
+			if err := dumpNode(w, added, links, verityDigests, &e); err != nil {
 				pipeW.CloseWithError(err)
 				closed = true
 				return
