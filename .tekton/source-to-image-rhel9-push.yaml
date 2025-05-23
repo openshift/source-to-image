@@ -33,7 +33,7 @@ spec:
     value: rhel9.Dockerfile
   - name: build-source-image
     value: "true"
-  - name: hermatic
+  - name: hermetic
     value: "true"
   - name: build-platforms
     value:
