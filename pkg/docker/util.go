@@ -30,7 +30,8 @@ var (
 	log = utillog.StderrLog
 
 	// DefaultEntrypoint is the default entry point used when starting containers
-	DefaultEntrypoint = []string{"/usr/bin/env"}
+	DefaultEntrypoint   = []string{"/usr/bin/env"}
+	DefaultPodmanSocket = filepath.Join("/run", "podman", "podman.sock")
 )
 
 // AuthConfigurations maps a registry name to an AuthConfig, as used for
@@ -434,7 +435,7 @@ func GetDefaultDockerConfig() *api.DockerConfig {
 	cfg := &api.DockerConfig{}
 
 	if cfg.Endpoint = os.Getenv("DOCKER_HOST"); cfg.Endpoint == "" {
-		cfg.Endpoint = client.DefaultDockerHost
+		cfg.Endpoint = GetDefaultContainerEngineHost()
 	}
 
 	certPath := os.Getenv("DOCKER_CERT_PATH")
@@ -455,6 +456,36 @@ func GetDefaultDockerConfig() *api.DockerConfig {
 	}
 
 	return cfg
+}
+
+// GetDefaultContainerEngineHost returns a default container engine socket address. It checks the
+// following locations for a container engine socket:
+//
+// 1. Rootless podman socket: unix://$XDG_RUNTIME_DIR/podman/podman.sock
+// 2. "Rootful" podman socket: unix:///run/podman/podman.sock
+// 3. Docker socket: unix:///var/run/docker.sock
+func GetDefaultContainerEngineHost() string {
+	podmanSockets := []string{}
+
+	// Podman socket provides a unix socket that is directly compatible with Docker
+	// There are two modes the socket can be provided:
+	//
+	// 1) "rootless" - runs as nonroot, with socket at $XDG_RUNTIME_DIR/podman/podman.sock
+	// 2) "rootful" - runs as root, with socket at /run/podman/podman.sock
+
+	if runtimeDir, ok := os.LookupEnv("XDG_RUNTIME_DIR"); ok {
+		podmanSockets = append(podmanSockets, filepath.Join(runtimeDir, "podman", "podman.sock"))
+	}
+	podmanSockets = append(podmanSockets, DefaultPodmanSocket)
+
+	for _, socket := range podmanSockets {
+		if _, err := os.Stat(socket); err == nil {
+			return fmt.Sprintf("unix://%s", socket)
+		}
+	}
+
+	// Fall back to default docker socket.
+	return client.DefaultDockerHost
 }
 
 // GetAssembleUser finds an assemble user on the given image.

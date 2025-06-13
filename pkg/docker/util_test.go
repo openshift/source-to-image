@@ -1,8 +1,12 @@
 package docker
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
+
+	"github.com/docker/docker/client"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/api/constants"
@@ -233,14 +237,17 @@ func TestGetDefaultDockerConfig(t *testing.T) {
 		},
 	}
 	for _, tc := range tests {
+		oldXdgRuntimeDir := os.Getenv("XDG_RUNTIME_DIR")
 		oldHost := os.Getenv("DOCKER_HOST")
 		oldCertPath := os.Getenv("DOCKER_CERT_PATH")
 		oldTLSVerify := os.Getenv("DOCKER_TLS_VERIFY")
 		oldTLS := os.Getenv("DOCKER_TLS")
+		os.Setenv("XDG_RUNTIME_DIR", "")
 		os.Setenv("DOCKER_HOST", tc.envHost)
 		os.Setenv("DOCKER_CERT_PATH", tc.envCertPath)
 		os.Setenv("DOCKER_TLS_VERIFY", tc.envTLSVerify)
 		os.Setenv("DOCKER_TLS", tc.envTLS)
+		defer os.Setenv("XDG_RUNTIME_DIR", oldXdgRuntimeDir)
 		defer os.Setenv("DOCKER_HOST", oldHost)
 		defer os.Setenv("DOCKER_CERT_PATH", oldCertPath)
 		defer os.Setenv("DOCKER_TLS_VERIFY", oldTLSVerify)
@@ -259,6 +266,84 @@ func TestGetDefaultDockerConfig(t *testing.T) {
 		if tc.expectedTLS != cfg.UseTLS {
 			t.Errorf("UseTLS: expected '%t', but got '%t'", tc.expectedTLS, cfg.UseTLS)
 		}
+	}
+}
+
+func TestGetDefaultContainerEngineHost(t *testing.T) {
+
+	tmpDir, err := os.MkdirTemp("", "s2i-container-engine-host-*")
+	if err != nil {
+		t.Fatalf("failed to create xdg temp dir: %v", err)
+	}
+	defer func() {
+		if rmErr := os.RemoveAll(tmpDir); rmErr != nil {
+			t.Errorf("failed to clean up xdg temp dir: %v", err)
+		}
+	}()
+
+	testCases := []struct {
+		name               string
+		xdgRuntimeDir      string
+		createPodmanSocket bool
+		expectedHost       string
+	}{
+		{
+			name:               "rootless podman - socket exists",
+			xdgRuntimeDir:      tmpDir,
+			createPodmanSocket: true,
+			expectedHost:       fmt.Sprintf("unix://%s", filepath.Join(tmpDir, "podman", "podman.sock")),
+		},
+		{
+			name:               "rootless podman - socket does not exist",
+			xdgRuntimeDir:      tmpDir,
+			createPodmanSocket: false,
+			expectedHost:       client.DefaultDockerHost,
+		},
+		{
+			name:         "docker default",
+			expectedHost: client.DefaultDockerHost,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			oldXdgDir := os.Getenv("XDG_RUNTIME_DIR")
+			os.Setenv("XDG_RUNTIME_DIR", tc.xdgRuntimeDir)
+			defer os.Setenv("XDG_RUNTIME_DIR", oldXdgDir)
+
+			socketCreated := false
+			socketPath := filepath.Join(tc.xdgRuntimeDir, "podman", "podman.sock")
+			if tc.createPodmanSocket {
+
+				if _, err := os.Stat(socketPath); err != nil {
+					if err := os.MkdirAll(filepath.Dir(socketPath), 0750); err != nil {
+						t.Fatalf("failed to create socket directory: %v", err)
+					}
+					file, err := os.Create(socketPath)
+					if err != nil {
+						t.Fatalf("failed to create default podman socket: %v", err)
+					}
+					defer func() {
+						if closeErr := file.Close(); closeErr != nil {
+							t.Errorf("failed to close file: %v", closeErr)
+						}
+					}()
+					socketCreated = true
+				}
+			}
+
+			engineHost := GetDefaultContainerEngineHost()
+			if tc.expectedHost != engineHost {
+				t.Errorf("expected container host %s; got %s", tc.expectedHost, engineHost)
+			}
+
+			if socketCreated {
+				if err := os.RemoveAll(filepath.Dir(socketPath)); err != nil {
+					t.Errorf("failed to clean up podman socket: %v", err)
+				}
+			}
+
+		})
 	}
 }
 

@@ -10,7 +10,20 @@ ready-to-run images by injecting source code into a container image and letting 
 
 For a deep dive on S2I you can view [this presentation](https://www.youtube.com/watch?v=flI6zx9wH6M).
 
-Want to try it right now?  Download the [latest release](https://github.com/openshift/source-to-image/releases/latest) and run:
+### Try It!
+
+First, make sure your machine has either [Docker](https://www.docker.com) or [Podman](https://podman.io)
+installed:
+
+- s2i can work with Docker out of the box. However, the container image build will run in root
+  containers by default, which may pose a security risk.
+- s2i can work with Podman by starting the Podman socket service. Passing `--user` to systemctl
+  ensures podman runs in rootless mode:
+  ```sh
+  systemctl enable --user --now podman.socket
+  ```
+
+Next, download the [latest release](https://github.com/openshift/source-to-image/releases/latest) and run:
 
 	$ s2i build https://github.com/sclorg/django-ex centos/python-35-centos7 hello-python
 	$ docker run -p 8080:8080 hello-python
