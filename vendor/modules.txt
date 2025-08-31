@@ -54,6 +54,7 @@ github.com/containerd/errdefs
 # github.com/containerd/errdefs/pkg v0.3.0
 ## explicit; go 1.22
 github.com/containerd/errdefs/pkg/errgrpc
+github.com/containerd/errdefs/pkg/errhttp
 github.com/containerd/errdefs/pkg/internal/cause
 github.com/containerd/errdefs/pkg/internal/types
 # github.com/containerd/stargz-snapshotter/estargz v0.16.3
@@ -180,11 +181,12 @@ github.com/distribution/reference
 ## explicit
 github.com/docker/distribution/registry/api/errcode
 github.com/docker/distribution/registry/api/v2
-# github.com/docker/docker v28.1.1+incompatible
+# github.com/docker/docker v28.2.2+incompatible
 ## explicit
 github.com/docker/docker/api
 github.com/docker/docker/api/types
 github.com/docker/docker/api/types/blkiodev
+github.com/docker/docker/api/types/build
 github.com/docker/docker/api/types/checkpoint
 github.com/docker/docker/api/types/common
 github.com/docker/docker/api/types/container
@@ -203,7 +205,6 @@ github.com/docker/docker/api/types/time
 github.com/docker/docker/api/types/versions
 github.com/docker/docker/api/types/volume
 github.com/docker/docker/client
-github.com/docker/docker/errdefs
 github.com/docker/docker/internal/lazyregexp
 github.com/docker/docker/internal/multierror
 github.com/docker/docker/pkg/homedir
@@ -248,8 +249,8 @@ github.com/gogo/protobuf/proto
 # github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8
 ## explicit; go 1.20
 github.com/golang/groupcache/lru
-# github.com/google/go-containerregistry v0.20.3
-## explicit; go 1.23.0
+# github.com/google/go-containerregistry v0.20.6
+## explicit; go 1.24
 github.com/google/go-containerregistry/pkg/v1
 github.com/google/go-containerregistry/pkg/v1/types
 # github.com/google/go-intervals v0.0.2
@@ -377,8 +378,8 @@ go.opencensus.io/trace/tracestate
 ## explicit; go 1.22.0
 go.opentelemetry.io/auto/sdk
 go.opentelemetry.io/auto/sdk/internal/telemetry
-# go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.59.0
-## explicit; go 1.22.0
+# go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.61.0
+## explicit; go 1.23.0
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/request
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconv
@@ -407,7 +408,7 @@ go.opentelemetry.io/otel/trace
 go.opentelemetry.io/otel/trace/embedded
 go.opentelemetry.io/otel/trace/internal/telemetry
 go.opentelemetry.io/otel/trace/noop
-# golang.org/x/mod v0.24.0
+# golang.org/x/mod v0.25.0
 ## explicit; go 1.23.0
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/modfile
@@ -416,7 +417,7 @@ golang.org/x/mod/semver
 # golang.org/x/net v0.40.0
 ## explicit; go 1.23.0
 golang.org/x/net/context
-# golang.org/x/sync v0.13.0
+# golang.org/x/sync v0.15.0
 ## explicit; go 1.23.0
 golang.org/x/sync/errgroup
 # golang.org/x/sys v0.33.0
