@@ -2,7 +2,7 @@ module github.com/openshift/source-to-image
 
 go 1.23.3
 
-toolchain go1.23.9
+toolchain go1.25.3
 
 require (
 	github.com/containers/image/v5 v5.35.0
