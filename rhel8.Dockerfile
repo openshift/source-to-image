@@ -20,12 +20,13 @@ USER 1001
 ENTRYPOINT [ "/usr/local/bin/s2i" ]
 
 LABEL \
-    name="source-to-image/source-to-image" \
+    name="source-to-image/source-to-image-rhel8" \
     description="Source-to-Image is a builder image" \
     summary="Source-to-Image is a builder image" \
     version="1.6.0" \
     vendor="Red Hat, Inc." \
     com.redhat.component="source-to-image-container" \
+    cpe="cpe:/a:redhat:source_to_image:1.5::el8" \
     maintainer="openshift-builds@redhat.com" \
     io.k8s.description="Source-to-Image is a builder image" \
     io.k8s.display-name="Source-to-Image" \
