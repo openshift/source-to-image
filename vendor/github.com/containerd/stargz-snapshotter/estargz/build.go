@@ -42,6 +42,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+type GzipHelperFunc func(io.Reader) (io.ReadCloser, error)
+
 type options struct {
 	chunkSize              int
 	compressionLevel       int
@@ -50,6 +52,7 @@ type options struct {
 	compression            Compression
 	ctx                    context.Context
 	minChunkSize           int
+	gzipHelperFunc         GzipHelperFunc
 }
 
 type Option func(o *options) error
@@ -127,6 +130,18 @@ func WithMinChunkSize(minChunkSize int) Option {
 	}
 }
 
+// WithGzipHelperFunc option specifies a custom function to decompress gzip-compressed layers.
+// When a gzip-compressed layer is detected, this function will be used instead of the
+// Go standard library gzip decompression for better performance.
+// The function should take an io.Reader as input and return an io.ReadCloser.
+// If nil, the Go standard library gzip.NewReader will be used.
+func WithGzipHelperFunc(gzipHelperFunc GzipHelperFunc) Option {
+	return func(o *options) error {
+		o.gzipHelperFunc = gzipHelperFunc
+		return nil
+	}
+}
+
 // Blob is an eStargz blob.
 type Blob struct {
 	io.ReadCloser
@@ -186,7 +201,7 @@ func Build(tarBlob *io.SectionReader, opt ...Option) (_ *Blob, rErr error) {
 			rErr = fmt.Errorf("error from context %q: %w", cErr, rErr)
 		}
 	}()
-	tarBlob, err := decompressBlob(tarBlob, layerFiles)
+	tarBlob, err := decompressBlob(tarBlob, layerFiles, opts.gzipHelperFunc)
 	if err != nil {
 		return nil, err
 	}
@@ -408,11 +423,11 @@ func readerFromEntries(entries ...*entry) io.Reader {
 		defer tw.Close()
 		for _, entry := range entries {
 			if err := tw.WriteHeader(entry.header); err != nil {
-				pw.CloseWithError(fmt.Errorf("Failed to write tar header: %v", err))
+				pw.CloseWithError(fmt.Errorf("failed to write tar header: %v", err))
 				return
 			}
 			if _, err := io.Copy(tw, entry.payload); err != nil {
-				pw.CloseWithError(fmt.Errorf("Failed to write tar payload: %v", err))
+				pw.CloseWithError(fmt.Errorf("failed to write tar payload: %v", err))
 				return
 			}
 		}
@@ -627,12 +642,12 @@ func (cr *countReadSeeker) Seek(offset int64, whence int) (int64, error) {
 
 	switch whence {
 	default:
-		return 0, fmt.Errorf("Unknown whence: %v", whence)
+		return 0, fmt.Errorf("unknown whence: %v", whence)
 	case io.SeekStart:
 	case io.SeekCurrent:
 		offset += *cr.cPos
 	case io.SeekEnd:
-		return 0, fmt.Errorf("Unsupported whence: %v", whence)
+		return 0, fmt.Errorf("unsupported whence: %v", whence)
 	}
 
 	if offset < 0 {
@@ -649,7 +664,7 @@ func (cr *countReadSeeker) currentPos() int64 {
 	return *cr.cPos
 }
 
-func decompressBlob(org *io.SectionReader, tmp *tempFiles) (*io.SectionReader, error) {
+func decompressBlob(org *io.SectionReader, tmp *tempFiles, gzipHelperFunc GzipHelperFunc) (*io.SectionReader, error) {
 	if org.Size() < 4 {
 		return org, nil
 	}
@@ -660,7 +675,13 @@ func decompressBlob(org *io.SectionReader, tmp *tempFiles) (*io.SectionReader, e
 	var dR io.Reader
 	if bytes.Equal([]byte{0x1F, 0x8B, 0x08}, src[:3]) {
 		// gzip
-		dgR, err := gzip.NewReader(io.NewSectionReader(org, 0, org.Size()))
+		var dgR io.ReadCloser
+		var err error
+		if gzipHelperFunc != nil {
+			dgR, err = gzipHelperFunc(io.NewSectionReader(org, 0, org.Size()))
+		} else {
+			dgR, err = gzip.NewReader(io.NewSectionReader(org, 0, org.Size()))
+		}
 		if err != nil {
 			return nil, err
 		}
