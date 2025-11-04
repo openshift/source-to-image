@@ -1,0 +1,57 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: source-to-image-unit-test
+  annotations:
+    tekton.dev/title: "Unit Test Task"
+spec:
+  params:
+    - description: The trusted artifact URI containing the application source code.
+      name: SOURCE_ARTIFACT
+      type: string
+    - description: The Trusted Artifact URI pointing to the artifact with the prefetched dependencies.
+      name: CACHI2_ARTIFACT
+      type: string
+    - description: The go command used to run the go unit test
+      name: TEST_COMMAND
+      type: string
+      default: go test ./...
+    - description: The Go base image used to run the unit tests
+      name: BASE_IMAGE
+      type: string
+      default: registry.redhat.io/ubi9/go-toolset:1.23
+  stepTemplate:
+    volumeMounts:
+      - mountPath: /var/workdir
+        name: workdir
+      # This path is hard coded in the cachi2.env file.
+      - mountPath: /cachi2
+        name: cachi2
+    securityContext:
+      # This is needed because the different steps in this Task run with different user IDs.
+      runAsUser: 0
+  steps:
+    - image: quay.io/redhat-appstudio/build-trusted-artifacts:latest@sha256:9b180776a41d9a22a1c51539f1647c60defbbd55b44bbebdd4130e33512d8b0d
+      name: use-trusted-artifact
+      args:
+        - use
+        - $(params.SOURCE_ARTIFACT)=/var/workdir/source
+        - $(params.CACHI2_ARTIFACT)=/cachi2
+    - name: run-tests
+      image:  $(params.BASE_IMAGE)
+      workingDir: /var/workdir/source
+      resources:
+        requests:
+          memory: 1Gi
+          cpu: 1000m
+        limits:
+          memory: 2Gi
+          cpu: 2000m
+      script: |
+        #!/usr/bin/env sh
+        $(params.TEST_COMMAND)
+  volumes:
+    - name: workdir
+      emptyDir: {}
+    - name: cachi2
+      emptyDir: {}
