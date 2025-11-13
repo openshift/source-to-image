@@ -10,7 +10,7 @@ require (
 	github.com/docker/docker v28.1.1+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/go-imports-organizer/goio v1.5.0
-	github.com/moby/buildkit v0.22.0
+	github.com/moby/buildkit v0.26.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
