@@ -7,8 +7,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/containerd/errdefs"
+	"github.com/docker/docker/api/types/build"
+	"github.com/docker/docker/api/types/common"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"os"
@@ -21,7 +23,7 @@ import (
 
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
+	dockerimage "github.com/docker/docker/api/types/image"
 	dockernetwork "github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/registry"
 	dockerapi "github.com/docker/docker/client"
@@ -79,7 +81,7 @@ const containerNamePrefix = "s2i"
 // meant to resemble Kubernetes' pkg/kubelet/dockertools.BuildDockerName.
 func containerName(image string) string {
 	//Initialize seed
-	rand.Seed(time.Now().UnixNano())
+	rand.NewSource(time.Now().UnixNano())
 	uid := fmt.Sprintf("%08x", rand.Uint32())
 	// Replace invalid characters for container name with underscores.
 	image = strings.Map(func(r rune) rune {
@@ -124,19 +126,19 @@ type Docker interface {
 // Client contains all methods used when interacting directly with docker engine-api
 type Client interface {
 	ContainerAttach(ctx context.Context, container string, options dockercontainer.AttachOptions) (dockertypes.HijackedResponse, error)
-	ContainerCommit(ctx context.Context, container string, options dockercontainer.CommitOptions) (dockertypes.IDResponse, error)
+	ContainerCommit(ctx context.Context, container string, options dockercontainer.CommitOptions) (common.IDResponse, error)
 	ContainerCreate(ctx context.Context, config *dockercontainer.Config, hostConfig *dockercontainer.HostConfig, networkingConfig *dockernetwork.NetworkingConfig, platform *v1.Platform, containerName string) (dockercontainer.CreateResponse, error)
-	ContainerInspect(ctx context.Context, container string) (dockertypes.ContainerJSON, error)
+	ContainerInspect(ctx context.Context, container string) (dockercontainer.InspectResponse, error)
 	ContainerRemove(ctx context.Context, container string, options dockercontainer.RemoveOptions) error
 	ContainerStart(ctx context.Context, container string, options dockercontainer.StartOptions) error
 	ContainerKill(ctx context.Context, container, signal string) error
 	ContainerWait(ctx context.Context, container string, condition dockercontainer.WaitCondition) (<-chan dockercontainer.WaitResponse, <-chan error)
 	CopyToContainer(ctx context.Context, container, path string, content io.Reader, opts dockercontainer.CopyToContainerOptions) error
 	CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, dockercontainer.PathStat, error)
-	ImageBuild(ctx context.Context, buildContext io.Reader, options dockertypes.ImageBuildOptions) (dockertypes.ImageBuildResponse, error)
-	ImageInspectWithRaw(ctx context.Context, image string) (dockertypes.ImageInspect, []byte, error)
-	ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error)
-	ImageRemove(ctx context.Context, image string, options image.RemoveOptions) ([]image.DeleteResponse, error)
+	ImageBuild(ctx context.Context, buildContext io.Reader, options build.ImageBuildOptions) (build.ImageBuildResponse, error)
+	ImageInspectWithRaw(ctx context.Context, image string) (dockerimage.InspectResponse, []byte, error)
+	ImagePull(ctx context.Context, ref string, options dockerimage.PullOptions) (io.ReadCloser, error)
+	ImageRemove(ctx context.Context, image string, options dockerimage.RemoveOptions) ([]dockerimage.DeleteResponse, error)
 	ServerVersion(ctx context.Context) (dockertypes.Version, error)
 }
 
@@ -146,7 +148,7 @@ type stiDocker struct {
 }
 
 // InspectImage returns the image information and its raw representation.
-func (d stiDocker) InspectImage(name string) (*dockertypes.ImageInspect, error) {
+func (d stiDocker) InspectImage(name string) (*dockerimage.InspectResponse, error) {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
 	resp, _, err := d.client.ImageInspectWithRaw(ctx, name)
@@ -436,7 +438,7 @@ func (d *stiDocker) IsImageInLocalRegistry(name string) (bool, error) {
 	if resp != nil {
 		return true, nil
 	}
-	if err != nil && !dockerapi.IsErrNotFound(err) {
+	if err != nil && !errdefs.IsNotFound(err) {
 		return false, s2ierr.NewInspectImageError(name, err)
 	}
 	return false, nil
@@ -550,7 +552,7 @@ func (d *stiDocker) PullImage(name string) (*api.Image, error) {
 
 	for retries := 0; retries <= DefaultPullRetryCount; retries++ {
 		err = util.TimeoutAfter(DefaultDockerTimeout, fmt.Sprintf("pulling image %q", name), func(timer *time.Timer) error {
-			resp, pullErr := d.client.ImagePull(context.Background(), name, image.PullOptions{RegistryAuth: base64Auth})
+			resp, pullErr := d.client.ImagePull(context.Background(), name, dockerimage.PullOptions{RegistryAuth: base64Auth})
 			if pullErr != nil {
 				return pullErr
 			}
@@ -612,7 +614,7 @@ func (d *stiDocker) PullImage(name string) (*api.Image, error) {
 	return nil, nil
 }
 
-func updateImageWithInspect(image *api.Image, inspect *dockertypes.ImageInspect) {
+func updateImageWithInspect(image *api.Image, inspect *dockerimage.InspectResponse) {
 	image.ID = inspect.ID
 	if inspect.Config != nil {
 		image.Config = &api.ContainerConfig{
@@ -859,10 +861,10 @@ func dumpContainerInfo(container dockercontainer.CreateResponse, d *stiDocker, i
 // then the container, will block.
 func (d *stiDocker) redirectResponseToOutputStream(tty bool, outputStream, errorStream io.Writer, resp io.Reader) error {
 	if outputStream == nil {
-		outputStream = ioutil.Discard
+		outputStream = io.Discard
 	}
 	if errorStream == nil {
-		errorStream = ioutil.Discard
+		errorStream = io.Discard
 	}
 	var err error
 	if tty {
@@ -1142,13 +1144,13 @@ func (d *stiDocker) CommitContainer(opts CommitContainerOptions) (string, error)
 func (d *stiDocker) RemoveImage(imageID string) error {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	_, err := d.client.ImageRemove(ctx, imageID, image.RemoveOptions{})
+	_, err := d.client.ImageRemove(ctx, imageID, dockerimage.RemoveOptions{})
 	return err
 }
 
 // BuildImage builds the image according to specified options
 func (d *stiDocker) BuildImage(opts BuildImageOptions) error {
-	dockerOpts := dockertypes.ImageBuildOptions{
+	dockerOpts := build.ImageBuildOptions{
 		Tags:           []string{opts.Name},
 		NoCache:        true,
 		SuppressOutput: false,

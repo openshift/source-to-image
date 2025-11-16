@@ -3,6 +3,7 @@ package docker
 import (
 	"bytes"
 	"fmt"
+	"github.com/docker/docker/api/types/image"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -14,7 +15,8 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/registry"
 	dockerstrslice "github.com/docker/docker/api/types/strslice"
-
+	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
+	containerspec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/openshift/source-to-image/pkg/api/constants"
 	dockertest "github.com/openshift/source-to-image/pkg/docker/test"
 	"github.com/openshift/source-to-image/pkg/errors"
@@ -252,7 +254,7 @@ func TestImageBuild(t *testing.T) {
 
 func TestGetScriptsURL(t *testing.T) {
 	type urltest struct {
-		image      dockertypes.ImageInspect
+		image      image.InspectResponse
 		result     string
 		calls      []string
 		inspectErr error
@@ -260,14 +262,16 @@ func TestGetScriptsURL(t *testing.T) {
 	tests := map[string]urltest{
 		"not present": {
 			calls: []string{"inspect_image"},
-			image: dockertypes.ImageInspect{
+			image: image.InspectResponse{
 				ContainerConfig: &dockercontainer.Config{
 					Env:    []string{"Env1=value1"},
 					Labels: map[string]string{},
 				},
-				Config: &dockercontainer.Config{
-					Env:    []string{"Env2=value2"},
-					Labels: map[string]string{},
+				Config: &dockerspec.DockerOCIImageConfig{
+					ImageConfig: containerspec.ImageConfig{
+						Env:    []string{"Env2=value2"},
+						Labels: map[string]string{},
+					},
 				},
 			},
 			result: "",
@@ -275,24 +279,26 @@ func TestGetScriptsURL(t *testing.T) {
 
 		"env in containerConfig": {
 			calls: []string{"inspect_image"},
-			image: dockertypes.ImageInspect{
+			image: image.InspectResponse{
 				ContainerConfig: &dockercontainer.Config{
 					Env: []string{"Env1=value1", constants.ScriptsURLEnvironment + "=test_url_value"},
 				},
-				Config: &dockercontainer.Config{},
+				Config: &dockerspec.DockerOCIImageConfig{},
 			},
 			result: "",
 		},
 
 		"env in image config": {
 			calls: []string{"inspect_image"},
-			image: dockertypes.ImageInspect{
+			image: image.InspectResponse{
 				ContainerConfig: &dockercontainer.Config{},
-				Config: &dockercontainer.Config{
-					Env: []string{
-						"Env1=value1",
-						constants.ScriptsURLEnvironment + "=test_url_value_2",
-						"Env2=value2",
+				Config: &dockerspec.DockerOCIImageConfig{
+					ImageConfig: containerspec.ImageConfig{
+						Env: []string{
+							"Env1=value1",
+							constants.ScriptsURLEnvironment + "=test_url_value_2",
+							"Env2=value2",
+						},
 					},
 				},
 			},
@@ -301,21 +307,23 @@ func TestGetScriptsURL(t *testing.T) {
 
 		"label in containerConfig": {
 			calls: []string{"inspect_image"},
-			image: dockertypes.ImageInspect{
+			image: image.InspectResponse{
 				ContainerConfig: &dockercontainer.Config{
 					Labels: map[string]string{constants.ScriptsURLLabel: "test_url_value"},
 				},
-				Config: &dockercontainer.Config{},
+				Config: &dockerspec.DockerOCIImageConfig{},
 			},
 			result: "",
 		},
 
 		"label in image config": {
 			calls: []string{"inspect_image"},
-			image: dockertypes.ImageInspect{
+			image: image.InspectResponse{
 				ContainerConfig: &dockercontainer.Config{},
-				Config: &dockercontainer.Config{
-					Labels: map[string]string{constants.ScriptsURLLabel: "test_url_value_2"},
+				Config: &dockerspec.DockerOCIImageConfig{
+					ImageConfig: containerspec.ImageConfig{
+						Labels: map[string]string{constants.ScriptsURLLabel: "test_url_value_2"},
+					},
 				},
 			},
 			result: "test_url_value_2",
@@ -323,7 +331,7 @@ func TestGetScriptsURL(t *testing.T) {
 
 		"inspect error": {
 			calls:      []string{"inspect_image", "pull"},
-			image:      dockertypes.ImageInspect{},
+			image:      image.InspectResponse{},
 			inspectErr: fmt.Errorf("Inspect error"),
 		},
 	}
@@ -334,7 +342,7 @@ func TestGetScriptsURL(t *testing.T) {
 		if tst.inspectErr != nil {
 			fakeDocker.PullFail = tst.inspectErr
 		} else {
-			fakeDocker.Images = map[string]dockertypes.ImageInspect{tst.image.ID: tst.image}
+			fakeDocker.Images = map[string]image.InspectResponse{tst.image.ID: tst.image}
 		}
 		url, err := dh.GetScriptsURL(tst.image.ID)
 
@@ -354,7 +362,7 @@ func TestGetScriptsURL(t *testing.T) {
 func TestRunContainer(t *testing.T) {
 	type runtest struct {
 		calls            []string
-		image            dockertypes.ImageInspect
+		image            image.InspectResponse
 		cmd              string
 		externalScripts  bool
 		paramScriptsURL  string
@@ -368,9 +376,9 @@ func TestRunContainer(t *testing.T) {
 	tests := map[string]runtest{
 		"default": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: dockertypes.ImageInspect{
+			image: image.InspectResponse{
 				ContainerConfig: &dockercontainer.Config{},
-				Config:          &dockercontainer.Config{},
+				Config:          &dockerspec.DockerOCIImageConfig{},
 			},
 			cmd:             constants.Assemble,
 			externalScripts: true,
@@ -378,9 +386,9 @@ func TestRunContainer(t *testing.T) {
 		},
 		"runerror": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: dockertypes.ImageInspect{
+			image: image.InspectResponse{
 				ContainerConfig: &dockercontainer.Config{},
-				Config:          &dockercontainer.Config{},
+				Config:          &dockerspec.DockerOCIImageConfig{},
 			},
 			cmd:             constants.Assemble,
 			externalScripts: true,
@@ -399,9 +407,9 @@ func TestRunContainer(t *testing.T) {
 		},
 		"paramDestination": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: dockertypes.ImageInspect{
+			image: image.InspectResponse{
 				ContainerConfig: &dockercontainer.Config{},
-				Config:          &dockercontainer.Config{},
+				Config:          &dockerspec.DockerOCIImageConfig{},
 			},
 			cmd:              constants.Assemble,
 			externalScripts:  true,
@@ -410,9 +418,9 @@ func TestRunContainer(t *testing.T) {
 		},
 		"paramDestination&paramScripts": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: dockertypes.ImageInspect{
+			image: image.InspectResponse{
 				ContainerConfig: &dockercontainer.Config{},
-				Config:          &dockercontainer.Config{},
+				Config:          &dockerspec.DockerOCIImageConfig{},
 			},
 			cmd:              constants.Assemble,
 			externalScripts:  true,
@@ -422,10 +430,12 @@ func TestRunContainer(t *testing.T) {
 		},
 		"scriptsInsideImageEnvironment": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: dockertypes.ImageInspect{
+			image: image.InspectResponse{
 				ContainerConfig: &dockercontainer.Config{},
-				Config: &dockercontainer.Config{
-					Env: []string{constants.ScriptsURLEnvironment + "=image:///opt/bin/"},
+				Config: &dockerspec.DockerOCIImageConfig{
+					ImageConfig: containerspec.ImageConfig{
+						Env: []string{constants.ScriptsURLEnvironment + "=image:///opt/bin/"},
+					},
 				},
 			},
 			cmd:             constants.Assemble,
@@ -434,10 +444,12 @@ func TestRunContainer(t *testing.T) {
 		},
 		"scriptsInsideImageLabel": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: dockertypes.ImageInspect{
+			image: image.InspectResponse{
 				ContainerConfig: &dockercontainer.Config{},
-				Config: &dockercontainer.Config{
-					Labels: map[string]string{constants.ScriptsURLLabel: "image:///opt/bin/"},
+				Config: &dockerspec.DockerOCIImageConfig{
+					ImageConfig: containerspec.ImageConfig{
+						Labels: map[string]string{constants.ScriptsURLLabel: "image:///opt/bin/"},
+					},
 				},
 			},
 			cmd:             constants.Assemble,
@@ -446,10 +458,12 @@ func TestRunContainer(t *testing.T) {
 		},
 		"scriptsInsideImageEnvironmentWithParamDestination": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: dockertypes.ImageInspect{
+			image: image.InspectResponse{
 				ContainerConfig: &dockercontainer.Config{},
-				Config: &dockercontainer.Config{
-					Env: []string{constants.ScriptsURLEnvironment + "=image:///opt/bin"},
+				Config: &dockerspec.DockerOCIImageConfig{
+					ImageConfig: containerspec.ImageConfig{
+						Env: []string{constants.ScriptsURLEnvironment + "=image:///opt/bin"},
+					},
 				},
 			},
 			cmd:              constants.Assemble,
@@ -459,10 +473,12 @@ func TestRunContainer(t *testing.T) {
 		},
 		"scriptsInsideImageLabelWithParamDestination": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: dockertypes.ImageInspect{
+			image: image.InspectResponse{
 				ContainerConfig: &dockercontainer.Config{},
-				Config: &dockercontainer.Config{
-					Labels: map[string]string{constants.ScriptsURLLabel: "image:///opt/bin"},
+				Config: &dockerspec.DockerOCIImageConfig{
+					ImageConfig: containerspec.ImageConfig{
+						Labels: map[string]string{constants.ScriptsURLLabel: "image:///opt/bin"},
+					},
 				},
 			},
 			cmd:              constants.Assemble,
@@ -472,10 +488,12 @@ func TestRunContainer(t *testing.T) {
 		},
 		"paramDestinationFromImageEnvironment": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: dockertypes.ImageInspect{
+			image: image.InspectResponse{
 				ContainerConfig: &dockercontainer.Config{},
-				Config: &dockercontainer.Config{
-					Env: []string{constants.LocationEnvironment + "=/opt", constants.ScriptsURLEnvironment + "=http://my.test.url/test?param=one"},
+				Config: &dockerspec.DockerOCIImageConfig{
+					ImageConfig: containerspec.ImageConfig{
+						Env: []string{constants.LocationEnvironment + "=/opt", constants.ScriptsURLEnvironment + "=http://my.test.url/test?param=one"},
+					},
 				},
 			},
 			cmd:             constants.Assemble,
@@ -484,10 +502,12 @@ func TestRunContainer(t *testing.T) {
 		},
 		"paramDestinationFromImageLabel": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: dockertypes.ImageInspect{
+			image: image.InspectResponse{
 				ContainerConfig: &dockercontainer.Config{},
-				Config: &dockercontainer.Config{
-					Labels: map[string]string{constants.DestinationLabel: "/opt", constants.ScriptsURLLabel: "http://my.test.url/test?param=one"},
+				Config: &dockerspec.DockerOCIImageConfig{
+					ImageConfig: containerspec.ImageConfig{
+						Labels: map[string]string{constants.DestinationLabel: "/opt", constants.ScriptsURLLabel: "http://my.test.url/test?param=one"},
+					},
 				},
 			},
 			cmd:             constants.Assemble,
@@ -496,9 +516,9 @@ func TestRunContainer(t *testing.T) {
 		},
 		"usageCommand": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: dockertypes.ImageInspect{
+			image: image.InspectResponse{
 				ContainerConfig: &dockercontainer.Config{},
-				Config:          &dockercontainer.Config{},
+				Config:          &dockerspec.DockerOCIImageConfig{},
 			},
 			cmd:             constants.Usage,
 			externalScripts: true,
@@ -506,9 +526,9 @@ func TestRunContainer(t *testing.T) {
 		},
 		"otherCommand": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: dockertypes.ImageInspect{
+			image: image.InspectResponse{
 				ContainerConfig: &dockercontainer.Config{},
-				Config:          &dockercontainer.Config{},
+				Config:          &dockerspec.DockerOCIImageConfig{},
 			},
 			cmd:             constants.Run,
 			externalScripts: true,
@@ -520,7 +540,7 @@ func TestRunContainer(t *testing.T) {
 		fakeDocker := dockertest.NewFakeDockerClient()
 		dh := getDocker(fakeDocker)
 		tst.image.ID = "test/image:latest"
-		fakeDocker.Images = map[string]dockertypes.ImageInspect{tst.image.ID: tst.image}
+		fakeDocker.Images = map[string]image.InspectResponse{tst.image.ID: tst.image}
 		if len(fakeDocker.Containers) > 0 {
 			t.Errorf("newly created fake client should have empty container map: %+v", fakeDocker.Containers)
 		}
@@ -583,8 +603,8 @@ func TestRunContainer(t *testing.T) {
 func TestGetImageID(t *testing.T) {
 	fakeDocker := dockertest.NewFakeDockerClient()
 	dh := getDocker(fakeDocker)
-	image := dockertypes.ImageInspect{ID: "test-abcd:latest"}
-	fakeDocker.Images = map[string]dockertypes.ImageInspect{image.ID: image}
+	img := image.InspectResponse{ID: "test-abcd:latest"}
+	fakeDocker.Images = map[string]image.InspectResponse{img.ID: img}
 	id, err := dh.GetImageID("test-abcd")
 	expectedCalls := []string{"inspect_image"}
 	if !reflect.DeepEqual(fakeDocker.Calls, expectedCalls) {
@@ -592,19 +612,19 @@ func TestGetImageID(t *testing.T) {
 	}
 	if err != nil {
 		t.Errorf("Unexpected error returned: %v", err)
-	} else if id != image.ID {
-		t.Errorf("Unexpected image id returned: %s", id)
+	} else if id != img.ID {
+		t.Errorf("Unexpected img id returned: %s", id)
 	}
 }
 
 func TestRemoveImage(t *testing.T) {
 	fakeDocker := dockertest.NewFakeDockerClient()
 	dh := getDocker(fakeDocker)
-	image := dockertypes.ImageInspect{ID: "test-abcd"}
-	fakeDocker.Images = map[string]dockertypes.ImageInspect{image.ID: image}
+	img := image.InspectResponse{ID: "test-abcd"}
+	fakeDocker.Images = map[string]image.InspectResponse{img.ID: img}
 	err := dh.RemoveImage("test-abcd")
 	if err != nil {
-		t.Errorf("Unexpected error removing image: %s", err)
+		t.Errorf("Unexpected error removing img: %s", err)
 	}
 }
 
