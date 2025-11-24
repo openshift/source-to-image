@@ -3,7 +3,6 @@ package util
 import (
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"testing"
 )
@@ -17,7 +16,7 @@ type FakePost struct {
 
 func (f *FakePost) post(url, contentType string, body io.Reader) (resp *http.Response, err error) {
 	f.url = url
-	f.body, _ = ioutil.ReadAll(body)
+	f.body, _ = io.ReadAll(body)
 	return &f.response, f.err
 }
 

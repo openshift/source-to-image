@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -47,7 +46,7 @@ func createTestFiles(baseDir string, dirs []dirDesc, files []fileDesc, links []l
 	}
 	for _, fd := range files {
 		fileName := filepath.Join(baseDir, fd.name)
-		err := ioutil.WriteFile(fileName, []byte(fd.content), fd.mode)
+		err := os.WriteFile(fileName, []byte(fd.content), fd.mode)
 		if err != nil {
 			return err
 		}
@@ -140,7 +139,7 @@ func verifyTarFile(t *testing.T, filename string, dirs []dirDesc, files []fileDe
 				t.Errorf("File %q from tar %q does not match expected modified date. Expected: %v, actual: %v",
 					hdr.Name, filename, fd.modifiedDate, finfo.ModTime().UTC())
 			}
-			fileBytes, err := ioutil.ReadAll(tr)
+			fileBytes, err := io.ReadAll(tr)
 			if err != nil {
 				t.Fatalf("Error reading tar %q: %v", filename, err)
 			}
@@ -168,7 +167,7 @@ func verifyTarFile(t *testing.T, filename string, dirs []dirDesc, files []fileDe
 }
 
 func TestCreateTarStreamIncludeParentDir(t *testing.T) {
-	tempDir, err := ioutil.TempDir("", "testtar")
+	tempDir, err := os.MkdirTemp("", "testtar")
 	defer os.RemoveAll(tempDir)
 	if err != nil {
 		t.Fatalf("Cannot create temp directory for test: %v", err)
@@ -190,7 +189,7 @@ func TestCreateTarStreamIncludeParentDir(t *testing.T) {
 		t.Fatalf("Cannot create test files: %v", err)
 	}
 	th := New(fs.NewFileSystem())
-	tarFile, err := ioutil.TempFile("", "testtarout")
+	tarFile, err := os.CreateTemp("", "testtarout")
 	if err != nil {
 		t.Fatalf("Unable to create temporary file %v", err)
 	}
@@ -211,7 +210,7 @@ func TestCreateTarStreamIncludeParentDir(t *testing.T) {
 
 func TestCreateTar(t *testing.T) {
 	th := New(fs.NewFileSystem())
-	tempDir, err := ioutil.TempDir("", "testtar")
+	tempDir, err := os.MkdirTemp("", "testtar")
 	defer os.RemoveAll(tempDir)
 	if err != nil {
 		t.Fatalf("Cannot create temp directory for test: %v", err)
@@ -252,7 +251,7 @@ func TestCreateTar(t *testing.T) {
 func TestCreateTarIncludeDotGit(t *testing.T) {
 	th := New(fs.NewFileSystem())
 	th.SetExclusionPattern(regexp.MustCompile("test3.txt"))
-	tempDir, err := ioutil.TempDir("", "testtar")
+	tempDir, err := os.MkdirTemp("", "testtar")
 	defer os.RemoveAll(tempDir)
 	if err != nil {
 		t.Fatalf("Cannot create temp directory for test: %v", err)
@@ -292,7 +291,7 @@ func TestCreateTarIncludeDotGit(t *testing.T) {
 func TestCreateTarEmptyRegexp(t *testing.T) {
 	th := New(fs.NewFileSystem())
 	th.SetExclusionPattern(regexp.MustCompile(""))
-	tempDir, err := ioutil.TempDir("", "testtar")
+	tempDir, err := os.MkdirTemp("", "testtar")
 	defer os.RemoveAll(tempDir)
 	if err != nil {
 		t.Fatalf("Cannot create temp directory for test: %v", err)
@@ -501,7 +500,7 @@ func verifyDirectory(t *testing.T, dir string, dirs []dirDesc, files []fileDesc,
 					relpath, fd.modifiedDate, info.ModTime())
 			}
 			if !info.IsDir() {
-				contentBytes, err := ioutil.ReadFile(path)
+				contentBytes, err := os.ReadFile(path)
 				if err != nil {
 					t.Errorf("Error reading file %q: %v", path, err)
 					return err
@@ -565,7 +564,7 @@ func TestExtractTarStream(t *testing.T) {
 		{"dir01/dir03/tëst3.txt", modificationDate, 0444, "utf-8 header file content", false, ""},
 	}
 	reader, writer := io.Pipe()
-	destDir, err := ioutil.TempDir("", "testExtract")
+	destDir, err := os.MkdirTemp("", "testExtract")
 	if err != nil {
 		t.Fatalf("Cannot create temp directory: %v", err)
 	}
@@ -585,7 +584,7 @@ func TestExtractTarStream(t *testing.T) {
 
 func TestExtractTarStreamTimeout(t *testing.T) {
 	reader, writer := io.Pipe()
-	destDir, err := ioutil.TempDir("", "testExtract")
+	destDir, err := os.MkdirTemp("", "testExtract")
 	if err != nil {
 		t.Fatalf("Cannot create temp directory: %v", err)
 	}
@@ -602,12 +601,12 @@ func TestExtractTarStreamTimeout(t *testing.T) {
 func TestRoundTripTar(t *testing.T) {
 	tarWriter := New(fs.NewFileSystem())
 	tarReader := New(fs.NewFileSystem())
-	tempDir, err := ioutil.TempDir("", "testtar")
+	tempDir, err := os.MkdirTemp("", "testtar")
 	defer os.RemoveAll(tempDir)
 	if err != nil {
 		t.Fatalf("Cannot create temp input directory for test: %v", err)
 	}
-	destDir, err := ioutil.TempDir("", "testExtract")
+	destDir, err := os.MkdirTemp("", "testExtract")
 	defer os.RemoveAll(destDir)
 	if err != nil {
 		t.Fatalf("Cannot create temp extract directory for test: %v", err)

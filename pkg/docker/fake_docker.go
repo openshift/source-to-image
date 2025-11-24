@@ -3,7 +3,6 @@ package docker
 import (
 	"errors"
 	"io"
-	"io/ioutil"
 
 	dockertypes "github.com/docker/docker/api/types"
 
@@ -130,7 +129,7 @@ func (f *FakeDocker) RunContainer(opts RunContainerOptions) error {
 		}
 	}
 	if opts.Stdin != nil {
-		_, err := io.Copy(ioutil.Discard, opts.Stdin)
+		_, err := io.Copy(io.Discard, opts.Stdin)
 		if err != nil {
 			return err
 		}
@@ -210,7 +209,7 @@ func (f *FakeDocker) CheckAndPullImage(name string) (*api.Image, error) {
 func (f *FakeDocker) BuildImage(opts BuildImageOptions) error {
 	f.BuildImageOpts = opts
 	if opts.Stdin != nil {
-		_, err := io.Copy(ioutil.Discard, opts.Stdin)
+		_, err := io.Copy(io.Discard, opts.Stdin)
 		if err != nil {
 			return err
 		}

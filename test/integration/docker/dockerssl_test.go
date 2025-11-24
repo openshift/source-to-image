@@ -6,7 +6,7 @@ package docker
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -36,7 +36,7 @@ func init() {
 		panic(err)
 	}
 
-	ca, err := ioutil.ReadFile("../testdata/ca.crt")
+	ca, err := os.ReadFile("../testdata/ca.crt")
 	if err != nil {
 		panic(err)
 	}
@@ -44,7 +44,7 @@ func init() {
 	caPool = x509.NewCertPool()
 	caPool.AppendCertsFromPEM(ca)
 
-	log.SetOutput(ioutil.Discard)
+	log.SetOutput(io.Discard)
 }
 
 type Server struct {

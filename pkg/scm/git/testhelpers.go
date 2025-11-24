@@ -1,7 +1,6 @@
 package git
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -41,7 +40,7 @@ func CreateLocalGitDirectory() (string, error) {
 func CreateEmptyLocalGitDirectory() (string, error) {
 	cr := cmd.NewCommandRunner()
 
-	dir, err := ioutil.TempDir(os.TempDir(), "gitdir-s2i-test")
+	dir, err := os.MkdirTemp(os.TempDir(), "gitdir-s2i-test")
 	if err != nil {
 		return "", err
 	}

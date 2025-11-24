@@ -3,7 +3,6 @@ package scripts
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -23,7 +22,7 @@ type FakeHTTPGet struct {
 
 func (f *FakeHTTPGet) get(url string) (*http.Response, error) {
 	f.url = url
-	f.body = ioutil.NopCloser(strings.NewReader(f.content))
+	f.body = io.NopCloser(strings.NewReader(f.content))
 	return &http.Response{
 		Body:       f.body,
 		StatusCode: f.statusCode,
@@ -81,7 +80,7 @@ type FakeSchemeReader struct {
 }
 
 func (f *FakeSchemeReader) Read(url *url.URL) (io.ReadCloser, error) {
-	return ioutil.NopCloser(strings.NewReader(f.content)), f.err
+	return io.NopCloser(strings.NewReader(f.content)), f.err
 }
 
 func getDownloader() (Downloader, *FakeSchemeReader) {
@@ -98,7 +97,7 @@ func getDownloader() (Downloader, *FakeSchemeReader) {
 func TestDownload(t *testing.T) {
 	dl, fr := getDownloader()
 	fr.content = "test file content"
-	temp, err := ioutil.TempFile("", "testdownload")
+	temp, err := os.CreateTemp("", "testdownload")
 	if err != nil {
 		t.Fatalf("Cannot create temp directory for test: %v", err)
 	}
@@ -112,7 +111,7 @@ func TestDownload(t *testing.T) {
 	if len(info.Location) == 0 {
 		t.Errorf("Expected info.Location to be set, got %v", info)
 	}
-	content, _ := ioutil.ReadFile(temp.Name())
+	content, _ := os.ReadFile(temp.Name())
 	if string(content) != fr.content {
 		t.Errorf("Unexpected file content: %s", string(content))
 	}

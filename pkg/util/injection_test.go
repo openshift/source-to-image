@@ -3,7 +3,6 @@ package util
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,7 +26,7 @@ func TestCreateTruncateFilesScript(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected file %q to exists, got: %v", name, err)
 	}
-	data, err := ioutil.ReadFile(name)
+	data, err := os.ReadFile(name)
 	if err != nil {
 		t.Errorf("Unable to read %q: %v", name, err)
 	}
@@ -43,9 +42,9 @@ func TestCreateTruncateFilesScript(t *testing.T) {
 }
 
 func TestListFilesToTruncate(t *testing.T) {
-	tmp, err := ioutil.TempDir("", "s2i-test-")
-	tmpKeep, err := ioutil.TempDir("", "s2i-test-")
-	tmpNested, err := ioutil.TempDir(tmp, "nested")
+	tmp, err := os.MkdirTemp("", "s2i-test-")
+	tmpKeep, err := os.MkdirTemp("", "s2i-test-")
+	tmpNested, err := os.MkdirTemp(tmp, "nested")
 	if err != nil {
 		t.Errorf("Unable to create temp directory: %v", err)
 	}
@@ -55,9 +54,9 @@ func TestListFilesToTruncate(t *testing.T) {
 		{Source: tmp, Destination: "/foo"},
 		{Source: tmpKeep, Destination: "/this", Keep: true},
 	}
-	f1, _ := ioutil.TempFile(tmp, "foo")
-	f2, _ := ioutil.TempFile(tmpNested, "bar")
-	ioutil.TempFile(tmpKeep, "that")
+	f1, _ := os.CreateTemp(tmp, "foo")
+	f2, _ := os.CreateTemp(tmpNested, "bar")
+	os.CreateTemp(tmpKeep, "that")
 	files, err := ListFilesToTruncate(fs.NewFileSystem(), list)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -101,7 +100,7 @@ func TestCreateInjectionResultFile(t *testing.T) {
 		if err != nil {
 			t.Errorf("Expected file %q to exists, got: %v", name, err)
 		}
-		data, err := ioutil.ReadFile(name)
+		data, err := os.ReadFile(name)
 		if err != nil {
 			t.Errorf("Unable to read %q: %v", name, err)
 		}

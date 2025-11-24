@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -197,7 +196,7 @@ func (t *stiTar) SetExclusionPattern(p *regexp.Regexp) {
 // while excluding files that match the given exclusion pattern
 // It returns the name of the created file
 func (t *stiTar) CreateTarFile(base, dir string) (string, error) {
-	tarFile, err := ioutil.TempFile(base, "tar")
+	tarFile, err := os.CreateTemp(base, "tar")
 	defer tarFile.Close()
 	if err != nil {
 		return "", err

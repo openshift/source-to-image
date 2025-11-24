@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -73,7 +72,7 @@ func getDestination(config *api.Config) string {
 // checkValidDirWithContents returns true if the parameter provided is a valid,
 // accessible and non-empty directory.
 func checkValidDirWithContents(name string) bool {
-	items, err := ioutil.ReadDir(name)
+	items, err := os.ReadDir(name)
 	if os.IsNotExist(err) {
 		log.Warningf("Unable to access directory %q: %v", name, err)
 	}

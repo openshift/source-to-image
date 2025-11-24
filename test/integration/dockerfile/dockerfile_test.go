@@ -5,7 +5,6 @@ package dockerfile
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -21,7 +20,7 @@ import (
 )
 
 func TestDockerfileBuild(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -64,7 +63,7 @@ func TestDockerfileBuild(t *testing.T) {
 }
 
 func TestDockerfileBuildDefaultDockerfile(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -106,7 +105,7 @@ func TestDockerfileBuildDefaultDockerfile(t *testing.T) {
 }
 
 func TestDockerfileBuildEnv(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -144,7 +143,7 @@ func TestDockerfileBuildEnv(t *testing.T) {
 }
 
 func TestDockerfileBuildLabels(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -183,7 +182,7 @@ func TestDockerfileBuildLabels(t *testing.T) {
 }
 
 func TestDockerfileBuildInjections(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -196,7 +195,7 @@ func TestDockerfileBuildInjections(t *testing.T) {
 	}
 
 	for i := 0; i < 3; i++ {
-		_, err = ioutil.TempFile(injection1, "injectfile-")
+		_, err = os.CreateTemp(injection1, "injectfile-")
 		if err != nil {
 			t.Errorf("Unable to create injection file: %v", err)
 		}
@@ -207,7 +206,7 @@ func TestDockerfileBuildInjections(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unable to create injection dir: %v", err)
 	}
-	_, err = ioutil.TempFile(injection2, "injectfile-2")
+	_, err = os.CreateTemp(injection2, "injectfile-2")
 	if err != nil {
 		t.Errorf("Unable to create injection file: %v", err)
 	}
@@ -263,7 +262,7 @@ func TestDockerfileBuildInjections(t *testing.T) {
 }
 
 func TestDockerfileBuildScriptsURLAssemble(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -303,7 +302,7 @@ func TestDockerfileBuildScriptsURLAssemble(t *testing.T) {
 }
 
 func TestDockerfileBuildScriptsURLRun(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -343,7 +342,7 @@ func TestDockerfileBuildScriptsURLRun(t *testing.T) {
 }
 
 func TestDockerfileBuildScriptsURLNone(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -367,7 +366,7 @@ func TestDockerfileBuildScriptsURLNone(t *testing.T) {
 }
 
 func TestDockerfileBuildSourceScriptsAssemble(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -414,7 +413,7 @@ func TestDockerfileBuildSourceScriptsAssemble(t *testing.T) {
 }
 
 func TestDockerfileBuildSourceScriptsRun(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -465,7 +464,7 @@ func TestDockerfileBuildSourceScriptsRun(t *testing.T) {
 // contains all of the s2i scripts at the given directory, regardless
 // of what is contained in the source.
 func TestDockerfileBuildScriptsURLImage(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -512,7 +511,7 @@ func TestDockerfileBuildScriptsURLImage(t *testing.T) {
 }
 
 func TestDockerfileBuildImageScriptsURLAssemble(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -552,7 +551,7 @@ func TestDockerfileBuildImageScriptsURLAssemble(t *testing.T) {
 }
 
 func TestDockerfileBuildImageScriptsURLRun(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -592,7 +591,7 @@ func TestDockerfileBuildImageScriptsURLRun(t *testing.T) {
 }
 
 func TestDockerfileBuildImageScriptsURLImage(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -639,7 +638,7 @@ func TestDockerfileBuildImageScriptsURLImage(t *testing.T) {
 }
 
 func TestDockerfileBuildScriptsAndImageURL(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -683,19 +682,19 @@ func TestDockerfileBuildScriptsAndImageURL(t *testing.T) {
 // the ScriptsURL and ImageScriptsURL point to a non-image directory.
 // In this event, the ScriptsURL value should take precedence.
 func TestDockerfileBuildScriptsAndImageURLConflicts(t *testing.T) {
-	scriptsTempDir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	scriptsTempDir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
 	defer os.RemoveAll(scriptsTempDir)
 
-	imageTempDir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	imageTempDir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
 	defer os.RemoveAll(imageTempDir)
 
-	outputDir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	outputDir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -703,7 +702,7 @@ func TestDockerfileBuildScriptsAndImageURLConflicts(t *testing.T) {
 
 	scriptsAssemble := filepath.Join(scriptsTempDir, "assemble")
 	assembleData := []byte("#!/bin/bash\necho \"Hello World!\"")
-	err = ioutil.WriteFile(scriptsAssemble, assembleData, 0666)
+	err = os.WriteFile(scriptsAssemble, assembleData, 0666)
 	if err != nil {
 		t.Errorf("Unable to create image assemble file: %v", err)
 	}
@@ -740,7 +739,7 @@ func TestDockerfileBuildScriptsAndImageURLConflicts(t *testing.T) {
 		filepath.Join(outputDir, "upload/scripts/assemble"),
 	}
 	runDockerfileTest(t, config, expected, nil, expectedFiles, false)
-	dockerfileAssemble, err := ioutil.ReadFile(filepath.Join(outputDir, "upload/scripts/assemble"))
+	dockerfileAssemble, err := os.ReadFile(filepath.Join(outputDir, "upload/scripts/assemble"))
 	if err != nil {
 		t.Errorf("Failed to read uploaded assemble script: %v", err)
 	}
@@ -750,7 +749,7 @@ func TestDockerfileBuildScriptsAndImageURLConflicts(t *testing.T) {
 }
 
 func TestDockerfileIncrementalBuild(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -791,7 +790,7 @@ func TestDockerfileIncrementalBuild(t *testing.T) {
 }
 
 func TestDockerfileIncrementalSourceSave(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -846,7 +845,7 @@ func TestDockerfileIncrementalSourceSave(t *testing.T) {
 }
 
 func TestDockerfileIncrementalSaveURL(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -894,7 +893,7 @@ func TestDockerfileIncrementalSaveURL(t *testing.T) {
 }
 
 func TestDockerfileIncrementalTag(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -930,7 +929,7 @@ func TestDockerfileIncrementalTag(t *testing.T) {
 }
 
 func TestDockerfileIncrementalAssembleUser(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -966,13 +965,13 @@ func TestDockerfileIncrementalAssembleUser(t *testing.T) {
 }
 
 func TestDockerfileLocalSource(t *testing.T) {
-	localTempDir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	localTempDir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
 	defer os.RemoveAll(localTempDir)
 
-	outputDir, err := ioutil.TempDir("", "s2i-dockerfiletest-dir")
+	outputDir, err := os.MkdirTemp("", "s2i-dockerfiletest-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -1003,7 +1002,7 @@ func TestDockerfileLocalSource(t *testing.T) {
 	}
 	for _, fileName := range fileTree {
 		dummyContent := []byte("Hello World!")
-		err = ioutil.WriteFile(filepath.Join(localTempDir, fileName), dummyContent, 0666)
+		err = os.WriteFile(filepath.Join(localTempDir, fileName), dummyContent, 0666)
 		if err != nil {
 			t.Errorf("Unable to create file: %v", err)
 		}
@@ -1022,7 +1021,7 @@ func TestDockerfileLocalSource(t *testing.T) {
 
 	s2iignore := filepath.Join(localTempDir, ".s2iignore")
 	s2iignoreDate := []byte("dummy\n#skip_file\nfoo/bar/another_file\nfoo/baz/foobar")
-	err = ioutil.WriteFile(s2iignore, s2iignoreDate, 0666)
+	err = os.WriteFile(s2iignore, s2iignoreDate, 0666)
 	if err != nil {
 		t.Errorf("Unable to create .s2iignore file: %v", err)
 	}
@@ -1056,7 +1055,7 @@ func runDockerfileTest(t *testing.T, config *api.Config, expected []string, notE
 		t.Fatalf("The build failed when it should have succeeded.")
 	}
 
-	filebytes, err := ioutil.ReadFile(config.AsDockerfile)
+	filebytes, err := os.ReadFile(config.AsDockerfile)
 	if err != nil {
 		t.Fatalf("An error occurred reading the dockerfile: %v", err)
 	}

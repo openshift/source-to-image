@@ -2,7 +2,6 @@ package layered
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -45,7 +44,7 @@ func newFakeLayeredWithScripts(workDir string) *Layered {
 }
 
 func TestBuildOK(t *testing.T) {
-	workDir, _ := ioutil.TempDir("", "sti")
+	workDir, _ := os.MkdirTemp("", "sti")
 	scriptDir := filepath.Join(workDir, constants.UploadScripts)
 	err := os.MkdirAll(scriptDir, 0700)
 	assemble := filepath.Join(scriptDir, constants.Assemble)
@@ -78,7 +77,7 @@ func TestBuildOK(t *testing.T) {
 }
 
 func TestBuildOKWithImageRef(t *testing.T) {
-	workDir, _ := ioutil.TempDir("", "sti")
+	workDir, _ := os.MkdirTemp("", "sti")
 	scriptDir := filepath.Join(workDir, constants.UploadScripts)
 	err := os.MkdirAll(scriptDir, 0700)
 	assemble := filepath.Join(scriptDir, constants.Assemble)

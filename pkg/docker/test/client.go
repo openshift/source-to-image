@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"time"
 
@@ -127,7 +126,7 @@ func (d *FakeDockerClient) CopyToContainer(ctx context.Context, container, path 
 func (d *FakeDockerClient) CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, dockercontainer.PathStat, error) {
 	d.CopyFromContainerID = container
 	d.CopyFromContainerPath = srcPath
-	return ioutil.NopCloser(bytes.NewReader([]byte(""))), dockercontainer.PathStat{}, d.CopyFromContainerErr
+	return io.NopCloser(bytes.NewReader([]byte(""))), dockercontainer.PathStat{}, d.CopyFromContainerErr
 }
 
 // ContainerWait pauses execution until a container exits.
@@ -165,7 +164,7 @@ func (d *FakeDockerClient) ContainerAttach(ctx context.Context, container string
 func (d *FakeDockerClient) ImageBuild(ctx context.Context, buildContext io.Reader, options dockertypes.ImageBuildOptions) (dockertypes.ImageBuildResponse, error) {
 	d.BuildImageOpts = options
 	return dockertypes.ImageBuildResponse{
-		Body: ioutil.NopCloser(bytes.NewReader([]byte(""))),
+		Body: io.NopCloser(bytes.NewReader([]byte(""))),
 	}, d.BuildImageErr
 }
 
@@ -213,7 +212,7 @@ func (d *FakeDockerClient) ImagePull(ctx context.Context, ref string, options im
 		return nil, d.PullFail
 	}
 
-	return ioutil.NopCloser(bytes.NewReader([]byte{})), nil
+	return io.NopCloser(bytes.NewReader([]byte{})), nil
 }
 
 // ImageRemove removes an image from the docker host.

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -446,7 +445,7 @@ func getImageScriptsDir(config *api.Config, builder *Dockerfile) (string, map[st
 // scanScripts returns a map of provided s2i scripts
 func scanScripts(name string) map[string]bool {
 	scriptsMap := make(map[string]bool)
-	items, err := ioutil.ReadDir(name)
+	items, err := os.ReadDir(name)
 	if os.IsNotExist(err) {
 		log.Warningf("Unable to access directory %q: %v", name, err)
 	}
