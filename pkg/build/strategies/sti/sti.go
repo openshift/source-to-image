@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -525,7 +524,7 @@ func (builder *STI) Save(config *api.Config) (err error) {
 	extractFunc := func(string) error {
 		startTime := time.Now()
 		extractErr := builder.tar.ExtractTarStream(artifactTmpDir, outReader)
-		io.Copy(ioutil.Discard, outReader) // must ensure reader from container is drained
+		io.Copy(io.Discard, outReader) // must ensure reader from container is drained
 		builder.result.BuildInfo.Stages = api.RecordStageAndStepInfo(builder.result.BuildInfo.Stages, api.StageRetrieve, api.StepRetrievePreviousArtifacts, startTime, time.Now())
 
 		if extractErr != nil {

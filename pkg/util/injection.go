@@ -2,7 +2,6 @@ package util
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -115,7 +114,7 @@ func CreateTruncateFilesScript(files []string, scriptName string) (string, error
 		rmScript += fmt.Sprintf("truncate -s0 %q\n", s)
 	}
 
-	f, err := ioutil.TempFile("", "s2i-injection-remove")
+	f, err := os.CreateTemp("", "s2i-injection-remove")
 	if err != nil {
 		return "", err
 	}
@@ -123,7 +122,7 @@ func CreateTruncateFilesScript(files []string, scriptName string) (string, error
 		rmScript += fmt.Sprintf("truncate -s0 %q\n", scriptName)
 	}
 	rmScript += "set +e\n"
-	err = ioutil.WriteFile(f.Name(), []byte(rmScript), 0700)
+	err = os.WriteFile(f.Name(), []byte(rmScript), 0700)
 	return f.Name(), err
 }
 
@@ -131,12 +130,12 @@ func CreateTruncateFilesScript(files []string, scriptName string) (string, error
 // error. The path to the result file is returned. If the provided error is nil, an empty file is
 // created.
 func CreateInjectionResultFile(injectErr error) (string, error) {
-	f, err := ioutil.TempFile("", "s2i-injection-result")
+	f, err := os.CreateTemp("", "s2i-injection-result")
 	if err != nil {
 		return "", err
 	}
 	if injectErr != nil {
-		err = ioutil.WriteFile(f.Name(), []byte(injectErr.Error()), 0700)
+		err = os.WriteFile(f.Name(), []byte(injectErr.Error()), 0700)
 	}
 	return f.Name(), err
 }

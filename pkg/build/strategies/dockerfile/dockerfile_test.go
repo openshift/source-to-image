@@ -2,7 +2,6 @@ package dockerfile
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -161,7 +160,7 @@ func TestInstallScripts(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			workDir, err := ioutil.TempDir("", "s2i-dockerfile-uploads")
+			workDir, err := os.MkdirTemp("", "s2i-dockerfile-uploads")
 			if err != nil {
 				t.Fatalf("failed to create working dir: %v", err)
 			}
@@ -177,7 +176,7 @@ func TestInstallScripts(t *testing.T) {
 				}
 			}
 
-			tempDir, err := ioutil.TempDir("", "s2i-dockerfile-scripts")
+			tempDir, err := os.MkdirTemp("", "s2i-dockerfile-scripts")
 			if err != nil {
 				t.Fatalf("could not create temp dir: %v", err)
 			}
@@ -221,6 +220,6 @@ func TestInstallScripts(t *testing.T) {
 func createTestScript(dir string, name string) error {
 	script := "echo \"test script\""
 	path := filepath.Join(dir, name)
-	err := ioutil.WriteFile(path, []byte(script), 0700)
+	err := os.WriteFile(path, []byte(script), 0700)
 	return err
 }

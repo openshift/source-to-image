@@ -8,7 +8,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -111,13 +111,13 @@ func getDefaultContext() (context.Context, context.CancelFunc) {
 
 // TestInjectionBuild tests the build where we inject files to assemble script.
 func TestInjectionBuild(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-test-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-test-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
 	defer os.RemoveAll(tempdir)
 
-	err = ioutil.WriteFile(filepath.Join(tempdir, "secret"), []byte("secret"), 0666)
+	err = os.WriteFile(filepath.Join(tempdir, "secret"), []byte("secret"), 0666)
 	if err != nil {
 		t.Errorf("Unable to write content to temporary injection file: %v", err)
 	}
@@ -130,13 +130,13 @@ func TestInjectionBuild(t *testing.T) {
 }
 
 func TestInjectionBuildBadDestination(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "s2i-test-dir")
+	tempdir, err := os.MkdirTemp("", "s2i-test-dir")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
 	defer os.RemoveAll(tempdir)
 
-	err = ioutil.WriteFile(filepath.Join(tempdir, "secret"), []byte("secret"), 0666)
+	err = os.WriteFile(filepath.Join(tempdir, "secret"), []byte("secret"), 0666)
 	if err != nil {
 		t.Errorf("Unable to write content to temporary injection file: %v", err)
 	}
@@ -329,7 +329,7 @@ func (i *integrationTest) exerciseCleanBuild(tag string, verifyCallback bool, im
 			// the request body is as expected
 			if callbackHasValidJSON {
 				defer r.Body.Close()
-				body, _ := ioutil.ReadAll(r.Body)
+				body, _ := io.ReadAll(r.Body)
 				type CallbackMessage struct {
 					Success bool
 					Labels  map[string]string

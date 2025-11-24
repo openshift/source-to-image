@@ -3,7 +3,6 @@ package fs
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -133,11 +132,23 @@ func (h *fs) Lstat(path string) (os.FileInfo, error) {
 // ReadDir reads the directory named by dirname and returns a list of directory
 // entries sorted by filename.
 func (h *fs) ReadDir(path string) ([]os.FileInfo, error) {
-	fis, err := ioutil.ReadDir(path)
-	if runtime.GOOS == "windows" && err == nil {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+	// Convert []os.DirEntry to []os.FileInfo
+	fis := make([]os.FileInfo, len(entries))
+	for i, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			return nil, err
+		}
+		fis[i] = info
+	}
+	if runtime.GOOS == "windows" {
 		h.enrichFileInfos(path, fis)
 	}
-	return fis, err
+	return fis, nil
 }
 
 // Chmod sets the file mode
@@ -328,7 +339,7 @@ func (h *fs) RemoveDirectory(dir string) error {
 
 // CreateWorkingDirectory creates a directory to be used for STI
 func (h *fs) CreateWorkingDirectory() (directory string, err error) {
-	directory, err = ioutil.TempDir("", "s2i")
+	directory, err = os.MkdirTemp("", "s2i")
 	if err != nil {
 		return "", s2ierr.NewWorkDirError(directory, err)
 	}
@@ -349,7 +360,7 @@ func (h *fs) Create(filename string) (io.WriteCloser, error) {
 // WriteFile opens a file and writes data to it, returning error if such
 // occurred
 func (h *fs) WriteFile(filename string, data []byte) error {
-	return ioutil.WriteFile(filename, data, 0700)
+	return os.WriteFile(filename, data, 0700)
 }
 
 // Walk walks the file tree rooted at root, calling walkFn for each file or

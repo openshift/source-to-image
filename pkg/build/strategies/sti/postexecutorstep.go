@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -242,7 +241,7 @@ type startRuntimeImageAndUploadFilesStep struct {
 func (step *startRuntimeImageAndUploadFilesStep) execute(ctx *postExecutorStepContext) error {
 	log.V(3).Info("Executing step: start runtime image and upload files")
 
-	fd, err := ioutil.TempFile("", "s2i-upload-done")
+	fd, err := os.CreateTemp("", "s2i-upload-done")
 	if err != nil {
 		step.builder.result.BuildInfo.FailureReason = utilstatus.NewFailureReason(
 			utilstatus.ReasonGenericS2IBuildFailed,
@@ -464,7 +463,7 @@ func createCommandForExecutingRunScript(scriptsURL map[string]string, location s
 func downloadAndExtractFileFromContainer(docker dockerpkg.Docker, tar s2itar.Tar, sourcePath, destinationPath, containerID string) (api.FailureReason, error) {
 	log.V(5).Infof("Downloading file %q", sourcePath)
 
-	fd, err := ioutil.TempFile(destinationPath, "s2i-runtime-artifact")
+	fd, err := os.CreateTemp(destinationPath, "s2i-runtime-artifact")
 	if err != nil {
 		res := utilstatus.NewFailureReason(
 			utilstatus.ReasonFSOperationFailed,
@@ -549,7 +548,7 @@ func checkAndGetNewLabels(builder *STI, docker dockerpkg.Docker, tar s2itar.Tar,
 	defer fd.Close()
 
 	// read the file to a string
-	str, err := ioutil.ReadAll(fd)
+	str, err := io.ReadAll(fd)
 	if err != nil {
 		return fmt.Errorf("error reading file '%s' in to a string: %v", filePath, err)
 	}

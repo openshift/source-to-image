@@ -3,7 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"regexp"
 	"strings"
 
@@ -51,7 +51,7 @@ func Save(config *api.Config, cmd *cobra.Command) {
 		log.V(1).Infof("Unable to serialize to %s: %v", DefaultConfigPath, err)
 		return
 	}
-	if err := ioutil.WriteFile(DefaultConfigPath, data, 0644); err != nil {
+	if err := os.WriteFile(DefaultConfigPath, data, 0644); err != nil {
 		log.V(1).Infof("Unable to save %s: %v", DefaultConfigPath, err)
 	}
 	return
@@ -59,9 +59,9 @@ func Save(config *api.Config, cmd *cobra.Command) {
 
 // Restore loads the arguments from disk and prefills the Request
 func Restore(config *api.Config, cmd *cobra.Command) {
-	data, err := ioutil.ReadFile(DefaultConfigPath)
+	data, err := os.ReadFile(DefaultConfigPath)
 	if err != nil {
-		data, err = ioutil.ReadFile(".stifile")
+		data, err = os.ReadFile(".stifile")
 		if err != nil {
 			log.V(1).Infof("Unable to restore %s: %v", DefaultConfigPath, err)
 			return

@@ -3,8 +3,7 @@ package docker
 import (
 	"bytes"
 	"fmt"
-	"github.com/docker/docker/api/types/image"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -13,6 +12,7 @@ import (
 
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/registry"
 	dockerstrslice "github.com/docker/docker/api/types/strslice"
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
@@ -131,7 +131,7 @@ func TestCopyToContainer(t *testing.T) {
 		var err error
 		var file *os.File
 		if len(tst.src) > 0 {
-			tempDir, err = ioutil.TempDir("", tst.src)
+			tempDir, err = os.MkdirTemp("", tst.src)
 			defer os.RemoveAll(tempDir)
 			fileName = filepath.Join(tempDir, "bar")
 			if err = os.MkdirAll(filepath.Dir(fileName), 0700); err == nil {
@@ -557,7 +557,7 @@ func TestRunContainer(t *testing.T) {
 			Destination:     tst.paramDestination,
 			Command:         tst.cmd,
 			Env:             []string{"Key1=Value1", "Key2=Value2"},
-			Stdin:           ioutil.NopCloser(os.Stdin),
+			Stdin:           io.NopCloser(os.Stdin),
 		})
 
 		if tst.errResult > 0 {
