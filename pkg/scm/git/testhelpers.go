@@ -29,7 +29,7 @@ func CreateLocalGitDirectory() (string, error) {
 		return "", err
 	}
 
-	err = cr.RunWithOptions(cmd.CommandOpts{Dir: dir, EnvAppend: []string{"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@test", "GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@test"}}, "git", "commit", "-m", "testcommit")
+	err = cr.RunWithOptions(cmd.CommandOpts{Dir: dir, EnvAppend: []string{"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@test", "GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@test"}}, "git", "commit", "-n", "-m", "testcommit")
 	if err != nil {
 		return "", err
 	}

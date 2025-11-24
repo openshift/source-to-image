@@ -1,6 +1,6 @@
-FROM registry.access.redhat.com/ubi8/go-toolset:1.23 AS builder
+FROM registry.access.redhat.com/ubi10/go-toolset:1.25.3 AS builder
 
-ENV S2I_GIT_VERSION="1.5.0" \
+ENV S2I_GIT_VERSION="1.5.2" \
     S2I_GIT_MAJOR="1" \
     S2I_GIT_MINOR="5"
 
@@ -23,11 +23,14 @@ LABEL \
     name="source-to-image/source-to-image-rhel8" \
     description="Source-to-Image is a builder image" \
     summary="Source-to-Image is a builder image" \
-    version="1.6.0" \
+    version="v1.5.2" \
     vendor="Red Hat, Inc." \
     com.redhat.component="source-to-image-container" \
     cpe="cpe:/a:redhat:source_to_image:1.5::el8" \
     maintainer="openshift-builds@redhat.com" \
+    distribution-scope="public" \
+    release="v1.5.2" \
+    url="https://catalog.redhat.com/en/software/container-stacks/detail/5ec54a2e110f56bd24f2ddc7" \
     io.k8s.description="Source-to-Image is a builder image" \
     io.k8s.display-name="Source-to-Image" \
     io.openshift.tags="source-to-image,s2i" \

@@ -94,11 +94,11 @@ func TestParse(t *testing.T) {
 			},
 		},
 		parseTest{
-			rawurl: "http://[::ffff:1.2.3.4]:443",
+			rawurl: "http://::ffff:1.2.3.4:443",
 			expectedGitURL: &URL{
 				URL: url.URL{
 					Scheme: "http",
-					Host:   "[::ffff:1.2.3.4]:443",
+					Host:   "::ffff:1.2.3.4:443",
 				},
 				Type: URLTypeURL,
 			},
@@ -165,10 +165,10 @@ func TestParse(t *testing.T) {
 			},
 		},
 		parseTest{
-			rawurl: "[::ffff:1.2.3.4]:",
+			rawurl: "::ffff:1.2.3.4:",
 			expectedGitURL: &URL{
 				URL: url.URL{
-					Host: "[::ffff:1.2.3.4]",
+					Host: "::ffff:1.2.3.4",
 				},
 				Type: URLTypeSCP,
 			},
