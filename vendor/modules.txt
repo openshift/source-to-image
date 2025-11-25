@@ -259,8 +259,8 @@ github.com/gogo/protobuf/proto
 # github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8
 ## explicit; go 1.20
 github.com/golang/groupcache/lru
-# github.com/google/go-containerregistry v0.20.6
-## explicit; go 1.24
+# github.com/google/go-containerregistry v0.20.7
+## explicit; go 1.24.0
 github.com/google/go-containerregistry/pkg/v1
 github.com/google/go-containerregistry/pkg/v1/types
 # github.com/google/go-intervals v0.0.2
