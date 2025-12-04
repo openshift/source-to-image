@@ -12,7 +12,7 @@ require (
 	github.com/moby/buildkit v0.26.2
 	github.com/moby/docker-image-spec v1.3.1
 	github.com/opencontainers/image-spec v1.1.1
-	github.com/spf13/cobra v1.10.1
+	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	golang.org/x/net v0.47.0
 	k8s.io/klog/v2 v2.130.1
