@@ -1,3 +1,9 @@
+# cyphar.com/go-pathrs v0.2.1
+## explicit; go 1.18
+cyphar.com/go-pathrs
+cyphar.com/go-pathrs/internal/fdutils
+cyphar.com/go-pathrs/internal/libpathrs
+cyphar.com/go-pathrs/procfs
 # dario.cat/mergo v1.0.2
 ## explicit; go 1.13
 dario.cat/mergo
@@ -176,7 +182,7 @@ github.com/containers/storage/pkg/tarlog
 github.com/containers/storage/pkg/truncindex
 github.com/containers/storage/pkg/unshare
 github.com/containers/storage/types
-# github.com/cyphar/filepath-securejoin v0.5.1
+# github.com/cyphar/filepath-securejoin v0.6.0
 ## explicit; go 1.18
 github.com/cyphar/filepath-securejoin
 github.com/cyphar/filepath-securejoin/internal/consts
@@ -185,6 +191,7 @@ github.com/cyphar/filepath-securejoin/pathrs-lite/internal
 github.com/cyphar/filepath-securejoin/pathrs-lite/internal/assert
 github.com/cyphar/filepath-securejoin/pathrs-lite/internal/fd
 github.com/cyphar/filepath-securejoin/pathrs-lite/internal/gocompat
+github.com/cyphar/filepath-securejoin/pathrs-lite/internal/gopathrs
 github.com/cyphar/filepath-securejoin/pathrs-lite/internal/kernelversion
 github.com/cyphar/filepath-securejoin/pathrs-lite/internal/linux
 github.com/cyphar/filepath-securejoin/pathrs-lite/internal/procfs
@@ -223,7 +230,7 @@ github.com/docker/docker/client
 github.com/docker/docker/pkg/homedir
 github.com/docker/docker/pkg/jsonmessage
 github.com/docker/docker/pkg/stdcopy
-# github.com/docker/docker-credential-helpers v0.9.3
+# github.com/docker/docker-credential-helpers v0.9.5
 ## explicit; go 1.21
 github.com/docker/docker-credential-helpers/client
 github.com/docker/docker-credential-helpers/credentials
@@ -298,8 +305,8 @@ github.com/klauspost/pgzip
 # github.com/mistifyio/go-zfs/v3 v3.1.0
 ## explicit; go 1.14
 github.com/mistifyio/go-zfs/v3
-# github.com/moby/buildkit v0.26.2
-## explicit; go 1.24.3
+# github.com/moby/buildkit v0.27.0
+## explicit; go 1.25.0
 github.com/moby/buildkit/frontend/dockerfile/command
 github.com/moby/buildkit/frontend/dockerfile/parser
 github.com/moby/buildkit/frontend/dockerfile/shell
@@ -350,8 +357,8 @@ github.com/pkg/errors
 # github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10
 ## explicit; go 1.20
 github.com/planetscale/vtprotobuf/protohelpers
-# github.com/sirupsen/logrus v1.9.3
-## explicit; go 1.13
+# github.com/sirupsen/logrus v1.9.4
+## explicit; go 1.17
 github.com/sirupsen/logrus
 # github.com/spf13/cobra v1.10.2
 ## explicit; go 1.15
@@ -387,12 +394,11 @@ go.opencensus.io/trace/tracestate
 ## explicit; go 1.24.0
 go.opentelemetry.io/auto/sdk
 go.opentelemetry.io/auto/sdk/internal/telemetry
-# go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.61.0
+# go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0
 ## explicit; go 1.23.0
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/request
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconv
-go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconvutil
 # go.opentelemetry.io/otel v1.39.0
 ## explicit; go 1.24.0
 go.opentelemetry.io/otel
@@ -404,9 +410,8 @@ go.opentelemetry.io/otel/codes
 go.opentelemetry.io/otel/internal/baggage
 go.opentelemetry.io/otel/internal/global
 go.opentelemetry.io/otel/propagation
-go.opentelemetry.io/otel/semconv/v1.20.0
-go.opentelemetry.io/otel/semconv/v1.26.0
 go.opentelemetry.io/otel/semconv/v1.37.0
+go.opentelemetry.io/otel/semconv/v1.37.0/httpconv
 # go.opentelemetry.io/otel/metric v1.39.0
 ## explicit; go 1.24.0
 go.opentelemetry.io/otel/metric
@@ -418,19 +423,19 @@ go.opentelemetry.io/otel/trace
 go.opentelemetry.io/otel/trace/embedded
 go.opentelemetry.io/otel/trace/internal/telemetry
 go.opentelemetry.io/otel/trace/noop
-# golang.org/x/mod v0.30.0
+# golang.org/x/mod v0.31.0
 ## explicit; go 1.24.0
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/modfile
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.47.0
+# golang.org/x/net v0.48.0
 ## explicit; go 1.24.0
 golang.org/x/net/context
-# golang.org/x/sync v0.18.0
+# golang.org/x/sync v0.19.0
 ## explicit; go 1.24.0
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.38.0
+# golang.org/x/sys v0.39.0
 ## explicit; go 1.24.0
 golang.org/x/sys/unix
 golang.org/x/sys/windows
@@ -450,7 +455,7 @@ google.golang.org/grpc/internal
 google.golang.org/grpc/internal/status
 google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/status
-# google.golang.org/protobuf v1.36.10
+# google.golang.org/protobuf v1.36.11
 ## explicit; go 1.23
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
