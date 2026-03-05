@@ -14,7 +14,7 @@ import (
 	"runtime"
 	"testing"
 
-	dockerapi "github.com/docker/docker/api"
+	mobyClient "github.com/moby/moby/client"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/docker"
@@ -59,7 +59,7 @@ func (s *Server) Close() {
 
 func (s *Server) serveFakeDockerAPIServer() {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/v"+dockerapi.DefaultVersion+"/version", func(w http.ResponseWriter, req *http.Request) {
+	mux.HandleFunc("/v"+mobyClient.MaxAPIVersion+"/version", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
 		w.Write([]byte("{}"))
 	})

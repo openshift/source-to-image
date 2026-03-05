@@ -19,18 +19,13 @@ import (
 	"time"
 
 	"github.com/containerd/errdefs"
-	dockertypes "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/build"
-	"github.com/docker/docker/api/types/common"
-	dockercontainer "github.com/docker/docker/api/types/container"
-	dockerimage "github.com/docker/docker/api/types/image"
-	dockernetwork "github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/registry"
-	dockerapi "github.com/docker/docker/client"
 	dockermessage "github.com/docker/docker/pkg/jsonmessage"
 	dockerstdcopy "github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/tlsconfig"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	mobyContainer "github.com/moby/moby/api/types/container"
+	mobyNetwork "github.com/moby/moby/api/types/network"
+	mobyClient "github.com/moby/moby/client"
 	"golang.org/x/net/context"
 
 	"github.com/openshift/source-to-image/pkg/api"
@@ -119,27 +114,27 @@ type Docker interface {
 	UploadToContainer(fs fs.FileSystem, srcPath, destPath, container string) error
 	UploadToContainerWithTarWriter(fs fs.FileSystem, srcPath, destPath, container string, makeTarWriter func(io.Writer) s2itar.Writer) error
 	DownloadFromContainer(containerPath string, w io.Writer, container string) error
-	Version() (dockertypes.Version, error)
+	Version() (mobyClient.ServerVersionResult, error)
 	CheckReachable() error
 }
 
 // Client contains all methods used when interacting directly with docker engine-api
 type Client interface {
-	ContainerAttach(ctx context.Context, container string, options dockercontainer.AttachOptions) (dockertypes.HijackedResponse, error)
-	ContainerCommit(ctx context.Context, container string, options dockercontainer.CommitOptions) (common.IDResponse, error)
-	ContainerCreate(ctx context.Context, config *dockercontainer.Config, hostConfig *dockercontainer.HostConfig, networkingConfig *dockernetwork.NetworkingConfig, platform *v1.Platform, containerName string) (dockercontainer.CreateResponse, error)
-	ContainerInspect(ctx context.Context, container string) (dockercontainer.InspectResponse, error)
-	ContainerRemove(ctx context.Context, container string, options dockercontainer.RemoveOptions) error
-	ContainerStart(ctx context.Context, container string, options dockercontainer.StartOptions) error
-	ContainerKill(ctx context.Context, container, signal string) error
-	ContainerWait(ctx context.Context, container string, condition dockercontainer.WaitCondition) (<-chan dockercontainer.WaitResponse, <-chan error)
-	CopyToContainer(ctx context.Context, container, path string, content io.Reader, opts dockercontainer.CopyToContainerOptions) error
-	CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, dockercontainer.PathStat, error)
-	ImageBuild(ctx context.Context, buildContext io.Reader, options build.ImageBuildOptions) (build.ImageBuildResponse, error)
-	ImageInspectWithRaw(ctx context.Context, image string) (dockerimage.InspectResponse, []byte, error)
-	ImagePull(ctx context.Context, ref string, options dockerimage.PullOptions) (io.ReadCloser, error)
-	ImageRemove(ctx context.Context, image string, options dockerimage.RemoveOptions) ([]dockerimage.DeleteResponse, error)
-	ServerVersion(ctx context.Context) (dockertypes.Version, error)
+	ContainerAttach(ctx context.Context, container string, options mobyClient.ContainerAttachOptions) (mobyClient.ContainerAttachResult, error)
+	ContainerCommit(ctx context.Context, container string, options mobyClient.ContainerCommitOptions) (mobyClient.ContainerCommitResult, error)
+	ContainerCreate(ctx context.Context, options mobyClient.ContainerCreateOptions) (mobyClient.ContainerCreateResult, error)
+	ContainerInspect(ctx context.Context, container string, options mobyClient.ContainerInspectOptions) (mobyClient.ContainerInspectResult, error)
+	ContainerRemove(ctx context.Context, container string, options mobyClient.ContainerRemoveOptions) (mobyClient.ContainerRemoveResult, error)
+	ContainerStart(ctx context.Context, container string, options mobyClient.ContainerStartOptions) (mobyClient.ContainerStartResult, error)
+	ContainerKill(ctx context.Context, container string, options mobyClient.ContainerKillOptions) (mobyClient.ContainerKillResult, error)
+	ContainerWait(ctx context.Context, container string, options mobyClient.ContainerWaitOptions) mobyClient.ContainerWaitResult
+	CopyToContainer(ctx context.Context, container string, options mobyClient.CopyToContainerOptions) (mobyClient.CopyToContainerResult, error)
+	CopyFromContainer(ctx context.Context, container string, options mobyClient.CopyFromContainerOptions) (mobyClient.CopyFromContainerResult, error)
+	ImageBuild(ctx context.Context, context io.Reader, options mobyClient.ImageBuildOptions) (mobyClient.ImageBuildResult, error)
+	ImageInspect(ctx context.Context, image string, _ ...mobyClient.ImageInspectOption) (mobyClient.ImageInspectResult, error)
+	ImagePull(ctx context.Context, ref string, options mobyClient.ImagePullOptions) (mobyClient.ImagePullResponse, error)
+	ImageRemove(ctx context.Context, image string, options mobyClient.ImageRemoveOptions) (mobyClient.ImageRemoveResult, error)
+	ServerVersion(ctx context.Context, options mobyClient.ServerVersionOptions) (mobyClient.ServerVersionResult, error)
 }
 
 type stiDocker struct {
@@ -148,10 +143,10 @@ type stiDocker struct {
 }
 
 // InspectImage returns the image information and its raw representation.
-func (d stiDocker) InspectImage(name string) (*dockerimage.InspectResponse, error) {
+func (d stiDocker) InspectImage(name string) (*mobyClient.ImageInspectResult, error) {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	resp, _, err := d.client.ImageInspectWithRaw(ctx, name)
+	resp, err := d.client.ImageInspect(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -211,8 +206,8 @@ type RunContainerOptions struct {
 
 // asDockerConfig converts a RunContainerOptions into a Config understood by the
 // docker client
-func (rco RunContainerOptions) asDockerConfig() dockercontainer.Config {
-	return dockercontainer.Config{
+func (rco RunContainerOptions) asDockerConfig() mobyContainer.Config {
+	return mobyContainer.Config{
 		Image:        getImageName(rco.Image),
 		User:         rco.User,
 		Env:          rco.Env,
@@ -225,11 +220,11 @@ func (rco RunContainerOptions) asDockerConfig() dockercontainer.Config {
 
 // asDockerHostConfig converts a RunContainerOptions into a HostConfig
 // understood by the docker client
-func (rco RunContainerOptions) asDockerHostConfig() dockercontainer.HostConfig {
-	hostConfig := dockercontainer.HostConfig{
+func (rco RunContainerOptions) asDockerHostConfig() mobyContainer.HostConfig {
+	hostConfig := mobyContainer.HostConfig{
 		CapDrop:         rco.CapDrop,
 		PublishAllPorts: rco.TargetImage,
-		NetworkMode:     dockercontainer.NetworkMode(rco.NetworkMode),
+		NetworkMode:     mobyContainer.NetworkMode(rco.NetworkMode),
 		Binds:           rco.Binds,
 		ExtraHosts:      rco.AddHost,
 		SecurityOpt:     rco.SecurityOpt,
@@ -243,10 +238,10 @@ func (rco RunContainerOptions) asDockerHostConfig() dockercontainer.HostConfig {
 }
 
 type configWrapper struct {
-	*dockercontainer.Config
+	*mobyContainer.Config
 	Name             string
-	HostConfig       *dockercontainer.HostConfig
-	NetworkingConfig *dockernetwork.NetworkingConfig
+	HostConfig       *mobyContainer.HostConfig
+	NetworkingConfig *mobyNetwork.NetworkingConfig
 }
 
 // asDockerCreateContainerOptions converts a RunContainerOptions into a
@@ -263,8 +258,8 @@ func (rco RunContainerOptions) asDockerCreateContainerOptions() configWrapper {
 
 // asDockerAttachToContainerOptions converts a RunContainerOptions into a
 // ContainerAttachOptions understood by the docker client
-func (rco RunContainerOptions) asDockerAttachToContainerOptions() dockercontainer.AttachOptions {
-	return dockercontainer.AttachOptions{
+func (rco RunContainerOptions) asDockerAttachToContainerOptions() mobyClient.ContainerAttachOptions {
+	return mobyClient.ContainerAttachOptions{
 		Stdin:  rco.Stdin != nil,
 		Stdout: rco.Stdout != nil,
 		Stderr: rco.Stderr != nil,
@@ -292,7 +287,7 @@ type BuildImageOptions struct {
 }
 
 // NewEngineAPIClient creates a new Docker engine API client
-func NewEngineAPIClient(config *api.DockerConfig) (*dockerapi.Client, error) {
+func NewEngineAPIClient(config *api.DockerConfig) (mobyClient.APIClient, error) {
 	var httpClient *http.Client
 
 	if config.UseTLS || config.TLSVerify {
@@ -321,16 +316,17 @@ func NewEngineAPIClient(config *api.DockerConfig) (*dockerapi.Client, error) {
 			},
 		}
 	}
+
 	// Create a new docker client with the provided host endpoint and HTTP Client.
 	// By default, this client will negotiate the Docker API version to use with the backend engine on the first request.
 	// The API version to use can be fixed by setting the DOCKER_API_VERSION environment variable.
 	// See https://pkg.go.dev/github.com/docker/docker/client#WithAPIVersionNegotiation and
 	// https://pkg.go.dev/github.com/docker/docker/client#WithVersionFromEnv for more information
-	return dockerapi.NewClientWithOpts(
-		dockerapi.WithHost(config.Endpoint),
-		dockerapi.WithHTTPClient(httpClient),
-		dockerapi.WithAPIVersionNegotiation(),
-		dockerapi.WithVersionFromEnv(),
+	return mobyClient.New(
+		mobyClient.WithHost(config.Endpoint),
+		mobyClient.WithHTTPClient(httpClient),
+		mobyClient.WithAPIVersionNegotiation(),
+		mobyClient.WithVersionFromEnv(),
 	)
 }
 
@@ -411,7 +407,7 @@ func (d *stiDocker) UploadToContainerWithTarWriter(fs fs.FileSystem, src, dest, 
 	log.V(3).Infof("Uploading %q to %q ...", src, destPath)
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	err := d.client.CopyToContainer(ctx, container, destPath, r, dockercontainer.CopyToContainerOptions{})
+	_, err := d.client.CopyToContainer(ctx, container, mobyClient.CopyToContainerOptions{Content: r, DestinationPath: destPath})
 	if err != nil {
 		log.V(0).Infof("error: Uploading to container failed: %v", err)
 	}
@@ -422,10 +418,11 @@ func (d *stiDocker) UploadToContainerWithTarWriter(fs fs.FileSystem, src, dest, 
 func (d *stiDocker) DownloadFromContainer(containerPath string, w io.Writer, container string) error {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	readCloser, _, err := d.client.CopyFromContainer(ctx, container, containerPath)
+	resp, err := d.client.CopyFromContainer(ctx, container, mobyClient.CopyFromContainerOptions{SourcePath: containerPath})
 	if err != nil {
 		return err
 	}
+	readCloser := resp.Content
 	defer readCloser.Close()
 	_, err = io.Copy(w, readCloser)
 	return err
@@ -458,10 +455,10 @@ func (d *stiDocker) GetImageUser(name string) (string, error) {
 }
 
 // Version returns information of the docker client and server host
-func (d *stiDocker) Version() (dockertypes.Version, error) {
+func (d *stiDocker) Version() (mobyClient.ServerVersionResult, error) {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	return d.client.ServerVersion(ctx)
+	return d.client.ServerVersion(ctx, mobyClient.ServerVersionOptions{})
 }
 
 // IsImageOnBuild provides information about whether the Docker image has
@@ -552,7 +549,7 @@ func (d *stiDocker) PullImage(name string) (*api.Image, error) {
 
 	for retries := 0; retries <= DefaultPullRetryCount; retries++ {
 		err = util.TimeoutAfter(DefaultDockerTimeout, fmt.Sprintf("pulling image %q", name), func(timer *time.Timer) error {
-			resp, pullErr := d.client.ImagePull(context.Background(), name, dockerimage.PullOptions{RegistryAuth: base64Auth})
+			resp, pullErr := d.client.ImagePull(context.Background(), name, mobyClient.ImagePullOptions{RegistryAuth: base64Auth})
 			if pullErr != nil {
 				return pullErr
 			}
@@ -614,7 +611,7 @@ func (d *stiDocker) PullImage(name string) (*api.Image, error) {
 	return nil, nil
 }
 
-func updateImageWithInspect(image *api.Image, inspect *dockerimage.InspectResponse) {
+func updateImageWithInspect(image *api.Image, inspect *mobyClient.ImageInspectResult) {
 	image.ID = inspect.ID
 	if inspect.Config != nil {
 		image.Config = &api.ContainerConfig{
@@ -622,10 +619,10 @@ func updateImageWithInspect(image *api.Image, inspect *dockerimage.InspectRespon
 			Env:    inspect.Config.Env,
 		}
 	}
-	if inspect.ContainerConfig != nil {
+	if inspect.Config != nil {
 		image.ContainerConfig = &api.ContainerConfig{
-			Labels: inspect.ContainerConfig.Labels,
-			Env:    inspect.ContainerConfig.Env,
+			Labels: inspect.Config.Labels,
+			Env:    inspect.Config.Env,
 		}
 	}
 }
@@ -634,17 +631,19 @@ func updateImageWithInspect(image *api.Image, inspect *dockerimage.InspectRespon
 func (d *stiDocker) RemoveContainer(id string) error {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	opts := dockercontainer.RemoveOptions{
+	opts := mobyClient.ContainerRemoveOptions{
 		RemoveVolumes: true,
 	}
-	return d.client.ContainerRemove(ctx, id, opts)
+	_, err := d.client.ContainerRemove(ctx, id, opts)
+	return err
 }
 
 // KillContainer kills a container.
 func (d *stiDocker) KillContainer(id string) error {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	return d.client.ContainerKill(ctx, id, "SIGKILL")
+	_, err := d.client.ContainerKill(ctx, id, mobyClient.ContainerKillOptions{Signal: "SIGKILL"})
+	return err
 }
 
 // GetLabels retrieves the labels of the given image.
@@ -831,21 +830,22 @@ func determineCommandBaseDir(opts RunContainerOptions, imageMetadata *api.Image,
 }
 
 // dumpContainerInfo dumps information about a running container (port/IP/etc).
-func dumpContainerInfo(container dockercontainer.CreateResponse, d *stiDocker, image string) {
+func dumpContainerInfo(container mobyClient.ContainerCreateResult, d *stiDocker, image string) {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
 
-	containerJSON, err := d.client.ContainerInspect(ctx, container.ID)
+	resp, err := d.client.ContainerInspect(ctx, container.ID, mobyClient.ContainerInspectOptions{})
 	if err != nil {
 		return
 	}
+	containerJSON := resp.Container
 
 	liveports := "\n\nPort Bindings:  "
-	for port, bindings := range containerJSON.NetworkSettings.NetworkSettingsBase.Ports {
-		liveports = liveports + "\n  Container Port:  " + string(port)
+	for port, bindings := range containerJSON.NetworkSettings.Ports {
+		liveports = liveports + "\n  Container Port:  " + string(port.String())
 		liveports = liveports + "\n        Public Host / Port Mappings:"
 		for _, binding := range bindings {
-			liveports = liveports + "\n            IP: " + binding.HostIP + " Port: " + binding.HostPort
+			liveports = liveports + "\n            IP: " + binding.HostIP.String() + " Port: " + binding.HostPort
 		}
 	}
 	liveports = liveports + "\n"
@@ -879,7 +879,7 @@ func (d *stiDocker) redirectResponseToOutputStream(tty bool, outputStream, error
 // goroutine to pump data down from the container's stdout and stderr.  it holds
 // open the HijackedResponse until all of this is done.  Caller's responsibility
 // to close resp, as well as outputStream and errorStream if appropriate.
-func (d *stiDocker) holdHijackedConnection(tty bool, opts *RunContainerOptions, resp dockertypes.HijackedResponse) error {
+func (d *stiDocker) holdHijackedConnection(tty bool, opts *RunContainerOptions, resp mobyClient.HijackedResponse) error {
 	receiveStdout := make(chan error, 1)
 	if opts.Stdout != nil || opts.Stderr != nil {
 		go func() {
@@ -993,7 +993,12 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 	log.V(2).Infof("Creating container with options {Name:%q Config:%+v HostConfig:%+v} ...", createOpts.Name, *util.SafeForLoggingContainerConfig(createOpts.Config), createOpts.HostConfig)
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	container, err := d.client.ContainerCreate(ctx, createOpts.Config, createOpts.HostConfig, createOpts.NetworkingConfig, nil, createOpts.Name)
+	container, err := d.client.ContainerCreate(ctx, mobyClient.ContainerCreateOptions{
+		Name:             createOpts.Name,
+		Config:           createOpts.Config,
+		HostConfig:       createOpts.HostConfig,
+		NetworkingConfig: createOpts.NetworkingConfig,
+	})
 	if err != nil {
 		return err
 	}
@@ -1043,7 +1048,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 		log.V(2).Infof("Starting container %q ...", container.ID)
 		ctx, cancel = getDefaultContext()
 		defer cancel()
-		err = d.client.ContainerStart(ctx, container.ID, dockercontainer.StartOptions{})
+		_, err = d.client.ContainerStart(ctx, container.ID, mobyClient.ContainerStartOptions{})
 		if err != nil {
 			return err
 		}
@@ -1064,7 +1069,7 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 			dumpContainerInfo(container, d, image)
 		}
 
-		err = d.holdHijackedConnection(false, &opts, resp)
+		err = d.holdHijackedConnection(false, &opts, resp.HijackedResponse)
 		if err != nil {
 			return err
 		}
@@ -1072,14 +1077,15 @@ func (d *stiDocker) RunContainer(opts RunContainerOptions) error {
 		// Return an error if the exit code of the container is
 		// non-zero.
 		log.V(4).Infof("Waiting for container %q to stop ...", container.ID)
-		waitC, errC := d.client.ContainerWait(context.Background(), container.ID, dockercontainer.WaitConditionNotRunning)
+		waitRes := d.client.ContainerWait(context.Background(), container.ID, mobyClient.ContainerWaitOptions{Condition: mobyContainer.WaitConditionNotRunning})
+		waitC, errC := waitRes.Result, waitRes.Error
 		select {
 		case result := <-waitC:
 			if result.StatusCode != 0 {
 				var output string
-				jsonOutput, _ := d.client.ContainerInspect(ctx, container.ID)
-				if err == nil && jsonOutput.ContainerJSONBase != nil && jsonOutput.ContainerJSONBase.State != nil {
-					state := jsonOutput.ContainerJSONBase.State
+				jsonOutput, err := d.client.ContainerInspect(ctx, container.ID, mobyClient.ContainerInspectOptions{})
+				if err == nil && jsonOutput.Container.State != nil {
+					state := jsonOutput.Container.State
 					output = fmt.Sprintf("Status: %s, Error: %s, OOMKilled: %v, Dead: %v", state.Status, state.Error, state.OOMKilled, state.Dead)
 				}
 				return s2ierr.NewContainerError(container.ID, int(result.StatusCode), output)
@@ -1118,11 +1124,11 @@ func (d *stiDocker) GetImageID(name string) (string, error) {
 // CommitContainer commits a container to an image with a specific tag.
 // The new image ID is returned
 func (d *stiDocker) CommitContainer(opts CommitContainerOptions) (string, error) {
-	dockerOpts := dockercontainer.CommitOptions{
+	dockerOpts := mobyClient.ContainerCommitOptions{
 		Reference: opts.Repository,
 	}
 	if opts.Command != nil || opts.Entrypoint != nil {
-		config := dockercontainer.Config{
+		config := mobyContainer.Config{
 			Cmd:        opts.Command,
 			Entrypoint: opts.Entrypoint,
 			Env:        opts.Env,
@@ -1144,13 +1150,13 @@ func (d *stiDocker) CommitContainer(opts CommitContainerOptions) (string, error)
 func (d *stiDocker) RemoveImage(imageID string) error {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	_, err := d.client.ImageRemove(ctx, imageID, dockerimage.RemoveOptions{})
+	_, err := d.client.ImageRemove(ctx, imageID, mobyClient.ImageRemoveOptions{})
 	return err
 }
 
 // BuildImage builds the image according to specified options
 func (d *stiDocker) BuildImage(opts BuildImageOptions) error {
-	dockerOpts := build.ImageBuildOptions{
+	dockerOpts := mobyClient.ImageBuildOptions{
 		Tags:           []string{opts.Name},
 		NoCache:        true,
 		SuppressOutput: false,

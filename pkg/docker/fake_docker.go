@@ -4,7 +4,7 @@ import (
 	"errors"
 	"io"
 
-	dockertypes "github.com/docker/docker/api/types"
+	mobyClient "github.com/moby/moby/client"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/tar"
@@ -69,8 +69,8 @@ func (f *FakeDocker) IsImageOnBuild(imageName string) bool {
 }
 
 // Version returns information of the docker client and server host
-func (f *FakeDocker) Version() (dockertypes.Version, error) {
-	return dockertypes.Version{}, nil
+func (f *FakeDocker) Version() (mobyClient.ServerVersionResult, error) {
+	return mobyClient.ServerVersionResult{}, nil
 }
 
 // GetImageWorkdir returns the workdir

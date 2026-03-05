@@ -10,12 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	dockertypes "github.com/docker/docker/api/types"
-	dockercontainer "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/registry"
-	dockerstrslice "github.com/docker/docker/api/types/strslice"
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
+	mobyContainer "github.com/moby/moby/api/types/container"
+	mobyImage "github.com/moby/moby/api/types/image"
+	mobyClient "github.com/moby/moby/client"
 	containerspec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/openshift/source-to-image/pkg/api/constants"
@@ -43,7 +42,7 @@ func TestRemoveContainer(t *testing.T) {
 	fakeDocker := dockertest.NewFakeDockerClient()
 	dh := getDocker(fakeDocker)
 	containerID := "testContainerId"
-	fakeDocker.Containers[containerID] = dockercontainer.Config{}
+	fakeDocker.Containers[containerID] = mobyContainer.Config{}
 	err := dh.RemoveContainer(containerID)
 	if err != nil {
 		t.Errorf("%+v", err)
@@ -81,10 +80,10 @@ func TestCommitContainer(t *testing.T) {
 			ContainerID: tst.containerID,
 			Repository:  tst.containerTag,
 		}
-		param := dockercontainer.CommitOptions{
+		param := mobyClient.ContainerCommitOptions{
 			Reference: tst.containerTag,
 		}
-		resp := dockertypes.IDResponse{
+		resp := mobyClient.ContainerCommitResult{
 			ID: tst.expectedImageID,
 		}
 		fakeDocker := &dockertest.FakeDockerClient{
@@ -255,7 +254,7 @@ func TestImageBuild(t *testing.T) {
 
 func TestGetScriptsURL(t *testing.T) {
 	type urltest struct {
-		image      image.InspectResponse
+		image      mobyImage.InspectResponse
 		result     string
 		calls      []string
 		inspectErr error
@@ -263,11 +262,11 @@ func TestGetScriptsURL(t *testing.T) {
 	tests := map[string]urltest{
 		"not present": {
 			calls: []string{"inspect_image"},
-			image: image.InspectResponse{
-				ContainerConfig: &dockercontainer.Config{
-					Env:    []string{"Env1=value1"},
-					Labels: map[string]string{},
-				},
+			image: mobyImage.InspectResponse{
+				//ContainerConfig: &dockercontainer.Config{
+				//	Env:    []string{"Env1=value1"},
+				//	Labels: map[string]string{},
+				//},
 				Config: &dockerspec.DockerOCIImageConfig{
 					ImageConfig: containerspec.ImageConfig{
 						Env:    []string{"Env2=value2"},
@@ -280,10 +279,10 @@ func TestGetScriptsURL(t *testing.T) {
 
 		"env in containerConfig": {
 			calls: []string{"inspect_image"},
-			image: image.InspectResponse{
-				ContainerConfig: &dockercontainer.Config{
-					Env: []string{"Env1=value1", constants.ScriptsURLEnvironment + "=test_url_value"},
-				},
+			image: mobyImage.InspectResponse{
+				//ContainerConfig: &dockercontainer.Config{
+				//	Env: []string{"Env1=value1", constants.ScriptsURLEnvironment + "=test_url_value"},
+				//},
 				Config: &dockerspec.DockerOCIImageConfig{},
 			},
 			result: "",
@@ -291,8 +290,7 @@ func TestGetScriptsURL(t *testing.T) {
 
 		"env in image config": {
 			calls: []string{"inspect_image"},
-			image: image.InspectResponse{
-				ContainerConfig: &dockercontainer.Config{},
+			image: mobyImage.InspectResponse{
 				Config: &dockerspec.DockerOCIImageConfig{
 					ImageConfig: containerspec.ImageConfig{
 						Env: []string{
@@ -308,10 +306,10 @@ func TestGetScriptsURL(t *testing.T) {
 
 		"label in containerConfig": {
 			calls: []string{"inspect_image"},
-			image: image.InspectResponse{
-				ContainerConfig: &dockercontainer.Config{
-					Labels: map[string]string{constants.ScriptsURLLabel: "test_url_value"},
-				},
+			image: mobyImage.InspectResponse{
+				//ContainerConfig: &dockercontainer.Config{
+				//	Labels: map[string]string{constants.ScriptsURLLabel: "test_url_value"},
+				//},
 				Config: &dockerspec.DockerOCIImageConfig{},
 			},
 			result: "",
@@ -319,8 +317,8 @@ func TestGetScriptsURL(t *testing.T) {
 
 		"label in image config": {
 			calls: []string{"inspect_image"},
-			image: image.InspectResponse{
-				ContainerConfig: &dockercontainer.Config{},
+			image: mobyImage.InspectResponse{
+				//ContainerConfig: &dockercontainer.Config{},
 				Config: &dockerspec.DockerOCIImageConfig{
 					ImageConfig: containerspec.ImageConfig{
 						Labels: map[string]string{constants.ScriptsURLLabel: "test_url_value_2"},
@@ -332,7 +330,7 @@ func TestGetScriptsURL(t *testing.T) {
 
 		"inspect error": {
 			calls:      []string{"inspect_image", "pull"},
-			image:      image.InspectResponse{},
+			image:      mobyImage.InspectResponse{},
 			inspectErr: fmt.Errorf("Inspect error"),
 		},
 	}
@@ -343,7 +341,7 @@ func TestGetScriptsURL(t *testing.T) {
 		if tst.inspectErr != nil {
 			fakeDocker.PullFail = tst.inspectErr
 		} else {
-			fakeDocker.Images = map[string]image.InspectResponse{tst.image.ID: tst.image}
+			fakeDocker.Images = map[string]mobyClient.ImageInspectResult{tst.image.ID: {tst.image}}
 		}
 		url, err := dh.GetScriptsURL(tst.image.ID)
 
@@ -363,23 +361,23 @@ func TestGetScriptsURL(t *testing.T) {
 func TestRunContainer(t *testing.T) {
 	type runtest struct {
 		calls            []string
-		image            image.InspectResponse
+		image            mobyImage.InspectResponse
 		cmd              string
 		externalScripts  bool
 		paramScriptsURL  string
 		paramDestination string
 		cmdExpected      []string
 		errResult        int
-		errJSON          dockertypes.ContainerJSON
+		errJSON          mobyClient.ContainerInspectResult
 		errMsg           string
 	}
 
 	tests := map[string]runtest{
 		"default": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: image.InspectResponse{
-				ContainerConfig: &dockercontainer.Config{},
-				Config:          &dockerspec.DockerOCIImageConfig{},
+			image: mobyImage.InspectResponse{
+				//ContainerConfig: &dockercontainer.Config{},
+				Config: &dockerspec.DockerOCIImageConfig{},
 			},
 			cmd:             constants.Assemble,
 			externalScripts: true,
@@ -387,17 +385,17 @@ func TestRunContainer(t *testing.T) {
 		},
 		"runerror": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: image.InspectResponse{
-				ContainerConfig: &dockercontainer.Config{},
-				Config:          &dockerspec.DockerOCIImageConfig{},
+			image: mobyImage.InspectResponse{
+				//ContainerConfig: &dockercontainer.Config{},
+				Config: &dockerspec.DockerOCIImageConfig{},
 			},
 			cmd:             constants.Assemble,
 			externalScripts: true,
 			cmdExpected:     []string{"/bin/sh", "-c", fmt.Sprintf("tar -C /tmp -xf - && /tmp/scripts/%s", constants.Assemble)},
 			errResult:       302,
-			errJSON: dockertypes.ContainerJSON{
-				ContainerJSONBase: &dockertypes.ContainerJSONBase{
-					State: &dockertypes.ContainerState{
+			errJSON: mobyClient.ContainerInspectResult{
+				Container: mobyContainer.InspectResponse{
+					State: &mobyContainer.State{
 						Status:    "Failed",
 						Error:     "Process was terminated",
 						OOMKilled: true,
@@ -408,9 +406,9 @@ func TestRunContainer(t *testing.T) {
 		},
 		"paramDestination": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: image.InspectResponse{
-				ContainerConfig: &dockercontainer.Config{},
-				Config:          &dockerspec.DockerOCIImageConfig{},
+			image: mobyImage.InspectResponse{
+				//ContainerConfig: &dockercontainer.Config{},
+				Config: &dockerspec.DockerOCIImageConfig{},
 			},
 			cmd:              constants.Assemble,
 			externalScripts:  true,
@@ -419,9 +417,9 @@ func TestRunContainer(t *testing.T) {
 		},
 		"paramDestination&paramScripts": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: image.InspectResponse{
-				ContainerConfig: &dockercontainer.Config{},
-				Config:          &dockerspec.DockerOCIImageConfig{},
+			image: mobyImage.InspectResponse{
+				//ContainerConfig: &dockercontainer.Config{},
+				Config: &dockerspec.DockerOCIImageConfig{},
 			},
 			cmd:              constants.Assemble,
 			externalScripts:  true,
@@ -431,8 +429,8 @@ func TestRunContainer(t *testing.T) {
 		},
 		"scriptsInsideImageEnvironment": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: image.InspectResponse{
-				ContainerConfig: &dockercontainer.Config{},
+			image: mobyImage.InspectResponse{
+				//ContainerConfig: &dockercontainer.Config{},
 				Config: &dockerspec.DockerOCIImageConfig{
 					ImageConfig: containerspec.ImageConfig{
 						Env: []string{constants.ScriptsURLEnvironment + "=image:///opt/bin/"},
@@ -445,8 +443,8 @@ func TestRunContainer(t *testing.T) {
 		},
 		"scriptsInsideImageLabel": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: image.InspectResponse{
-				ContainerConfig: &dockercontainer.Config{},
+			image: mobyImage.InspectResponse{
+				//ContainerConfig: &dockercontainer.Config{},
 				Config: &dockerspec.DockerOCIImageConfig{
 					ImageConfig: containerspec.ImageConfig{
 						Labels: map[string]string{constants.ScriptsURLLabel: "image:///opt/bin/"},
@@ -459,8 +457,8 @@ func TestRunContainer(t *testing.T) {
 		},
 		"scriptsInsideImageEnvironmentWithParamDestination": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: image.InspectResponse{
-				ContainerConfig: &dockercontainer.Config{},
+			image: mobyImage.InspectResponse{
+				//ContainerConfig: &dockercontainer.Config{},
 				Config: &dockerspec.DockerOCIImageConfig{
 					ImageConfig: containerspec.ImageConfig{
 						Env: []string{constants.ScriptsURLEnvironment + "=image:///opt/bin"},
@@ -474,8 +472,8 @@ func TestRunContainer(t *testing.T) {
 		},
 		"scriptsInsideImageLabelWithParamDestination": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: image.InspectResponse{
-				ContainerConfig: &dockercontainer.Config{},
+			image: mobyImage.InspectResponse{
+				//ContainerConfig: &dockercontainer.Config{},
 				Config: &dockerspec.DockerOCIImageConfig{
 					ImageConfig: containerspec.ImageConfig{
 						Labels: map[string]string{constants.ScriptsURLLabel: "image:///opt/bin"},
@@ -489,8 +487,8 @@ func TestRunContainer(t *testing.T) {
 		},
 		"paramDestinationFromImageEnvironment": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: image.InspectResponse{
-				ContainerConfig: &dockercontainer.Config{},
+			image: mobyImage.InspectResponse{
+				//ContainerConfig: &dockercontainer.Config{},
 				Config: &dockerspec.DockerOCIImageConfig{
 					ImageConfig: containerspec.ImageConfig{
 						Env: []string{constants.LocationEnvironment + "=/opt", constants.ScriptsURLEnvironment + "=http://my.test.url/test?param=one"},
@@ -503,8 +501,8 @@ func TestRunContainer(t *testing.T) {
 		},
 		"paramDestinationFromImageLabel": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: image.InspectResponse{
-				ContainerConfig: &dockercontainer.Config{},
+			image: mobyImage.InspectResponse{
+				//ContainerConfig: &dockercontainer.Config{},
 				Config: &dockerspec.DockerOCIImageConfig{
 					ImageConfig: containerspec.ImageConfig{
 						Labels: map[string]string{constants.DestinationLabel: "/opt", constants.ScriptsURLLabel: "http://my.test.url/test?param=one"},
@@ -517,9 +515,9 @@ func TestRunContainer(t *testing.T) {
 		},
 		"usageCommand": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: image.InspectResponse{
-				ContainerConfig: &dockercontainer.Config{},
-				Config:          &dockerspec.DockerOCIImageConfig{},
+			image: mobyImage.InspectResponse{
+				//ContainerConfig: &dockercontainer.Config{},
+				Config: &dockerspec.DockerOCIImageConfig{},
 			},
 			cmd:             constants.Usage,
 			externalScripts: true,
@@ -527,9 +525,9 @@ func TestRunContainer(t *testing.T) {
 		},
 		"otherCommand": {
 			calls: []string{"inspect_image", "inspect_image", "inspect_image", "create", "attach", "start", "remove"},
-			image: image.InspectResponse{
-				ContainerConfig: &dockercontainer.Config{},
-				Config:          &dockerspec.DockerOCIImageConfig{},
+			image: mobyImage.InspectResponse{
+				//ContainerConfig: &dockercontainer.Config{},
+				Config: &dockerspec.DockerOCIImageConfig{},
 			},
 			cmd:             constants.Run,
 			externalScripts: true,
@@ -541,7 +539,7 @@ func TestRunContainer(t *testing.T) {
 		fakeDocker := dockertest.NewFakeDockerClient()
 		dh := getDocker(fakeDocker)
 		tst.image.ID = "test/image:latest"
-		fakeDocker.Images = map[string]image.InspectResponse{tst.image.ID: tst.image}
+		fakeDocker.Images = map[string]mobyClient.ImageInspectResult{tst.image.ID: {tst.image}}
 		if len(fakeDocker.Containers) > 0 {
 			t.Errorf("newly created fake client should have empty container map: %+v", fakeDocker.Containers)
 		}
@@ -588,7 +586,7 @@ func TestRunContainer(t *testing.T) {
 			if container.Image != "test/image:latest" {
 				t.Errorf("%s: Unexpected create config image: %s", desc, container.Image)
 			}
-			if !reflect.DeepEqual(container.Cmd, dockerstrslice.StrSlice(tst.cmdExpected)) {
+			if !reflect.DeepEqual(container.Cmd, tst.cmdExpected) {
 				t.Errorf("%s: Unexpected create config command: %#v instead of %q", desc, container.Cmd, strings.Join(tst.cmdExpected, " "))
 			}
 			if !reflect.DeepEqual(container.Env, []string{"Key1=Value1", "Key2=Value2"}) {
@@ -604,8 +602,8 @@ func TestRunContainer(t *testing.T) {
 func TestGetImageID(t *testing.T) {
 	fakeDocker := dockertest.NewFakeDockerClient()
 	dh := getDocker(fakeDocker)
-	img := image.InspectResponse{ID: "test-abcd:latest"}
-	fakeDocker.Images = map[string]image.InspectResponse{img.ID: img}
+	img := mobyImage.InspectResponse{ID: "test-abcd:latest"}
+	fakeDocker.Images = map[string]mobyClient.ImageInspectResult{img.ID: {img}}
 	id, err := dh.GetImageID("test-abcd")
 	expectedCalls := []string{"inspect_image"}
 	if !reflect.DeepEqual(fakeDocker.Calls, expectedCalls) {
@@ -621,8 +619,8 @@ func TestGetImageID(t *testing.T) {
 func TestRemoveImage(t *testing.T) {
 	fakeDocker := dockertest.NewFakeDockerClient()
 	dh := getDocker(fakeDocker)
-	img := image.InspectResponse{ID: "test-abcd"}
-	fakeDocker.Images = map[string]image.InspectResponse{img.ID: img}
+	img := mobyImage.InspectResponse{ID: "test-abcd"}
+	fakeDocker.Images = map[string]mobyClient.ImageInspectResult{img.ID: {img}}
 	err := dh.RemoveImage("test-abcd")
 	if err != nil {
 		t.Errorf("Unexpected error removing img: %s", err)

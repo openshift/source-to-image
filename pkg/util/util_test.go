@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
+	mobyContainer "github.com/moby/moby/api/types/container"
 )
 
 func TestSafeForLoggingContainerConfig(t *testing.T) {
-	c := &container.Config{
+	c := &mobyContainer.Config{
 		Env: []string{
 			"http_proxy=http://user:password@hostname.com",
 			"https_proxy=https://user:password@hostname.com",

@@ -20,9 +20,9 @@ import (
 
 	"k8s.io/klog/v2"
 
-	dockertypes "github.com/docker/docker/api/types"
-	dockercontainer "github.com/docker/docker/api/types/container"
-	dockerapi "github.com/docker/docker/client"
+	"github.com/containerd/errdefs"
+	mobyContainer "github.com/moby/moby/api/types/container"
+	mobyClient "github.com/moby/moby/client"
 	"golang.org/x/net/context"
 
 	"github.com/openshift/source-to-image/pkg/api"
@@ -149,12 +149,12 @@ type integrationTest struct {
 	setupComplete bool
 }
 
-func (i integrationTest) InspectImage(name string) (*dockertypes.ImageInspect, error) {
+func (i integrationTest) InspectImage(name string) (*mobyClient.ImageInspectResult, error) {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	resp, _, err := engineClient.ImageInspectWithRaw(ctx, name)
+	resp, err := engineClient.ImageInspect(ctx, name)
 	if err != nil {
-		if dockerapi.IsErrNotFound(err) {
+		if errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("no such image :%q", name)
 		}
 		return nil, err
@@ -187,7 +187,7 @@ func (i *integrationTest) setup() {
 
 		for _, image := range []string{TagCleanBuild, TagCleanBuildUser, TagIncrementalBuild, TagIncrementalBuildUser} {
 			ctx, cancel := getDefaultContext()
-			engineClient.ImageRemove(ctx, image, dockertypes.ImageRemoveOptions{})
+			engineClient.ImageRemove(ctx, image, mobyClient.ImageRemoveOptions{})
 			cancel()
 		}
 
@@ -600,8 +600,11 @@ func (i *integrationTest) checkForImage(tag string) {
 func (i *integrationTest) createContainer(image string) string {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	opts := dockertypes.ContainerCreateConfig{Name: "", Config: &dockercontainer.Config{Image: image}}
-	container, err := engineClient.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, nil, opts.Name)
+	opts := mobyClient.ContainerCreateOptions{
+		Name:   "",
+		Config: &mobyContainer.Config{Image: image},
+	}
+	container, err := engineClient.ContainerCreate(ctx, opts)
 	if err != nil {
 		i.t.Errorf("Couldn't create container from image %s with error %+v", image, err)
 		return ""
@@ -609,7 +612,7 @@ func (i *integrationTest) createContainer(image string) string {
 
 	ctx, cancel = getDefaultContext()
 	defer cancel()
-	err = engineClient.ContainerStart(ctx, container.ID, dockertypes.ContainerStartOptions{})
+	_, err = engineClient.ContainerStart(ctx, container.ID, mobyClient.ContainerStartOptions{})
 	if err != nil {
 		i.t.Errorf("Couldn't start container: %s with error %+v", container.ID, err)
 		return ""
@@ -617,7 +620,8 @@ func (i *integrationTest) createContainer(image string) string {
 
 	ctx, cancel = getDefaultContext()
 	defer cancel()
-	waitC, errC := engineClient.ContainerWait(ctx, container.ID, dockercontainer.WaitConditionNextExit)
+	waitResp := engineClient.ContainerWait(ctx, container.ID, mobyClient.ContainerWaitOptions{Condition: mobyContainer.WaitConditionNextExit})
+	waitC, errC := waitResp.Result, waitResp.Error
 	select {
 	case result := <-waitC:
 		if result.StatusCode != 0 {
@@ -628,8 +632,8 @@ func (i *integrationTest) createContainer(image string) string {
 		if errors.Is(err, context.DeadlineExceeded) {
 			ctx, cancel := getDefaultContext()
 			defer cancel()
-			inspectInfo, err2 := engineClient.ContainerInspect(ctx, container.ID)
-			if err2 == nil && inspectInfo.State != nil && inspectInfo.State.Status == "exited" {
+			inspectInfo, err2 := engineClient.ContainerInspect(ctx, container.ID, mobyClient.ContainerInspectOptions{})
+			if err2 == nil && inspectInfo.Container.State != nil && inspectInfo.Container.State.Status == "exited" {
 				// it must have finished before we tried to wait for a not-exited->exited state change
 				i.t.Logf("timed out waiting for container %q: it had already exited; continuing", container.ID)
 				err = nil
@@ -646,8 +650,11 @@ func (i *integrationTest) createContainer(image string) string {
 func (i *integrationTest) runInContainer(image string, command []string) int {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	opts := dockertypes.ContainerCreateConfig{Name: "", Config: &dockercontainer.Config{Image: image, AttachStdout: false, AttachStdin: false, Cmd: command}}
-	container, err := engineClient.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, nil, opts.Name)
+	opts := mobyClient.ContainerCreateOptions{
+		Name:   "",
+		Config: &mobyContainer.Config{Image: image, AttachStdout: false, AttachStdin: false, Cmd: command},
+	}
+	container, err := engineClient.ContainerCreate(ctx, opts)
 	if err != nil {
 		i.t.Errorf("Couldn't create container from image %s err %+v", image, err)
 		return -1
@@ -655,13 +662,14 @@ func (i *integrationTest) runInContainer(image string, command []string) int {
 
 	ctx, cancel = getDefaultContext()
 	defer cancel()
-	err = engineClient.ContainerStart(ctx, container.ID, dockertypes.ContainerStartOptions{})
+	_, err = engineClient.ContainerStart(ctx, container.ID, mobyClient.ContainerStartOptions{})
 	if err != nil {
 		i.t.Errorf("Couldn't start container: %s", container.ID)
 	}
 	ctx, cancel = getDefaultContext()
 	defer cancel()
-	waitC, errC := engineClient.ContainerWait(ctx, container.ID, dockercontainer.WaitConditionNextExit)
+	waitResp := engineClient.ContainerWait(ctx, container.ID, mobyClient.ContainerWaitOptions{Condition: mobyContainer.WaitConditionNextExit})
+	waitC, errC := waitResp.Result, waitResp.Error
 	exitCode := -1
 	select {
 	case result := <-waitC:
@@ -670,11 +678,11 @@ func (i *integrationTest) runInContainer(image string, command []string) int {
 		if errors.Is(err, context.DeadlineExceeded) {
 			ctx, cancel := getDefaultContext()
 			defer cancel()
-			inspectInfo, err2 := engineClient.ContainerInspect(ctx, container.ID)
-			if err2 == nil && inspectInfo.State != nil && inspectInfo.State.Status == "exited" {
+			inspectInfo, err2 := engineClient.ContainerInspect(ctx, container.ID, mobyClient.ContainerInspectOptions{})
+			if err2 == nil && inspectInfo.Container.State != nil && inspectInfo.Container.State.Status == "exited" {
 				// it must have finished before we tried to wait for a not-exited->exited state change
 				i.t.Logf("timed out waiting for container %q: it had already exited; continuing", container.ID)
-				exitCode = inspectInfo.State.ExitCode
+				exitCode = inspectInfo.Container.State.ExitCode
 				err = nil
 			}
 		}
@@ -684,7 +692,7 @@ func (i *integrationTest) runInContainer(image string, command []string) int {
 	}
 	ctx, cancel = getDefaultContext()
 	defer cancel()
-	err = engineClient.ContainerRemove(ctx, container.ID, dockertypes.ContainerRemoveOptions{})
+	_, err = engineClient.ContainerRemove(ctx, container.ID, mobyClient.ContainerRemoveOptions{})
 	if err != nil {
 		i.t.Errorf("Couldn't remove container: %s", container.ID)
 	}
@@ -694,11 +702,11 @@ func (i *integrationTest) runInContainer(image string, command []string) int {
 func (i *integrationTest) removeContainer(cID string) {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	engineClient.ContainerKill(ctx, cID, "SIGKILL")
-	removeOpts := dockertypes.ContainerRemoveOptions{
+	engineClient.ContainerKill(ctx, cID, mobyClient.ContainerKillOptions{Signal: "SIGKILL"})
+	removeOpts := mobyClient.ContainerRemoveOptions{
 		RemoveVolumes: true,
 	}
-	err := engineClient.ContainerRemove(ctx, cID, removeOpts)
+	_, err := engineClient.ContainerRemove(ctx, cID, removeOpts)
 	if err != nil {
 		i.t.Errorf("Couldn't remove container %s: %s", cID, err)
 	}
@@ -747,12 +755,12 @@ func (i *integrationTest) checkIncrementalBuildState(cID string, workingDir stri
 func (i *integrationTest) fileExistsInContainer(cID string, filePath string) bool {
 	ctx, cancel := getDefaultContext()
 	defer cancel()
-	rdr, stats, err := engineClient.CopyFromContainer(ctx, cID, filePath)
+	resp, err := engineClient.CopyFromContainer(ctx, cID, mobyClient.CopyFromContainerOptions{SourcePath: filePath})
 	if err != nil {
 		return false
 	}
-	defer rdr.Close()
-	return "" != stats.Name
+	defer resp.Content.Close()
+	return "" != resp.Stat.Name
 }
 
 func (i *integrationTest) checkForLabel(image string) {
