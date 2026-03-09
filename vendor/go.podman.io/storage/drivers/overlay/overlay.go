@@ -49,7 +49,6 @@ var untar = chrootarchive.UntarUncompressed
 
 const (
 	defaultPerms         = os.FileMode(0o555)
-	selinuxLabelTest     = "system_u:object_r:container_file_t:s0"
 	mountProgramFlagFile = ".has-mount-program"
 )
 
