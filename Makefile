@@ -29,7 +29,7 @@ all build:
 .PHONY: all build
 
 build-container:
-	${CONTAINER_ENGINE} build -t localhost/source-to-image/s2i:${VERSION} .
+	${CONTAINER_ENGINE} build -t localhost/source-to-image/s2i:${VERSION} -f images/release/Dockerfile .
 
 # Build cross-compiled binaries.
 build-cross:

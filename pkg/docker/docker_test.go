@@ -17,6 +17,7 @@ import (
 	dockerstrslice "github.com/docker/docker/api/types/strslice"
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	containerspec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/openshift/source-to-image/pkg/api/constants"
 	dockertest "github.com/openshift/source-to-image/pkg/docker/test"
 	"github.com/openshift/source-to-image/pkg/errors"
