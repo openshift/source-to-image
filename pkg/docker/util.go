@@ -14,8 +14,8 @@ import (
 	"strings"
 
 	"github.com/distribution/reference"
-	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/homedir"
+	mobyClient "github.com/moby/moby/client"
 
 	"github.com/openshift/source-to-image/pkg/api"
 	"github.com/openshift/source-to-image/pkg/api/constants"
@@ -434,7 +434,7 @@ func GetDefaultDockerConfig() *api.DockerConfig {
 	cfg := &api.DockerConfig{}
 
 	if cfg.Endpoint = os.Getenv("DOCKER_HOST"); cfg.Endpoint == "" {
-		cfg.Endpoint = client.DefaultDockerHost
+		cfg.Endpoint = mobyClient.DefaultDockerHost
 	}
 
 	certPath := os.Getenv("DOCKER_CERT_PATH")
