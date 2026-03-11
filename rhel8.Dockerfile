@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi8/go-toolset@sha256:10bd7b95a28b8f19c396dbd357c537e62ed9c97145e769b63c93cc3ea7fd033e AS builder
+FROM registry.redhat.io/ubi8/go-toolset@sha256:e20b9b4796b727680ad135a060706c1ac47c59dd49302efeb7d7202b0c130986 AS builder
 
 ENV S2I_GIT_VERSION="1.6.0" \
     S2I_GIT_MAJOR="1" \
