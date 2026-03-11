@@ -167,8 +167,8 @@ go.opentelemetry.io/otel/trace v1.42.0 h1:OUCgIPt+mzOnaUTpOQcBiM/PLQ/Op7oq6g4Len
 go.opentelemetry.io/otel/trace v1.42.0/go.mod h1:f3K9S+IFqnumBkKhRJMeaZeNk9epyhnCmQh/EysQCdc=
 go.podman.io/image/v5 v5.39.2-0.20260306124909-d48bc74146d6 h1:aEDmWRMDzDhCvkmGcbooyUr8iN0m9HxzvWvMb1fUrr4=
 go.podman.io/image/v5 v5.39.2-0.20260306124909-d48bc74146d6/go.mod h1:7TiwfxX95KG1bg4MdM6+ImDtw1Iw1ktlTiC8XCTgNwQ=
-go.podman.io/storage v1.62.1-0.20260227183033-854aaaf0575d h1:jw6mZJGLjOvxJqQenwzHBYCO44Ya9G/0RM6ifXSBr6I=
-go.podman.io/storage v1.62.1-0.20260227183033-854aaaf0575d/go.mod h1:B83Ad8mtO0GZs7rEwb66f0Ed5G57NyKI/iJZHoJrpUE=
+go.podman.io/storage v1.62.1-0.20260310180906-9819c3739308 h1:ItVOnUmApDtfnqEehnD5HO6hircHr5ud7lCJmNf+5Mk=
+go.podman.io/storage v1.62.1-0.20260310180906-9819c3739308/go.mod h1:B83Ad8mtO0GZs7rEwb66f0Ed5G57NyKI/iJZHoJrpUE=
 go.yaml.in/yaml/v3 v3.0.4/go.mod h1:DhzuOOF2ATzADvBadXxruRBLzYTpT36CKvDb3+aBEFg=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
