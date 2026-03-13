@@ -15,7 +15,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
-	go.podman.io/image/v5 v5.39.2-0.20260306124909-d48bc74146d6
+	go.podman.io/image/v5 v5.39.2-0.20260313202710-ddaabae34a06
 	golang.org/x/net v0.51.0
 	k8s.io/klog/v2 v2.140.0
 )
