@@ -71,7 +71,7 @@ require (
 	go.opentelemetry.io/otel v1.42.0 // indirect
 	go.opentelemetry.io/otel/metric v1.42.0 // indirect
 	go.opentelemetry.io/otel/trace v1.42.0 // indirect
-	go.podman.io/storage v1.62.1-0.20260310180906-9819c3739308 // indirect
+	go.podman.io/storage v1.62.1-0.20260313202710-ddaabae34a06 // indirect
 	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
