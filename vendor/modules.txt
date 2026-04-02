@@ -128,8 +128,8 @@ github.com/inconshreveable/mousetrap
 # github.com/json-iterator/go v1.1.12
 ## explicit; go 1.12
 github.com/json-iterator/go
-# github.com/klauspost/compress v1.18.4
-## explicit; go 1.23
+# github.com/klauspost/compress v1.18.5
+## explicit; go 1.24
 github.com/klauspost/compress
 github.com/klauspost/compress/flate
 github.com/klauspost/compress/fse
@@ -283,8 +283,8 @@ go.opentelemetry.io/otel/trace
 go.opentelemetry.io/otel/trace/embedded
 go.opentelemetry.io/otel/trace/internal/telemetry
 go.opentelemetry.io/otel/trace/noop
-# go.podman.io/image/v5 v5.39.2-0.20260306124909-d48bc74146d6
-## explicit; go 1.24.6
+# go.podman.io/image/v5 v5.39.2-0.20260401174726-f0ddf1a745bb
+## explicit; go 1.25.6
 go.podman.io/image/v5/directory
 go.podman.io/image/v5/directory/explicitfilepath
 go.podman.io/image/v5/docker
@@ -334,8 +334,8 @@ go.podman.io/image/v5/transports
 go.podman.io/image/v5/transports/alltransports
 go.podman.io/image/v5/types
 go.podman.io/image/v5/version
-# go.podman.io/storage v1.62.1-0.20260310180906-9819c3739308
-## explicit; go 1.24.0
+# go.podman.io/storage v1.62.1-0.20260325203629-8af78737e8bb
+## explicit; go 1.25.0
 go.podman.io/storage
 go.podman.io/storage/drivers
 go.podman.io/storage/drivers/btrfs
@@ -347,6 +347,7 @@ go.podman.io/storage/drivers/register
 go.podman.io/storage/drivers/vfs
 go.podman.io/storage/drivers/zfs
 go.podman.io/storage/internal/dedup
+go.podman.io/storage/internal/driver
 go.podman.io/storage/internal/rawfilelock
 go.podman.io/storage/internal/staging_lockfile
 go.podman.io/storage/internal/tempdir
@@ -359,6 +360,7 @@ go.podman.io/storage/pkg/chunked/internal/minimal
 go.podman.io/storage/pkg/chunked/internal/path
 go.podman.io/storage/pkg/chunked/toc
 go.podman.io/storage/pkg/config
+go.podman.io/storage/pkg/configfile
 go.podman.io/storage/pkg/directory
 go.podman.io/storage/pkg/fileutils
 go.podman.io/storage/pkg/fsutils

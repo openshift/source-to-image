@@ -276,7 +276,7 @@ func newDockerClient(sys *types.SystemContext, registry, reference string) (*doc
 	}
 	if reg != nil {
 		if reg.Blocked {
-			return nil, fmt.Errorf("registry %s is blocked in %s or %s", reg.Prefix, sysregistriesv2.ConfigPath(sys), sysregistriesv2.ConfigDirPath(sys))
+			return nil, fmt.Errorf("registry %s is blocked in one of %s", reg.Prefix, sysregistriesv2.ConfigurationSourceDescription(sys))
 		}
 		skipVerify = reg.Insecure
 	}
@@ -1030,7 +1030,7 @@ func (c *dockerClient) fetchManifest(ctx context.Context, ref dockerReference, t
 	}
 	res, err := c.makeRequest(ctx, http.MethodGet, path, headers, nil, v2Auth, nil)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("fetching manifest %s in %s: %w", tagOrDigest, ref.ref.Name(), err)
 	}
 	logrus.Debugf("Content-Type from manifest GET is %q", res.Header.Get("Content-Type"))
 	defer res.Body.Close()
@@ -1040,7 +1040,7 @@ func (c *dockerClient) fetchManifest(ctx context.Context, ref dockerReference, t
 
 	manblob, err := iolimits.ReadAtMost(res.Body, iolimits.MaxManifestBodySize)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("reading manifest body %s in %s: %w", tagOrDigest, ref.ref.Name(), err)
 	}
 	return manblob, simplifyContentType(res.Header.Get("Content-Type")), nil
 }

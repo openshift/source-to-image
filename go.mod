@@ -15,7 +15,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
-	go.podman.io/image/v5 v5.39.2-0.20260306124909-d48bc74146d6
+	go.podman.io/image/v5 v5.39.2-0.20260401174726-f0ddf1a745bb
 	golang.org/x/net v0.51.0
 	k8s.io/klog/v2 v2.140.0
 )
@@ -46,7 +46,7 @@ require (
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.18.4 // indirect
+	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
 	github.com/mistifyio/go-zfs/v4 v4.0.0 // indirect
 	github.com/moby/sys/capability v0.4.0 // indirect
@@ -71,7 +71,7 @@ require (
 	go.opentelemetry.io/otel v1.42.0 // indirect
 	go.opentelemetry.io/otel/metric v1.42.0 // indirect
 	go.opentelemetry.io/otel/trace v1.42.0 // indirect
-	go.podman.io/storage v1.62.1-0.20260310180906-9819c3739308 // indirect
+	go.podman.io/storage v1.62.1-0.20260325203629-8af78737e8bb // indirect
 	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
