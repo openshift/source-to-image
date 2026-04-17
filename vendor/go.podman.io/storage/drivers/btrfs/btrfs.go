@@ -33,12 +33,12 @@ import (
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/sirupsen/logrus"
 	graphdriver "go.podman.io/storage/drivers"
+	"go.podman.io/storage/internal/driver"
 	"go.podman.io/storage/internal/tempdir"
 	"go.podman.io/storage/pkg/directory"
 	"go.podman.io/storage/pkg/fileutils"
 	"go.podman.io/storage/pkg/idtools"
 	"go.podman.io/storage/pkg/mount"
-	"go.podman.io/storage/pkg/parsers"
 	"go.podman.io/storage/pkg/system"
 	"golang.org/x/sys/unix"
 )
@@ -97,23 +97,34 @@ func parseOptions(opt []string) (btrfsOptions, bool, error) {
 	var options btrfsOptions
 	userDiskQuota := false
 	for _, option := range opt {
-		key, val, err := parsers.ParseKeyValueOpt(option)
+		driver, key, val, err := driver.ParseDriverOption(option)
 		if err != nil {
 			return options, userDiskQuota, err
 		}
-		key = strings.ToLower(key)
+		if driver != "" && driver != "btrfs" {
+			// do not parse options meant for another storage driver
+			continue
+		}
+
 		switch key {
-		case "btrfs.min_space":
+		case "min_space":
 			minSpace, err := units.RAMInBytes(val)
 			if err != nil {
 				return options, userDiskQuota, err
 			}
 			userDiskQuota = true
 			options.minSpace = uint64(minSpace)
-		case "btrfs.mountopt":
+		case "size":
+			size, err := units.RAMInBytes(val)
+			if err != nil {
+				return options, userDiskQuota, err
+			}
+			userDiskQuota = true
+			options.size = uint64(size)
+		case "mountopt":
 			return options, userDiskQuota, fmt.Errorf("btrfs driver does not support mount options")
 		default:
-			return options, userDiskQuota, fmt.Errorf("unknown option %s (%q)", key, option)
+			return options, userDiskQuota, fmt.Errorf("unknown option %q (%q)", key, option)
 		}
 	}
 	return options, userDiskQuota, nil
@@ -155,6 +166,12 @@ func (d *Driver) Metadata(id string) (map[string]string, error) {
 // Cleanup unmounts the home directory.
 func (d *Driver) Cleanup() error {
 	return mount.Unmount(d.home)
+}
+
+// SyncMode returns the sync mode configured for the driver.
+// Btrfs does not support sync mode configuration, always returns SyncModeNone.
+func (d *Driver) SyncMode() graphdriver.SyncMode {
+	return graphdriver.SyncModeNone
 }
 
 func free(p *C.char) {
@@ -466,11 +483,15 @@ func (d *Driver) CreateFromTemplate(id, template string, templateIDMappings *idt
 // CreateReadWrite creates a layer that is writable for use as a container
 // file system.
 func (d *Driver) CreateReadWrite(id, parent string, opts *graphdriver.CreateOpts) error {
-	return d.Create(id, parent, opts)
+	return d.create(id, parent, opts, true)
 }
 
 // Create the filesystem with given id.
 func (d *Driver) Create(id, parent string, opts *graphdriver.CreateOpts) error {
+	return d.create(id, parent, opts, false)
+}
+
+func (d *Driver) create(id, parent string, opts *graphdriver.CreateOpts, applyDriverDefaultQuota bool) error {
 	quotas := d.quotasDir()
 	subvolumes := d.subvolumesDir()
 	if err := os.MkdirAll(subvolumes, 0o700); err != nil {
@@ -502,19 +523,29 @@ func (d *Driver) Create(id, parent string, opts *graphdriver.CreateOpts) error {
 		storageOpt = opts.StorageOpt
 	}
 
+	var quotaSize uint64
+	var needQuota bool
 	if _, ok := storageOpt["size"]; ok {
 		driver := &Driver{}
 		if err := d.parseStorageOpt(storageOpt, driver); err != nil {
 			return err
 		}
-
-		if err := d.setStorageSize(path.Join(subvolumes, id), driver); err != nil {
+		quotaSize = driver.options.size
+		needQuota = true
+	}
+	if !needQuota && applyDriverDefaultQuota && d.options.size > 0 {
+		quotaSize = d.options.size
+		needQuota = true
+	}
+	if needQuota {
+		layerDriver := &Driver{options: btrfsOptions{size: quotaSize}}
+		if err := d.setStorageSize(path.Join(subvolumes, id), layerDriver); err != nil {
 			return err
 		}
 		if err := os.MkdirAll(quotas, 0o700); err != nil {
 			return err
 		}
-		if err := os.WriteFile(path.Join(quotas, id), []byte(fmt.Sprint(driver.options.size)), 0o644); err != nil {
+		if err := os.WriteFile(path.Join(quotas, id), []byte(fmt.Sprint(quotaSize)), 0o644); err != nil {
 			return err
 		}
 	}
