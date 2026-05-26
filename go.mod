@@ -1,6 +1,6 @@
 module github.com/openshift/source-to-image
 
-go 1.25.7
+go 1.26.2
 
 require (
 	github.com/containerd/errdefs v1.0.0
