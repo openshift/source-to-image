@@ -1,5 +1,5 @@
 FROM registry.redhat.io/ubi9/go-toolset@sha256:2dc44e9ae10db3f7cfb06a0063e9d792350fb004a65bf59f4268c164cacffe54 AS builder
-ENV S2I_GIT_VERSION="1.6.0" \
+ENV S2I_GIT_VERSION="1.6.2" \
     S2I_GIT_MAJOR="1" \
     S2I_GIT_MINOR="6"
 
@@ -22,13 +22,13 @@ LABEL \
     name="source-to-image/source-to-image-rhel9" \
     description="Source-to-Image is a builder image" \
     summary="Source-to-Image is a builder image" \
-    version="v1.6.0" \
+    version="v1.6.2" \
     vendor="Red Hat, Inc." \
     com.redhat.component="source-to-image-container" \
     cpe="cpe:/a:redhat:source_to_image:1.6::el8" \
     maintainer="openshift-builds@redhat.com" \
     distribution-scope="public" \
-    release="v1.6.0" \
+    release="v1.6.2" \
     url="https://github.com/openshift/source-to-image" \
     io.k8s.description="Source-to-Image is a builder image" \
     io.k8s.display-name="Source-to-Image" \
