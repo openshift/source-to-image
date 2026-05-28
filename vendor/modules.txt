@@ -250,7 +250,7 @@ github.com/vbatts/tar-split/tar/storage
 ## explicit; go 1.24.0
 go.opentelemetry.io/auto/sdk
 go.opentelemetry.io/auto/sdk/internal/telemetry
-# go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0
+# go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0
 ## explicit; go 1.25.0
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/request
@@ -268,9 +268,8 @@ go.opentelemetry.io/otel/internal/errorhandler
 go.opentelemetry.io/otel/internal/global
 go.opentelemetry.io/otel/propagation
 go.opentelemetry.io/otel/semconv/v1.37.0
-go.opentelemetry.io/otel/semconv/v1.40.0
-go.opentelemetry.io/otel/semconv/v1.40.0/httpconv
 go.opentelemetry.io/otel/semconv/v1.41.0
+go.opentelemetry.io/otel/semconv/v1.41.0/httpconv
 # go.opentelemetry.io/otel/metric v1.44.0
 ## explicit; go 1.25.0
 go.opentelemetry.io/otel/metric
