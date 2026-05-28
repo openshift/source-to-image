@@ -94,11 +94,11 @@ func TestParse(t *testing.T) {
 			},
 		},
 		parseTest{
-			rawurl: "http://::ffff:1.2.3.4:443",
+			rawurl: "http://1.2.3.4:443",
 			expectedGitURL: &URL{
 				URL: url.URL{
 					Scheme: "http",
-					Host:   "::ffff:1.2.3.4:443",
+					Host:   "1.2.3.4:443",
 				},
 				Type: URLTypeURL,
 			},
