@@ -137,14 +137,11 @@ func (builder *Dockerfile) CreateDockerfile(config *api.Config) error {
 		buffer.WriteString(fmt.Sprintf("FROM %s as cached\n", imageTag))
 		var artifactsScript string
 		if _, provided := providedScripts[constants.SaveArtifacts]; provided {
-			// switch to root to COPY and chown content
 			log.V(2).Infof("Override save-artifacts script is included in directory %q", builder.uploadScriptsDir)
 			buffer.WriteString("# Copying in override save-artifacts script\n")
-			buffer.WriteString("USER root\n")
 			artifactsScript = sanitize(filepath.ToSlash(filepath.Join(scriptsDestDir, "save-artifacts")))
 			uploadScript := sanitize(filepath.ToSlash(filepath.Join(builder.uploadScriptsDir, "save-artifacts")))
-			buffer.WriteString(fmt.Sprintf("COPY %s %s\n", uploadScript, artifactsScript))
-			buffer.WriteString(fmt.Sprintf("RUN chown %s:0 %s\n", sanitize(imageUser), artifactsScript))
+			buffer.WriteString(fmt.Sprintf("COPY --chown=%s:0 %s %s\n", sanitize(imageUser), uploadScript, artifactsScript))
 		} else {
 			buffer.WriteString(fmt.Sprintf("# Save-artifacts script sourced from builder image based on user input or image metadata.\n"))
 			artifactsScript = sanitize(filepath.ToSlash(filepath.Join(imageScriptsDir, "save-artifacts")))
@@ -188,14 +185,9 @@ func (builder *Dockerfile) CreateDockerfile(config *api.Config) error {
 	env := createBuildEnvironment(config.WorkingDir, config.Environment)
 	buffer.WriteString(fmt.Sprintf("%s", env))
 
-	// run as root to COPY and chown source content
-	buffer.WriteString("USER root\n")
-	chownList := make([]string, 0)
-
 	if config.Incremental {
 		// COPY artifacts.tar from the `cached` stage
-		buffer.WriteString(fmt.Sprintf("COPY --from=cached %[1]s %[1]s\n", artifactsTar))
-		chownList = append(chownList, artifactsTar)
+		buffer.WriteString(fmt.Sprintf("COPY --chown=%s:0 --from=cached %[2]s %[2]s\n", sanitize(imageUser), artifactsTar))
 	}
 
 	if len(providedScripts) > 0 {
@@ -204,15 +196,13 @@ func (builder *Dockerfile) CreateDockerfile(config *api.Config) error {
 		log.V(2).Infof("Override scripts are included in directory %q", builder.uploadScriptsDir)
 		scriptsDest := sanitize(filepath.ToSlash(scriptsDestDir))
 		buffer.WriteString("# Copying in override assemble/run scripts\n")
-		buffer.WriteString(fmt.Sprintf("COPY %s %s\n", sanitize(filepath.ToSlash(builder.uploadScriptsDir)), scriptsDest))
-		chownList = append(chownList, scriptsDest)
+		buffer.WriteString(fmt.Sprintf("COPY --chown=%s:0 %s %s\n", sanitize(imageUser), sanitize(filepath.ToSlash(builder.uploadScriptsDir)), scriptsDest))
 	}
 
 	// copy in the user's source code.
 	buffer.WriteString("# Copying in source code\n")
 	sourceDest := sanitize(filepath.ToSlash(sourceDestDir))
-	buffer.WriteString(fmt.Sprintf("COPY %s %s\n", sanitize(filepath.ToSlash(builder.uploadSrcDir)), sourceDest))
-	chownList = append(chownList, sourceDest)
+	buffer.WriteString(fmt.Sprintf("COPY --chown=%s:0 %s %s\n", sanitize(imageUser), sanitize(filepath.ToSlash(builder.uploadSrcDir)), sourceDest))
 
 	// add injections
 	log.V(4).Infof("Processing injected inputs: %#v", config.Injections)
@@ -225,18 +215,7 @@ func (builder *Dockerfile) CreateDockerfile(config *api.Config) error {
 	for _, injection := range config.Injections {
 		src := sanitize(filepath.ToSlash(filepath.Join(constants.Injections, injection.Source)))
 		dest := sanitize(filepath.ToSlash(injection.Destination))
-		buffer.WriteString(fmt.Sprintf("COPY %s %s\n", src, dest))
-		chownList = append(chownList, dest)
-	}
-
-	// chown directories COPYed to image
-	if len(chownList) > 0 {
-		buffer.WriteString("# Change file ownership to the assemble user. Builder image must support chown command.\n")
-		buffer.WriteString(fmt.Sprintf("RUN chown -R %s:0", sanitize(imageUser)))
-		for _, dir := range chownList {
-			buffer.WriteString(fmt.Sprintf(" %s", dir))
-		}
-		buffer.WriteString("\n")
+		buffer.WriteString(fmt.Sprintf("COPY --chown=%s:0 %s %s\n", sanitize(imageUser), src, dest))
 	}
 
 	// run remaining commands as the image user
