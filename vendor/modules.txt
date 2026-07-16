@@ -45,7 +45,7 @@ github.com/containers/libtrust
 # github.com/containers/ocicrypt v1.3.0
 ## explicit; go 1.24.0
 github.com/containers/ocicrypt/spec
-# github.com/cyphar/filepath-securejoin v0.6.1
+# github.com/cyphar/filepath-securejoin v0.7.0
 ## explicit; go 1.18
 github.com/cyphar/filepath-securejoin
 github.com/cyphar/filepath-securejoin/internal/consts
