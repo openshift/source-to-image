@@ -20,8 +20,8 @@ github.com/containerd/typeurl/v2 v2.3.0 h1:HZHPhRWo5XMy3QGQoPrUzbW/2ckwjfweHmOwl
 github.com/containerd/typeurl/v2 v2.3.0/go.mod h1:Qk+PAdUYArVj41TnGi6rJ+48RF0PkcTc4i/taoBcK0w=
 github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01 h1:Qzk5C6cYglewc+UyGf6lc8Mj2UaPTHy/iF2De0/77CA=
 github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01/go.mod h1:9rfv8iPl1ZP7aqh9YA68wnZv2NUDbXdcdPHVz0pFbPY=
-github.com/containers/ocicrypt v1.3.1 h1:s7KzBxIjvqL1YANzONHoUqCVuhurSI6xMC/lWu+Az60=
-github.com/containers/ocicrypt v1.3.1/go.mod h1:x9k7a/qzgnVeKJbwDKFLeL2bQgsR6uQxz/D+NgF38A0=
+github.com/containers/ocicrypt v1.3.2 h1:MuqHSfiPpGzoAQdgDSX85FgixSgIm9mSDXTLTgugY5E=
+github.com/containers/ocicrypt v1.3.2/go.mod h1:ntBZabYG0rlvstB/1rK/ba2laaU5EHE0pD5ioHoPTq4=
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
 github.com/creack/pty v1.1.24 h1:bJrF4RRfyJnbTJqzRLHzcGaZK1NeM5kTC9jGgovnR1s=
 github.com/creack/pty v1.1.24/go.mod h1:08sCNb52WyoAwi2QDyzUCTgcvVFhUzewun7wtTfvcwE=
