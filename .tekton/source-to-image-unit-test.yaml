@@ -1,4 +1,4 @@
-apiVersion: tekton.dev/v1beta1
+apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: source-to-image-unit-test
@@ -19,7 +19,7 @@ spec:
     - description: The Go base image used to run the unit tests
       name: BASE_IMAGE
       type: string
-      default: registry.access.redhat.com/ubi10/go-toolset@sha256:2a25b4be2dcc671b854a31c5b0269b9de0574a7f24f64dc1d6bf1c472ed18049
+      default: registry.redhat.io/ubi10/go-toolset@sha256:c468f485f6bdc8ba6b106d63d4019851eaf1912182f7e67ff1a185234d58ebf7
   stepTemplate:
     volumeMounts:
       - mountPath: /var/workdir
@@ -38,7 +38,7 @@ spec:
         - $(params.SOURCE_ARTIFACT)=/var/workdir/source
         - $(params.CACHI2_ARTIFACT)=/cachi2
     - name: run-tests
-      image:  $(params.BASE_IMAGE)
+      image: $(params.BASE_IMAGE)
       workingDir: /var/workdir/source
       resources:
         requests:
