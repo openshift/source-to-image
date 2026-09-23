@@ -15,7 +15,7 @@ github.com/Azure/go-ansiterm/winterm
 ## explicit; go 1.18
 github.com/BurntSushi/toml
 github.com/BurntSushi/toml/internal
-# github.com/Microsoft/go-winio v0.6.3-0.20251027160822-ad3df93bed29
+# github.com/Microsoft/go-winio v0.6.3-0.20260917205003-526e22f39a0a
 ## explicit; go 1.23.0
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/internal/fs
