@@ -11,7 +11,7 @@ COPY . .
 RUN CGO_ENABLED=1 GO111MODULE=on go build -a -mod=vendor -ldflags="-s -w" -tags="strictfipsruntime exclude_graphdriver_btrfs" -o /tmp/s2i ./cmd/s2i
 
 
-FROM registry.redhat.io/ubi8-minimal@sha256:aecfd01dd8b41550287f30461a3bf82edef31cbd6e785fea080d34a74d47f4d0
+FROM registry.redhat.io/ubi8-minimal@sha256:ecc9eba659d04c56b12da3efb83483349d57aa08734ad3e64e9bd6128806c7cc
 
 COPY --from=builder /tmp/s2i /usr/local/bin/s2i
 
