@@ -3,7 +3,7 @@
 #
 # The standard name for this image is openshift/sti-release
 #
-FROM registry.access.redhat.com/ubi10/go-toolset@sha256:de00e16138966f9fed6bca2d22d28f6cc0d50b26ef6977398e2d8980d80be75f AS builder
+FROM registry.access.redhat.com/ubi10/go-toolset@sha256:d517b3c1043131d6d3cfa341beac96300302d9149504e452289d0bd904f5c3ab AS builder
 
 USER root
 ENV S2I_VERSION_FILE=/opt/app-root/src/source-to-image/sti-version-defs
