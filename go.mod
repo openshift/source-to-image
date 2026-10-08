@@ -1,6 +1,6 @@
 module github.com/openshift/source-to-image
 
-go 1.26.7
+go 1.26.8
 
 require (
 	github.com/containerd/errdefs v1.0.0
@@ -8,7 +8,7 @@ require (
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.8.1
 	github.com/go-imports-organizer/goio v1.5.0
-	github.com/moby/buildkit v0.33.0
+	github.com/moby/buildkit v0.33.1
 	github.com/moby/docker-image-spec v1.3.1
 	github.com/moby/moby/api v1.56.1
 	github.com/moby/moby/client v0.6.1
