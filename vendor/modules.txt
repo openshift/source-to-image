@@ -77,7 +77,7 @@ github.com/docker/docker/pkg/stdcopy
 ## explicit; go 1.21
 github.com/docker/docker-credential-helpers/client
 github.com/docker/docker-credential-helpers/credentials
-# github.com/docker/go-connections v0.8.1
+# github.com/docker/go-connections v0.8.2
 ## explicit; go 1.23
 github.com/docker/go-connections/sockets
 github.com/docker/go-connections/tlsconfig
