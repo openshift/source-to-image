@@ -49,7 +49,7 @@ require (
 	github.com/klauspost/pgzip v1.2.7 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mistifyio/go-zfs/v4 v4.0.0 // indirect
-	github.com/moby/sys/capability v0.4.0 // indirect
+	github.com/moby/sys/capability v0.5.0 // indirect
 	github.com/moby/sys/mountinfo v0.7.2 // indirect
 	github.com/moby/sys/user v0.4.1 // indirect
 	github.com/moby/term v0.5.2 // indirect
