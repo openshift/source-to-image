@@ -14,7 +14,7 @@ require (
 	github.com/moby/moby/client v0.6.1
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/spf13/cobra v1.10.2
-	github.com/spf13/pflag v1.0.10
+	github.com/spf13/pflag v1.1.0
 	go.podman.io/image/v5 v5.39.2-0.20260306124909-d48bc74146d6
 	golang.org/x/net v0.59.0
 	k8s.io/klog/v2 v2.140.0
